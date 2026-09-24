@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.venv
+.eval
+PLAN.md
+notes.md
+ISSUES.md
+PLANNING_ISSUES.md

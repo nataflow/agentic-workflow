@@ -1,0 +1,584 @@
+#!/usr/bin/env python3
+"""Brief Matrix & Scaffold Writer.
+
+Dua mode yang menegakkan urutan kerja Fase 3: **alokasi lebih dulu, penulisan
+menyusul**.
+
+* `--write-matrix --spec <json>` — kunci matriks alokasi batch sebelum satu baris
+  brief ditulis. Skrip memvonis kelengkapannya terhadap `## Success Criteria`
+  `TASK.md` dan `## Acceptance criteria` `PRD.md`: tiap `SC-{n}` dan `AC-{n}`
+  wajib punya brief pengklaim, tidak boleh ada rujukan hantu, penomoran `NN`
+  wajib urut tanpa lompatan, `Consumes` wajib menunjuk `NN` lebih kecil, dan
+  `risk` tiap brief wajib di bawah plafon akar. Matriks yang lolos ditulis ke
+  laci kerja taskdir dalam dua bentuk: tabel markdown untuk dibaca, dan JSON
+  untuk dibaca skrip.
+
+* `--write-matrix --append --spec <json>` — tambahkan unit kerja yang baru ketahuan
+  **sesudah** sebagian brief dieksekusi. Baris matriks lama dipertahankan apa
+  adanya, nomor barunya melanjutkan `NN` tertinggi, dan alokasi brief berstatus
+  `DONE`/`BLOCKED` dilarang didefinisikan ulang. Tanpa `--append`, penulisan
+  matriks penuh di atas taskdir yang sudah punya brief tereksekusi ditolak —
+  itu memalsukan alokasi `Covers:`/`Fulfills:` pekerjaan yang kodenya sudah
+  mendarat di `src/`.
+
+* `--nn <NN>` — tuliskan kerangka satu brief dari baris matriksnya. Sepuluh
+  seksi baku, frontmatter terisi, dan baris `Covers:`/`Fulfills:` **disalin dari
+  matriks**, bukan diketik ulang. Tiap seksi membawa satu penanda
+  `<!-- scaffold: ... -->` yang wajib dihapus penulis saat mengisinya;
+  `validate_briefs.py` menolak brief yang masih menyisakan penanda itu.
+
+Alasan urutannya: alokasi `AC`/`SC` adalah keputusan slicing. Menentukannya
+sesudah delapan brief ditulis berarti coverage yang bolong menuntut pembongkaran
+slicing — biaya yang tidak pernah perlu dibayar bila matriksnya dikunci lebih
+dulu.
+
+Zero external dependencies (Python Standard Library only).
+"""
+
+import argparse
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+VALID_RISKS = ["BREAKING", "MAJOR", "MINOR"]
+RISK_ORDER = {"MINOR": 1, "MAJOR": 2, "BREAKING": 3}
+
+# Laci kerja taskdir. Direktori ini sudah dikecualikan tiap gerbang git di
+# rantai — tidak di-stage, tidak di-commit, tidak dihitung working tree kotor —
+# sehingga matriks yang mendarat di sini tidak pernah menghentikan `architect`
+# Fase 0 maupun gerbang penutup. Ia berbagi laci dengan laporan `code-explorer`.
+LACI = ".explore"
+MATRIX_MD = "brief-matrix.md"
+MATRIX_JSON = "brief-matrix.json"
+
+SECTIONS = [
+    ("Objective", "2-3 kalimat: apa yang dikerjakan dan alasannya, dengan bukti file:line "
+                  "kondisi saat ini. Asumsi hulu yang membentuk langkah brief ini ditulis di "
+                  "sini sebagai kalimat berawalan \"Berlaku asumsi:\""),
+    ("Interfaces", "salin baris Consumes/Produces dari matriks; signature lengkap, bukan nama saja"),
+    ("File scope", "tabel Folder lalu tabel File. Tiap baris `modify` wajib membawa Anchor "
+                   "yang disalin dari kolom `Simbol anchor` laporan .explore unit ini, dan "
+                   "anchor itu wajib disebut minimal satu langkah `## Steps`. Baris berkas "
+                   "test pemikul AC bertanda `test otomatis` wajib menyebut `AC-{n}`-nya"),
+    ("Out of scope", "modul/file/alur yang sengaja TIDAK disentuh beserta alasan teknisnya"),
+    ("Steps", "maksimal 5 langkah bernomor, snippet lengkap dan valid, tiap langkah bertitik "
+              "sisip konkret. Nol perintah build/test"),
+    ("Migration", "nama berkas migrasi beserta DDL-nya dan urutan deploy bernomor, atau "
+                  "\"tidak perlu\" beserta alasannya"),
+    ("Mirrored paths", "consumer queue, scheduler, websocket, changelog dengan bukti file:line, "
+                       "atau \"tidak ada\""),
+    ("Risk & rollback", "dampak regresi, cara deteksi, strategi rollback. Langkah verifikasi tiap "
+                        "AC bertanda `QA manual:` yang diklaim brief ini mendarat di sini, "
+                        "bernomor AC-nya"),
+    ("Work status", "tabel item kerja berstatus PLANNED"),
+    ("Analysis trace", "BUKAN pekerjaan eksekutor: temuan gugur, pola modul tetangga, atau "
+                       "asumsi. Tulis \"Tidak ada.\" bila kosong"),
+]
+
+
+def _find_repo_root() -> Path:
+    try:
+        out = subprocess.check_output(
+            ["git", "rev-parse", "--show-toplevel"],
+            stderr=subprocess.DEVNULL, universal_newlines=True,
+        ).strip()
+        if out and os.path.isdir(out):
+            return Path(out)
+    except Exception:
+        pass
+    return Path.cwd()
+
+
+def _read(path: Path) -> Optional[str]:
+    try:
+        return path.read_text(encoding="utf-8")
+    except Exception:
+        return None
+
+
+def _doc_section(text: Optional[str], title: str) -> Optional[str]:
+    if not text:
+        return None
+    want = re.sub(r"\s+", " ", title).strip().lower()
+    capture: List[str] = []
+    active = False
+    for line in text.splitlines():
+        if line.startswith("## "):
+            if active:
+                break
+            active = re.sub(r"\s+", " ", line[3:]).strip().lower() == want
+            continue
+        if active:
+            capture.append(line)
+    return "\n".join(capture) if capture else None
+
+
+class MatrixTool:
+    def __init__(self, taskdir: str, target_root: Optional[Path] = None):
+        self.root = (target_root or _find_repo_root()).resolve()
+        td = Path(taskdir)
+        self.taskdir = td if td.is_absolute() else self.root / td
+        self.task_text = _read(self.taskdir / "TASK.md")
+        self.prd_text = _read(self.taskdir / "PRD.md")
+
+    # -- sumbu hulu --------------------------------------------------------
+
+    def sc_ids(self) -> Set[str]:
+        body = _doc_section(self.task_text, "Success Criteria")
+        return set(re.findall(r"\bSC-(\d+)\b", body)) if body else set()
+
+    def ac_ids(self) -> Set[str]:
+        body = _doc_section(self.prd_text, "Acceptance criteria")
+        return set(re.findall(r"\bAC-(\d+)\b", body)) if body else set()
+
+    def next_nn(self) -> int:
+        """Nomor brief pertama batch ini: lanjutan `NN` tertinggi taskdir, atau 1.
+
+        Batch yang ditambahkan ke taskdir eksisting (`preserve_history`) melanjutkan
+        penomoran; nomor yang sudah terpakai tidak pernah dipakai ulang.
+        """
+        # Brief yang sudah dikerangkakan batch ini sendiri tidak menggeser titik
+        # mulainya: tanpa pengecualian ini, menjalankan ulang `--write-matrix`
+        # sesudah sebagian kerangka terbit — yang persis terjadi saat `plan`
+        # dipanggil ulang — menolak matriksnya sendiri.
+        own: Set[str] = set()
+        existing = self.load_matrix()
+        if existing:
+            own = {str(b.get("nn")) for b in existing.get("briefs", [])}
+
+        used = [
+            int(m.group(1))
+            for p in self.taskdir.glob("brief-*.md")
+            for m in [re.match(r"^brief-(\d{2})-", p.name)]
+            if m and m.group(1) not in own
+        ]
+        return max(used) + 1 if used else 1
+
+    def locked_briefs(self) -> Dict[str, str]:
+        """Brief taskdir yang sudah dieksekusi, dipetakan `NN` -> status.
+
+        `DONE` dan `BLOCKED` ditulis `code-implementor` saat brief dieksekusi.
+        Alokasinya karena itu **fakta sejarah**, bukan rencana yang boleh ditulis
+        ulang: menimpanya berarti memalsukan riwayat brief yang kodenya sudah
+        mendarat di `src/`, dan membuat `Covers:`/`Fulfills:` matriks berbeda dari
+        yang benar-benar dikerjakan.
+        """
+        locked: Dict[str, str] = {}
+        for p in sorted(self.taskdir.glob("brief-*.md")):
+            m = re.match(r"^brief-(\d{2})-", p.name)
+            if not m:
+                continue
+            text = _read(p) or ""
+            s = re.search(r"^status:\s*([A-Za-z_-]+)\s*$", text, re.MULTILINE)
+            status = (s.group(1).strip().upper() if s else "")
+            if status in ("DONE", "BLOCKED"):
+                locked[m.group(1)] = status
+        return locked
+
+    def merge_spec(self, spec: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str], List[str]]:
+        """Gabungkan baris matriks eksisting dengan baris baru `--append`.
+
+        Mengembalikan (spec gabungan, nn yang dipertahankan, pelanggaran).
+        Baris brief yang sudah `DONE`/`BLOCKED` dipertahankan apa adanya dan
+        dilarang didefinisikan ulang oleh spec baru.
+        """
+        existing = self.load_matrix()
+        problems: List[str] = []
+        if not existing or not existing.get("briefs"):
+            return spec, [], [
+                "`--append` menuntut matriks eksisting di "
+                f"{self.taskdir / LACI / MATRIX_JSON}; tidak ada yang dapat ditambahi. "
+                "Kunci batch pertamanya dengan `--write-matrix` tanpa `--append`."
+            ]
+
+        locked = self.locked_briefs()
+        kept: List[Dict[str, Any]] = []
+        kept_nn: List[str] = []
+        for b in existing.get("briefs", []):
+            nn = str(b.get("nn") or "")
+            kept.append(b)
+            kept_nn.append(nn)
+
+        incoming = spec.get("briefs") or []
+        for b in incoming:
+            nn = str(b.get("nn") or "")
+            if nn in locked:
+                problems.append(
+                    f"brief {nn}: berstatus `{locked[nn]}` di disk — alokasinya tidak dapat "
+                    f"didefinisikan ulang. Beri nomor baru pada unit kerja tambahan"
+                )
+            elif nn in kept_nn:
+                problems.append(
+                    f"brief {nn}: sudah ada di matriks. `--append` menambah baris baru, "
+                    f"bukan menimpa baris lama"
+                )
+
+        merged = dict(existing)
+        merged["briefs"] = kept + [b for b in incoming if str(b.get("nn") or "") not in kept_nn]
+        return merged, kept_nn, problems
+
+    def risk_ceiling(self, override: Optional[str]) -> Optional[str]:
+        if override and override.strip().upper() not in ("", "-", "—"):
+            return override.strip().upper()
+        if not self.task_text:
+            return None
+        m = re.search(r"^risk:\s*([A-Za-z_-]+)\s*$", self.task_text, re.MULTILINE)
+        if not m:
+            return None
+        val = m.group(1).strip().upper()
+        return "MINOR" if val in ("-", "—") else val
+
+    # -- penulisan matriks -------------------------------------------------
+
+    def validate_spec(self, spec: Dict[str, Any], ceiling: Optional[str]) -> List[str]:
+        problems: List[str] = []
+        briefs = spec.get("briefs") or []
+        if not briefs:
+            return ["spec tidak memuat satu pun entri `briefs`"]
+
+        seen_nn: List[int] = []
+        for i, b in enumerate(briefs, start=1):
+            label = b.get("nn") or f"entri ke-{i}"
+
+            for field in ("nn", "unit", "title", "risk"):
+                if not str(b.get(field) or "").strip():
+                    problems.append(f"brief {label}: field `{field}` kosong")
+
+            nn = str(b.get("nn") or "")
+            if not re.fullmatch(r"\d{2}", nn):
+                problems.append(f"brief {label}: `nn` wajib dua digit (mis. `01`)")
+            else:
+                seen_nn.append(int(nn))
+
+            unit = str(b.get("unit") or "")
+            if unit and not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", unit):
+                problems.append(f"brief {label}: `unit` \"{unit}\" bukan kebab-case")
+
+            risk = str(b.get("risk") or "").upper()
+            if risk and risk not in VALID_RISKS:
+                problems.append(f"brief {label}: `risk` \"{risk}\" di luar enum")
+            elif risk and ceiling and RISK_ORDER.get(risk, 0) > RISK_ORDER.get(ceiling, 3):
+                problems.append(
+                    f"brief {label}: `risk: {risk}` melampaui plafon akar `{ceiling}` — "
+                    f"hentikan batch dan kembalikan klasifikasinya ke pemanggil"
+                )
+
+        # Penomoran melanjutkan brief yang sudah ada di taskdir (`preserve_history`),
+        # bukan selalu mulai dari 01. Yang ditegakkan: kontinuitas tanpa lompatan
+        # dan tanpa pemakaian ulang nomor — nomor brief tidak pernah dipakai dua kali
+        # dalam satu taskdir.
+        start = self.next_nn()
+        if seen_nn:
+            expected = list(range(start, start + len(seen_nn)))
+            if sorted(seen_nn) != expected:
+                problems.append(
+                    f"penomoran `nn` wajib urut {start:02d}..{start + len(seen_nn) - 1:02d} "
+                    f"tanpa lompatan (menemukan: "
+                    f"{', '.join(f'{n:02d}' for n in sorted(seen_nn))})"
+                )
+
+        # DAG: `consumes` hanya boleh menunjuk brief bernomor lebih kecil.
+        for b in briefs:
+            nn = int(b["nn"]) if re.fullmatch(r"\d{2}", str(b.get("nn") or "")) else None
+            for c in b.get("consumes") or []:
+                for ref in re.findall(r"brief-(\d{2})", str(c)):
+                    if nn is not None and int(ref) >= nn:
+                        problems.append(
+                            f"brief {b.get('nn')}: `consumes` menunjuk brief-{ref} yang "
+                            f"nomornya tidak lebih kecil — DAG wajib satu arah"
+                        )
+
+        problems += self._validate_axis(briefs, "covers", "AC", self.ac_ids(), self.prd_text)
+        # Sumbu `fulfills` hanya berlaku pada rantai tanpa PRD. Pada rantai
+        # ber-PRD keterlacakan `SC-{n}` diangkut kolom `Akar` PRD, dan baris
+        # `Fulfills:` tidak ditulis ke brief sama sekali.
+        if not self.prd_text:
+            problems += self._validate_axis(briefs, "fulfills", "SC", self.sc_ids(), self.task_text)
+        return problems
+
+    @staticmethod
+    def _validate_axis(briefs: List[Dict[str, Any]], key: str, prefix: str,
+                       upstream: Set[str], upstream_text: Optional[str]) -> List[str]:
+        problems: List[str] = []
+        claimed: Set[str] = set()
+
+        for b in briefs:
+            tokens = [str(t) for t in (b.get(key) or [])]
+            if not upstream_text:
+                # Dokumen hulu sah tidak ada: barisnya tetap wajib berupa penegasan.
+                if tokens:
+                    problems.append(
+                        f"brief {b.get('nn')}: `{key}` memuat {prefix} padahal dokumen "
+                        f"hulunya tidak ada di taskdir"
+                    )
+                continue
+            if not tokens:
+                problems.append(f"brief {b.get('nn')}: `{key}` kosong")
+                continue
+
+            # Penegasan bernalar `— (<alasan>)`: brief yang sah tidak memikul
+            # sumbu ini. Bentuk normalnya brief tambahan untuk berkas yatim —
+            # ia melandaskan pekerjaan yang baru ketahuan sesudah eksekusi, dan
+            # tidak memperkenalkan AC/SC baru. Cakupan tetap ditegakkan atas
+            # gabungan matriks di bawah, jadi penegasan ini tidak membuka celah:
+            # AC/SC yang tidak diklaim siapa pun tetap gagal.
+            if len(tokens) == 1 and re.fullmatch(r"[—-]\s*\(\s*\S.*\)", tokens[0].strip()):
+                continue
+
+            for t in tokens:
+                m = re.fullmatch(rf"{prefix}-(\d+)", t.strip())
+                if not m:
+                    problems.append(
+                        f"brief {b.get('nn')}: token `{t}` bukan `{prefix}-{{n}}` yang sah"
+                    )
+                    continue
+                num = m.group(1)
+                if num not in upstream:
+                    problems.append(
+                        f"brief {b.get('nn')}: `{prefix}-{num}` tidak ada di dokumen hulu "
+                        f"(rujukan hantu)"
+                    )
+                claimed.add(num)
+
+        if upstream_text:
+            for num in sorted(upstream, key=int):
+                if num not in claimed:
+                    problems.append(
+                        f"`{prefix}-{num}` tidak dialokasikan ke satu pun brief — petakan ke "
+                        f"brief yang mengerjakannya atau tambah brief"
+                    )
+        return problems
+
+    def render_matrix(self, spec: Dict[str, Any]) -> str:
+        rows = []
+        for b in spec.get("briefs", []):
+            rows.append(
+                "| `brief-{nn}` | `{unit}` | {covers} | {fulfills} | {risk} | {explore} | "
+                "{consumes} | {produces} |".format(
+                    nn=b.get("nn", ""),
+                    unit=b.get("unit", ""),
+                    covers=", ".join(b.get("covers") or []) or "—",
+                    fulfills=", ".join(b.get("fulfills") or []) or "—",
+                    risk=str(b.get("risk", "")).upper(),
+                    explore=f"`.explore/{b['explore']}.md`" if b.get("explore") else "—",
+                    consumes="; ".join(f"`{c}`" for c in (b.get("consumes") or [])) or "—",
+                    produces="; ".join(f"`{p}`" for p in (b.get("produces") or [])) or "—",
+                )
+            )
+        return "\n".join([
+            "# Matriks Alokasi Batch Brief",
+            "",
+            "Dikunci di Fase 3 langkah 0 **sebelum** satu baris brief ditulis. Baris",
+            "`Covers:`/`Fulfills:` tiap brief disalin dari tabel ini, bukan sebaliknya —",
+            "dengan begitu cakupan dua sumbu benar sejak konstruksi, dan Check G/H turun",
+            "jadi konfirmasi, bukan penemuan.",
+            "",
+            "Berkas ini laci kerja taskdir: tidak di-stage, tidak di-commit, dan tidak",
+            "dihitung sebagai working tree kotor oleh gerbang git mana pun.",
+            "",
+            "| Brief | Unit | Covers | Fulfills | risk | Laporan `.explore` | Consumes | Produces |",
+            "|---|---|---|---|---|---|---|---|",
+            *rows,
+            "",
+        ])
+
+    def write_matrix(self, spec: Dict[str, Any]) -> Path:
+        laci = self.taskdir / LACI
+        laci.mkdir(parents=True, exist_ok=True)
+        (laci / MATRIX_MD).write_text(self.render_matrix(spec), encoding="utf-8")
+        (laci / MATRIX_JSON).write_text(
+            json.dumps(spec, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        return laci / MATRIX_MD
+
+    def load_matrix(self) -> Optional[Dict[str, Any]]:
+        text = _read(self.taskdir / LACI / MATRIX_JSON)
+        if not text:
+            return None
+        try:
+            return json.loads(text)
+        except Exception:
+            return None
+
+    # -- scaffold ----------------------------------------------------------
+
+    def scaffold(self, nn: str, force: bool) -> str:
+        matrix = self.load_matrix()
+        if not matrix:
+            raise SystemExit(
+                f"Matriks alokasi belum ada di {self.taskdir / LACI / MATRIX_JSON}. "
+                f"Jalankan `--write-matrix` lebih dulu: kerangka brief diturunkan darinya, "
+                f"bukan diketik ulang."
+            )
+
+        row = next((b for b in matrix.get("briefs", []) if str(b.get("nn")) == nn), None)
+        if not row:
+            raise SystemExit(f"Matriks tidak memuat baris untuk brief-{nn}.")
+
+        locked = self.locked_briefs()
+        if nn in locked:
+            raise SystemExit(
+                f"brief-{nn} berstatus `{locked[nn]}` — kerangkanya tidak ditulis ulang, "
+                f"`--force` sekalipun. Brief yang sudah dieksekusi adalah riwayat; "
+                f"pekerjaan susulan atasnya ditampung brief bernomor baru lewat "
+                f"`--write-matrix --append`."
+            )
+
+        unit = row["unit"]
+        path = self.taskdir / f"brief-{nn}-{unit}.md"
+        if path.exists() and not force:
+            raise SystemExit(
+                f"{path} sudah ada. Gunakan `--force` hanya bila kerangkanya memang "
+                f"ditulis ulang dari nol."
+            )
+
+        covers = ", ".join(row.get("covers") or []) or row.get("covers_note") or "— (tidak memikul AC)"
+        fulfills = ", ".join(row.get("fulfills") or []) or row.get("fulfills_note") or "— (akar absen)"
+        commit_type = row.get("commit_type") or "feat"
+        domain = row.get("domain") or unit.split("-")[0]
+
+        lines = [
+            "---",
+            f"title: {row['title']}",
+            f"source: {row.get('source') or matrix.get('source') or 'TASK.md'}",
+            f"risk: {str(row['risk']).upper()}",
+            "status: READY",
+            f'commit_message: "{commit_type}({domain}): implement {unit}"',
+            "---",
+            "",
+            f"# Brief: {row['title']} — {matrix.get('date', '<yyyy-mm-dd>')}",
+            "",
+        ]
+
+        for title, hint in SECTIONS:
+            lines.append(f"## {title}")
+            lines.append(f"<!-- scaffold: {hint} -->")
+            if title == "Objective":
+                lines.append("")
+                lines.append(f"Covers: {covers}")
+                # Rantai ber-PRD memakai satu sumbu: `SC-{n}` diangkut kolom
+                # `Akar` PRD, bukan baris ini.
+                if not self.prd_text:
+                    lines.append(f"Fulfills: {fulfills}")
+            elif title == "Interfaces":
+                lines.append("")
+                for c in row.get("consumes") or []:
+                    lines.append(f"- Consumes: {c}")
+                for p in row.get("produces") or []:
+                    lines.append(f"- Produces: {p}")
+            elif title == "Work status":
+                lines.extend([
+                    "",
+                    "| Item | Status | Catatan |",
+                    "|---|---|---|",
+                    "| P1-1 | PLANNED | — |",
+                ])
+            lines.append("")
+
+        path.write_text("\n".join(lines), encoding="utf-8")
+        explore = row.get("explore")
+        note = (
+            f"Panen `{LACI}/{explore}.md` lebih dulu sebelum mengisi `## File scope` "
+            f"dan `## Steps`." if explore else
+            f"Unit ini tidak punya laporan `{LACI}/`; anchor diturunkan dari sapuan mandiri."
+        )
+        return f"{path}\n{note}"
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Brief Matrix & Scaffold Writer — alokasi dikunci sebelum penulisan"
+    )
+    parser.add_argument("--taskdir", required=True, help="Path taskdir aktif")
+    parser.add_argument("--write-matrix", action="store_true",
+                        help="Kunci matriks alokasi batch dari --spec")
+    parser.add_argument("--spec", help="Path JSON spesifikasi batch; `-` berarti stdin")
+    parser.add_argument("--nn", help="Nomor brief yang kerangkanya ditulis dari matriks")
+    parser.add_argument("--risk", help="Plafon risk; fallback frontmatter risk: TASK.md")
+    parser.add_argument("--append", action="store_true",
+                        help="Tambahkan baris ke matriks eksisting; alokasi brief yang sudah "
+                             "dieksekusi dipertahankan apa adanya")
+    parser.add_argument("--force", action="store_true", help="Timpa kerangka yang sudah ada")
+    parser.add_argument("--root", help="Root repositori target")
+    args = parser.parse_args()
+
+    tool = MatrixTool(args.taskdir, Path(args.root) if args.root else None)
+    if not tool.taskdir.is_dir():
+        print(f"SCAFFOLD: [FAIL] Taskdir tidak ditemukan: {tool.taskdir}")
+        sys.exit(1)
+
+    if args.write_matrix:
+        if not args.spec:
+            print("SCAFFOLD: [FAIL] `--write-matrix` menuntut `--spec <json|->`")
+            sys.exit(1)
+        raw = sys.stdin.read() if args.spec == "-" else (_read(Path(args.spec)) or "")
+        try:
+            spec = json.loads(raw)
+        except Exception as exc:
+            print(f"SCAFFOLD: [FAIL] spec bukan JSON sah: {exc}")
+            sys.exit(1)
+
+        locked = tool.locked_briefs()
+        kept_nn: List[str] = []
+        merge_problems: List[str] = []
+        n_new = len(spec.get("briefs") or [])
+
+        if args.append:
+            spec, kept_nn, merge_problems = tool.merge_spec(spec)
+        elif locked:
+            # Menulis ulang matriks penuh di atas brief yang sudah dieksekusi
+            # membuang alokasi `Covers:`/`Fulfills:` yang benar-benar dikerjakan,
+            # tanpa satu pun peringatan. Berkas terdampak yang baru ketahuan
+            # sesudah eksekusi ditampung brief tambahan, bukan penulisan ulang.
+            print(f"BRIEF MATRIX: [FAIL] {len(locked)} brief sudah dieksekusi di taskdir ini")
+            for nn, status in sorted(locked.items()):
+                print(f"    - brief-{nn}: `{status}`")
+            print("\nMatriks penuh tidak boleh ditulis ulang di atas brief yang sudah "
+                  "dieksekusi — alokasi AC/SC-nya adalah fakta sejarah, bukan rencana. "
+                  "Tambahkan unit kerja baru dengan `--write-matrix --append --spec <json>`; "
+                  "brief lama dipertahankan apa adanya dan nomor barunya melanjutkan `NN` "
+                  "tertinggi.")
+            sys.exit(1)
+
+        ceiling = tool.risk_ceiling(args.risk)
+        problems = merge_problems + tool.validate_spec(spec, ceiling)
+        if problems:
+            print(f"BRIEF MATRIX: [FAIL] {len(problems)} pelanggaran alokasi")
+            for p in problems:
+                print(f"    - {p}")
+            print("\nPerbaiki alokasinya lebih dulu. Matriks yang bolong di sini menjadi "
+                  "coverage yang bolong sesudah seluruh brief ditulis — dan pada titik itu "
+                  "perbaikannya menuntut pembongkaran slicing.")
+            sys.exit(1)
+
+        out = tool.write_matrix(spec)
+        n = len(spec.get("briefs", []))
+        if args.append:
+            print(f"BRIEF MATRIX: [PASS] {n} brief di matriks ({n_new} baru); "
+                  f"plafon risk {ceiling or '—'}")
+        else:
+            print(f"BRIEF MATRIX: [PASS] {n} brief teralokasi; plafon risk {ceiling or '—'}")
+        if args.append:
+            print(f"    dipertahankan : {len(kept_nn)} baris lama "
+                  f"({', '.join(f'brief-{n}' for n in kept_nn) or '—'})")
+            print(f"    baris baru    : {n_new}")
+            if locked:
+                print(f"    terkunci      : "
+                      f"{', '.join(f'brief-{k}={v}' for k, v in sorted(locked.items()))}")
+        print(f"    matriks : {out}")
+        print(f"    sumbu   : AC {len(tool.ac_ids())} · SC {len(tool.sc_ids())} tertutup penuh")
+        sys.exit(0)
+
+    if args.nn:
+        print(f"SCAFFOLD: [PASS]\n    {tool.scaffold(args.nn, args.force)}")
+        sys.exit(0)
+
+    parser.error("pilih salah satu mode: `--write-matrix --spec <json>` atau `--nn <NN>`")
+
+
+if __name__ == "__main__":
+    main()

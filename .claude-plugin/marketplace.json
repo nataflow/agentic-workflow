@@ -1,0 +1,51 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "fakhrulnugroho",
+  "description": "Plugin Claude Code untuk stack yang dipakai Fakhrul Nugroho",
+  "owner": {
+    "name": "Fakhrul Nugroho",
+    "email": "fakhrulnugroho15@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "analyst",
+      "description": "Skill dan subagent jembatan antara pengguna/stakeholder dan engineer: klasifikasi permintaan, elisitasi terarah dengan peminta non-engineer, dan penulisan TICKET.md non-teknis (user story, acceptance criteria, aturan bisnis) setara kartu Jira/Trello — dengan review independen dan persetujuan user sebelum diserahkan ke backenddev/frontenddev",
+      "version": "0.2.0",
+      "source": "./src/plugins/analyst",
+      "author": {
+        "name": "Fakhrul Nugroho",
+        "email": "fakhrulnugroho15@gmail.com"
+      }
+    },
+    {
+      "name": "backenddev",
+      "description": "Agent dan skill untuk kerja backend lintas-stack (Java Spring, Go, Node, Bun, Rust, PHP, CodeIgniter 4): profiling repo, eksplorasi, audit konvensi, review terhadap kontrak, perencanaan, orkestrasi eksekusi, implementasi, dan analisis kebutuhan",
+      "version": "0.5.0",
+      "source": "./src/plugins/backenddev",
+      "author": {
+        "name": "Fakhrul Nugroho",
+        "email": "fakhrulnugroho15@gmail.com"
+      }
+    },
+    {
+      "name": "frontenddev",
+      "description": "Skill dan subagent untuk kerja frontend lintas-stack (React Vite SPA, React Native/Expo, SvelteKit, Svelte + Vite): profil repo, penelusuran kode, perjalanan antar-layar, bentuk layar, kontrak arsitektur, review kesesuaian, dan eksekusi lewat brief",
+      "version": "0.3.0",
+      "source": "./src/plugins/frontenddev",
+      "author": {
+        "name": "Fakhrul Nugroho",
+        "email": "fakhrulnugroho15@gmail.com"
+      }
+    },
+    {
+      "name": "quickdev",
+      "description": "Skill alur kerja ringan untuk repo backend dan frontend: profil repo, penelusuran kode, klarifikasi spesifikasi, rencana satu berkas, eksekusi terverifikasi, dan review diff terhadap rencana — tanpa taskdir maupun subagent",
+      "version": "0.1.0",
+      "source": "./src/plugins/quickdev",
+      "author": {
+        "name": "Fakhrul Nugroho",
+        "email": "fakhrulnugroho15@gmail.com"
+      }
+    }
+  ]
+}

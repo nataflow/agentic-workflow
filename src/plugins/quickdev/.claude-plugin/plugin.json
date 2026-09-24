@@ -1,0 +1,18 @@
+{
+  "name": "quickdev",
+  "description": "Skill alur kerja ringan untuk repo backend dan frontend: profil repo, penelusuran kode, klarifikasi spesifikasi, rencana satu berkas, eksekusi terverifikasi, dan review diff terhadap rencana — tanpa taskdir maupun subagent",
+  "version": "0.1.0",
+  "author": {
+    "name": "Fakhrul Nugroho",
+    "email": "fakhrulnugroho15@gmail.com"
+  },
+  "license": "MIT",
+  "keywords": [
+    "backend",
+    "frontend",
+    "development-workflow",
+    "code-review",
+    "task-planning",
+    "repository-profiling"
+  ]
+}
