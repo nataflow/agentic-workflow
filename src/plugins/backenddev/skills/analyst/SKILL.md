@@ -16,7 +16,7 @@ metadata:
 ## Precondition [REQUIRED]
 
 1. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/analyst/scripts/check_preconditions.py --taskdir <taskdir> --risk <risk> [--chain <chain>]`.
-2. `PASS` (6/6 checks) → lanjut ke Workflow. `FAIL` → hentikan dan remediasi butir gagal: taskdir belum sah atau belum diprovisi → minta alokasi ke `backenddev:tech-lead`; profil belum lengkap → `backenddev:profile`; `risk` di luar enum → minta gerbang menetapkannya; artefak taskdir bertentangan dengan `chain` → laporkan salah rute ke gerbang; working tree kotor di luar taskdir → bersihkan dulu.
+2. `PASS` (7/7 checks) → lanjut ke Workflow; baris check 7 (`Resume Point`) menentukan titik masuk Fase 0. `FAIL` → hentikan dan remediasi butir gagal: taskdir belum sah atau belum diprovisi → minta alokasi ke `backenddev:tech-lead`; profil belum lengkap → `backenddev:profile`; `risk` di luar enum → minta gerbang menetapkannya; artefak taskdir bertentangan dengan `chain` → laporkan salah rute ke gerbang; working tree kotor di luar taskdir → bersihkan dulu.
 
 ## Parameter [REQUIRED]
 
@@ -32,6 +32,17 @@ metadata:
 
 ## Workflow
 
+### Fase 0 — Resume Taskdir Berakar
+
+Jalankan sebelum Fase 1 tiap kali skill ini berangkat.
+
+1. `{taskdir}/TASK.md` tidak ada (check 7: `rantai baru`) → lanjut ke Fase 1.
+2. `TASK.md` ada → **dilarang memanggil `backenddev:task`** dan dilarang menurunkan `chain` ulang: Fase 1 dan 2 dilewati. Pakai `chain:` dan `risk:` frontmatter; parameter gerbang yang berbeda sudah ditolak prasyarat check 4. Baca baris `Resume:` check 7 prasyarat.
+3. Titik masuk dari ledger `## Chain`: ada hop `[ ]`/`[~]` (`Resume: hop <HOP>`) → Fase 3 pada hop teratas itu, dan artefak hop yang sudah ada (`BRD.md`/`PRD.md` `DRAFT` ter-commit penulisnya) langsung masuk Fase 4 atasnya alih-alih ditulis ulang; ledger tercentang penuh (`butuh reentry_reason`) → Fase 3 butir 0 dengan `reentry_reason` (kosong → `## Failure path` butir 9).
+4. Plafon yang berjalan dibaca dari `## Counters` `TASK.md`, bukan dari ingatan sesi.
+
+Tiga keadaan normal masuk lewat jalur ini: taskdir ber-`BRD.md`/`PRD.md` `DRAFT` yang dirutekan gerbang, keberangkatan ulang sesudah amandemen akar, dan keberangkatan ulang sesudah rantai tertahan atau kegagalan hilir.
+
 ### Fase 1 — Derivasi & Penguncian Chain
 
 1. Vonis **sumbu bisnis** bagian 1.1 `references/chain-rules.md` atas lima butirnya, lalu **sumbu kontrak** bagian 1.2 atas tiga butirnya. Kedua sumbu dievaluasi terpisah dan masing-masing berpredikat bukti `file:line` atau jawaban user, bukan keyakinan.
@@ -44,7 +55,7 @@ metadata:
 
 1. Panggil `backenddev:task` dengan `taskdir`, `lane` terminal chain (matriks bagian 1.3 `references/chain-rules.md`, kolom keempat), `risk`, `request`, `evidence`, `clarification`, `chain`, dan `finding_source` apa adanya.
 2. Tangkap laporan `### TASK ROOT LOCKED`; `Uji Akar` bukan `9/9 lolos` atau `Commit` bernilai `GAGAL` → `## Failure path` butir 2.
-3. Verifikasi `TASK.md` memuat frontmatter `chain:` sesuai Fase 1 dan seksi `## Chain` berisi tepat hop chain itu, seluruhnya belum tercentang.
+3. Verifikasi `TASK.md` **yang baru diterbitkan `task` di giliran ini** memuat frontmatter `chain:` sesuai Fase 1 dan seksi `## Chain` berisi tepat hop chain itu, seluruhnya belum tercentang. Butir ini tidak berlaku pada jalur resume Fase 0.
 
 ### Fase 3 — Eksekusi Hop Rantai
 

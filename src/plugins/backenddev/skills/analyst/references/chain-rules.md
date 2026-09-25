@@ -84,6 +84,8 @@ Keadaan ketiga ada karena taskdir yang kembali dari gerbang membawa kegagalan hi
 
 `[~]` diperlakukan persis seperti `[ ]` oleh Fase 3, dan kembali `[x]` bersha **baru** saat hop-nya tuntas; sha lama bertahan di dalam kurung sebagai jejak. Predikat B gerbang akhir menuntut ledger tercentang penuh, sehingga satu `[~]` yang tersisa memang menahan vonis `READY_FOR_IMPLEMENTATION` — itu perilaku yang benar, bukan kebocoran.
 
+Taskdir yang sudah berakar masuk lewat `analyst` Fase 0 Resume; `task` hanya dipanggil pada taskdir tanpa `TASK.md`, dan titik masuknya dibaca dari baris `Resume:` check 7 prasyarat `analyst`.
+
 Membuka hop **tidak menurunkan status artefaknya**: `BRD.md`/`PRD.md` `APPROVED` bertahan `APPROVED` sampai revisinya terbit, lalu gerbang dokumen bagian 4 berjalan ulang atasnya. Brief `DONE` tidak pernah dibuka — sisa pekerjaan atasnya adalah brief tambahan pada taskdir yang sama. Plafon dua re-entry per taskdir, dihitung terpisah dari eskalasi bagian 3 dan amandemen akar bagian 5.
 
 ### 2.1 Parameter yang diteruskan ke tiap hop

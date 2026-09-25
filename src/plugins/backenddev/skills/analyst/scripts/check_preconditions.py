@@ -2,7 +2,7 @@
 """Analyst Precondition Validator.
 
 Automates verification of repository preconditions before analyst skill execution.
-Runs checks 1 through 6 in a single pass and produces a compact, actionable report.
+Runs checks 1 through 7 in a single pass and produces a compact, actionable report.
 Zero external dependencies (Python Standard Library only).
 """
 
@@ -82,6 +82,7 @@ class PreconditionChecker:
         self._check_4_chain()
         self._check_5_artifact_consistency()
         self._check_6_git_worktree_and_status()
+        self._check_7_resume_point()
         return all(r["status"] == "PASS" for r in self.results)
 
     def _resolve_taskdir(self) -> Optional[Path]:
@@ -435,6 +436,37 @@ class PreconditionChecker:
                 "summary": f"Gagal memeriksa git status: {e}",
                 "action": "Periksa kondisi repositori git.",
             })
+
+    def _check_7_resume_point(self):
+        """Titik resume taskdir berakar — informatif, selalu PASS.
+
+        Taskdir yang sudah memuat `TASK.md` tidak memanggil `backenddev:task` lagi
+        (prasyarat `task` check 3 menolaknya); titik masuknya dihitung di sini dari
+        ledger `## Chain`, bukan ditebak model.
+        """
+        check_id, name = 7, "Resume Point"
+        taskdir_path = self._resolve_taskdir()
+        task = taskdir_path / "TASK.md" if taskdir_path else None
+        if not task or not task.exists():
+            summary = "TASK.md belum ada — rantai baru (Fase 1)"
+        else:
+            text = task.read_text(encoding="utf-8")
+            ledger = re.search(r"^## Chain\s*$(.*?)(?=^## |\Z)", text, re.M | re.S)
+            hops = re.findall(r"^- \[( |x|~)\] (BRD|PRD|BRIEF)\b", ledger.group(1) if ledger else "", re.M)
+            top = next((h for mark, h in hops if mark in (" ", "~")), None)
+            if top:
+                summary = f"Resume: hop {top} (TASK.md ada; `task` tidak dipanggil)"
+            elif hops:
+                summary = "Resume: ledger tercentang penuh — butuh reentry_reason (Fase 3 butir 0)"
+            else:
+                summary = "Resume: TASK.md tanpa ledger `## Chain` — laporkan ke gerbang (lane non-planning)"
+        self.results.append({
+            "id": check_id,
+            "name": name,
+            "status": "PASS",
+            "summary": summary,
+            "action": "",
+        })
 
     def format_text(self) -> str:
         all_passed = all(r["status"] == "PASS" for r in self.results)
