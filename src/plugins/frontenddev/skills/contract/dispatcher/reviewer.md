@@ -15,7 +15,7 @@ Review satu draft CONTRACT.md frontend.
 - Stack: `{stack}` — idiom penamaan di `{adapter_path}` seksi `## Layer taxonomy`.
 - Ronde: `{round}` dari plafon 2 per putaran (putaran baru sesudah draft `PASS` di-commit, atau sesudah `reopen`).
 - Ronde 2 saja: vonis sebelumnya `{previous_verdict}`, seksi yang berubah `{changed_sections}`.
-- Aturan Semantik: bagian 2 butir 7–13 `${CLAUDE_PLUGIN_ROOT}/skills/contract/templates/contract-template.md`.
+- Aturan Semantik: bagian 2 butir 7–13 `{contract_template}`.
 - Sudah Dijamin: `validate_doc.py` `PASS` — struktur, penomoran AC, token Sumber, dan keterpikulan
   SC/DD/ST. Dilarang menghitung ulang.
 - Larangan: read-only; dilarang menulis `status: APPROVED`, merancang ulang kontrak, atau bertanya ke user.
@@ -29,18 +29,19 @@ Review satu draft CONTRACT.md frontend.
 | `{taskdir}` | Parameter `taskdir` contract | **[REQUIRED]** |
 | `{sections}` | `Terselesaikan: sections=` prasyarat | **[REQUIRED]** Dari `TASK.md`, bukan diketik ulang |
 | `{stack}` | Field `stack` `index.json` profil | **[REQUIRED]** |
-| `{adapter_path}` | `${CLAUDE_PLUGIN_ROOT}/skills/profile/stacks/<stack>.md` | **[REQUIRED]** Hasil substitusi, bukan literal |
+| `{adapter_path}` | Entri `adapter` peta **Skrip:** SKILL.md, `<stack>` dari `index.json` | **[REQUIRED]** Hasil substitusi, bukan literal |
+| `{contract_template}` | Entri `contract-template.md` peta **Skrip:** SKILL.md | **[REQUIRED]** Path absolut hasil substitusi |
 | `{round}` | Keluaran `review_round.py open --gate contract` | **[REQUIRED]** `1` atau `2` |
 | `{previous_verdict}` | Blok `## Contract Review` ronde 1 | **[OPTIONAL]** Hanya ronde 2; `-` di ronde 1 |
 | `{changed_sections}` | Heading `##` yang berubah sejak ronde 1 | **[OPTIONAL]** Hanya ronde 2; `-` di ronde 1 |
 
 ### Aturan untuk Pendispatch
 
-**Gerbang masuk** — kegagalan mana pun membatalkan dispatch:
+**Gerbang masuk** — kegagalan mana pun membatalkan dispatch (`«nama.py»` = path absolut dari peta **Skrip:** SKILL.md):
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/validate_doc.py --kind contract --taskdir {taskdir}
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/review_round.py open --taskdir {taskdir} --gate contract
+python3 «validate_doc.py» --kind contract --taskdir {taskdir}
+python3 «review_round.py» open --taskdir {taskdir} --gate contract
 ```
 
 - `validate_doc.py` `FAIL` → perbaiki draft dulu; memberangkatkan subagent untuk temuan mekanis adalah pemborosan.
@@ -54,7 +55,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/review_round.py open --taskdir {tas
 Simpan balikan apa adanya ke `{taskdir}/.explore/contract-review-r<ronde>.md` (tanpa menyunting satu karakter pun), lalu catat sebelum melangkah — `record` membandingkan `Verdict:` dan hitungan `BLOCKER:` berkas itu dengan flag-nya dan menolak bila berbeda:
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/review_round.py record --taskdir {taskdir} --gate contract \
+python3 «review_round.py» record --taskdir {taskdir} --gate contract \
   --verdict <PASS|BLOCKED> --mechanical <n> --semantic <n> \
   --evidence {taskdir}/.explore/contract-review-r<ronde>.md
 ```

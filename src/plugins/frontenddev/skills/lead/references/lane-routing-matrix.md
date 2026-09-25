@@ -79,7 +79,7 @@ Fakta baru yang memperluas cakupan ditangani lewat `chain.py` — satu-satunya p
 
 ## 4. Session Recovery — `taskdir_state.py`
 
-Keadaan tiap taskdir divonis `python3 ${CLAUDE_PLUGIN_ROOT}/skills/lead/scripts/taskdir_state.py` dari disk dan ledger — urutan vonis dan rutenya didokumentasikan di docstring skrip itu dan disalin di `SKILL.md` Phase 2. Prinsip yang tidak berubah:
+Keadaan tiap taskdir divonis `taskdir_state.py` (path di peta **Skrip:** `lead/SKILL.md`) dari disk dan ledger — urutan vonis dan rutenya didokumentasikan di docstring skrip itu dan disalin di `SKILL.md` Phase 2. Prinsip yang tidak berubah:
 
 - Taskdir dengan brief `BLOCKED`, draft menggantung, atau ledger belum penuh tidak ditinggal diam-diam; ia muncul di setiap pemindaian sampai tuntas atau diputuskan user.
 - Taskdir tuntas (`REPORT.md` ada) tidak diedit ulang; permintaan baru membuka taskdir baru.

@@ -12,6 +12,7 @@ Review seluruh branch pekerjaan untuk satu direktori tugas.
 - Objek: `{taskdir}/`, dinilai terhadap seluruh diff branch ini terhadap `{base_branch}`.
 - Rentang Git: `git merge-base {base_branch} HEAD`..`HEAD` — bukan `{base_branch}..HEAD` polos.
 - Kontrak Penilai: Gabungan seluruh brief di `{taskdir}/`, bukan kualitas umum modul sekitarnya.
+- Adapter: `{adapter_path}` — `## Audit checklist` stack repo ini.
 - Acceptance: Tulis `{taskdir}/REVIEW.md` (selalu, termasuk bila diff bersih) sesuai `## Kontrak
   REVIEW.md` di definisi agent-mu.
 - Pencatatan Isu: Tambahkan baris temuan di `backenddev/issues/README.md` dengan `target` menyebut
@@ -33,6 +34,7 @@ Review seluruh branch pekerjaan untuk satu direktori tugas.
 | --- | --- | --- |
 | `{taskdir}` | Parameter `taskdir` architect | **[REQUIRED]** Direktori tugas yang dinilai — misal `backenddev/docs/2608181430-order-split`. Dilarang dikosongkan atau diganti path induknya; reviewer menurunkan kontrak penilaiannya dari brief di direktori ini |
 | `{base_branch}` | Field `base_branch` di `.claude/profile/backenddev/index.json` | **[REQUIRED]** Titik cabang dasar — misal `main` atau `dev`. Batalkan dispatch bila profil tidak terbaca; menebak `main` pada repo ber-`base_branch` lain menghasilkan rentang diff yang salah dan review yang menilai pekerjaan orang lain |
+| `{adapter_path}` | Path adapter yang sama dengan slot `adapter_path` implementor (`architect/SKILL.md` Fase 3 butir 1) | **[REQUIRED]** Path absolut hasil substitusi `${CLAUDE_PLUGIN_ROOT}` di badan SKILL.md, bukan literal. Batalkan dispatch bila berkasnya tidak ada |
 
 ### Aturan untuk Pendispatch
 

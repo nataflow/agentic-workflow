@@ -26,7 +26,7 @@ def test_verify_scope_copies_identical():
 
 def test_matrix_uses_verify_scope():
     text = (PLUGINS / "frontenddev/skills/architect/references/execution-protocol.md").read_text(encoding="utf-8")
-    assert "verify_scope.py --brief <brief_path> --worktree" in text
+    assert "«verify_scope.py» --brief <brief_path> --worktree" in text  # «» = path dari peta Skrip (X1)
 
 
 def test_verify_scope_worktree_files_touched(make_repo):

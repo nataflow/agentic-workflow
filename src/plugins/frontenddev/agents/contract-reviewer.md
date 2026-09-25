@@ -13,7 +13,7 @@ Kamu adalah reviewer khusus `CONTRACT.md` frontend. Tugasmu memvonis apakah kont
 
 ## Masukan
 
-Slot prompt: `taskdir`, `sections`, `stack`, `adapter_path`, `round`, dan — pada ronde 2 — `previous_verdict` beserta `changed_sections`. Baca sendiri: `{taskdir}/CONTRACT.md`, `TASK.md`, `FLOW.md`/`UI.md` sesuai `sections`, `.claude/profile/frontenddev/layer-adoption.md`, `invariants.md`, `surface-map.md`, dan `## Layer taxonomy` di `{adapter_path}`. Aturan semantik kanonik: bagian 2 butir 7–13 `${CLAUDE_PLUGIN_ROOT}/skills/contract/templates/contract-template.md`.
+Slot prompt: `taskdir`, `sections`, `stack`, `adapter_path`, `contract_template`, `round`, dan — pada ronde 2 — `previous_verdict` beserta `changed_sections`. Baca sendiri: `{taskdir}/CONTRACT.md`, `TASK.md`, `FLOW.md`/`UI.md` sesuai `sections`, `.claude/profile/frontenddev/layer-adoption.md`, `invariants.md`, `surface-map.md`, dan `## Layer taxonomy` di `{adapter_path}`. Aturan semantik kanonik: bagian 2 butir 7–13 `{contract_template}`. Slot `{adapter_path}` atau `{contract_template}` kosong, tak terbaca, atau masih memuat `${` → `BLOCKED` tanpa menilai, minta dispatch ulang dengan path absolut.
 
 ## Fokus Pemeriksaan
 

@@ -73,8 +73,8 @@ integrasi) hanya sesudah izin user. `architect` memakainya di gerbang verifikasi
 ### 3. `## Layer taxonomy` — konsumen: `agents/code-implementor.md` (lewat slot `{adapter_path}`), `backenddev:plan`, `backenddev:audit`
 
 `code-implementor` tidak pernah menyusun path adapter sendiri: `backenddev:architect` menghidrasi slot
-`{adapter_path}` di `skills/architect/dispatcher/implementor.md` dengan
-`${CLAUDE_PLUGIN_ROOT}/skills/profile/stacks/<stack>.md`, dan subagent berhenti `BLOCKED` bila slot itu
+`{adapter_path}` di `skills/architect/dispatcher/implementor.md` dengan path absolut adapter hasil
+substitusi di `architect/SKILL.md` Fase 3 butir 1, dan subagent berhenti `BLOCKED` bila slot itu
 absen. Direktori `.claude/profile/backenddev/stacks/` tidak pernah ditulis `backenddev:profile` dan dilarang dirujuk.
 
 Urutan layer eksekusi kode (dipakai `code-implementor` untuk mengurutkan pekerjaan dalam satu brief),

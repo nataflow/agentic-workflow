@@ -131,11 +131,11 @@ laporan.
 
 ### Aturan untuk Pendispatch
 
-**Gerbang masuk sebelum dispatch** — seluruhnya mekanis; kegagalan mana pun membatalkan dispatch tanpa memberangkatkan subagent:
+**Gerbang masuk sebelum dispatch** — seluruhnya mekanis; kegagalan mana pun membatalkan dispatch tanpa memberangkatkan subagent (`«nama.py»` = path absolut dari peta **Skrip:** SKILL.md):
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/plan/scripts/validate_briefs.py --taskdir {taskdir} --contract
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/review_round.py open --taskdir {taskdir} --gate plan
+python3 «validate_briefs.py» --taskdir {taskdir} --contract
+python3 «review_round.py» open --taskdir {taskdir} --gate plan
 ```
 
 - `validate_briefs.py` `FAIL` → perbaiki brief dulu. Temuannya mekanis; memberangkatkan subagent berbayar untuk menemukannya lagi adalah pemborosan.
@@ -154,7 +154,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/review_round.py open --taskdir {tas
 Sesudah tiap balikan, catat vonisnya — `record` menolak bila `verdict` frontmatter `REVIEW-PLAN.md` berbeda dari flag, menyimpan sidik laporannya, dan `chain.py approve --row BRIEF` menolak approval tanpa ronde terakhir `PASS` atas konten yang persis sama, atau dengan `REVIEW-PLAN.md` basi (bukan laporan ronde terakhir):
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/review_round.py record --taskdir {taskdir} --gate plan \
+python3 «review_round.py» record --taskdir {taskdir} --gate plan \
   --verdict <PASS|BLOCKED|DISPATCH_FAILED> --mechanical <n> --semantic <n>
 ```
 

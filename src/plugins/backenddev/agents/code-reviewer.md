@@ -19,10 +19,10 @@ Kamu adalah penilai independen diff merge-base branch backend terhadap kontrak g
 
 Verifikasi sendiri sebelum menyentuh diff. Tiap kegagalan mengembalikan `BLOCKED` beserta tindakan remediasinya; dilarang meminta input balik.
 
-1. **Parameter**: `taskdir` dan `base_branch` terisi. Salah satu kosong → `BLOCKED` menyebut parameter yang hilang.
+1. **Parameter**: `taskdir`, `base_branch`, dan `adapter_path` terisi. Salah satu kosong → `BLOCKED` menyebut parameter yang hilang; `adapter_path` yang masih memuat `${` → `BLOCKED`, minta dispatch ulang dengan path absolut.
 2. **Taskdir**: `{taskdir}` ada di disk dan berformat `backenddev/docs/<YYMMDDhhmm>-<slug>/`. Tidak ada → `BLOCKED`, minta alokasi dari `backenddev:tech-lead`.
 3. **Brief set**: `{taskdir}` memuat minimal satu `brief-*.md`; kontrak penilaian diturunkan dari sana. Nihil → `BLOCKED`, kontrak acuan tidak ada, jalankan `backenddev:plan`.
-4. **Profil & adapter**: `.claude/profile/backenddev/index.json` terbaca, dan adapter `${CLAUDE_PLUGIN_ROOT}/skills/profile/stacks/<stack>.md` — `<stack>` dari field `stack` — ada serta memuat `## Audit checklist`. Absen → `BLOCKED`, rutekan ke `backenddev:profile`.
+4. **Profil & adapter**: `.claude/profile/backenddev/index.json` terbaca, dan adapter `{adapter_path}` ada serta memuat `## Audit checklist`. Absen → `BLOCKED`, rutekan ke `backenddev:profile`.
 5. **Merge-base**: `git merge-base <base_branch> HEAD` menghasilkan SHA. Gagal → `BLOCKED` beserta `base_branch` yang dicoba; dilarang menilai diff terhadap acuan tebakan.
 6. **Working tree**: `git status --porcelain` bersih. Berkas di bawah segmen `.explore/` adalah laci kerja `code-explorer`, bukan berkas kotor. Sisa lain → `BLOCKED`, minta tree dirapikan sebelum review.
 7. **Branch**: `git symbolic-ref -q --short HEAD` menghasilkan nama branch (exit 0) dan nama itu ≠ `<base_branch>`. Detached HEAD atau HEAD = `<base_branch>` → `BLOCKED`, minta user checkout branch taskdir; dilarang menilai rentang kosong atau meng-commit di luar branch kerja.

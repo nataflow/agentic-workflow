@@ -103,7 +103,7 @@ Verifikasi berkumpul di sini, tepat satu kali sesudah brief `NN` tertinggi berst
    - Exit 0 → catat `Verifikasi Penutup: PASS (<n> perintah, merah warisan <m>)` dan lanjut ke butir 2. `MERAH` bergalat baru 0 adalah warisan baseline, bukan kegagalan rantai ini.
    - Exit 1 (`TIMEOUT` atau galat baru > 0) → hentikan eksekusi, lalu jalankan klasifikasi `## Failure path` butir 4 — cacat eksekusi (4a) atau cacat perencanaan (4b) — atas berkas yang disebut ekor log di berkas hasil, sebelum menyerahkan kendali. Dilarang menambal kode sendiri.
    - Exit 2 → argumen salah; perbaiki pemanggilannya, bukan vonisnya.
-2. **Dispatch Code Reviewer**: Muat template prompt dari `dispatcher/reviewer.md`, hidrasi slot `taskdir` dan `base_branch`, lalu panggil subagent `code-reviewer` secara langsung tepat **satu kali**.
+2. **Dispatch Code Reviewer**: Muat template prompt dari `dispatcher/reviewer.md`, hidrasi slot `taskdir`, `base_branch`, dan `adapter_path` (path yang sama dengan Fase 3 butir 1), lalu panggil subagent `code-reviewer` secara langsung tepat **satu kali**.
    - Subagent mengevaluasi diff `git merge-base {base_branch} HEAD`..`HEAD`, menerbitkan `{taskdir}/REVIEW.md`, lalu meng-commit laporannya sendiri.
    - Tangkap balikan berupa path `REVIEW.md` dan satu tingkat severity tertinggi, lalu petakan lewat `### Penanganan Balikan` template itu. Ambil SHA laporan dari `git log`, bukan dari balikan.
    - Sesudah balikan, pastikan `git status --porcelain` kosong di luar `.explore/`. Sisa `{taskdir}/REVIEW.md` atau `backenddev/issues/README.md` → baris commit gagal `### Penanganan Balikan`.

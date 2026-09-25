@@ -1,6 +1,6 @@
 # Layer Patterns & Architecture Rules Reference
 
-Panduan arsitektur layer frontend 5-tier (Presentation, Controller, View-Model, API layer, Service/DTO), tanggung jawab dan ekspor tiap layer, spesifikasi platform, dan katalog anti-pattern untuk skill `frontenddev:contract`. Penamaan berkas, letak direktori, dan potongan kode idiomatik per stack **tidak** ditulis di sini — rumahnya `## Layer taxonomy` pada adapter `${CLAUDE_PLUGIN_ROOT}/skills/profile/stacks/<stack-id>.md`.
+Panduan arsitektur layer frontend 5-tier (Presentation, Controller, View-Model, API layer, Service/DTO), tanggung jawab dan ekspor tiap layer, spesifikasi platform, dan katalog anti-pattern untuk skill `frontenddev:contract`. Penamaan berkas, letak direktori, dan potongan kode idiomatik per stack **tidak** ditulis di sini — rumahnya `## Layer taxonomy` pada adapter `skills/profile/stacks/<stack-id>.md` (relatif root plugin).
 
 ---
 

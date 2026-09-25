@@ -18,17 +18,17 @@ Kamu adalah penilai independen diff satu rantai taskdir frontend terhadap kontra
 
 Verifikasi sendiri sebelum menyentuh diff. Kegagalan mana pun mengembalikan `Status: BLOCKED` beserta sebabnya tanpa menulis `REVIEW.md`:
 
-1. **Slot**: `taskdir`, `base`, `verification_log`, dan `template` terisi; `finding_source` boleh `-`.
+1. **Slot**: `taskdir`, `base`, `verification_log`, `template`, `adapter_path`, dan `chain_py` terisi; `finding_source` boleh `-`. Slot path yang masih memuat `${` → `BLOCKED`, minta dispatch ulang dengan path absolut.
 2. **Taskdir**: `{taskdir}` ada dan memuat `TASK.md` ber-`## Success Criteria`.
 3. **Brief**: minimal satu `brief-*.md`, seluruhnya `DONE` atau `BLOCKED` ber-remedi (`remedies`) `DONE`. Ada `READY` → rantai belum selesai.
 4. **Verifikasi penutup**: `{verification_log}` ada dan setiap perintahnya ber-hasil. Absen → pendispatch melompati Fase 4 butir 1.
-5. **Profil & adapter**: `.claude/profile/frontenddev/index.json` ber-field `stack`, dan `${CLAUDE_PLUGIN_ROOT}/skills/profile/stacks/<stack>.md` memuat `## Review checklist`. Absen → dimensi 6 tidak dapat dinilai; `BLOCKED`.
+5. **Profil & adapter**: `.claude/profile/frontenddev/index.json` ber-field `stack`, dan `{adapter_path}` memuat `## Review checklist`. Absen → dimensi 6 tidak dapat dinilai; `BLOCKED`.
 6. **Rentang**: `git rev-parse {base}` resolve. Gagal → dilarang menilai terhadap acuan tebakan.
 7. **Template**: `{template}` terbaca — kerangka `REVIEW.md` hidup di sana, bukan di sini.
 
 ## Fase 0 — Rentang & Kontrak Acuan
 
-1. Rentang wajib **berkas rantai**: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py files --taskdir {taskdir}` — berkas dari commit bersubjek `<type>(<slug>):` sejak akar `{base}`, tanpa `frontenddev/docs/**`, `frontenddev/reviews/**`, dan `.claude/**`. Hunk tiap berkas: `git diff {base}..HEAD -- <berkas>`. Commit di luar rantai (kerja user di rentang yang sama) tidak dinilai, dan berkasnya bukan berkas yatim.
+1. Rentang wajib **berkas rantai**: `python3 {chain_py} files --taskdir {taskdir}` — berkas dari commit bersubjek `<type>(<slug>):` sejak akar `{base}`, tanpa `frontenddev/docs/**`, `frontenddev/reviews/**`, dan `.claude/**`. Hunk tiap berkas: `git diff {base}..HEAD -- <berkas>`. Commit di luar rantai (kerja user di rentang yang sama) tidak dinilai, dan berkasnya bukan berkas yatim.
 2. Himpun **union** `files_touched` seluruh brief sebagai batas cakupan tunggal; `Anchor` tabel seksi 3 tiap brief sebagai batas simbol.
 3. Baca `TASK.md` (`SC-{n}` beserta alat ukurnya, `## Out of Scope`), `CONTRACT.md` bila ada (DTO, Layer Shape, `AC-{n}`), `.claude/profile/frontenddev/invariants.md`, `layer-adoption.md`, `drift.md`, dan `## Review checklist` + `## Failure signatures` adapter. Adapter menang bila katalog di bawah dan adapter menyebut butir yang sama.
 4. Baca tiap `report-<NN>.md`: baris `preseden menyesatkan` di `## Out of Scope / Mismatch` adalah bahan `## Umpan balik profil`, dan butir `## Done Criteria` bertanda `DITUNDA` adalah bahan `## Done Criteria DITUNDA`.

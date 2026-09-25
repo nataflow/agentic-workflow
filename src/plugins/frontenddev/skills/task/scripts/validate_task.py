@@ -20,6 +20,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
+# Path absolut dicetak apa adanya: variabel root plugin tidak tersedia di shell tool Bash.
+CHAIN_PY = Path(__file__).resolve().parents[2] / "_common" / "chain.py"
 from precondition_lib import (  # noqa: E402
     expected_rows,
     find_repo_root,
@@ -192,8 +194,8 @@ class TaskValidator:
         if ticked and not self.amend:
             errors.append(f"akar baru tidak boleh bercentang: {ticked}")
         self._add(9, "Ledger ## Chain", not errors, "; ".join(errors) or f"{len(present)} hop `[ ]`",
-                  "Tulis ledger lewat `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py init "
-                  "--taskdir <taskdir>`; dilarang mengetik baris ledger dengan tangan.")
+                  f"Tulis ledger lewat `python3 {CHAIN_PY} init --taskdir <taskdir>`; "
+                  "dilarang mengetik baris ledger dengan tangan.")
 
     def format_text(self) -> str:
         return format_report("task self-test", self.results)

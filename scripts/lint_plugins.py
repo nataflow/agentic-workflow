@@ -221,7 +221,7 @@ def lint_plugin(root: Path, pdir: Path, rep: Report, modes: Dict[str, str]) -> N
                         rep.add("FAIL", "R1", where, f"rujukan `{tok}` tidak ditemukan di plugin")
             if PLUGIN_ROOT in line and md.name != "SKILL.md" and "substitusi" not in line:
                 if md.parent.name == "agents":
-                    rep.add("WARN", "R3", where, f"`{PLUGIN_ROOT}` literal di badan agent (X2)")
+                    rep.add("FAIL", "R3", where, f"`{PLUGIN_ROOT}` literal di badan agent (X2)")
                 else:
                     rep.add("FAIL", "R2", where, f"`{PLUGIN_ROOT}` literal di berkas non-SKILL.md (X1)")
     # S0/S1 — skrip
@@ -237,6 +237,10 @@ def lint_plugin(root: Path, pdir: Path, rep: Report, modes: Dict[str, str]) -> N
         hits = dev_path_lines(tree)
         if hits:
             rep.add("FAIL", "S1", rel(root, py), f"path .gemini/repo-dev di {len(hits)} baris (mis. :{hits[0]})")
+        # R4 — teks yang dicetak skrip disalin model ke Bash, tempat variabel itu tidak ada (X1)
+        for no, line in enumerate(src.splitlines(), 1):
+            if PLUGIN_ROOT in line:
+                rep.add("FAIL", "R4", f"{rel(root, py)}:{no}", f"`{PLUGIN_ROOT}` literal di skrip; cetak path dari `__file__` (X1)")
     # S2 — skrip yang dirujuk SKILL.md ada
     for skill_md in sorted(pdir.glob("skills/*/SKILL.md")):
         for target in sorted(set(ROOT_PATH.findall(skill_md.read_text(encoding="utf-8")))):

@@ -1,6 +1,6 @@
 # The 9-Dimension Architecture Review Catalog
 
-Katalog standar review 9 dimensi arsitektur frontend dan rubrik klasifikasi keparahan P1–P3 untuk skill `frontenddev:review`. Katalog ini **netral stack**: ia menetapkan target periksa dan predikat pelanggaran tiap dimensi. Cuplikan kode benar vs salah, perintah grep deteksi, dan severity per butir yang idiomatik hidup di `## Review checklist` adapter `${CLAUDE_PLUGIN_ROOT}/skills/profile/stacks/<stack-id>.md`; adapter menang bila keduanya menyebut butir yang sama.
+Katalog standar review 9 dimensi arsitektur frontend dan rubrik klasifikasi keparahan P1–P3 untuk skill `frontenddev:review`. Katalog ini **netral stack**: ia menetapkan target periksa dan predikat pelanggaran tiap dimensi. Cuplikan kode benar vs salah, perintah grep deteksi, dan severity per butir yang idiomatik hidup di `## Review checklist` adapter `skills/profile/stacks/<stack-id>.md` (relatif root plugin); adapter menang bila keduanya menyebut butir yang sama.
 
 ---
 

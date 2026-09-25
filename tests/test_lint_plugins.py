@@ -137,12 +137,17 @@ def test_r1_rujukan_hilang_dan_singkat(tmp_path):
     assert ("WARN", "R1") in found(mini(tmp_path, **{p: "Lihat `templates/brief.md`.\n", **other}))
 
 
-def test_r2_r3_plugin_root_literal(tmp_path):
+@pytest.mark.regression("X1")
+@pytest.mark.regression("X2")
+def test_r2_r3_r4_plugin_root_literal(tmp_path):
     ref = "src/plugins/demo/skills/plan/references/rules.md"
     assert ("FAIL", "R2") in found(mini(tmp_path, **{ref: "Baca ${CLAUDE_PLUGIN_ROOT}/skills/x.md\n"}))
     assert ("FAIL", "R2") not in found(mini(tmp_path, **{ref: "| slot | hasil substitusi ${CLAUDE_PLUGIN_ROOT} |\n"}))
     agent = "src/plugins/demo/agents/code-explorer.md"
-    assert ("WARN", "R3") in found(mini(tmp_path, **{agent: AGENT + "Baca ${CLAUDE_PLUGIN_ROOT}/x.md\n"}))
+    assert ("FAIL", "R3") in found(mini(tmp_path, **{agent: AGENT + "Baca ${CLAUDE_PLUGIN_ROOT}/x.md\n"}))
+    py = "src/plugins/demo/skills/plan/scripts/check.py"
+    assert ("FAIL", "R4") in found(mini(tmp_path, **{py: 'print("python3 ${CLAUDE_PLUGIN_ROOT}/x.py")\n'}))
+    assert ("FAIL", "R4") not in found(mini(tmp_path, **{py: 'print("python3 x.py")\n'}))
 
 
 def test_s0_syntax_error(tmp_path):
@@ -202,20 +207,21 @@ def _cli(root, *args):
 
 
 def test_cli_ignore_strict_json(tmp_path):
+    agent = AGENT.replace("tools: Read, Grep\n", "tools: Read, Grep\nwarna: biru\n")
     root = mini(tmp_path, **{"src/plugins/demo/plugin.json": "{}",
-                             "src/plugins/demo/agents/code-explorer.md": AGENT + "${CLAUDE_PLUGIN_ROOT}\n"})
+                             "src/plugins/demo/agents/code-explorer.md": agent})
     assert _cli(root).returncode == 1                      # M5 FAIL
-    assert _cli(root, "--ignore", "M5").returncode == 0     # sisa WARN R3
+    assert _cli(root, "--ignore", "M5").returncode == 0     # sisa WARN F2
     assert _cli(root, "--ignore", "M5", "--strict").returncode == 1
     out = json.loads(_cli(root, "--json").stdout)
-    assert out["fail"] == 1 and {i["check"] for i in out["items"]} == {"M5", "R3"}
+    assert out["fail"] == 1 and {i["check"] for i in out["items"]} == {"M5", "F2"}
 
 
 def test_repo_ini_hanya_gagal_di_check_yang_dijadwalkan():
-    """Repo sendiri: FAIL hanya boleh dari check yang ditunda (R2 ← X1).
+    """Repo sendiri: FAIL hanya boleh dari check yang ditunda (kini tidak ada; R2 ← X1 sudah tutup).
 
-    Hapus ID dari DEFERRED di PR yang memperbaikinya, bersamaan dengan LINT_IGNORE di CI.
+    Tambahkan ID ke `deferred` hanya bersamaan dengan LINT_IGNORE di CI, dan hapus di PR yang memperbaikinya.
     """
-    deferred = {"R2"}
+    deferred = set()
     fails = {i["check"] for i in lint_mod.lint(REPO).items if i["level"] == "FAIL"}
     assert fails <= deferred, fails - deferred

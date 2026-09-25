@@ -8,11 +8,10 @@ Rumah kanonik prosedur eksekusi rantai brief: ingest, dispatch implementor, matr
 
 ## 1. Ingest — Prasyarat per Unit
 
-Sebelum tiap dispatch, predikat unit divonis skrip, bukan dibaca ulang:
+Sebelum tiap dispatch, predikat unit divonis skrip, bukan dibaca ulang (`«nama.py»` = path absolut dari peta **Skrip:** `architect/SKILL.md`):
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/architect/scripts/check_preconditions.py \
-  --taskdir <taskdir> --brief <NN>
+python3 «check_preconditions.py» --taskdir <taskdir> --brief <NN>
 ```
 
 | # | Predikat |
@@ -46,7 +45,7 @@ Enam butir batas ditegakkan di tingkat prompt:
 
 ## 3. Matriks Bukti Disk & Triase
 
-`report-<NN>.md` adalah klaim subagent, bukan bukti. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/verify_scope.py --brief <brief_path> --worktree` **sebelum** cabang mana pun dibuka — skrip menyandingkan `git status --porcelain -uall` (laci `.explore/` dibuang) dengan `files_touched` + brief + `report-<NN>.md`. `PASS` (exit 0) = baris "hanya `files_touched` berubah"; `FAIL` (exit 1) = baris "ada berkas berubah di luar `files_touched`", dengan daftar berkas liarnya; exit 2 = brief tak terbaca, perbaiki pemanggilannya. Vonis scope diambil dari exit skrip, bukan dari pembacaan manual:
+`report-<NN>.md` adalah klaim subagent, bukan bukti. Jalankan `python3 «verify_scope.py» --brief <brief_path> --worktree` **sebelum** cabang mana pun dibuka — skrip menyandingkan `git status --porcelain -uall` (laci `.explore/` dibuang) dengan `files_touched` + brief + `report-<NN>.md`. `PASS` (exit 0) = baris "hanya `files_touched` berubah"; `FAIL` (exit 1) = baris "ada berkas berubah di luar `files_touched`", dengan daftar berkas liarnya; exit 2 = brief tak terbaca, perbaiki pemanggilannya. Vonis scope diambil dari exit skrip, bukan dari pembacaan manual:
 
 | `report-<NN>.md` | Disk vs `files_touched` | Tindakan |
 |---|---|---|
@@ -128,7 +127,7 @@ Pakai `typecheck_per_brief` dari baris `Terselesaikan:` prasyarat rantai (nilai 
 | Nilai | Tindakan sesudah commit unit |
 |---|---|
 | `tidak` | Lewati; pembuktian menunggu Phase 4 |
-| `ya` | `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/run_verification.py closing --taskdir <taskdir> --cmd typecheck='<typecheck commands.md>' --out {taskdir}/.explore/gate-<NN>.md` — dibandingkan dengan baseline Phase 0; exit 1 = galat baru atau `TIMEOUT` |
+| `ya` | `python3 «run_verification.py» closing --taskdir <taskdir> --cmd typecheck='<typecheck commands.md>' --out {taskdir}/.explore/gate-<NN>.md` — dibandingkan dengan baseline Phase 0; exit 1 = galat baru atau `TIMEOUT` |
 
 Vonis **relatif baseline**: nol galat *baru*, bukan hijau absolut. Galat baru → unit `BLOCKED` retroaktif: tambahkan `## Triase` berisi galat mentahnya ke `report-<NN>.md`, turunkan brief `DONE` → `BLOCKED`, dan commit keduanya (`docs(<slug>): unit <NN> BLOCKED - galat kompilasi baru`). Kode unit **tetap** di tree — `git revert` hanya atas persetujuan eksplisit user, karena ia ikut membalik `report-<NN>.md` dan status brief. Brief remedi (`remedies: "<NN>"`) memperbaikinya dengan aksi `MODIFY`. Dilarang melanjutkan ke `NN+1` di atas galat yang unit ini terbitkan. Lint, test, dan build tidak pernah ikut gerbang ini.
 

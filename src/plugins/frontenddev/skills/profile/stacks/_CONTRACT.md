@@ -3,8 +3,8 @@
 Rumah tunggal aturan penulisan `stacks/<stack-id>.md`. Setiap adapter **wajib** memuat tujuh seksi di
 bawah ini, dengan judul persis seperti tertulis, berurutan, tanpa seksi tambahan. Skill di
 `skills/` tidak boleh menyalin isi adapter; ia merujuknya lewat path
-`${CLAUDE_PLUGIN_ROOT}/skills/profile/stacks/<stack-id>.md` (atau `stacks/<stack-id>.md` dari sisi
-skill `profile`) yang dibaca di Phase 0 masing-masing.
+`skills/profile/stacks/<stack-id>.md` relatif root plugin (skill menerimanya sebagai path absolut dari peta
+**Skrip:** SKILL.md-nya; `stacks/<stack-id>.md` dari sisi skill `profile`) yang dibaca di Phase 0 masing-masing.
 
 `<stack-id>` sah: `react-vite`, `react-native`, `sveltekit`, `svelte-vite`. Nilai ini identik dengan
 field `stack` pada `.claude/profile/frontenddev/index.json` yang ditulis
@@ -95,8 +95,8 @@ adapter.
 ### 3. `## Layer taxonomy` — konsumen: `agents/code-implementor.md` (lewat slot `{adapter_path}`), `frontenddev:contract`, `frontenddev:plan`
 
 `code-implementor` tidak pernah menyusun path adapter sendiri: `frontenddev:architect` menghidrasi slot
-`{adapter_path}` di `skills/architect/dispatcher/implementor.md` dengan
-`${CLAUDE_PLUGIN_ROOT}/skills/profile/stacks/<stack-id>.md`, dan subagent berhenti `FAILED` bila slot
+`{adapter_path}` di `skills/architect/dispatcher/implementor.md` dengan path absolut adapter hasil
+substitusi di `architect/SKILL.md` Phase 2 butir 1, dan subagent berhenti `FAILED` bila slot
 itu absen.
 
 Penamaan berkas, letak direktori, ekspor utama, dan satu potongan kode singkat per layer kanonik,

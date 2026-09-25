@@ -10,12 +10,13 @@ Gunakan template ini saat `architect` mendispatch subagent penilai diff rantai (
 Review seluruh diff rantai untuk satu taskdir frontend.
 
 - Taskdir: `{taskdir}`
-- Rentang: berkas keluaran `chain.py files --taskdir {taskdir}` (perintah lengkap di definisi agent-mu) —
+- Rentang: berkas keluaran `python3 {chain_py} files --taskdir {taskdir}` (perintah lengkap di definisi agent-mu) —
   commit rantai (subjek `<type>(<slug>):`) sejak akar `{base}`; hunk lewat `git diff {base}..HEAD -- <berkas>`.
   Commit di luar rantai tidak dinilai dan berkasnya bukan berkas yatim.
 - Review ulang: `REVIEW.md` yang sudah ada ditimpa utuh, bukan disambung.
 - Kontrak Penilai: union `files_touched` seluruh brief, `CONTRACT.md` bila ada, dan `## Success Criteria`
   `TASK.md` — bukan kualitas umum modul sekitarnya.
+- Adapter: `{adapter_path}` — `## Review checklist` untuk dimensi 6.
 - Verifikasi Penutup: `{verification_log}` — sudah dijalankan pendispatch; baca, jangan jalankan ulang.
 - Kerangka Laporan: `{template}` bagian 1 — tulis `{taskdir}/REVIEW.md` persis kerangka itu, selalu,
   termasuk saat bersih. Verdict diturunkan dari bagian 2 butir 6, bukan dipilih.
@@ -36,7 +37,9 @@ Review seluruh diff rantai untuk satu taskdir frontend.
 | `{taskdir}` | Parameter `taskdir` architect | **[REQUIRED]** |
 | `{base}` | `git log --diff-filter=A --format=%h -- {taskdir}/TASK.md \| tail -1` | **[REQUIRED]** Commit yang melahirkan akar; `validate_review.py` menolak `base` selain commit itu. Dilarang menebak `main`/`HEAD~N`: rentang yang salah menilai pekerjaan orang lain |
 | `{verification_log}` | Phase 4 butir 1 | **[REQUIRED]** `{taskdir}/.explore/closing-verification.md` |
-| `{template}` | Tetap | **[REQUIRED]** `${CLAUDE_PLUGIN_ROOT}/skills/architect/templates/review-template.md` — hasil substitusi, bukan literal |
+| `{template}` | Entri `review-template.md` peta **Skrip:** SKILL.md | **[REQUIRED]** Path absolut hasil substitusi, bukan literal |
+| `{adapter_path}` | Entri `adapter` peta **Skrip:** SKILL.md, `<stack>` dari `index.json` | **[REQUIRED]** Path absolut hasil substitusi |
+| `{chain_py}` | Entri `chain.py` peta **Skrip:** SKILL.md | **[REQUIRED]** Path absolut hasil substitusi |
 | `{finding_source}` | Frontmatter `finding_source` `TASK.md` | **[OPTIONAL]** `-` bila akar bukan taskdir perbaikan |
 
 ### Aturan untuk Pendispatch
@@ -47,10 +50,10 @@ Review seluruh diff rantai untuk satu taskdir frontend.
 
 ### Penanganan Balikan
 
-Jalankan validator lebih dulu, apa pun isi amplopnya — amplop adalah klaim, `REVIEW.md` di disk adalah bukti:
+Jalankan validator lebih dulu, apa pun isi amplopnya — amplop adalah klaim, `REVIEW.md` di disk adalah bukti (`«nama.py»` = path absolut dari peta **Skrip:** SKILL.md):
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/architect/scripts/validate_review.py --taskdir {taskdir} \
+python3 «validate_review.py» --taskdir {taskdir} \
   --log {taskdir}/.explore/closing-verification.json
 ```
 

@@ -74,8 +74,8 @@ jobs:
           python-version: "3.13"
       - name: lint_plugins.py
         env:
-          # Kosongkan bertahap: R2 ← X1 (sinkron dengan DEFERRED di tests/test_lint_plugins.py)
-          LINT_IGNORE: R2
+          # Check yang ditunda (sinkron dengan `deferred` di tests/test_lint_plugins.py); kosong sejak X1
+          LINT_IGNORE: ""
           BASE_REF: ${{ github.base_ref }}
         run: |
           if [ -n "$BASE_REF" ]; then
