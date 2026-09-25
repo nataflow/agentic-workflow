@@ -1,12 +1,18 @@
 """L4.10 — satu resolver `typecheck-per-brief`: profil menang, fallback adapter, lalu `tidak`."""
+import importlib.util
 import sys
 
 import pytest
 
 from conftest import FE_MINOR_TD, FE_SKILLS, fe_run
 
-sys.path.insert(0, str(FE_SKILLS / "_common"))
-from precondition_lib import typecheck_per_brief  # noqa: E402
+# Dimuat per path, bukan lewat sys.path: backenddev punya modul bernama sama
+# (`precondition_lib`) yang mungkin sudah terdaftar di sys.modules sesi pytest ini.
+_spec = importlib.util.spec_from_file_location("fe_precondition_lib", FE_SKILLS / "_common/precondition_lib.py")
+_lib = importlib.util.module_from_spec(_spec)
+sys.modules[_spec.name] = _lib
+_spec.loader.exec_module(_lib)
+typecheck_per_brief = _lib.typecheck_per_brief
 
 
 @pytest.mark.parametrize("commands, stack, expected", [

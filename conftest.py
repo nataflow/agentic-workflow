@@ -4,6 +4,7 @@ Semua test memanggil skrip plugin lewat `subprocess` dengan `sys.executable`,
 persis seperti hook dan skill memanggilnya, sehingga yang diuji adalah perilaku
 berkas yang benar-benar dikirim ke user.
 """
+import importlib.util
 import json
 import os
 import subprocess
@@ -88,6 +89,27 @@ def run_hook(plugin: str, cwd: Path, *, stdin: Optional[str] = None, explain: bo
     proc = run_script(PLUGINS / plugin / "hooks" / "detect.py", *args, stdin=stdin)
     out = proc.stdout.strip()
     return proc, (json.loads(out) if out else None)
+
+
+def load_module(path: Path, name: str):
+    """Muat satu modul skrip per path dengan nama unik, tanpa meninggalkan jejak di `sys.path`.
+
+    backenddev dan frontenddev sama-sama punya `precondition_lib` (dan `detect`). Modul yang
+    ikut terimpor lewat direktori induk `path` dibuang dari `sys.modules` sesudahnya, supaya
+    test plugin lain di sesi pytest yang sama tidak mendapat salinan plugin yang salah.
+    """
+    before = set(sys.modules)
+    sys.path.insert(0, str(Path(path).parent))
+    try:
+        spec = importlib.util.spec_from_file_location(name, path)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    finally:
+        sys.path.remove(str(Path(path).parent))
+        for k in set(sys.modules) - before - {name}:
+            del sys.modules[k]
+    return module
 
 
 @pytest.fixture

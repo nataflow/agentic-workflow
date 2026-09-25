@@ -5,12 +5,10 @@ yang benar-benar dikirim ke user. Nomor langkah mengikuti tabel skenario di
 `issues/02-backenddev-jalan-buntu.md`.
 """
 import json
-import sys
 
-from conftest import BE_SKILLS, TD, be_checks, be_run, brief, commit, git, write_files
+from conftest import BE_SKILLS, TD, be_checks, be_run, brief, commit, git, write_files, load_module
 
-sys.path.insert(0, str(BE_SKILLS / "_common"))
-import brief_status as bs  # noqa: E402
+bs = load_module(BE_SKILLS / "_common" / "brief_status.py", "be_brief_status")
 
 ARCH = "architect/scripts/check_preconditions.py"
 REPORT = "report/scripts/check_preconditions.py"

@@ -1,12 +1,10 @@
 """L2.6 — penanda `> Status: FIXED` di berkas temuan di-stage implementor dan lolos pemeriksa scope."""
 import json
 import re
-import sys
 
-from conftest import BE_SKILLS, PLUGINS, TD, be_run, brief, commit, git, write_files
+from conftest import BE_SKILLS, PLUGINS, TD, be_run, brief, commit, git, write_files, load_module
 
-sys.path.insert(0, str(BE_SKILLS / "_common"))
-import brief_status as bs  # noqa: E402
+bs = load_module(BE_SKILLS / "_common" / "brief_status.py", "be_brief_status")
 
 FINDING = "backenddev/issues/2026-09-05-001-issues.md"
 

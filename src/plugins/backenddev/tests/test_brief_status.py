@@ -1,10 +1,8 @@
 """Pustaka `_common/brief_status.py` (L2.2, L2.3, L2.4, L2.10)."""
-import sys
 
-from conftest import BE_SKILLS, TD, brief, commit, write_files
+from conftest import BE_SKILLS, TD, brief, commit, write_files, load_module
 
-sys.path.insert(0, str(BE_SKILLS / "_common"))
-import brief_status as bs  # noqa: E402
+bs = load_module(BE_SKILLS / "_common" / "brief_status.py", "be_brief_status")
 
 
 def test_read_frontmatter_ignores_body_status(tmp_path):
