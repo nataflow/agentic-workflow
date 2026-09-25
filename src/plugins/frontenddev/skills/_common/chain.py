@@ -35,8 +35,6 @@ Zero external dependencies (Python Standard Library only).
 """
 
 import argparse
-import hashlib
-import json
 import re
 import subprocess
 import sys
@@ -65,15 +63,14 @@ from precondition_lib import (  # noqa: E402
     read_chain,
     read_status,
     replace_chain_row,
-    review_generation,
     revisions_since_open,
     set_frontmatter_field,
     split_frontmatter,
-    strip_status_line,
     task_lane_sections,
     taskdir_slug,
     verify_chain_row,
 )
+from review_round import Rounds  # noqa: E402
 
 PLUGIN_SKILLS = Path(__file__).resolve().parents[1]
 MAX_REOPEN_ROW = 3
@@ -233,7 +230,7 @@ class Chain:
         if proc.returncode != 0:
             raise ChainError(f"`validate_doc.py --kind {kind}` FAIL — perbaiki draft dulu:\n{proc.stdout}")
         if row == "CONTRACT":
-            self._require_review_pass("contract", [rel])
+            self._require_review_pass("contract")
         sha = last_commit(self.root, rel)
         originals = self.snapshot(rel, self.task_rel)
         path.write_text(set_frontmatter_field(path.read_text(encoding="utf-8"), "status", "APPROVED"),
@@ -274,7 +271,7 @@ class Chain:
             verdict = read_status(review, "verdict")
             if verdict != "PASS":
                 raise ChainError(f"`REVIEW-PLAN.md` ber-verdict `{verdict or '(kosong)'}`, bukan `PASS`.")
-            self._require_review_pass("plan", rels, review_rel)
+            self._require_review_pass("plan")
             paths.append(review_rel)
         sha = last_commit(self.root, *paths)
         originals = self.snapshot(self.task_rel)
@@ -285,27 +282,11 @@ class Chain:
                           f"Persetujuan user: {answer.strip()}\nKonten disetujui: {sha}\nHop: BRIEF", originals)
         return f"CHAIN APPROVE: BRIEF @ READY {sha} — commit {new}"
 
-    def _require_review_pass(self, gate: str, rels: List[str], report_rel: str = "") -> None:
-        """Ronde reviewer terakhir wajib `PASS` atas konten yang persis sama dengan yang disetujui."""
-        state_path = self.taskdir / ".explore" / f"{gate}-review-state.json"
-        try:
-            state = json.loads(state_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            raise ChainError(f"state review `{gate}` tidak ada — reviewer belum pernah berangkat "
-                             f"(`review_round.py open --gate {gate}`).")
-        rounds = state.get("rounds") or []
-        last = rounds[-1] if rounds else {}
-        if last.get("generation") != review_generation(self.root, self.taskdir_rel, gate):
-            raise ChainError(f"ronde review `{gate}` terakhir milik generasi lama ({last.get('generation')}) — "
-                             "revisi/reopen sesudahnya menuntut ronde baru atas konten sekarang.")
-        if last.get("verdict") != "PASS":
-            raise ChainError(f"ronde review `{gate}` terakhir ber-verdict `{last.get('verdict') or 'belum dicatat'}`, bukan PASS.")
-        if last.get("snapshot") != content_snapshot(self.root, rels):
-            raise ChainError(f"konten berubah sesudah ronde review `{gate}` terakhir — "
-                             "jalankan ronde baru atas konten final (bila plafon masih ada).")
-        if report_rel and last.get("report") != content_snapshot(self.root, [report_rel]):
-            raise ChainError(f"`{report_rel}` bukan laporan ronde terakhir — laporan basi dari ronde "
-                             "sebelumnya, atau reviewer gagal menulisnya.")
+    def _require_review_pass(self, gate: str) -> None:
+        """Ronde reviewer terakhir wajib `PASS` atas konten yang persis sama dan epoch reopen sekarang."""
+        problem = Rounds(self.taskdir_rel, gate, self.root).ready()
+        if problem:
+            raise ChainError(problem + ".")
 
     # ------------------------------------------------------------ reopen / escalate / revisions
 
@@ -399,16 +380,6 @@ class Chain:
             doc = CHAIN_BY_ROW[row][2]
             return revisions_since_open(self.root, [f"{self.taskdir_rel}/{doc}"], self.slug, doc)
         return revisions_since_open(self.root, [f"{self.taskdir_rel}/{BRIEF_GLOB}"], self.slug, "breakdown")
-
-
-def content_snapshot(root: Path, rels: List[str]) -> str:
-    """Sidik sha1 isi berkas tanpa baris `status:` — sama di `review_round.py`."""
-    h = hashlib.sha1()
-    for rel in sorted(rels):
-        path = root / rel
-        h.update(rel.encode())
-        h.update(strip_status_line(path.read_text(encoding="utf-8")).encode() if path.is_file() else b"<absen>")
-    return h.hexdigest()
 
 
 def main() -> None:

@@ -13,7 +13,7 @@ Review satu draft CONTRACT.md frontend.
   `sections`, `FLOW.md`/`UI.md` sudah disetujui.
 - Sections: `{sections}`
 - Stack: `{stack}` — idiom penamaan di `{adapter_path}` seksi `## Layer taxonomy`.
-- Ronde: `{round}` dari plafon 2 per generasi (tiap revisi user atau re-entry membuka generasi baru).
+- Ronde: `{round}` dari plafon 2 per putaran (putaran baru sesudah draft `PASS` di-commit, atau sesudah `reopen`).
 - Ronde 2 saja: vonis sebelumnya `{previous_verdict}`, seksi yang berubah `{changed_sections}`.
 - Aturan Semantik: bagian 2 butir 7–13 `${CLAUDE_PLUGIN_ROOT}/skills/contract/templates/contract-template.md`.
 - Sudah Dijamin: `validate_doc.py` `PASS` — struktur, penomoran AC, token Sumber, dan keterpikulan
@@ -44,8 +44,8 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/review_round.py open --taskdir {tas
 ```
 
 - `validate_doc.py` `FAIL` → perbaiki draft dulu; memberangkatkan subagent untuk temuan mekanis adalah pemborosan.
-- `review_round.py open` `FAIL` → plafon habis (2 per generasi, 8 per taskdir); dilarang mendispatch. Kontrak ber-BLOCKER tidak dapat disetujui (`chain.py approve` menuntut ronde terakhir `PASS`): hentikan Gate Contract, sajikan BLOCKER tersisa ke user, dan serahkan ke `frontenddev:lead` Phase 8 (klarifikasi lingkup: amandemen akar, atau `chain.py abandon`) — dua ronde yang gagal menandakan lingkupnya yang belum jelas, bukan redaksinya.
-- **Ronde 2** bila ronde 1 ber-verdict `BLOCKED` — termasuk yang hanya ber-`BLOCKER [MEKANIS]` — atau draft disunting sesudah ronde `PASS`: `chain.py approve` menuntut ronde terakhir `PASS` atas konten final milik generasi sekarang.
+- `review_round.py open` `FAIL` → plafon habis (2 per putaran, 8 per taskdir); dilarang mendispatch. Kontrak ber-BLOCKER tidak dapat disetujui (`chain.py approve` menuntut ronde terakhir `PASS`): hentikan Gate Contract, sajikan BLOCKER tersisa ke user, dan serahkan ke `frontenddev:lead` Phase 8 (klarifikasi lingkup: amandemen akar, atau `chain.py abandon`) — dua ronde yang gagal menandakan lingkupnya yang belum jelas, bukan redaksinya.
+- **Ronde 2** bila ronde 1 ber-verdict `BLOCKED` — termasuk yang hanya ber-`BLOCKER [MEKANIS]` — atau draft disunting sesudah ronde `PASS`: `chain.py approve` menuntut ronde terakhir `PASS` atas konten final, tanpa `reopen` hop sesudahnya.
 - **Dispatch langsung tanpa skill pembungkus**: doktrin review duduk di `agents/contract-reviewer.md`. Dilarang menyalin isi kontrak, FLOW, UI, atau profil ke prompt; sebut path-nya.
 - **Audit hidrasi**: batalkan dispatch bila prompt masih memuat slot `{...}` mentah atau `TBD`/`TODO`.
 

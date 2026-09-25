@@ -10,7 +10,7 @@ Gunakan template ini saat `plan` mendispatch subagent auditor dokumen planning (
 Audit dokumen planning satu taskdir secara helikopter view sebelum eksekusi kode.
 
 - Taskdir: `{taskdir}` — `brief-*.md` aktif berstatus `READY`; brief `DONE`/`BLOCKED` terkunci dan hanya ditagih predikat cakupan.
-- Ronde: `{round}` dari plafon 2 per generasi (tiap revisi user atau re-entry membuka generasi baru).
+- Ronde: `{round}` dari plafon 2 per putaran (putaran baru sesudah draft `PASS` di-commit, atau sesudah `reopen`).
 - Ronde menyempit: brief berubah sejak ronde lalu `{brief_berubah}`; laporan ronde lalu `{previous_report}`.
   Keduanya `-` pada ronde 1. Bila terisi, baca laporan lalu untuk tahu temuan mana yang seharusnya
   tertutup, lalu nilai ulang brief yang berubah beserta dependen dan konsumennya.
@@ -139,12 +139,12 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/review_round.py open --taskdir {tas
 ```
 
 - `validate_briefs.py` `FAIL` → perbaiki brief dulu. Temuannya mekanis; memberangkatkan subagent berbayar untuk menemukannya lagi adalah pemborosan.
-- `review_round.py open` `FAIL` → plafon ronde habis (2 per generasi, 8 per taskdir). Dilarang mendispatch; batch ber-BLOCKER tidak dapat disetujui (`chain.py approve` menuntut ronde terakhir `PASS`) — sajikan `BLOCKER` tersisa ke user dan serahkan ke `frontenddev:lead` Phase 8 (klarifikasi lingkup: amandemen akar, atau `chain.py abandon`). Isi slot `{round}` dengan nomor ronde dari keluaran `open`.
+- `review_round.py open` `FAIL` → plafon ronde habis (2 per putaran, 8 per taskdir). Dilarang mendispatch; batch ber-BLOCKER tidak dapat disetujui (`chain.py approve` menuntut ronde terakhir `PASS`) — sajikan `BLOCKER` tersisa ke user dan serahkan ke `frontenddev:lead` Phase 8 (klarifikasi lingkup: amandemen akar, atau `chain.py abandon`). Isi slot `{round}` dengan nomor ronde dari keluaran `open`.
 
 **Predikat mekanis sudah dijamin.** Seluruh check `validate_briefs.py` — S, N, D, L, T, F, B, R, V, K, O, E, C, P, G, M — sudah `PASS`. `doc-reviewer` dilarang menghitung ulang satu pun.
 
 - **Dispatch langsung tanpa skill pembungkus**: doktrin audit — gerbang masuk, D1–D4, severity, verdict — duduk di `agents/doc-reviewer.md`. Dilarang menyalin potongannya ke prompt, dan dilarang menyalin isi brief, `CONTRACT.md`, `UI.md`, `FLOW.md`, atau profil.
-- **Ronde 2 menyempit**: hidrasi `{brief_berubah}` dan `{previous_report}`; ronde 2 berangkat bila ronde 1 ber-verdict `BLOCKED` — termasuk yang hanya ber-`BLOCKER [MEKANIS]`, sesudah perbaikannya lolos `validate_briefs.py` — atau bila brief disunting sesudah ronde terakhir `PASS`. Approval menuntut ronde terakhir `PASS` atas konten final milik generasi sekarang; tanpa ronde menyempit, batch yang sudah diperbaiki tidak dapat disetujui.
+- **Ronde 2 menyempit**: hidrasi `{brief_berubah}` dan `{previous_report}`; ronde 2 berangkat bila ronde 1 ber-verdict `BLOCKED` — termasuk yang hanya ber-`BLOCKER [MEKANIS]`, sesudah perbaikannya lolos `validate_briefs.py` — atau bila brief disunting sesudah ronde terakhir `PASS`. Approval menuntut ronde terakhir `PASS` atas konten final, tanpa `reopen` hop sesudahnya; tanpa ronde menyempit, batch yang sudah diperbaiki tidak dapat disetujui.
 - **Verdict bukan approval**: `PASS` membuka pintu approval user, bukan menggantikannya.
 - **Laporan di-commit pendispatch**: `REVIEW-PLAN.md` masuk batch commit breakdown `plan`; dilarang menyisipkan instruksi git ke prompt.
 - **Audit hidrasi**: batalkan dispatch bila prompt masih memuat slot `{...}` mentah atau `TBD`/`TODO`. Penanda `<...>` di blok format bukan slot.

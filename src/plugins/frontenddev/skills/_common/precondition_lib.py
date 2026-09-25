@@ -29,6 +29,8 @@ Isinya lima kelompok:
 Zero external dependencies (Python Standard Library only).
 """
 
+import fnmatch
+import hashlib
 import json
 import os
 import re
@@ -809,14 +811,52 @@ def lane_tamper(root: Path, taskdir_rel: str) -> str:
     return ""
 
 
-def review_generation(root: Path, taskdir_rel: str, gate: str) -> str:
-    """Generasi ronde reviewer = jumlah siklus git (revise/reopen/append) atas berkas gate."""
-    slug = taskdir_slug(taskdir_rel)
-    paths = [f"{taskdir_rel}/CONTRACT.md"] if gate == "contract" else \
-            [f"{taskdir_rel}/{BRIEF_GLOB}", f"{taskdir_rel}/TASK.md"]
-    subjects = git(root, "log", "--format=%s", "--", *paths).splitlines()
-    marks = (f"docs({slug}): revise", f"docs({slug}): reopen", f"docs({slug}): draft breakdown append")
-    return f"{gate}#{sum(1 for s in subjects if s.startswith(marks))}"
+GATE_ROW = {"contract": "CONTRACT", "plan": "BRIEF"}
+
+
+def _snapshot(rels: List[str], read: Callable[[str], Optional[str]]) -> str:
+    h = hashlib.sha1()
+    for rel in sorted(rels):
+        text = read(rel)
+        h.update(rel.encode())
+        h.update(strip_status_line(text).encode() if text is not None else b"<absen>")
+    return h.hexdigest()
+
+
+def content_snapshot(root: Path, rels: List[str]) -> str:
+    """Sidik sha1 isi berkas di disk tanpa baris `status:` — basis vonis ronde reviewer."""
+    return _snapshot(rels, lambda r: (root / r).read_text(encoding="utf-8") if (root / r).is_file() else None)
+
+
+def snapshot_at(root: Path, sha: str, rels: List[str]) -> str:
+    """Sidik yang sama dengan `content_snapshot`, atas isi berkas di commit `sha`."""
+    def read(rel: str) -> Optional[str]:
+        proc = subprocess.run(["git", "-C", str(root), "show", f"{sha}:{rel}"],
+                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        if proc.returncode != 0:
+            return None
+        # samakan dengan Path.read_text(): newline universal
+        return proc.stdout.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+    return _snapshot(rels, read)
+
+
+def gate_targets_at(root: Path, taskdir_rel: str, gate: str, sha: str) -> List[str]:
+    """Berkas yang direview gate pada commit `sha` — padanan `Rounds.targets()` di disk."""
+    if gate == "contract":
+        return [f"{taskdir_rel}/CONTRACT.md"]
+    names = git(root, "ls-tree", "--name-only", sha, f"{taskdir_rel}/").splitlines()
+    return sorted(n for n in names if fnmatch.fnmatch(Path(n).name, BRIEF_GLOB))
+
+
+def reopen_epoch(root: Path, taskdir_rel: str, gate: str) -> int:
+    """Jumlah commit `reopen` yang membuka hop gate ini (sebagai target atau lewat kaskade).
+
+    Regexnya sama dengan `verify_chain_row`: kaskade memang membuka hop gate ini.
+    Angka, bukan sha, supaya tahan rebase.
+    """
+    slug = re.escape(taskdir_slug(taskdir_rel))
+    return count_subjects(root, rf"^docs\({slug}\): reopen [A-Z ]*\b{GATE_ROW[gate]}\b",
+                          f"{taskdir_rel}/TASK.md")
 
 
 def verify_chain_row(root: Path, taskdir_rel: str, entry: Dict[str, Any]) -> str:

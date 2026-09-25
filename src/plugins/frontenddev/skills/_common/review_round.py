@@ -9,21 +9,28 @@ Skrip ini menyimpan state ronde di laci `<taskdir>/.explore/<gate>-review-state.
 Subperintah:
 
 - `open`   — dipanggil **sebelum** dispatch reviewer. Mencatat ronde baru beserta
-             sidik konten berkas yang akan direview. `FAIL` (exit 1) bila plafon
-             generasi (2) atau plafon taskdir (8) habis — dispatch dilarang berangkat.
+             sidik konten berkas yang akan direview, epoch reopen, dan `HEAD`. `FAIL`
+             (exit 1) bila plafon putaran (2) atau plafon taskdir (8) habis —
+             dispatch dilarang berangkat.
 - `record` — dipanggil sesudah balikan reviewer. Mencatat verdict ronde terakhir
              beserta hitungan `BLOCKER [MEKANIS]`/`[SEMANTIK]`.
 - `status` — cetak ronde dan sisa plafon.
 
-**Generasi** adalah siklus kerja yang tercatat di git, bukan nama berkas: tiap
-commit `revise`, `reopen`, atau `draft breakdown append` atas berkas yang direview
-membuka generasi baru — revisi user dan re-entry yang sah masing-masing berhak atas
-dua ronde. Mengganti nama atau menghapus berkas tidak mereset apa pun. Plafon
-taskdir (8) tidak pernah reset, dan kegagalan dispatch yang dibatalkan dibatasi 2.
+**Putaran** adalah ronde ber-epoch sama yang dibuka sesudah ronde `PASS` terakhir
+yang **sudah diajukan** — kontennya pernah di-commit sesudah ronde itu dibuka
+(`git log <head>..HEAD` + sidik isi berkas di tiap commit). Tiap putaran berhak
+dua ronde. Commit draft yang belum pernah `PASS` tidak membuka putaran baru,
+apa pun subjeknya.
 
-`chain.py approve` membaca state ini: approval `CONTRACT` dan `BRIEF` hanya sah
-bila ronde terakhir ber-verdict `PASS` **dan** sidik kontennya sama dengan konten
-yang disetujui — suntingan sesudah reviewer lolos membatalkan vonisnya.
+**Epoch** adalah jumlah commit `reopen` yang membuka hop gate ini (`CONTRACT` untuk
+gate contract, `BRIEF` untuk gate plan), sebagai target atau kaskade. Reopen
+membuka putaran baru dan membatalkan vonis ronde sebelumnya.
+
+`chain.py approve` membaca state ini lewat `Rounds.ready()`: approval `CONTRACT`
+dan `BRIEF` hanya sah bila ronde terakhir ber-verdict `PASS`, sidik kontennya
+sama dengan konten yang disetujui, dan epoch-nya sama dengan epoch sekarang —
+suntingan atau `reopen` sesudah reviewer lolos membatalkan vonisnya. Commit
+`draft`/`revise`/`append` sesudah ronde tidak berpengaruh.
 
 Zero external dependencies (Python Standard Library only).
 """
@@ -37,11 +44,11 @@ from typing import Any, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from precondition_lib import (  # noqa: E402
-    BRIEF_GLOB, find_repo_root, normalize_taskdir, review_generation,
+    BRIEF_GLOB, content_snapshot, find_repo_root, gate_targets_at, git, normalize_taskdir,
+    reopen_epoch, snapshot_at,
 )
-from chain import content_snapshot  # noqa: E402
 
-MAX_PER_GENERATION = 2
+MAX_PER_CYCLE = 2
 MAX_PER_TASKDIR = 8
 MAX_DISPATCH_FAILED = 2
 GATES = ("contract", "plan")
@@ -70,17 +77,62 @@ class Rounds:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
 
-    def generation(self) -> str:
-        return review_generation(self.root, self.taskdir_rel, self.gate)
+    def epoch(self) -> int:
+        return reopen_epoch(self.root, self.taskdir_rel, self.gate)
+
+    def presented(self, r: Dict[str, Any]) -> bool:
+        """Ronde PASS yang kontennya sudah di-commit sesudah ronde itu dibuka — sudah diajukan ke user."""
+        if r.get("verdict") != "PASS" or not r.get("head"):
+            return False
+        pathspec = (f"{self.taskdir_rel}/CONTRACT.md" if self.gate == "contract"
+                    else f"{self.taskdir_rel}/{BRIEF_GLOB}")
+        # head yang hilang (rebase/amend) → git log gagal → dianggap belum diajukan (konservatif)
+        for sha in git(self.root, "log", "--format=%H", f"{r['head']}..HEAD", "--", pathspec).split():
+            targets = gate_targets_at(self.root, self.taskdir_rel, self.gate, sha)
+            if snapshot_at(self.root, sha, targets) == r.get("snapshot"):
+                return True
+        return False
+
+    def cycle(self, rounds: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Ronde putaran berjalan: epoch sama, sesudah ronde PASS terakhir yang sudah diajukan."""
+        epoch = self.epoch()
+        cur = [r for r in rounds if r.get("epoch", epoch) == epoch]   # ronde format lama ikut dihitung
+        for i in range(len(cur) - 1, -1, -1):
+            if self.presented(cur[i]):
+                return cur[i + 1:]
+        return cur
+
+    def ready(self, state: Optional[Dict[str, Any]] = None) -> str:
+        """Kosong bila ronde terakhir `PASS` atas konten disk sekarang dan epoch sekarang; selain itu alasannya."""
+        state = self.load() if state is None else state
+        rounds = state.get("rounds") or []
+        if not rounds:
+            return (f"state review `{self.gate}` kosong — reviewer belum pernah berangkat "
+                    f"(`review_round.py open --gate {self.gate}`)")
+        last = rounds[-1]
+        if last.get("verdict") != "PASS":
+            return f"ronde review `{self.gate}` terakhir ber-verdict `{last.get('verdict') or 'belum dicatat'}`, bukan PASS"
+        if "epoch" not in last:
+            return (f"ronde review `{self.gate}` terakhir tercatat format lama (tanpa `epoch`) — "
+                    "buka satu ronde baru atas konten sekarang")
+        if last["epoch"] != self.epoch():
+            return (f"hop dibuka ulang (`reopen`) sesudah ronde review `{self.gate}` terakhir — "
+                    "vonisnya atas hulu lama; jalankan ronde baru atas konten sekarang")
+        if last.get("snapshot") != content_snapshot(self.root, self.targets()):
+            return (f"konten berubah sesudah ronde review `{self.gate}` terakhir — "
+                    "jalankan ronde baru atas konten final (bila plafon masih ada)")
+        report = self.report_rel()
+        if report and last.get("report") != content_snapshot(self.root, [report]):
+            return (f"`{report}` bukan laporan ronde terakhir — laporan basi dari ronde "
+                    "sebelumnya, atau reviewer gagal menulisnya")
+        return ""
 
     def report_rel(self) -> str:
         return f"{self.taskdir_rel}/REVIEW-PLAN.md" if self.gate == "plan" else ""
 
     def counts(self, state: Dict[str, Any]) -> Dict[str, int]:
-        gen = self.generation()
         rounds = state.get("rounds", [])
-        return {"generation": sum(1 for r in rounds if r.get("generation") == gen),
-                "taskdir": len(rounds)}
+        return {"cycle": len(self.cycle(rounds)), "taskdir": len(rounds)}
 
     def open(self) -> str:
         targets = self.targets()
@@ -94,19 +146,23 @@ class Rounds:
             raise SystemExit("REVIEW ROUND OPEN: [FAIL] ronde sebelumnya belum dicatat — jalankan "
                              "`record` dengan verdict balikannya, atau `record --verdict DISPATCH_FAILED` "
                              "bila dispatch gagal (tidak dihitung plafon).")
-        if c["generation"] >= MAX_PER_GENERATION:
-            raise SystemExit(f"REVIEW ROUND OPEN: [FAIL] plafon {MAX_PER_GENERATION} ronde per generasi habis "
-                             f"(generasi `{self.generation()}`). Dilarang mendispatch ronde ketiga: sajikan "
-                             "BLOCKER yang tersisa ke user dan rutekan ke gate pemilik untuk rancang ulang.")
+        if c["cycle"] >= MAX_PER_CYCLE:
+            raise SystemExit(f"REVIEW ROUND OPEN: [FAIL] plafon {MAX_PER_CYCLE} ronde per putaran habis "
+                             "(putaran sejak draft terakhir yang lolos `PASS` dan di-commit, epoch "
+                             f"reopen {self.epoch()}). Dilarang mendispatch ronde ketiga: sajikan BLOCKER "
+                             "yang tersisa ke user dan rutekan ke gate pemilik untuk rancang ulang. "
+                             "(Commit ronde `PASS` yang hilang karena rebase/amend tidak lagi dihitung "
+                             "sebagai sudah diajukan.)")
         if c["taskdir"] >= MAX_PER_TASKDIR:
             raise SystemExit(f"REVIEW ROUND OPEN: [FAIL] plafon {MAX_PER_TASKDIR} ronde per taskdir habis.")
-        entry = {"round": c["generation"] + 1, "generation": self.generation(),
+        entry = {"round": c["cycle"] + 1, "epoch": self.epoch(),
+                 "head": git(self.root, "rev-parse", "HEAD").strip(),
                  "snapshot": content_snapshot(self.root, targets), "opened": _now(),
                  "verdict": None}
         rounds.append(entry)
         state["rounds"] = rounds
         self.save(state)
-        return (f"REVIEW ROUND OPEN: [PASS] {self.gate} ronde {entry['round']}/{MAX_PER_GENERATION} "
+        return (f"REVIEW ROUND OPEN: [PASS] {self.gate} ronde {entry['round']}/{MAX_PER_CYCLE} "
                 f"(taskdir {c['taskdir'] + 1}/{MAX_PER_TASKDIR}) atas {len(targets)} berkas")
 
     def record(self, verdict: str, mechanical: int, semantic: int) -> str:
@@ -140,17 +196,19 @@ class Rounds:
         nxt = ("gerbang terbuka" if verdict == "PASS" else
                "perbaiki, jalankan validator, lalu buka ronde menyempit atas konten final (approval menuntut ronde PASS)"
                if not semantic else
-               ("perbaiki lalu buka ronde menyempit" if c["generation"] < MAX_PER_GENERATION
+               ("perbaiki lalu buka ronde menyempit" if c["cycle"] < MAX_PER_CYCLE
                 else "plafon habis — sajikan BLOCKER ke user"))
         return f"REVIEW ROUND RECORD: {self.gate} ronde {rounds[-1]['round']} {verdict} — {nxt}"
 
     def status(self) -> str:
         state = self.load()
         c = self.counts(state)
-        lines = [f"REVIEW ROUND STATUS: {self.gate} — generasi {c['generation']}/{MAX_PER_GENERATION}, "
+        lines = [f"REVIEW ROUND STATUS: {self.gate} — putaran {c['cycle']}/{MAX_PER_CYCLE}, "
                  f"taskdir {c['taskdir']}/{MAX_PER_TASKDIR}"]
         for r in state.get("rounds", []):
-            lines.append(f"- ronde {r.get('round')} [{r.get('generation')}] → {r.get('verdict') or 'terbuka'}"
+            where = (f"epoch {r['epoch']}, head {str(r.get('head', ''))[:7] or '-'}" if "epoch" in r
+                     else f"format lama {r.get('generation', '-')}")
+            lines.append(f"- ronde {r.get('round')} [{where}] → {r.get('verdict') or 'terbuka'}"
                          + (f" (mekanis {r.get('mechanical')}, semantik {r.get('semantic')})" if r.get("verdict") else ""))
         return "\n".join(lines)
 

@@ -152,3 +152,54 @@ def chain_repo(make_repo):
     commit(root, "init")
     git(root, "checkout", "-q", "-b", "fix/order-fix")   # rantai berjalan di branch kerja, bukan base
     return root
+
+
+# --- Rantai frontenddev (Langkah 4) ------------------------------------------------------------
+
+FE_SKILLS = PLUGINS / "frontenddev" / "skills"
+FE_FIX = PLUGINS / "frontenddev" / "tests" / "fixtures"
+FE_TD = "frontenddev/docs/2609241200-orders-lacak"
+
+
+def fe_run(repo: Path, skill_script: str, *args: str) -> subprocess.CompletedProcess:
+    """Jalankan `frontenddev/skills/<skill_script>` dengan cwd = repo; stdout+stderr digabung di `.out`."""
+    proc = run_script(FE_SKILLS / skill_script, *args, cwd=repo)
+    proc.out = proc.stdout + proc.stderr
+    return proc
+
+
+def fe_commit(repo: Path, subject: str, *paths: str) -> str:
+    """Commit `paths` (default `CONTRACT.md`) dengan subjek `docs(orders-lacak): <subject>`."""
+    return commit(repo, f"docs(orders-lacak): {subject}", *(paths or (f"{FE_TD}/CONTRACT.md",)))
+
+
+def fe_brief(repo: Path, nn: str, status: str = "READY", step: str = "Tambah tombol Lacak di OrderDetail.",
+             remedies: str = "", total: int = 1) -> str:
+    """Tulis `brief-<nn>-orders-lacak-button.md` dari fixture; kembalikan path relatifnya."""
+    rel = f"{FE_TD}/brief-{nn}-orders-lacak-button.md"
+    sha = git(repo, "rev-list", "--max-parents=0", "--abbrev=7", "--abbrev-commit", "HEAD").strip()
+    text = (FE_FIX / "brief_button.md").read_text(encoding="utf-8")
+    for key, value in {"status": status, "sha": sha, "nn": nn, "total": total,
+                       "remedies": remedies, "step": step}.items():
+        text = text.replace("{" + key + "}", str(value))
+    write_files(repo, {rel: text})
+    return rel
+
+
+@pytest.fixture
+def fe_chain_repo(make_repo):
+    """Repo FAST_FORWARD frontenddev: akar `TASK.md` terkunci di `main`, `CONTRACT.md` DRAFT tertulis (belum di-commit)."""
+    root = make_repo({
+        ".gitignore": ".explore/\n",
+        f"{FE_TD}/TASK.md": (FE_FIX / "task_fast_forward.md").read_text(encoding="utf-8"),
+        "src/features/orders/OrderDetail.tsx": "export function OrderDetail() { return null }\n",
+    })
+    git(root, "checkout", "-q", "-b", "main")
+    fe_profile(root, "react-vite")
+    write_files(root, {".claude/profile/frontenddev/commands.md":
+                       "| Perintah | Status |\n|---|---|\n| `pnpm typecheck` | OK |\n| `pnpm test` | OK |\n"})
+    assert fe_run(root, "_common/chain.py", "init", "--taskdir", FE_TD).returncode == 0
+    sha = commit(root, "docs(orders-lacak): kunci TASK sebagai akar rantai")
+    write_files(root, {f"{FE_TD}/CONTRACT.md":
+                       (FE_FIX / "contract_valid.md").read_text(encoding="utf-8").replace("{sha}", sha)})
+    return root

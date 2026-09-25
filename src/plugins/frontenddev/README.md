@@ -101,7 +101,7 @@ Design, `sections` non-kosong Gate Contract, dan Gate Breakdown selalu. Lane `HO
 | Subperintah | Dipakai | Yang ditegakkan |
 |---|---|---|
 | `init` | `task` | baris ledger persis jadwal `sections` |
-| `approve --row R --answer "<jawaban>"` | gate pemilik hop | hop hulu sah; dokumen `DRAFT` ter-commit; validator `PASS`; untuk CONTRACT/BRIEF ronde reviewer terakhir `PASS` atas konten final **dan generasi sekarang** (BRIEF di hop `[~]` tanpa brief `READY` baru sah tanpa ronde baru). Menulis `APPROVED` + centang dalam satu commit yang memateraikan jawaban user, sha konten, dan `Hop: <R>` |
+| `approve --row R --answer "<jawaban>"` | gate pemilik hop | hop hulu sah; dokumen `DRAFT` ter-commit; validator `PASS`; untuk CONTRACT/BRIEF ronde reviewer terakhir `PASS` atas konten final **tanpa `reopen` sesudah ronde itu** (BRIEF di hop `[~]` tanpa brief `READY` baru sah tanpa ronde baru). Menulis `APPROVED` + centang dalam satu commit yang memateraikan jawaban user, sha konten, dan `Hop: <R>` |
 | `reopen --row R --reason` | `lead` | kaskade: R dan seluruh hop tercentang di bawahnya jadi `[~]`, dokumen FLOW/UI/CONTRACT-nya kembali `DRAFT`; plafon 3 per hop, 6 per taskdir |
 | `escalate --lane L --sections S` | `lead` | lane hanya naik, sections hanya bertambah, hop tercentang di bawah hop baru wajib di-`reopen` dulu; plafon 2 |
 | `abandon --reason` | `lead` | `TASK.md` `status: ABANDONED` atas keputusan user; taskdir keluar dari pemindaian (`DITUTUP`) |
@@ -131,9 +131,9 @@ Di atasnya lima validator:
 
 Dan dua penjaga keadaan:
 
-- `_common/review_round.py` — plafon ronde reviewer dokumen (2 per generasi, 8 per taskdir; tiap commit
-  `revise`/`reopen`/`draft breakdown append` membuka generasi baru) disimpan di
-  `.explore/<gate>-review-state.json` beserta sidik konten tiap ronde.
+- `_common/review_round.py` — plafon ronde reviewer dokumen (2 per putaran, 8 per taskdir; putaran baru
+  dimulai sesudah dokumen yang lolos ronde `PASS` di-commit, atau sesudah `reopen` hop gate itu) disimpan di
+  `.explore/<gate>-review-state.json` beserta sidik konten, epoch reopen, dan `HEAD` tiap ronde.
 - `lead/scripts/taskdir_state.py` — memvonis keadaan tiap taskdir (`AKAR`, `GATE`, `DRIFT`,
   `EKSEKUSI`, `TERHENTI`, `PENUTUP`, `TEMUAN`, `LAPORAN`, `TUNTAS`, `DITUTUP`, `RUSAK`) beserta satu
   rute berikutnya, dari disk dan ledger — bukan dari ingatan sesi.

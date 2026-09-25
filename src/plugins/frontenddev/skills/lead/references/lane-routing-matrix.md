@@ -92,12 +92,12 @@ Keadaan tiap taskdir divonis `python3 ${CLAUDE_PLUGIN_ROOT}/skills/lead/scripts/
 
 ## 5. Plafon Loop
 
-Loop yang berujung ke skill yang sama dapat berputar tanpa henti; plafonnya numerik dan ditegakkan skrip, bukan ingatan. Generasi ronde adalah siklus git: tiap commit `revise`, `reopen`, atau `draft breakdown append` membuka generasi baru berhak 2 ronde; `DISPATCH_FAILED` tidak dihitung, maksimal 2. Melampauinya menandakan cacat satu lapis di atas tempat putaran itu bekerja.
+Loop yang berujung ke skill yang sama dapat berputar tanpa henti; plafonnya numerik dan ditegakkan skrip, bukan ingatan. Putaran ronde dimulai sesudah dokumen yang lolos ronde `PASS` di-commit, atau sesudah `reopen` hop itu; tiap putaran berhak 2 ronde; `DISPATCH_FAILED` tidak dihitung, maksimal 2. Melampauinya menandakan cacat satu lapis di atas tempat putaran itu bekerja.
 
 | Loop | Plafon | Penegak | Sesudah plafon |
 |---|---|---|---|
-| Ronde `contract-reviewer` | 2 per generasi, 8 per taskdir | `review_round.py --gate contract` | Hentikan gate, sajikan BLOCKER, serahkan ke lead Phase 8 (klarifikasi lingkup: amandemen akar, atau `chain.py abandon`) |
-| Ronde `doc-reviewer` (Plan Review) | 2 per generasi, 8 per taskdir | `review_round.py --gate plan` | Hentikan, rutekan BLOCKER ke gate pemilik |
+| Ronde `contract-reviewer` | 2 per putaran, 8 per taskdir | `review_round.py --gate contract` | Hentikan gate, sajikan BLOCKER, serahkan ke lead Phase 8 (klarifikasi lingkup: amandemen akar, atau `chain.py abandon`) |
+| Ronde `doc-reviewer` (Plan Review) | 2 per putaran, 8 per taskdir | `review_round.py --gate plan` | Hentikan, rutekan BLOCKER ke gate pemilik |
 | Revisi user per gate (FLOW, UI, CONTRACT, breakdown) | 2 berturut sejak draft/reopen | `chain.py revisions` · prasyarat `plan` mode REVISE | Hentikan gate, sajikan poin penolakan, serahkan ke lead Phase 8 (klarifikasi lingkup: amandemen akar, atau `chain.py abandon`) |
 | Brief remedi per unit asal | 2 | `validate_briefs.py` Check M | `reopen CONTRACT` — cacatnya di kontrak (MINOR: reopen BRIEF → escalate) |
 | Re-entry | 3 per hop, 6 per taskdir | `chain.py reopen` | Klarifikasi lingkup bersama user, atau `abandon` |
