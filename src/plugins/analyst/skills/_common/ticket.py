@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """CLI siklus hidup ticketdir plugin `analyst`.
 
-Tiap ticketdir memuat **satu** berkas, `TICKET.md`: kartu tiket di atas, `## Catatan Elisitasi`
-sebagai H2 terakhir. Frontmatter `elicitation` (OPEN/CLOSED) milik `analyst:elicit`; `status`
+Tiap ticketdir memuat `TICKET.md`: kartu tiket di atas, `## Catatan Elisitasi` sebagai H2
+terakhir. `review.md` (opsional) adalah jejak blok `## Ticket Review` terakhir, hanya ditulis
+`review --report`. Frontmatter `elicitation` (OPEN/CLOSED) milik `analyst:elicit`; `status`
 (DRAFT/READY/CANCELLED) milik skrip ini kecuali DRAFT awal.
 
 Satu-satunya jalan mutasi status yang punya konsekuensi di luar penulisnya:
@@ -10,21 +11,26 @@ Satu-satunya jalan mutasi status yang punya konsekuensi di luar penulisnya:
 - `state`   — pindai `analyst/tickets/*/`, vonis keadaan dan rute tiap ticketdir.
 - `new`     — alokasikan `analyst/tickets/<YYMMDDhhmm>-<slug>/` (menolak slug kembar terbuka).
 - `check`   — prasyarat gate `elicit` / `spec` atas satu ticketdir.
-- `review`  — catat vonis `ticket-reviewer` beserta sidik konten yang dinilainya.
+- `review`  — catat vonis `ticket-reviewer` beserta sidik konten yang dinilainya (dan bloknya).
 - `revise`  — buka putaran revisi draft atas permintaan user (plafon 3 per siklus persetujuan).
 - `approve` — materai `TICKET.md` `READY` sesudah jawaban eksplisit user; commit bila repo git.
 - `reopen`  — buka ulang tiket `READY` menjadi `DRAFT` untuk perubahan permintaan.
 - `cancel`  — tutup ticketdir atas keputusan user.
+- `ref`     — isi `external_ref` (kunci kartu Jira/Trello) pada DRAFT maupun READY.
 
-`approve` menuntut validator `PASS`, `elicitation: CLOSED`, **dan** vonis review `PASS` atas sidik
+`approve` menuntut kedua validator (`ticket`, `elicit`) `PASS`, `elicitation: CLOSED`, **dan** vonis review `PASS` atas sidik
 `<kartu>/<catatan elisitasi>` yang sama persis dengan sekarang: draft yang disunting sesudah direview,
 atau elisitasi yang dibuka dan berubah sesudahnya, tidak dapat disetujui.
+
+Kontrak exit `approve`/`ref`: 0 = tertulis dan ter-commit (atau tanpa git/`--no-commit`),
+1 = ditolak, 3 = tertulis tetapi commit gagal.
 
 Zero external dependencies (Python Standard Library only).
 """
 
 import argparse
 import datetime as dt
+import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, List
@@ -43,6 +49,7 @@ from analyst_lib import (  # noqa: E402
     find_root,
     format_report,
     git_commit,
+    git_error_line,
     is_git_repo,
     normalize_ticketdir,
     report_json,
@@ -55,6 +62,8 @@ from validate_doc import DocValidator  # noqa: E402
 PLUGIN_ROOT = Path(__file__).resolve().parents[2]
 REVISION_CAP = 3
 REVIEW_CAP = 2
+REVIEW_FILE = "review.md"  # blok `## Ticket Review` terakhir, ditulis hanya oleh `ticket.py review --report`
+REVIEW_VALUE = re.compile(r"^(PASS|BLOCKED) @([0-9a-f]{12})/([0-9a-f]{12})$")
 
 
 def read(path: Path) -> Dict[str, Any]:
@@ -69,6 +78,31 @@ def write_fields(path: Path, **fields: str) -> None:
     for key, value in fields.items():
         text = set_frontmatter_field(text, key, value)
     path.write_text(text, encoding="utf-8")
+
+
+def int_field(fm: Dict[str, Any], key: str) -> int:
+    """Field pembukuan bilangan; nilai rusak → FAIL rapi, bukan traceback. Field absen dibaca 0."""
+    raw = str(fm.get(key, "0")).strip()
+    if not raw.isdigit():
+        raise SystemExit(f"FAIL: field `{key}: {raw}` bukan bilangan — field ini hanya ditulis ticket.py; "
+                         f"pulihkan nilainya dari riwayat git, dilarang menebak")
+    return int(raw)
+
+
+def parse_review(value: Any) -> Any:
+    """`PASS @<kartu>/<elisitasi>` → (verdict, sidik kartu, sidik elisitasi); selain itu None."""
+    m = REVIEW_VALUE.match(str(value).strip())
+    return m.groups() if m else None
+
+
+def review_report(ticketdir: Path, fm: Dict[str, Any]) -> Any:
+    """`review.md` bila kepalanya mencatat ronde dan vonis yang sama dengan frontmatter; blok lama → None."""
+    f = ticketdir / REVIEW_FILE
+    review = str(fm.get("review", "")).strip()
+    if not f.is_file() or not parse_review(review):
+        return None
+    head = f.read_text(encoding="utf-8").split("\n", 1)[0]
+    return f if f"ronde {fm.get('review_round', '-')}/{REVIEW_CAP} · {review} ·" in head else None
 
 
 def review_digest(ticketdir: Path) -> str:
@@ -104,7 +138,10 @@ def classify(root: Path, rel: str) -> Dict[str, str]:
     t = read(ticket)
     es, ts = t.get("elicitation", ""), t.get("status", "")
     row = {"ticketdir": rel, "type": t.get("type", "-"), "title": title_of(ticket)}
-    if ts == "CANCELLED":
+    if not TICKETDIR_RE.match(rel):
+        row.update(state="NAMA_TIDAK_SAH", route=f"bukan ticketdir analyst — ganti nama ke {TICKETS_DIR}/"
+                                                 "<YYMMDDhhmm>-<slug> (git mv) atau pindahkan keluar analyst/tickets/")
+    elif ts == "CANCELLED":
         row.update(state="DIBATALKAN", route="-")
     elif not ticket.is_file():
         row.update(state="KOSONG", route="analyst:intake → analyst:elicit menulis TICKET.md ke ticketdir ini")
@@ -125,7 +162,8 @@ def classify(root: Path, rel: str) -> Dict[str, str]:
         row.update(state="DRIFT", route="TICKET READY disunting sesudah disetujui — analyst:spec REVISE "
                                         "(reopen) atau pulihkan isinya")
     else:
-        row.update(state="READY", route="selesai — serahkan ke backenddev:tech-lead / frontenddev:lead")
+        row.update(state="READY", route="selesai — tempel kartu ke backenddev:tech-lead / frontenddev:lead "
+                                        "(serah-terima manual)")
     return row
 
 
@@ -159,11 +197,10 @@ def cmd_new(root: Path, args: argparse.Namespace) -> int:
     if not SLUG_RE.match(args.slug) or len(args.slug) > 40:
         print(f"NEW FAIL: slug `{args.slug}` bukan kebab-case ≤40 karakter")
         return 1
-    if args.type not in TYPES:
-        print(f"NEW FAIL: type `{args.type}` bukan {'|'.join(TYPES)}")
-        return 1
     for rel in ticketdirs(root):
         r = classify(root, rel)
+        if r["state"] == "NAMA_TIDAK_SAH":
+            continue
         if rel.split("-", 1)[-1] == args.slug and r["state"] not in ("DIBATALKAN", "READY"):
             print(f"NEW FAIL: slug `{args.slug}` masih terbuka di {rel} ({r['state']}) — lanjutkan itu, "
                   f"atau pilih slug lain")
@@ -174,7 +211,7 @@ def cmd_new(root: Path, args: argparse.Namespace) -> int:
         print(f"NEW FAIL: {rel} sudah ada (slug sama dalam menit yang sama) — tunggu satu menit atau pilih slug lain")
         return 1
     (root / rel).mkdir(parents=True)
-    print(f"NEW PASS: {rel} · git={'ya' if is_git_repo(root) else 'tidak'}")
+    print(f"NEW PASS: {rel} · root={root} · git={'ya' if is_git_repo(root) else 'tidak'}")
     return 0
 
 
@@ -191,7 +228,7 @@ def cmd_check(root: Path, args: argparse.Namespace) -> int:
     missing = [f for f in needed if not (PLUGIN_ROOT / "skills" / f).is_file()]
     c.add(2, "Berkas plugin", not missing, "lengkap" if not missing else ", ".join(missing),
           "Instalasi plugin rusak — pasang ulang plugin analyst.")
-    resolved: Dict[str, str] = {"git": "ya" if is_git_repo(root) else "tidak"}
+    resolved: Dict[str, str] = {"root": str(root), "git": "ya" if is_git_repo(root) else "tidak"}
     if ok:
         state = classify(root, rel)
         resolved["keadaan"] = state["state"]
@@ -215,8 +252,14 @@ def cmd_check(root: Path, args: argparse.Namespace) -> int:
             if state["state"] == "DRAFT":
                 resolved["revision"] = str(t.get("revision", "0"))
                 resolved["review_round"] = str(t.get("review_round", "0"))
-                fresh = str(t.get("review", "")) == f"PASS @{review_digest(d)}"
+                digest = review_digest(d)
+                fresh = str(t.get("review", "")) == f"PASS @{digest}"
                 resolved["review_segar"] = "ya" if fresh else "tidak"
+                prev, cur = parse_review(t.get("review", "")), digest.split("/")
+                stale = [n for n, i in (("kartu", 1), ("elisitasi", 2)) if prev and prev[i] != cur[i - 1]]
+                resolved["review_basi"] = "belum" if not prev else (",".join(stale) or "-")
+                report = review_report(d, t)
+                resolved["review_report"] = f"{rel}/{REVIEW_FILE}" if report else "-"
     print(report_json(c.results, ticketdir=rel, **resolved) if args.json
           else format_report(f"prasyarat {gate}", c.results, resolved))
     return 0 if c.ok else 1
@@ -235,16 +278,41 @@ def cmd_review(root: Path, args: argparse.Namespace) -> int:
     if fm.get("status") != "DRAFT":
         print(f"REVIEW FAIL: TICKET.md berstatus `{fm.get('status', '-')}`, bukan DRAFT")
         return 1
-    rnd = int(str(fm.get("review_round", "0")) or 0)
-    if args.verdict != "DISPATCH_FAILED" and rnd >= REVIEW_CAP:
-        print(f"REVIEW FAIL: plafon {REVIEW_CAP} ronde per revisi habis — sajikan temuan tersisa ke user")
-        return 1
     if args.verdict == "DISPATCH_FAILED":
         print("REVIEW PASS: dispatch gagal dicatat, tidak dihitung ronde")
         return 0
+    rel = str(path.parent.relative_to(root))
+    bad = [k for k in ("ticket", "elicit") if not DocValidator(k, rel, root).run_all()]
+    if bad:
+        print("REVIEW FAIL: " + ", ".join(f"validate_doc.py --kind {k} FAIL" for k in bad)
+              + " — dispatch tidak sah; perbaiki draft (atau kembali ke analyst:elicit) lalu dispatch ulang")
+        return 1
+    rnd = int_field(fm, "review_round")
+    prev = parse_review(fm.get("review", ""))
+    if prev and prev[2] != content_hash(path.read_text(encoding="utf-8"), "elicit"):
+        rnd = 0  # basis fakta berubah sesudah ronde terakhir → siklus ronde baru (pola revision_base)
+    if rnd >= REVIEW_CAP:
+        print(f"REVIEW FAIL: plafon {REVIEW_CAP} ronde per revisi habis — sajikan temuan tersisa ke user")
+        return 1
+    report = ""
+    if args.report:
+        report = sys.stdin.read() if args.report == "-" else Path(args.report).read_text(encoding="utf-8")
+        if not re.search(r"^## Ticket Review\s*$", report, re.MULTILINE):
+            print("REVIEW FAIL: --report bukan blok `## Ticket Review` reviewer")
+            return 1
+        said = re.search(r"^- Verdict:\s*(PASS|BLOCKED)\b", report, re.MULTILINE)
+        if not said or said.group(1) != args.verdict:
+            print(f"REVIEW FAIL: --verdict {args.verdict} tidak sama dengan `- Verdict:` di blok "
+                  f"({said.group(1) if said else 'tidak ada'}) — catat vonis reviewer apa adanya")
+            return 1
     digest = review_digest(path.parent)
     write_fields(path, review=f"{args.verdict} @{digest}", review_round=str(rnd + 1))
-    print(f"REVIEW PASS: ronde {rnd + 1}/{REVIEW_CAP} · {args.verdict} @{digest}")
+    if report:
+        (path.parent / REVIEW_FILE).write_text(
+            f"<!-- ronde {rnd + 1}/{REVIEW_CAP} · {args.verdict} @{digest} · ditulis ticket.py review; "
+            f"jangan disunting -->\n{report.strip()}\n", encoding="utf-8")
+    print(f"REVIEW PASS: ronde {rnd + 1}/{REVIEW_CAP} · {args.verdict} @{digest}"
+          + (f" · blok tersimpan {rel}/{REVIEW_FILE}" if report else ""))
     return 0
 
 
@@ -257,7 +325,7 @@ def cmd_revise(root: Path, args: argparse.Namespace) -> int:
     # Plafon berlaku per basis fakta: elisitasi yang dibuka ulang dan berubah memulai siklus baru,
     # karena draft sesudahnya disusun dari fakta yang berbeda, bukan diredaksi ulang.
     base = content_hash(path.read_text(encoding="utf-8"), "elicit")
-    rev = int(str(fm.get("revision", "0")) or 0) if str(fm.get("revision_base", base)) == base else 0
+    rev = int_field(fm, "revision") if str(fm.get("revision_base", base)) == base else 0
     if rev >= REVISION_CAP:
         print(f"REVISE FAIL: plafon {REVISION_CAP} revisi habis — lingkup belum jelas; kembali ke analyst:elicit "
               f"(`check --gate elicit --reopen`) atau `cancel` atas keputusan user")
@@ -274,9 +342,10 @@ def cmd_approve(root: Path, args: argparse.Namespace) -> int:
     errors = []
     if fm.get("status") != "DRAFT":
         errors.append(f"status `{fm.get('status', '-')}` bukan DRAFT")
-    v = DocValidator("ticket", rel, root)
-    if not v.run_all():
-        errors.append("validate_doc.py --kind ticket FAIL")
+    for kind in ("ticket", "elicit"):
+        if not DocValidator(kind, rel, root).run_all():
+            errors.append(f"validate_doc.py --kind {kind} FAIL"
+                          + (" — catatan elisitasi rusak; kembali ke analyst:elicit" if kind == "elicit" else ""))
     if fm.get("elicitation") != "CLOSED":
         errors.append("elicitation bukan CLOSED — elisitasi dibuka ulang; tuntaskan analyst:elicit dulu")
     digest = review_digest(path.parent)
@@ -288,16 +357,27 @@ def cmd_approve(root: Path, args: argparse.Namespace) -> int:
     if errors:
         print("APPROVE FAIL: " + "; ".join(errors))
         return 1
+    report = review_report(path.parent, fm)
     sealed = content_hash(path.read_text(encoding="utf-8"))
     write_fields(path, status="READY", approved=dt.date.today().isoformat(),
                  approved_hash=sealed, approval=clean_value(args.answer))
     msg = f"APPROVE PASS: {rel}/{TICKET_FILE} READY @{sealed}"
     if is_git_repo(root) and not args.no_commit:
-        ok, out = git_commit(root, [f"{rel}/{TICKET_FILE}"],
-                             f"docs(ticket): kunci TICKET {rel.split('-', 1)[-1]} READY")
-        msg += f" · commit {out}" if ok else f" · COMMIT GAGAL: {out.splitlines()[-1] if out else '-'}"
+        # Subjek ini (dan `ref TICKET`) menandai tiket terkunci; ubah bersama pembacanya bila ada.
+        paths = [f"{rel}/{TICKET_FILE}"] + ([f"{rel}/{REVIEW_FILE}"] if report else [])
+        ok, out = git_commit(root, paths, f"docs(ticket): kunci TICKET {rel.split('-', 1)[-1]} READY")
+        if not ok:
+            return _commit_failed(msg, root, paths, out)
+        msg += f" · commit {out}"
     print(msg)
     return 0
+
+
+def _commit_failed(msg: str, root: Path, paths: List[str], out: str) -> int:
+    """Isi sudah tertulis tetapi commit gagal (hook, gpg, `.gitignore`) → exit 3 beserta sebab git."""
+    print(f"{msg} · COMMIT GAGAL: {git_error_line(out)} — isi sudah tertulis; commit manual "
+          f"`git -C {root} commit -- {' '.join(paths)}` sesudah sebabnya dibereskan")
+    return 3
 
 
 def cmd_reopen(root: Path, args: argparse.Namespace) -> int:
@@ -309,7 +389,7 @@ def cmd_reopen(root: Path, args: argparse.Namespace) -> int:
     if not args.reason.strip():
         print("REOPEN FAIL: alasan kosong")
         return 1
-    n = int(str(fm.get("reopened", "0")) or 0) + 1
+    n = int_field(fm, "reopened") + 1
     write_fields(path, status="DRAFT", revision="0", review="-", review_round="0", approved="-",
                  approved_hash="-", approval="-", reopened=str(n), reopen_reason=clean_value(args.reason))
     print(f"REOPEN PASS: TICKET.md DRAFT (buka ulang ke-{n})")
@@ -322,11 +402,46 @@ def cmd_cancel(root: Path, args: argparse.Namespace) -> int:
     if not TICKETDIR_RE.match(rel) or not d.is_dir():
         print(f"CANCEL FAIL: `{rel}` bukan ticketdir sah")
         return 1
-    if not (d / TICKET_FILE).is_file():
-        print(f"CANCEL PASS: {rel} (direktori kosong — hapus saja)")
+    f = d / TICKET_FILE
+    if not f.is_file():
+        if any(d.iterdir()):
+            print(f"CANCEL FAIL: {rel} tanpa {TICKET_FILE} tetapi berisi berkas lain — periksa dan hapus manual")
+            return 1
+        d.rmdir()
+        print(f"CANCEL PASS: {rel} (direktori kosong dihapus)")
         return 0
-    write_fields(d / TICKET_FILE, status="CANCELLED", cancel_reason=clean_value(args.reason))
-    print(f"CANCEL PASS: {rel} ({TICKET_FILE})")
+    try:
+        write_fields(f, status="CANCELLED", cancel_reason=clean_value(args.reason))
+        print(f"CANCEL PASS: {rel} ({TICKET_FILE})")
+    except ValueError as exc:
+        text = f.read_text(encoding="utf-8")
+        f.write_text(f"---\nstatus: CANCELLED\ncancel_reason: {clean_value(args.reason)}\n---\n\n{text}",
+                     encoding="utf-8")
+        print(f"CANCEL PASS: {rel} ({TICKET_FILE}: {exc} — frontmatter baru disisipkan di atas isi lama)")
+    return 0
+
+
+def cmd_ref(root: Path, args: argparse.Namespace) -> int:
+    """`external_ref` di luar sidik konten: boleh diisi pada DRAFT maupun READY tanpa DRIFT."""
+    path = _ticket_path(root, args)
+    fm = read(path)
+    if fm.get("status") not in ("DRAFT", "READY"):
+        print(f"REF FAIL: TICKET.md berstatus `{fm.get('status', '-')}`, bukan DRAFT|READY")
+        return 1
+    if not args.ref.strip():
+        print("REF FAIL: --ref kosong")
+        return 1
+    value = clean_value(args.ref, 120)
+    write_fields(path, external_ref=value)
+    rel = str(path.parent.relative_to(root))
+    msg = f"REF PASS: {rel}/{TICKET_FILE} external_ref = {value}"
+    if is_git_repo(root) and not args.no_commit:
+        paths = [f"{rel}/{TICKET_FILE}"]
+        ok, out = git_commit(root, paths, f"docs(ticket): ref TICKET {rel.split('-', 1)[-1]}")
+        if not ok:
+            return _commit_failed(msg, root, paths, out)
+        msg += f" · commit {out}"
+    print(msg)
     return 0
 
 
@@ -340,7 +455,7 @@ def main() -> None:
     s.add_argument("--json", action="store_true")
     s = sub.add_parser("new")
     s.add_argument("--slug", required=True)
-    s.add_argument("--type", required=True, choices=TYPES)
+    s.add_argument("--type", required=True, type=str.upper, choices=TYPES)
     s = sub.add_parser("check")
     s.add_argument("--gate", required=True, choices=("elicit", "spec"))
     s.add_argument("--ticketdir", required=True)
@@ -349,6 +464,7 @@ def main() -> None:
     s = sub.add_parser("review")
     s.add_argument("--ticketdir", required=True)
     s.add_argument("--verdict", required=True, choices=("PASS", "BLOCKED", "DISPATCH_FAILED"))
+    s.add_argument("--report", default="", help="blok `## Ticket Review` reviewer: path berkas atau `-` (stdin)")
     s = sub.add_parser("revise")
     s.add_argument("--ticketdir", required=True)
     s = sub.add_parser("approve")
@@ -361,11 +477,15 @@ def main() -> None:
     s = sub.add_parser("cancel")
     s.add_argument("--ticketdir", required=True)
     s.add_argument("--reason", required=True)
+    s = sub.add_parser("ref")
+    s.add_argument("--ticketdir", required=True)
+    s.add_argument("--ref", required=True, help="kunci atau tautan kartu Jira/Trello")
+    s.add_argument("--no-commit", action="store_true", dest="no_commit")
     args = p.parse_args()
     root = (Path(args.root) if args.root else find_root()).resolve()
     handler = {"state": cmd_state, "new": cmd_new, "check": cmd_check, "review": cmd_review,
                "revise": cmd_revise, "approve": cmd_approve, "reopen": cmd_reopen,
-               "cancel": cmd_cancel}[args.cmd]
+               "cancel": cmd_cancel, "ref": cmd_ref}[args.cmd]
     sys.exit(handler(root, args))
 
 

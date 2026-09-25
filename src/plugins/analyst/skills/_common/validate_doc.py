@@ -2,8 +2,8 @@
 """Validator mekanis TICKET.md plugin `analyst` — satu berkas, dua bagian.
 
 `--kind elicit` memvonis frontmatter dan `## Catatan Elisitasi` (H2 terakhir):
-bentuk catatan dan, bila `elicitation: CLOSED`, kelengkapan pilar wajib beserta
-nol pertanyaan memblokir. `--kind ticket` memvonis kartu di atasnya: bentuk
+bentuk catatan dan, bila `elicitation: CLOSED`, kelengkapan pilar wajib, nol
+pertanyaan memblokir, nol baris `Asumsi:`, dan jejak tiap `domain_terms`. `--kind ticket` memvonis kartu di atasnya: bentuk
 tiket, penomoran AC/BR, keterpikulan tiap `BR-{n}` oleh AC, nol placeholder,
 dan nol kebocoran teknis. Rumah kanonik aturannya bagian 2
 `skills/elicit/templates/elicit-template.md` dan
@@ -31,6 +31,7 @@ from analyst_lib import (  # noqa: E402
     TYPES,
     UNANSWERED,
     Checker,
+    body_offset,
     content_hash,
     find_root,
     format_report,
@@ -63,6 +64,7 @@ BR_NONE = re.compile(r"^- Tidak ada aturan khusus — .+")
 BR_TOKEN = re.compile(r"\bBR-(\d+)\b")
 OOS_LINE = re.compile(r"^- .+ — .+$")
 TICKET_Q = re.compile(r"^- \*\*Q-(\d+)\*\*: .+ — asumsi: .+$")
+ASSUMPTION = re.compile(r"^\s*(?:[-*]\s+)?Asumsi:")
 BUG_FIELDS = ("**Langkah reproduksi**:", "**Yang diharapkan**:", "**Yang terjadi**:", "**Dampak**:")
 
 
@@ -215,6 +217,22 @@ class DocValidator(Checker):
         self.add(8, "domain_terms", isinstance(terms, list), f"{len(terms) if isinstance(terms, list) else '-'} istilah",
                  "Tulis `domain_terms: [<istilah>, ...]` atau `domain_terms: []`.")
 
+        # 9–10 hanya menagih saat CLOSED: selama OPEN, asumsi dan istilah yang belum dikonfirmasi sah.
+        assumed = [l.strip()[:50] for l in self.h3.get("Fakta", []) if ASSUMPTION.match(l)]
+        self.add(9, "Asumsi terkonfirmasi", not (closed and assumed),
+                 f"{len(assumed)} baris `Asumsi:`" + (" pada CLOSED" if closed and assumed else ""),
+                 "Konfirmasi tiap `Asumsi:` di Phase 4 elicit (hapus labelnya) atau kembalikan pilarnya ke "
+                 "Phase 2 sebelum `elicitation: CLOSED`.")
+
+        trail = "\n".join(self.h3.get("Permintaan Asli", []) + self.h3.get("Log Tanya-Jawab", [])).lower()
+        listed = terms if isinstance(terms, list) else []
+        untraced = [t for t in listed if t.strip() and not re.search(
+            rf"(?<![\w-]){re.escape(t.strip().lower())}(?![\w-])", trail)]
+        self.add(10, "domain_terms berjejak", not (closed and untraced),
+                 "lolos" if not untraced else "tanpa jejak di Permintaan Asli/Log: " + ", ".join(untraced),
+                 "Tiap istilah `domain_terms` wajib muncul di permintaan asli atau baris log konfirmasinya "
+                 "(`| n | ... | Apakah \"<istilah>\" nama produk? | Ya | <peminta> |`).")
+
     # ── kartu tiket ──
     def _ticket(self) -> None:
         errors = self._frontmatter_common()
@@ -314,7 +332,8 @@ class DocValidator(Checker):
 
         terms = self.fm.get("domain_terms", [])
         terms = terms if isinstance(terms, list) else [terms]
-        leaks = scan_leaks(self.body, terms, skip_sections=("Lampiran", ELICIT_H2))
+        leaks = scan_leaks(self.body, terms, skip_sections=("Lampiran", ELICIT_H2),
+                           line_offset=body_offset(self.text, self.body))
         self.add(9, "Nol kebocoran teknis", not leaks,
                  "lolos" if not leaks else "; ".join(leaks[:6]) + (f" (+{len(leaks) - 6})" if len(leaks) > 6 else ""),
                  "Tulis ulang dalam bahasa perilaku yang dilihat pengguna; kutip teks layar dalam "

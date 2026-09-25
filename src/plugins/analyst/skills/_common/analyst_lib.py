@@ -25,6 +25,7 @@ TYPES = ("FEATURE", "IMPROVEMENT", "BUG")
 PRIORITIES = ("HIGH", "MEDIUM", "LOW")
 PLACEHOLDER = re.compile(r"\bTBD\b|\bTODO\b|diisi nanti|<[A-Za-z][^<>\n]*>")
 UNANSWERED = "_(belum terjawab)_"
+LIST_FIELDS = ("domain_terms",)  # satu-satunya field frontmatter bertipe list
 
 # Satu-satunya artefak: kartu tiket di atas, catatan elisitasi sebagai H2 terakhir.
 TICKET_FILE = "TICKET.md"
@@ -83,6 +84,17 @@ def git_commit(root: Path, paths: List[str], message: str) -> Tuple[bool, str]:
         return False, (exc.output or str(exc)).strip()
 
 
+def git_error_line(out: str) -> str:
+    """Baris galat git yang bermakna: `fatal:`/`error:` lebih dulu, lalu baris non-`hint:` pertama."""
+    lines = [l.strip() for l in out.splitlines() if l.strip()]
+    for prefix in ("fatal:", "error:"):
+        hit = [l for l in lines if l.startswith(prefix)]
+        if hit:
+            return hit[0]
+    plain = [l for l in lines if not l.startswith("hint:")]
+    return " ".join(plain[:2]) if plain else (lines[0] if lines else "-")
+
+
 def normalize_ticketdir(ticketdir: str, root: Path) -> str:
     """Path ticketdir relatif root, tanpa garis miring penutup."""
     p = Path(ticketdir)
@@ -102,7 +114,8 @@ BOM = chr(0xFEFF)
 def split_frontmatter(text: str) -> Tuple[Dict[str, Any], str]:
     """Parse subset YAML frontmatter → `(data, body)`.
 
-    Mendukung skalar, skalar berkutip, list inline `[a, "b, c"]`, dan `[]` kosong.
+    Mendukung skalar, skalar berkutip, list inline `[a, "b, c"]`, dan `[]` kosong. Nilai kosong
+    menjadi `[]` hanya untuk `LIST_FIELDS`; field lain tetap string kosong.
     Tidak ada komentar di akhir baris: `#` adalah bagian nilai (`Tim #2 Sales`).
     Berkas tanpa pagar `---` lengkap → `({}, text)`. BOM (U+FEFF) di awal berkas,
     tulisan sebagian editor Windows, dibuang lebih dulu: pagar sesudah BOM tetap pagar.
@@ -120,14 +133,14 @@ def split_frontmatter(text: str) -> Tuple[Dict[str, Any], str]:
         if not line.strip() or line.strip().startswith("#") or ":" not in line:
             continue
         key, _, value = line.partition(":")
-        value = value.strip()
-        if value in ("[]", ""):
-            data[key.strip()] = []
+        key, value = key.strip(), value.strip()
+        if value == "[]" or (value == "" and key in LIST_FIELDS):
+            data[key] = []
         elif value.startswith("[") and value.endswith("]"):
             items = _LIST_ITEM.findall(value[1:-1])
-            data[key.strip()] = [_unquote(v.strip()) for v in items if v.strip()]
+            data[key] = [_unquote(v.strip()) for v in items if v.strip()]
         else:
-            data[key.strip()] = _unquote(value)
+            data[key] = _unquote(value)
     return data, body.lstrip("\n")
 
 
@@ -150,9 +163,15 @@ def clean_value(value: str, limit: int = 200) -> str:
 def set_frontmatter_field(text: str, key: str, value: str) -> str:
     """Ganti nilai `key` di frontmatter, atau sisipkan sebelum pagar penutup.
 
-    BOM di awal berkas ikut `head` dan tertulis kembali apa adanya.
+    BOM di awal berkas ikut `head` dan tertulis kembali apa adanya. `ValueError` bila berkas
+    tidak diawali pagar `---` atau pagar penutupnya tidak ada — menyisipkan di posisi lain
+    merusak body tanpa membuat frontmatter terbaca.
     """
+    if not text.lstrip(BOM).startswith("---"):
+        raise ValueError("berkas tanpa frontmatter (tidak diawali `---`)")
     end = text.find("\n---", 3)
+    if end == -1:
+        raise ValueError("frontmatter tanpa pagar penutup `---`")
     head, rest = text[:end], text[end:]
     pattern = re.compile(rf"^{re.escape(key)}:.*$", re.MULTILINE)
     if pattern.search(head):
@@ -262,8 +281,16 @@ LEAK_PATTERNS = (
 _EXEMPT = re.compile(r'"[^"\n]*"|“[^”\n]*”|https?://\S+|[\w.+-]+@[\w-]+\.[\w.]+')
 
 
-def scan_leaks(body: str, allowed_terms: List[str], skip_sections: Tuple[str, ...] = ()) -> List[str]:
+def body_offset(text: str, body: str) -> int:
+    """Jumlah baris berkas sebelum `body` (frontmatter + baris kosong yang dibuang `split_frontmatter`)."""
+    return text[: len(text) - len(body)].count("\n") if text.endswith(body) else 0
+
+
+def scan_leaks(body: str, allowed_terms: List[str], skip_sections: Tuple[str, ...] = (),
+               line_offset: int = 0) -> List[str]:
     """Temuan kebocoran teknis `baris N: <jenis> «token»` di luar kutipan, URL, dan seksi dikecualikan.
+
+    `line_offset` menggeser N supaya menunjuk baris berkas, bukan baris `body`.
 
     Teks di dalam tanda kutip dikecualikan karena itu tulisan yang benar-benar dilihat pengguna
     (label tombol, pesan galat). `allowed_terms` adalah `domain_terms` frontmatter: istilah yang
@@ -278,7 +305,7 @@ def scan_leaks(body: str, allowed_terms: List[str], skip_sections: Tuple[str, ..
                                        + r")(?![\w-])", flags))
     hits: List[str] = []
     skipping = False
-    for no, raw in enumerate(body.splitlines(), 1):
+    for no, raw in enumerate(body.splitlines(), 1 + line_offset):
         if raw.startswith("## "):
             skipping = raw[3:].strip() in skip_sections
             continue

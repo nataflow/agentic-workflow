@@ -1,6 +1,6 @@
 # Panduan Elisitasi — `elicit`
 
-Dibaca di Phase 2 (`SKILL.md`) sebelum menyusun pertanyaan. Lawan bicara skill ini adalah peminta non-engineer — pemilik bisnis, tim operasional, sales, CS, atau pengguna akhir — sehingga pertanyaan disusun dalam bahasa pekerjaan mereka, bukan bahasa sistem.
+Dibaca di Phase 1 (`SKILL.md`); bagian 2 dipakai tiap giliran Phase 2. Lawan bicara skill ini adalah peminta non-engineer — pemilik bisnis, tim operasional, sales, CS, atau pengguna akhir — sehingga pertanyaan disusun dalam bahasa pekerjaan mereka, bukan bahasa sistem.
 
 ## 1. Pilar per Tipe
 

@@ -3,8 +3,9 @@
 Plugin Claude Code yang menjadi jembatan antara **pengguna/stakeholder** dan **engineer**. Perannya gabungan
 business analyst, system analyst di level perilaku, dan product owner: menerima permintaan mentah, menggali
 faktanya lewat tanya-jawab dengan peminta non-engineer, lalu menerbitkan `TICKET.md` — kartu tiket non-teknis
-setara detail kartu Jira/Trello — yang siap diambil tim developer. `TICKET.md` adalah **satu-satunya** berkas
-yang ditulis plugin ini: catatan elisitasi tinggal di dalamnya sebagai seksi terakhir.
+setara detail kartu Jira/Trello — yang siap diambil tim developer. `TICKET.md` adalah satu-satunya artefak
+yang disunting skill: catatan elisitasi tinggal di dalamnya sebagai seksi terakhir. `review.md` di sebelahnya
+adalah jejak vonis reviewer terakhir, hanya ditulis `ticket.py`.
 
 Tiga aturan menyetir bentuknya: **tiket menyebut apa dan kenapa, tidak pernah bagaimana**; **fakta berasal
 dari peminta, bukan dari tebakan analis**; dan **yang dapat divonis mesin divonis skrip** — struktur,
@@ -62,7 +63,8 @@ kebenaran tertulis.
 ./analyst/
   tickets/
     2609231400-cicilan-pembayaran/
-      TICKET.md   satu-satunya berkas ticketdir
+      TICKET.md   satu-satunya artefak yang disunting skill
+      review.md   blok `## Ticket Review` terakhir (ditulis `ticket.py review --report`)
 ```
 
 `TICKET.md` punya dua bagian dengan dua pemilik dan dua status di frontmatter:
@@ -97,13 +99,17 @@ Kerangka kanonik dan contoh terisi: `skills/elicit/templates/elicit-template.md`
 
 | Skrip | Memvonis |
 |---|---|
-| `_common/ticket.py state` | keadaan tiap ticketdir: `KOSONG`, `ELISITASI`, `SPEC`, `DRAFT`, `READY`, `DRIFT`, `RUSAK`, `DIBATALKAN` |
-| `_common/ticket.py check --gate elicit\|spec` | prasyarat gate atas satu ticketdir |
-| `_common/validate_doc.py --kind elicit` | `## Catatan Elisitasi`: struktur, pilar per tipe, log bernomor, `CLOSED` ⇒ nol pilar kosong dan nol pertanyaan memblokir |
+| `_common/ticket.py state` | keadaan tiap ticketdir: `KOSONG`, `ELISITASI`, `SPEC`, `DRAFT`, `READY`, `DRIFT`, `RUSAK`, `NAMA_TIDAK_SAH`, `DIBATALKAN` |
+| `_common/ticket.py check --gate elicit\|spec` | prasyarat gate atas satu ticketdir; mencetak `root=` (path ticketdir relatif root, bukan cwd) dan, untuk draft, `review_basi` (bagian yang berubah sesudah review) serta `review_report` |
+| `_common/validate_doc.py --kind elicit` | `## Catatan Elisitasi`: struktur, pilar per tipe, log bernomor, `CLOSED` ⇒ nol pilar kosong, nol pertanyaan memblokir, nol baris `Asumsi:`, dan tiap `domain_terms` berjejak di permintaan asli atau log |
 | `_common/validate_doc.py --kind ticket` | kartu: struktur per tipe, AC Given/When/Then, BR terpikul AC, nol placeholder, **nol kebocoran teknis** |
-| `_common/ticket.py review` | vonis reviewer disimpan bersama sidik `<kartu>/<catatan elisitasi>` yang dinilai; plafon 2 ronde per revisi |
-| `_common/ticket.py approve` | `READY` hanya bila validator `PASS`, `elicitation: CLOSED`, **dan** vonis review `PASS` atas sidik kartu dan catatan elisitasi sekarang |
-| `_common/ticket.py revise` / `reopen` / `cancel` | plafon 3 revisi per basis fakta; buka ulang tiket `READY`; tutup ticketdir |
+| `_common/ticket.py review` | vonis reviewer disimpan bersama sidik `<kartu>/<catatan elisitasi>` yang dinilai, bloknya ke `review.md` (`--report`, `- Verdict:` wajib sama dengan `--verdict`); ditolak bila salah satu validator `FAIL`; plafon 2 ronde per revisi, dibuka ulang bila catatan elisitasi berubah |
+| `_common/ticket.py approve` | `READY` hanya bila kedua validator (`ticket`, `elicit`) `PASS`, `elicitation: CLOSED`, **dan** vonis review `PASS` atas sidik kartu dan catatan elisitasi sekarang |
+| `_common/ticket.py revise` / `reopen` / `cancel` | plafon 3 revisi per basis fakta; buka ulang tiket `READY`; tutup ticketdir (direktori kosong dihapus) |
+| `_common/ticket.py ref` | isi `external_ref` pada `DRAFT`/`READY` tanpa `DRIFT`, commit `docs(ticket): ref TICKET <slug>` |
+
+Kontrak exit `approve`/`ref`: 0 = tertulis dan ter-commit (atau tanpa git), 1 = ditolak, 3 = tertulis tetapi
+commit gagal — baris `COMMIT GAGAL` memuat sebab git dan perintah commit manualnya.
 
 Pemindai kebocoran teknis menolak istilah sistem (endpoint, database, query, nama framework, `API`, …), path
 berkas, `file:baris`, metode dan kode status HTTP, identifier `snake_case`/`camelCase`, dan blok kode di kartu, di luar
@@ -125,9 +131,14 @@ eksplisit (`docs(ticket): ...`); di luar git, commit dilewati dan disebut di Out
 
 ## Serah Terima ke Engineer
 
-Plugin ini **mandiri**: tiket `READY` diserahkan dengan menempelkan isi `TICKET.md` sebagai permintaan
-ke `backenddev:tech-lead` dan/atau `frontenddev:lead` — kartunya wajib, catatan elisitasi boleh ikut sebagai
-jejak asal-usul tiap AC. Engineer menerbitkan `TASK.md` teknisnya sendiri —
+Serah-terima **masih manual**: tempel kartu `TICKET.md` (H1 sampai `## Lampiran`) sebagai permintaan ke
+`backenddev:tech-lead` dan/atau `frontenddev:lead`. Gerbang engineer belum mengenal format ini:
+`BR-{n}` tiket tidak dihitung sebagai aturan yang sudah disepakati, sehingga `backenddev:analyst` dapat
+menjadwalkan BRD dan menanyakan ulang aturannya — sebutkan saat menempel bahwa aturan di tiket sudah
+disetujui peminta. Nomor `AC-{n}`/`BR-{n}` tiket bertabrakan dengan nomor PRD/BRD/CONTRACT; rujuk
+sebagai "AC-3 tiket <slug>". Catatan elisitasi boleh ikut sebagai jejak asal-usul tiap AC.
+
+Engineer menerbitkan `TASK.md` teknisnya sendiri —
 lengkap dengan `file:baris`, alat ukur teknis, dan ledger — dari tiket itu. Nama `TICKET.md` sengaja berbeda
 dari `TASK.md`: kontraknya bertolak belakang, dan keduanya tidak pernah tinggal di direktori yang sama.
 

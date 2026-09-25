@@ -34,6 +34,7 @@ Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py state`. Tiap ba
 | `SPEC` / `DRAFT` | `analyst:spec` — tulis tiket, atau ajukan keputusan atas draft tertunda |
 | `DRIFT` | tiket `READY` disunting sesudah disetujui → tanyakan user: setujui ulang lewat `analyst:spec` (reopen), atau pulihkan isi yang disetujui |
 | `RUSAK` | laporkan baris skrip apa adanya ke user; dilarang menambal frontmatter dengan tangan |
+| `NAMA_TIDAK_SAH` | bukan ticketdir analyst — laporkan baris skrip; tawarkan `git mv` ke nama `<YYMMDDhhmm>-<slug>` atau pindahkan keluar `analyst/tickets/` atas keputusan user |
 
 Permintaan yang jelas menyambung ticketdir terbuka (topik, peminta, atau jawaban atas pertanyaan terbukanya) → rute ticketdir itu, lompat ke Output. Ada ticketdir terbuka tetapi hubungannya tidak jelas → `AskUserQuestion`: lanjutkan ticketdir itu, atau buka tiket baru (yang lama tetap terbuka dan muncul lagi di pemindaian berikutnya).
 

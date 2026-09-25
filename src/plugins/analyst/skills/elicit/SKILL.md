@@ -14,8 +14,8 @@ user-invocable: false
 ## Precondition [REQUIRED]
 
 1. Skrip: `ticket.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py`; `validate_doc.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/validate_doc.py`.
-2. **Tiket baru** (dari intake dengan `slug` + `type`): `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py new --slug <slug> --type <type>` → `NEW PASS: <ticketdir> · git=<ya|tidak>`. `FAIL` slug kembar → kembali ke `analyst:intake` Phase 1.
-3. **Ticketdir ada** (`ELISITASI`, `KOSONG`, atau buka ulang): `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py check --gate elicit --ticketdir <ticketdir>` (tambah `--reopen` bila `reopen_reason` terisi). `PASS` → catat `git=` dari baris `Terselesaikan:` lalu lanjut. `FAIL` → remediasi per baris `Tindakan`; tiket `READY` dibuka ulang hanya lewat `analyst:spec`.
+2. **Tiket baru** (dari intake dengan `slug` + `type`): `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py new --slug <slug> --type <type>` → `NEW PASS: <ticketdir> · root=<root> · git=<ya|tidak>`. `FAIL` slug kembar → kembali ke `analyst:intake` Phase 1.
+3. **Ticketdir ada** (`ELISITASI`, `KOSONG`, atau buka ulang): `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py check --gate elicit --ticketdir <ticketdir>` (tambah `--reopen` bila `reopen_reason` terisi). `PASS` → catat `root=` dan `git=` dari baris `Terselesaikan:` lalu lanjut. `FAIL` → remediasi per baris `Tindakan`; tiket `READY` dibuka ulang hanya lewat `analyst:spec`.
 
 ## Parameter [REQUIRED]
 
@@ -35,14 +35,14 @@ user-invocable: false
 
 ### Phase 1 — Isi dari Permintaan
 
-Baca `references/elicitation-guide.md`. Isi tiap pilar yang sudah dijawab permintaan asli. Fakta tersurat ditulis langsung; fakta tersirat ditulis `Asumsi: <...>`. Istilah teknis yang diucapkan peminta dirumuskan ulang sebagai perilaku (panduan bagian 3); istilah yang memang kosakata produk dikonfirmasi lalu dicatat di frontmatter `domain_terms`. Tulis `TICKET.md`.
+Baca `references/elicitation-guide.md`. Isi tiap pilar yang sudah dijawab permintaan asli. Fakta tersurat ditulis langsung; fakta tersirat ditulis `Asumsi: <...>`. Istilah teknis yang diucapkan peminta dirumuskan ulang sebagai perilaku (panduan bagian 3); istilah yang memang kosakata produk dikonfirmasi ke peminta — konfirmasinya dicatat sebagai baris log (`| n | <tanggal> | Apakah "<istilah>" nama produk? | Ya | <peminta> |`) — lalu dicatat di frontmatter `domain_terms`. `CLOSED` menuntut tiap istilah `domain_terms` berjejak di permintaan asli atau log. Tulis `TICKET.md`.
 
 ### Phase 2 — Giliran Tanya-Jawab
 
 1. Pilih ≤ 3 pilar wajib yang belum terjawab, urut dampak: `FEATURE`/`IMPROVEMENT` — Masalah → Aktor → Kondisi Diinginkan → Aturan Bisnis → Batas Cakupan → Urgensi → Kondisi Saat Ini; `BUG` — Langkah Reproduksi → Yang Terjadi → Yang Diharapkan → Dampak → Urgensi.
 2. `AskUserQuestion`: satu pertanyaan per pilar, 2–4 opsi konkret beserta konsekuensi bisnisnya (aturan bertanya: panduan bagian 2).
 3. **Sesudah tiap giliran**: tambahkan baris log per jawaban (sumber = `requester` atau nama yang disebut user), perbarui pilar, tulis `TICKET.md`, jalankan `validate_doc.py --kind elicit --ticketdir <ticketdir>` — `elicitation: OPEN` boleh menyisakan pilar belum terjawab, tetapi struktur wajib `PASS`.
-4. Jawaban "tidak tahu" atau "tanya si X" → `- **Q-{n}** [MEMBLOKIR | TIDAK MEMBLOKIR]: <pertanyaan> — menunggu: <siapa>` (butir 10 template menentukan labelnya), lanjut ke pilar lain.
+4. Jawaban "tidak tahu" atau "tanya si X" → `- **Q-{n}** [MEMBLOKIR | TIDAK MEMBLOKIR]: <pertanyaan> — menunggu: <siapa>` (butir 12 template menentukan labelnya), lanjut ke pilar lain.
 5. Ulangi sampai seluruh pilar wajib terisi atau yang tersisa hanya pertanyaan `menunggu`. **Plafon 5 giliran per sesi**: habis → simpan, commit, dan sajikan blok `TERTAHAN`.
 6. Jawaban memunculkan tujuan pengguna kedua yang dapat dirilis terpisah → panduan bagian 5: tanyakan mana yang dikerjakan, catat sisanya di `Batas Cakupan` `— tiket terpisah`.
 
@@ -56,13 +56,13 @@ Ini **konfirmasi fakta, bukan persetujuan tiket** — persetujuan hanya di `anal
 
 1. Sajikan ringkas per pilar: aktor beserta larangannya, angka dan ambang tiap aturan, batas cakupan, urgensi, tiap baris `Asumsi:`, dan pertanyaan terbuka yang tersisa.
 2. `AskUserQuestion`: *Fakta sudah benar* · *Ada koreksi (sebut)* · *Tunda — tunggu jawaban pihak lain*.
-3. Koreksi → catat di log, perbarui pilar, ulangi Phase 4. Asumsi yang dikonfirmasi → hapus label `Asumsi:`; yang ditolak → kembali ke Phase 2 untuk pilar itu. Tunda → blok `TERTAHAN`.
+3. Koreksi → catat di log, perbarui pilar, ulangi Phase 4. Asumsi yang dikonfirmasi → hapus label `Asumsi:` (validator menolak `CLOSED` selama masih ada baris `Asumsi:`); yang ditolak → kembali ke Phase 2 untuk pilar itu. Tunda → blok `TERTAHAN`.
 
 ### Phase 5 — Tutup & Serah Terima
 
 1. Pertanyaan `MEMBLOKIR` masih ada → dilarang menutup; blok `TERTAHAN` beserta daftar pertanyaan siap diteruskan.
-2. Set `elicitation: CLOSED`, jalankan `validate_doc.py --kind elicit` sampai `PASS`, lalu self-test semantik butir 8–11 template.
-3. Repo git (`git=ya` dari keluaran `ticket.py new` atau `check`): `git add <ticketdir>/TICKET.md` lalu `git commit -m "docs(ticket): elisitasi <slug>" -- <ticketdir>/TICKET.md`. Draft yang tertahan juga di-commit dengan pesan `docs(ticket): elisitasi <slug> (tertunda)`. Bukan repo git → lewati, sebut di Output.
+2. Set `elicitation: CLOSED`, jalankan `validate_doc.py --kind elicit` sampai `PASS`, lalu self-test semantik butir 10–14 template.
+3. Repo git (`git=ya` dari keluaran `ticket.py new` atau `check`): `git -C <root> add <ticketdir>/TICKET.md` lalu `git -C <root> commit -m "docs(ticket): elisitasi <slug>" -- <ticketdir>/TICKET.md` — `<root>` dari keluaran yang sama; path ticketdir relatif root, bukan relatif cwd. Draft yang tertahan juga di-commit dengan pesan `docs(ticket): elisitasi <slug> (tertunda)`. Bukan repo git → lewati, sebut di Output.
 4. Panggil `analyst:spec` dengan `{ ticketdir }`.
 
 ## Guardrails

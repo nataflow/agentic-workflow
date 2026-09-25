@@ -2,7 +2,7 @@
 
 Rumah kanonik bentuk **kartu** di `analyst/tickets/<YYMMDDhhmm>-<slug>/TICKET.md` — H1 dan tujuh H2 di atas `## Catatan Elisitasi`. Frontmatter dan catatan elisitasi berumah di `skills/elicit/templates/elicit-template.md`. Bagian 1 adalah kerangka yang disalin ke artefak, bagian 2 aturan yang ditagih `skills/_common/validate_doc.py --kind ticket` dan self-test penulis, bagian 3 contoh terisi yang **tidak** tersalin ke artefak. `SKILL.md` merujuk ke sini dan dilarang menulis ulang kerangkanya.
 
-Kartu setara kartu detail di Jira/Trello: dibaca peminta, product owner, QA, dan engineer. Isinya **apa** dan **kenapa**, tidak pernah **bagaimana** — pemecahan teknis, estimasi, dan pembagian backend/frontend milik engineer lewat `backenddev:tech-lead` / `frontenddev:lead`, yang menerbitkan `TASK.md` teknisnya sendiri dari tiket ini. `## Catatan Elisitasi` di bawah kartu tetap ikut di berkas yang sama sebagai jejak asal-usul tiap AC dan aturan.
+Kartu setara kartu detail di Jira/Trello: dibaca peminta, product owner, QA, dan engineer. Isinya **apa** dan **kenapa**, tidak pernah **bagaimana** — pemecahan teknis, estimasi, dan pembagian backend/frontend milik engineer lewat `backenddev:tech-lead` / `frontenddev:lead`, yang menerbitkan `TASK.md` teknisnya sendiri dari kartu ini (serah-terima manual — gerbang engineer belum membaca format TICKET.md). `## Catatan Elisitasi` di bawah kartu tetap ikut di berkas yang sama sebagai jejak asal-usul tiap AC dan aturan.
 
 ---
 
@@ -59,7 +59,7 @@ Tipe `BUG` mengganti `## User Story` dengan seksi berikut di posisi yang sama; s
 **Dampak**: <siapa, seberapa sering, ada jalan pintas atau tidak>
 ````
 
-Field frontmatter `status`, `revision`, `review`, `review_round`, `approved`, `approved_hash`, `approval`, `reopened`, `reopen_reason` ditulis **hanya** oleh `ticket.py`; `elicitation` dan `domain_terms` milik `analyst:elicit`. Penulis kartu menyalin nilainya apa adanya. `external_ref` diisi kunci atau tautan kartu Jira/Trello bila tiket ini disalin ke sana — yang disalin ke sana cukup kartunya, tanpa `## Catatan Elisitasi`.
+Field frontmatter `status`, `revision`, `revision_base`, `review`, `review_round`, `approved`, `approved_hash`, `approval`, `reopened`, `reopen_reason`, `cancel_reason` ditulis **hanya** oleh `ticket.py`; `elicitation` dan `domain_terms` milik `analyst:elicit`. Penulis kartu menyalin nilainya apa adanya. `external_ref` diisi kunci atau tautan kartu Jira/Trello bila tiket ini disalin ke sana (sesudah `READY` hanya lewat `ticket.py ref`) — yang disalin ke sana cukup kartunya, tanpa `## Catatan Elisitasi`.
 
 ---
 

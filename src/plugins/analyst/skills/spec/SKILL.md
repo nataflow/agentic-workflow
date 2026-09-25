@@ -9,26 +9,26 @@ user-invocable: false
 - Kartu `TICKET.md` disusun **hanya** dari `## Catatan Elisitasi` di berkas yang sama. Kebutuhan yang tidak ada di sana kembali ke `analyst:elicit`, tidak dikarang di sini.
 - `READY` hanya ditulis `ticket.py approve` sesudah jawaban eksplisit user di `AskUserQuestion`; skrip menolak bila validator gagal, `elicitation` tidak `CLOSED`, atau vonis `ticket-reviewer` terakhir bukan `PASS` atas sidik kartu **dan** catatan elisitasi yang sama persis dengan sekarang.
 - Nol isi teknis: tiket menyebut **apa** yang dilihat dan dilakukan pengguna, tidak pernah **bagaimana** sistem membangunnya.
-- Field pembukuan frontmatter (`revision`, `review`, `review_round`, `approved*`, `reopen*`) hanya ditulis `ticket.py`; saat menulis ulang body, nilainya disalin apa adanya.
+- Field pembukuan frontmatter (`revision`, `revision_base`, `review`, `review_round`, `approved*`, `reopen*`) dan `<ticketdir>/review.md` hanya ditulis `ticket.py`; saat menulis ulang body, nilainya disalin apa adanya.
 
 ## Precondition [REQUIRED]
 
 1. Skrip: `ticket.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py`; `validate_doc.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/validate_doc.py`; rubrik prioritas di bagian 4 `${CLAUDE_PLUGIN_ROOT}/skills/elicit/references/elicitation-guide.md`.
 2. **Perubahan tiket `READY`/`DRIFT`** (`change_request` terisi atau keadaan `DRIFT`): konfirmasi ke user lewat `AskUserQuestion` bahwa tiket dibuka ulang, lalu `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py reopen --ticketdir <ticketdir> --reason "<change_request atau DRIFT>"`.
-3. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py check --gate spec --ticketdir <ticketdir>`. `PASS` → baca baris `Terselesaikan:` (`type`, `git`, dan bila tiket sudah ada `revision`, `review_round`, `review_segar`). `FAIL` → remediasi per `Tindakan`: elisitasi belum `CLOSED` → `analyst:elicit`.
+3. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py check --gate spec --ticketdir <ticketdir>`. `PASS` → baca baris `Terselesaikan:` (`root`, `type`, `git`, dan bila tiket sudah ada `revision`, `review_round`, `review_segar`, `review_basi`, `review_report`). `FAIL` → remediasi per `Tindakan`: elisitasi belum `CLOSED` → `analyst:elicit`.
 
 ## Parameter [REQUIRED]
 
 - `ticketdir` — string — `[REQUIRED]` — ticketdir aktif.
 - `change_request` — string — default `""` — perubahan yang diminta atas tiket `READY`, apa adanya.
-- `external_ref` — string — default `"-"` — kunci atau tautan kartu Jira/Trello bila tiket ini disalin ke sana.
+- `external_ref` — string — default `"-"` — kunci atau tautan kartu Jira/Trello bila tiket ini disalin ke sana. Sesudah `READY` → `ticket.py ref --ticketdir <ticketdir> --ref <kunci>` (tanpa membuka ulang tiket); dilarang menyunting field ini dengan tangan.
 
 ## Workflow
 
 ### Phase 0 — Orientasi
 
-- Baca `TICKET.md` utuh — catatan elisitasi dan kartu bila sudah ada. Keadaan `DRAFT` dengan `review_segar=ya` (draft tertunda yang belum diputuskan) → langsung Phase 5 tanpa menulis ulang. `DRAFT` dengan `review_segar=tidak` → Phase 2 atas draft yang ada.
-- **Kembali dari elisitasi yang dibuka ulang** (kartu `DRAFT` sudah ada, catatan elisitasi berubah sesudah review terakhir): jalankan `ticket.py revise --ticketdir <ticketdir>` lebih dulu — basis fakta baru membuka siklus revisi dan ronde review baru — lalu Phase 1.
+- Baca `TICKET.md` utuh — catatan elisitasi dan kartu bila sudah ada. Keadaan `DRAFT` dengan `review_segar=ya` (draft tertunda yang belum diputuskan) → langsung Phase 5 tanpa menulis ulang, sajikan isi `review_report` apa adanya; `review_report=-` (vonis tercatat tanpa `--report`) → dispatch ulang reviewer satu ronde bila plafon masih ada, bila tidak sajikan hanya baris vonis.
+- **`review_basi` memuat `elisitasi`** (catatan elisitasi berubah sesudah ronde terakhir, mis. kembali dari elisitasi yang dibuka ulang): jalankan `ticket.py revise --ticketdir <ticketdir>` lebih dulu — basis fakta baru membuka siklus revisi dan ronde review baru — lalu Phase 1. `review_basi=kartu` (atau `review_segar=tidak` lainnya) → Phase 2 atas draft yang ada.
 - `change_request` menambah fakta yang tidak ada di catatan elisitasi (aturan, angka, aktor, istilah domain baru) → panggil `analyst:elicit` dengan `reopen_reason` = `change_request`, lalu kembali ke sini. Perubahan yang hanya redaksional atau memindahkan butir ke Di Luar Cakupan lanjut di sini.
 
 ### Phase 1 — Rumusan
@@ -58,17 +58,17 @@ user-invocable: false
 
 1. `review_round` sudah 2 → dilarang dispatch; lompat ke Phase 5 dengan BLOCKER tersisa (lihat `dispatcher/reviewer.md` gerbang masuk).
 2. Muat `dispatcher/reviewer.md`, hidrasi slot `ticketdir`, `type`, `round` (`review_round` + 1), dan pada ronde 2 `previous_verdict` beserta `changed_sections`; dispatch `ticket-reviewer` (`subagent_type`: `analyst:ticket-reviewer`) langsung, tanpa skill pembungkus.
-3. Catat balikan **seketika**, sebelum satu suntingan pun: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py review --ticketdir <ticketdir> --verdict <PASS|BLOCKED|DISPATCH_FAILED>` — skrip menyimpan sidik konten yang benar-benar dinilai reviewer. Suntingan sesudahnya membuat vonis itu basi dan menuntut ronde berikut. Tangani per tabel `### Penanganan Balikan` template itu.
+3. Catat balikan **seketika**, sebelum satu suntingan pun: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py review --ticketdir <ticketdir> --verdict <PASS|BLOCKED> --report - <<'EOF'`, lalu blok `## Ticket Review` reviewer apa adanya, lalu `EOF` (`--verdict DISPATCH_FAILED` tanpa `--report`). Skrip menyimpan sidik konten yang benar-benar dinilai reviewer dan bloknya ke `<ticketdir>/review.md`; menolak bila `- Verdict:` di blok berbeda dengan `--verdict`, atau bila `validate_doc.py` `ticket`/`elicit` `FAIL` (dispatch tidak sah). Suntingan sesudahnya membuat vonis itu basi dan menuntut ronde berikut. Tangani per tabel `### Penanganan Balikan` template itu.
 
 ### Phase 4 — Commit Draft
 
-Repo git (`git=ya`): `git add <ticketdir>/TICKET.md` lalu `git commit -m "docs(ticket): draft TICKET <slug>" -- <ticketdir>/TICKET.md` (revisi: `revise TICKET <slug>`). Bukan repo git → lewati.
+Repo git (`git=ya`): `git -C <root> add <ticketdir>/TICKET.md <ticketdir>/review.md` lalu `git -C <root> commit -m "docs(ticket): draft TICKET <slug>" -- <ticketdir>/TICKET.md <ticketdir>/review.md` (revisi: `revise TICKET <slug>`; `review.md` hanya bila ada). `<root>` dari `Terselesaikan:` — path ticketdir relatif root, bukan relatif cwd. Bukan repo git → lewati.
 
 ### Phase 5 — Persetujuan User
 
-1. Sajikan tiket: judul, tipe, prioritas beserta alasannya, user story atau laporan bug, daftar AC dan `BR-{n}`, Di Luar Cakupan, Pertanyaan Terbuka — ditambah blok `## Ticket Review` terakhir apa adanya.
-2. `AskUserQuestion`: *Setujui (READY)* · *Revisi (sebut poinnya)* · *Kembali ke elisitasi* · *Tahan*.
-3. **Setujui** → `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py approve --ticketdir <ticketdir> --answer "<jawaban user apa adanya>"`. Skrip memateraikan `READY` dan meng-commit bila repo git. `FAIL` → sebab di keluaran; review basi dengan plafon ronde tersisa → Phase 3 ronde berikut; plafon ronde habis → sajikan sebabnya dan ajukan ulang pilihan *Revisi* (satu-satunya jalan membuka ronde baru) atau *Kembali ke elisitasi*.
+1. Sajikan tiket: judul, tipe, prioritas beserta alasannya, user story atau laporan bug, daftar AC dan `BR-{n}`, Di Luar Cakupan, Pertanyaan Terbuka — ditambah blok `## Ticket Review` terakhir apa adanya (isi `review_report`, yaitu `<ticketdir>/review.md`).
+2. `AskUserQuestion`: *Setujui (READY)* — **hanya bila `review_segar=ya`** · *Revisi (sebut poinnya)* · *Kembali ke elisitasi* · *Tahan*. `review_segar=tidak` dengan plafon ronde habis → sajikan sebabnya tanpa opsi *Setujui*.
+3. **Setujui** → `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py approve --ticketdir <ticketdir> --answer "<jawaban user apa adanya>"`. Skrip memateraikan `READY` dan meng-commit `TICKET.md` (beserta `review.md`) bila repo git. `FAIL` → sebab di keluaran; review basi dengan plafon ronde tersisa → Phase 3 ronde berikut; plafon ronde habis → sajikan sebabnya dan ajukan ulang pilihan *Revisi* (satu-satunya jalan membuka ronde baru) atau *Kembali ke elisitasi*.
 4. **Revisi** → `ticket.py revise --ticketdir <ticketdir>` (plafon 3; mengosongkan vonis review) → perbarui draft → Phase 2–4 → ajukan ulang. Poin revisi yang menambah fakta baru → `analyst:elicit` dengan `reopen_reason`. Plafon habis → lingkup belum jelas: tawarkan *Kembali ke elisitasi* atau `ticket.py cancel` atas keputusan user.
 5. **Kembali ke elisitasi** → `analyst:elicit` dengan `ticketdir` dan `reopen_reason` = alasan user.
 6. **Tahan** → biarkan `DRAFT`; ticketdir muncul lagi di `ticket.py state`.
@@ -90,7 +90,7 @@ Repo git (`git=ya`): `git add <ticketdir>/TICKET.md` lalu `git commit -m "docs(t
 
 ## Output [REQUIRED]
 
-Tiket disetujui — tutup satu baris: `SPEC — READY · <ticketdir>/TICKET.md @<sidik> · <type> · <priority> · <n> AC · <n> BR · <commit <sha> | tanpa git> — serahkan ke engineer: tempel isi TICKET.md (kartunya; catatan elisitasi boleh ikut sebagai jejak) sebagai permintaan ke backenddev:tech-lead dan/atau frontenddev:lead.` Selain itu sajikan blok berikut dan hapus baris bernilai `—`:
+Tiket disetujui — tutup satu baris: `SPEC — READY · <ticketdir>/TICKET.md @<sidik> · <type> · <priority> · <n> AC · <n> BR · <commit <sha> | tanpa git> — serah-terima manual: tempel kartu TICKET.md (catatan elisitasi boleh ikut sebagai jejak) sebagai permintaan ke backenddev:tech-lead dan/atau frontenddev:lead (gerbang engineer belum membaca format ini; lihat README Serah Terima).` Selain itu sajikan blok berikut dan hapus baris bernilai `—`:
 
 ```markdown
 ### SPEC — <MENUNGGU KEPUTUSAN | TERTAHAN>
@@ -106,7 +106,7 @@ Tiket disetujui — tutup satu baris: `SPEC — READY · <ticketdir>/TICKET.md @
 2. **Fakta elisitasi saling bertentangan** saat merumuskan AC: jangan memilih sendiri — `analyst:elicit` dengan `reopen_reason` menyebut kedua fakta.
 3. **Validator kebocoran tidak kunjung `PASS`** karena istilah memang kosakata produk: dilarang menyunting catatan elisitasi atau `domain_terms` dari sini — panggil `analyst:elicit` dengan `reopen_reason` = `konfirmasi istilah domain: <istilah>`; sesudah istilah tercatat di `domain_terms` elisitasi, kembali ke Phase 0.
 4. **Dispatch reviewer gagal dua kali**: tiket tidak dapat di-`approve`; sajikan draft dengan status `TERTAHAN` dan minta user mengulang sesi.
-5. **`approve` gagal commit** (hook, gpg): status `READY` sudah tertulis; sertakan galat mentah dan minta user meng-commit sendiri. Dilarang `--no-verify`.
+5. **`approve` gagal commit** (exit 3; hook, gpg, `.gitignore`): status `READY` sudah tertulis; sajikan baris `COMMIT GAGAL` apa adanya dan minta user meng-commit sendiri dengan perintah yang dicetak. Dilarang `--no-verify`.
 
 ## STYLE
 

@@ -25,10 +25,10 @@ Review satu draft TICKET.md analyst.
 
 | Slot | Sumber Pengisian | Keterangan & Batasan Kritis |
 | --- | --- | --- |
-| `{ticketdir}` | Parameter `ticketdir` spec | **[REQUIRED]** Relatif root ruang kerja |
+| `{ticketdir}` | `<root>/<ticketdir>` (`root` dari baris `Terselesaikan:` `check --gate spec`) | **[REQUIRED]** Path absolut |
 | `{type}` | `Terselesaikan: type=` keluaran `ticket.py check --gate spec` | **[REQUIRED]** Dari frontmatter `TICKET.md`, bukan diketik ulang |
 | `{round}` | `review_round` frontmatter `TICKET.md` + 1 | **[REQUIRED]** `1` atau `2` |
-| `{previous_verdict}` | Blok `## Ticket Review` ronde 1 | **[OPTIONAL]** Hanya ronde 2; `-` di ronde 1 |
+| `{previous_verdict}` | Isi berkas `review_report` dari `check --gate spec` (blok `## Ticket Review` ronde 1) | **[OPTIONAL]** Hanya ronde 2; `-` di ronde 1 |
 | `{changed_sections}` | Heading `##` yang berubah sejak ronde 1 | **[OPTIONAL]** Hanya ronde 2; `-` di ronde 1 |
 
 ### Aturan untuk Pendispatch

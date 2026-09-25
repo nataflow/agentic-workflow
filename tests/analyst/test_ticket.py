@@ -147,20 +147,4 @@ def test_new_dari_subdirektori_menulis_di_root_git(make_repo):
     assert not (root / "src" / "features" / "analyst").exists()
 
 
-@pytest.mark.regression("A6")
-@pytest.mark.xfail(reason="A6: NEW PASS mencetak path relatif root tanpa `root=<abs>`; "
-                          "`git add` relatif cwd salah alamat bila cwd di subdirektori")
-def test_new_dari_subdirektori_mencetak_root_absolut(make_repo):
-    root = make_repo({"src/.keep": ""})
-    r = ticket(root, "new", "--slug", "cicilan", "--type", "FEATURE", cwd=root / "src")
-    assert f"root={root}" in r.stdout
-
-
-@pytest.mark.regression("A5")
-@pytest.mark.xfail(reason="A5: cancel menempel `status: CANCELLED` di akhir body berkas tanpa "
-                          "frontmatter, melapor PASS, tetapi state tetap RUSAK")
-def test_cancel_berkas_tanpa_frontmatter(make_repo):
-    root = repo_with(make_repo, "# Cicilan\n\n## Catatan Elisitasi\n\nisi\n")
-    r = ticket(root, "cancel", "--ticketdir", TD, "--reason", "batal")
-    # Perilaku benar: cancel ditolak dengan pesan jelas, ATAU tiket benar-benar dibatalkan.
-    assert r.returncode != 0 or state_of(root) not in ("RUSAK", "-"), (r.stdout, state_of(root))
+# Regresi A5/A6 (sebelumnya xfail di sini) pindah ke test_ticket_8a.py.

@@ -1,6 +1,6 @@
 # ELICIT Template — `elicit`
 
-Rumah kanonik **frontmatter** dan seksi `## Catatan Elisitasi` di `analyst/tickets/<YYMMDDhhmm>-<slug>/TICKET.md` — satu-satunya berkas ticketdir. Bagian 1 adalah kerangka yang disalin ke artefak, bagian 2 aturan yang ditagih `skills/_common/validate_doc.py --kind elicit` dan self-test penulis, bagian 3 contoh terisi yang **tidak** tersalin ke artefak. `SKILL.md` merujuk ke sini dan dilarang menulis ulang kerangkanya. Seksi kartu di atas catatan (Latar Belakang sampai Lampiran) milik `skills/spec/templates/ticket-template.md`.
+Rumah kanonik **frontmatter** dan seksi `## Catatan Elisitasi` di `analyst/tickets/<YYMMDDhhmm>-<slug>/TICKET.md` — satu-satunya artefak yang disunting skill; `review.md` di sebelahnya jejak vonis reviewer terakhir, hanya ditulis `ticket.py`. Bagian 1 adalah kerangka yang disalin ke artefak, bagian 2 aturan yang ditagih `skills/_common/validate_doc.py --kind elicit` dan self-test penulis, bagian 3 contoh terisi yang **tidak** tersalin ke artefak. `SKILL.md` merujuk ke sini dan dilarang menulis ulang kerangkanya. Seksi kartu di atas catatan (Latar Belakang sampai Lampiran) milik `skills/spec/templates/ticket-template.md`.
 
 `## Catatan Elisitasi` adalah **catatan kerja**, bukan kartu: ia menyimpan permintaan asli, fakta yang sudah terkumpul per pilar, riwayat tanya-jawab, dan pertanyaan yang masih menunggu jawaban. Seksi ini yang membuat elisitasi dapat dilanjutkan lintas sesi, dan satu-satunya masukan tertulis `analyst:spec`. Ia selalu H2 **terakhir**; `spec` menyisipkan kartu di antara H1 dan seksi ini tanpa menyentuh isinya.
 
@@ -75,7 +75,7 @@ _(belum terjawab)_
 
 Tipe `BUG` memakai `#### ` pilar berikut di bawah `### Fakta`, urutan persis: `Langkah Reproduksi`, `Yang Diharapkan`, `Yang Terjadi`, `Dampak`, `Urgensi` (wajib), lalu `Lingkungan`, `Batas Cakupan` (opsional). Seksi lain identik.
 
-Kepemilikan frontmatter: `elicitation`, `type`, `slug`, `requester`, `created`, `domain_terms` ditulis `elicit`; `priority`, `external_ref`, dan H1 final ditulis `spec`; `status` (selain `DRAFT` awal), `revision`, `review`, `review_round`, `approved*`, `reopen*`, `cancel_reason` ditulis **hanya** oleh `ticket.py`. Penulis mana pun menyalin field milik pihak lain apa adanya.
+Kepemilikan frontmatter: `elicitation`, `type`, `slug`, `requester`, `created`, `domain_terms` ditulis `elicit`; `priority`, `external_ref`, dan H1 final ditulis `spec`; `status` (selain `DRAFT` awal), `revision`, `revision_base`, `review`, `review_round`, `approved*`, `reopen*`, `cancel_reason` ditulis **hanya** oleh `ticket.py`; `external_ref` sesudah `READY` hanya lewat `ticket.py ref`. Penulis mana pun menyalin field milik pihak lain apa adanya.
 
 ---
 
@@ -90,14 +90,16 @@ Kepemilikan frontmatter: `elicitation`, `type`, `slug`, `requester`, `created`, 
 5. **Log**: tabel berheader lima kolom beserta baris pemisah; baris `| n | YYYY-MM-DD | <pertanyaan> | <jawaban> | <sumber> |` bernomor urut dari 1. Nol baris sah bila permintaan asli sudah menjawab seluruh pilar.
 6. **Pertanyaan terbuka**: `- Tidak ada.`, atau baris `- **Q-{n}** [MEMBLOKIR | TIDAK MEMBLOKIR]: <pertanyaan> — menunggu: <siapa>` ber-ID unik. `CLOSED` menuntut nol `MEMBLOKIR`.
 7. **Placeholder**: nol `TBD`/`TODO`/`diisi nanti` dan nol slot `<...>` di `### Fakta` dan `### Pertanyaan Terbuka`. `### Permintaan Asli` dan `### Log Tanya-Jawab` dikecualikan — keduanya kutipan mentah yang dilarang disunting.
+8. **Asumsi**: `CLOSED` menuntut nol baris `Asumsi:` di `### Fakta` — tiap asumsi dikonfirmasi (labelnya dihapus) atau pilarnya kembali ke Phase 2.
+9. **Jejak istilah domain**: `CLOSED` menuntut tiap istilah `domain_terms` muncul di `### Permintaan Asli` atau di baris `### Log Tanya-Jawab` (baris konfirmasinya).
 
 **Semantik** — self-test penulis sebelum `elicitation: CLOSED`, tidak dapat ditagih skrip:
 
-8. Tiap fakta berasal dari permintaan asli atau baris log — dilarang mengisi pilar dengan tebakan analis. Fakta yang disimpulkan, bukan dikatakan, ditulis `Asumsi: <...>` dan dikonfirmasi di Phase 4 `SKILL.md`.
-9. `Aktor` menyebut peran konkret (Kasir, Admin Cabang, Pembeli), bukan "user". `Aturan Bisnis` berangka atau berkondisi pasti ("maksimal 3 kali per hari"), bukan kata sifat ("secukupnya").
-10. Pertanyaan `MEMBLOKIR` ⇔ jawabannya mengubah `Aturan Bisnis`, `Kondisi Diinginkan`, `Batas Cakupan`, atau (BUG) `Yang Diharapkan`. Selain itu `TIDAK MEMBLOKIR` dan akan dibawa `spec` sebagai asumsi.
-11. Nomor `Q-{n}` tidak dipakai ulang sesudah terjawab; jawabannya pindah ke log.
-12. Nol istilah teknis rekaan analis. Istilah teknis yang **diucapkan** peminta boleh terekam di log apa adanya, tetapi pilar merumuskannya ulang sebagai perilaku yang dilihat pengguna.
+10. Tiap fakta berasal dari permintaan asli atau baris log — dilarang mengisi pilar dengan tebakan analis. Fakta yang disimpulkan, bukan dikatakan, ditulis `Asumsi: <...>` dan dikonfirmasi di Phase 4 `SKILL.md`.
+11. `Aktor` menyebut peran konkret (Kasir, Admin Cabang, Pembeli), bukan "user". `Aturan Bisnis` berangka atau berkondisi pasti ("maksimal 3 kali per hari"), bukan kata sifat ("secukupnya").
+12. Pertanyaan `MEMBLOKIR` ⇔ jawabannya mengubah `Aturan Bisnis`, `Kondisi Diinginkan`, `Batas Cakupan`, atau (BUG) `Yang Diharapkan`. Selain itu `TIDAK MEMBLOKIR` dan akan dibawa `spec` sebagai asumsi.
+13. Nomor `Q-{n}` tidak dipakai ulang sesudah terjawab; jawabannya pindah ke log.
+14. Nol istilah teknis rekaan analis. Istilah teknis yang **diucapkan** peminta boleh terekam di log apa adanya, tetapi pilar merumuskannya ulang sebagai perilaku yang dilihat pengguna.
 
 ---
 
@@ -175,4 +177,4 @@ Jam rekonsiliasi Finance turun dari ±6 jam menjadi ≤1 jam per minggu.
 - **Q-2** [TIDAK MEMBLOKIR]: Apakah pelanggan menerima pengingat sebelum jatuh tempo? — menunggu: Rina
 ````
 
-Pembanding pilar yang **gugur** di butir 9: `#### Aturan Bisnis` berisi `Cicilan untuk invoice yang nominalnya besar` — kata sifat tanpa ambang; engineer tidak dapat mengujinya.
+Pembanding pilar yang **gugur** di butir 11: `#### Aturan Bisnis` berisi `Cicilan untuk invoice yang nominalnya besar` — kata sifat tanpa ambang; engineer tidak dapat mengujinya.
