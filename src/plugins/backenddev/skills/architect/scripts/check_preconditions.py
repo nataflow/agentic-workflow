@@ -25,7 +25,7 @@ from precondition_lib import (  # noqa: E402
     legacy_suffix,
 )
 from brief_status import (  # noqa: E402
-    BRIEF_STATUSES, CLOSED, read_halt, review_freshness, scan_briefs, validate_links,
+    BRIEF_STATUSES, CLOSED, landed_sha, read_halt, review_freshness, scan_briefs, validate_links,
 )
 
 
@@ -235,7 +235,8 @@ class PreconditionChecker:
         """Titik masuk sesi dari status brief di disk.
 
         `entry` adalah titik masuk yang dibaca Fase 1: `FASE_3:<NN>`, `FASE_4`,
-        `FASE_5`, atau `TUNTAS`. Brief `BLOCKED` menahan rantai walau ada brief
+        `FASE_5`, `TUNTAS`, atau `KOREKSI:<NN>:<sha7>` — brief `READY` yang commit
+        ber-`commit_message`-nya sudah mendarat (matriks bukti disk, status tertinggal). Brief `BLOCKED` menahan rantai walau ada brief
         `READY` sesudahnya — Fase 1 berhenti di brief pertama yang terblokir.
         """
         cid, name = 3, "Brief Set & Readiness"
@@ -260,6 +261,12 @@ class PreconditionChecker:
                              "pengganti ber-`supersedes`.")
         start = next((b for b in briefs if b["status"] not in CLOSED), None)
         if start:
+            rel = f"{self._get_rel_taskdir_str()}/{start['name']}"
+            sha = landed_sha(self.root, rel, start["commit_message"])
+            if sha:
+                return self._add(cid, name, "PASS", f"brief-{start['nn']} READY tetapi commit {sha} sudah mendarat",
+                                 "Jalankan koreksi status (matriks bukti disk `lifecycle-recovery.md` bagian 3); "
+                                 "dilarang dispatch ulang.", entry=f"KOREKSI:{start['nn']}:{sha}")
             return self._add(cid, name, "PASS", f"Titik mulai brief-{start['nn']} ({start['name']})",
                              entry=f"FASE_3:{start['nn']}")
         self._all_closed(cid, name, td, briefs)

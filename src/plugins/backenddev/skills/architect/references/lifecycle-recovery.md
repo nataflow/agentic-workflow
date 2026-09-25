@@ -18,12 +18,14 @@ Alur siklus hidup status brief diatur secara deterministik untuk menjamin keterl
 
 Baris `status` frontmatter ditulis **`code-implementor`** (`DONE`/`BLOCKED`) dan skrip
 `scaffold_brief.py` milik `plan` (`SUPERSEDED`), bukan `architect`. Skill orkestrator membacanya
-untuk traversal dan memverifikasi commit-nya mendarat — tidak pernah menulisnya.
+untuk traversal dan memverifikasi commit-nya mendarat. Satu-satunya tulisan `architect` adalah koreksi
+`READY → DONE` saat commit brief terbukti mendarat tetapi statusnya tertinggal (bagian 3).
 
 | Status Awal | Kondisi Transisi                            | Status Akhir | Ditulis oleh       | Aksi Lanjutan `architect`                    |
 | ----------- | ------------------------------------------- | ------------ | ------------------ | -------------------------------------------- |
 | `READY`     | Seluruh `## Steps` tuntas + cek statis lolos | `DONE`      | `code-implementor` | Catat SHA dari amplop, lanjut ke `NN+1`      |
 | `READY`     | Kena stop condition / cacat statis di luar scope | `BLOCKED` | `code-implementor` | Jalankan matriks bukti disk bagian 3       |
+| `READY`     | Commit ber-`commit_message` sudah mendarat, status tertinggal | `DONE` | `architect` (koreksi) | Commit korektif brief saja, lanjut `NN+1` |
 | `DONE`      | Traversal sesi baru (re-entrancy)           | `DONE`       | —                  | Lewati unit, pertahankan commit eksisting    |
 | `BLOCKED`   | Traversal sesi baru, belum digantikan        | `BLOCKED`    | —                  | **BERHENTI**, eskalasi ke `tech-lead` (lane `PLANNING`, taskdir sama) |
 | `BLOCKED`   | `scaffold_brief.py --nn` baris pengganti     | `SUPERSEDED` | `plan` (skrip)     | Lewati; pengganti dieksekusi di NN-nya       |
@@ -72,6 +74,7 @@ itu mendarat dan diff-nya tidak melewati `## File scope`.
 | `src/**` + brief + report, brief terblokir | `code-implementor` | `wip(<domain>): brief-<NN>-<unit> [BLOCKED]` |
 | `{taskdir}/REVIEW.md` + baris riwayat review di `backenddev/issues/README.md` | `code-reviewer` | `docs(<slug>): add final review report` |
 | `{taskdir}/HALT.md`, rantai ditahan gerbang kompilasi/scope/simbol/berkas liar | `architect` | `chore(<slug>): tahan rantai di brief-NN (<verdict>)` |
+| `{taskdir}/brief-NN-<unit>.md` saja, koreksi `READY → DONE` (commit ada, status tertinggal) | `architect` | `chore(<slug>): koreksi status brief-NN ke DONE (<sha7>)` |
 | Penguncian susulan saat commit hilir terbukti gagal | `architect` | ulangi pesan milik penulisnya, catat penyimpangan |
 
 Seluruh staging wajib menyebut path satu per satu:
@@ -161,16 +164,21 @@ zona artefak `tech-lead --re-entry`.
 dispatch tidak pernah berangkat (**tidak ada vonis**). Kata statusnya tidak membedakan keduanya, jadi
 `architect` memutuskan dari bukti di disk — bukan dari amplop.
 
-| `report-<NN>.md` ada? | Commit brief ada di `git log`? | Tindakan `architect` |
-| --- | --- | --- |
-| ya | ya | Vonis dan penandanya sudah mendarat — **HENTIKAN RANTAI**, lompat ke Fase 5 sebagai `BLOCKED (di brief-<NN>)` tanpa melewati Fase 4 |
-| ya | tidak | Vonis ada, commit gagal — kunci sendiri `wip(<domain>): brief-<NN>-<unit> [BLOCKED]`, catat penyimpangan, **HENTIKAN RANTAI**, lompat ke Fase 5 sebagai `BLOCKED (di brief-<NN>)` |
-| tidak | ya | Kerja mendarat lengkap, vonisnya yang tak sampai — perlakukan `DONE`, ambil SHA dari `git log`, **dilarang retry**, lanjut ke `NN+1` |
-| tidak | tidak, `git status` bersih | Dispatch tak pernah berangkat — brief tetap `READY`, ulangi dispatch sebanyak `max_retries_per_brief`; masih gagal ⇒ eskalasi ke user |
-| tidak | tidak, `git status` kotor | Perubahan parsial tanpa vonis — **HENTIKAN**, eskalasi ke user; dilarang meng-commit apa pun |
+| `report-<NN>.md`? | Commit brief di `git log`? | `status` brief di disk | `git status` | Tindakan `architect` |
+| --- | --- | --- | --- | --- |
+| ya | ya | `BLOCKED` | bersih | **HENTIKAN**, Fase 5 `BLOCKED (di brief-NN)`; brief ditutup `plan` lewat pengganti ber-`supersedes` |
+| ya | tidak | apa pun | apa pun | Vonis ada, commit gagal — kunci sendiri `wip(<domain>): brief-NN-<unit> [BLOCKED]`, catat penyimpangan, **HENTIKAN**, Fase 5 `BLOCKED (di brief-NN)` |
+| tidak | ya | `DONE` | bersih | Normal — ambil SHA dari `git log`, lanjut `NN+1` |
+| tidak | ya | `READY` | bersih | **Koreksi status** (commit ada, status tertinggal): tulis `status: DONE` di brief, `git add {taskdir}/brief-NN-<unit>.md`, `git commit -m "chore(<slug>): koreksi status brief-NN ke DONE (<sha7>)"`; **dilarang retry**; lanjut `NN+1`. Skrip prasyarat menandainya `entry` `KOREKSI:<NN>:<sha7>` |
+| tidak | ya | apa pun | kotor | **HENTIKAN**, tulis `HALT.md` `verdict: STRAY` berisi `git status --porcelain` (bagian 3a); eskalasi ke user; dilarang meng-commit berkas selain `HALT.md` |
+| tidak | tidak | `READY` | bersih | Dispatch tak pernah berangkat — ulangi dispatch sebanyak `max_retries_per_brief`; masih gagal ⇒ eskalasi ke user |
+| tidak | tidak | apa pun | kotor | Perubahan parsial tanpa vonis — **HENTIKAN**, eskalasi ke user; dilarang meng-commit apa pun |
 
-Pembeda commit brief di `git log` adalah `commit_message` pada frontmatter brief (atau varian
-`wip(<domain>)`-nya), bukan tebakan dari isi diff.
+Pembeda commit brief di `git log` adalah subjek yang **persis sama** dengan `commit_message` pada
+frontmatter brief (atau varian `wip(<domain>)`-nya), dibandingkan persis — bukan `--grep` regex dan
+bukan tebakan dari isi diff. Berkas di luar `.explore/` yang tertinggal sesudah commit implementor
+tidak pernah dibersihkan `architect` (`git restore`, `git clean`, `git stash` dilarang): keputusan atas
+pekerjaan yang tidak diklaim siapa pun milik user.
 
 ### Struktur Laporan Kegagalan (`report-<NN>.md`)
 

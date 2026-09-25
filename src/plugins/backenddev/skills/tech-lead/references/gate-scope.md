@@ -61,6 +61,7 @@ Setiap artefak ditutup dengan `git commit` di titik ia menjadi keputusan final:
 | `{taskdir}/REVIEW.md` + baris riwayat review di `backenddev/issues/README.md` | Reviewer selesai menilai seluruh rantai | **`code-reviewer`** | `docs(<slug>): add final review report` |
 | `src/**` + berkas briefnya | Tiap brief selesai atau terblokir | **`code-implementor`** | `commit_message` frontmatter brief |
 | `{taskdir}/HALT.md` | Gerbang kompilasi, scope, simbol, atau berkas liar menahan rantai | **`architect`** | `chore(<slug>): tahan rantai di brief-NN (<verdict>)` |
+| `{taskdir}/brief-NN-<unit>.md` koreksi `READY → DONE` | Commit brief mendarat tetapi status tertinggal | **`architect`** | `chore(<slug>): koreksi status brief-NN ke DONE (<sha7>)` |
 | Penghapusan `{taskdir}/HALT.md` ber-`verdict: SCOPE`/`SYMBOL` | User menerima commit di luar scope | `tech-lead` | `docs(<slug>): cabut HALT brief-NN (scope diterima user)` |
 | `BRD.md` / `PRD.md` draft **yatim** | Terdeteksi belum terkunci di Fase 4 `analyst` | **`analyst`** | format pesan penulisnya (`draft <BRD\|PRD>`) |
 
