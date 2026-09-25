@@ -84,7 +84,7 @@ Sumber: `ISSUES.md` Langkah 1 (commit `34684ee`). Semua nomor baris, kutipan kod
 
 ## L1.1 [Kritis] backenddev dan frontenddev berebut `.claude/profile/`
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev, frontenddev (berdampak ke analyst dan quickdev lewat hook) · **Estimasi:** 2,5–3 hari (Opsi A) · **Bergantung pada:** K1, K2; L1.2 (hook memakai `detect.read_profile`) · **Memblokir:** L1.3 (teks hook), L1.4, B3, C10
 
@@ -386,83 +386,83 @@ Tata letak baru:
 
 | ☐ | Plugin | Berkas (relatif `src/plugins/<plugin>/`) | Konstruksi | Pesan | Impor `_common`? | Perubahan Opsi A |
 |---|---|---|---|---|---|---|
-| ☐ | backenddev | `hooks/tech-lead-gate.sh` | 38, 39 | 76, 78 | — | Hapus; diganti `detect.py` (L1.2) |
-| ☐ | backenddev | `skills/_common/precondition_lib.py` | 67, 90 | 49, 69 | rumah | Tambah `PROFILE_DIR_REL`, `resolve_profile_dir`; `:67` → resolver, `:90` → `PROFILE_DIR_REL` |
-| ☐ | backenddev | `skills/analyst/scripts/check_preconditions.py` | 157 | 164 | **tidak** | Tambah bootstrap; resolver |
-| ☐ | backenddev | `skills/architect/scripts/check_preconditions.py` | 142 | 150 | **tidak** | Tambah bootstrap; resolver |
-| ☐ | backenddev | `skills/audit/scripts/check_preconditions.py` | 70, 116, 174 | 124 | ya | Resolver (3×) |
-| ☐ | backenddev | `skills/business-analysis/scripts/check_preconditions.py` | 147, 206 | 155 | ya | Resolver (2×) |
-| ☐ | backenddev | `skills/debug/scripts/check_preconditions.py` | 72, 167, 319 | 80 | ya | Resolver (3×) |
-| ☐ | backenddev | `skills/document-api/scripts/check_preconditions.py` | 71, 108 | — | ya | Resolver (2×) |
-| ☐ | backenddev | `skills/plan/scripts/check_preconditions.py` | 176, 398 | 184, 221 | ya | Resolver (2×) |
-| ☐ | backenddev | `skills/plan/scripts/validate_briefs.py` | 450, 1062, 1488 | 168, 1053 (docstring), 1088 | **tidak** | Tambah bootstrap; resolver (3×) |
-| ☐ | backenddev | `skills/profile/scripts/check_preconditions.py` | 50 (default `--profile-dir`) | 153 | ya | Default `PROFILE_DIR_REL`, tolak nilai lain, check kepemilikan + MIGRATE, check 1 via `detect_backend` |
-| ☐ | backenddev | `skills/report/scripts/check_preconditions.py` | 276 | 284 | **tidak** | Tambah bootstrap; resolver |
-| ☐ | backenddev | `skills/system-analysis/scripts/check_preconditions.py` | 187, 293 | 195 | ya | Resolver (2×) |
-| ☐ | backenddev | `skills/task/scripts/check_preconditions.py` | 212 | 219 | **tidak** | Tambah bootstrap; resolver |
-| ☐ | backenddev | `skills/tech-lead/scripts/check_preconditions.py` | 24 (prefix re-entry), 75, 332 | 85, 129, 338, 371 | ya | Prefix `.claude/profile/backenddev/`; resolver (2×) |
-| ☐ | frontenddev | `hooks/lead-gate.sh` | 44, 45, 76 | 3, 88, 96, 104 | — | Hapus; diganti `detect.py` (L1.2) |
-| ☐ | frontenddev | `skills/_common/precondition_lib.py` | (baru) `DEFAULT_PROFILE_DIR` | 12, 96 (docstring hook), 680 | rumah | Konstanta + resolver; pesan `:680` → `DEFAULT_PROFILE_DIR`; `:942` (`:(exclude).claude`) tidak berubah |
-| ☐ | frontenddev | `skills/architect/scripts/check_preconditions.py` | 71 | — | ya | Resolver |
-| ☐ | frontenddev | `skills/contract/scripts/check_preconditions.py` | 42 | 75 (help) | ya | Resolver; help |
-| ☐ | frontenddev | `skills/plan/scripts/check_preconditions.py` | 74 | 235 (help) | ya | Resolver; help |
-| ☐ | frontenddev | `skills/plan/scripts/validate_briefs.py` | 204 | 1094 (help) | ya | Resolver; help |
-| ☐ | frontenddev | `skills/profile/scripts/check_preconditions.py` | 44 (`DEFAULT_PROFILE_DIR`) | — | ya | Impor dari lib; hapus duplikat `PROFILE_FILES` `:48-50`; kepemilikan + MIGRATE di `_resolve_mode` |
-| ☐ | frontenddev | `skills/review/scripts/check_preconditions.py` | 62 | — | ya | Resolver |
-| ☐ | frontenddev | `skills/task/scripts/check_preconditions.py` | 48 | 126 (help) | ya | Resolver; help |
-| ☐ | frontenddev | `skills/ui-design/scripts/check_preconditions.py` | 42 | 75 (help) | ya | Resolver; help |
-| ☐ | frontenddev | `skills/ux-design/scripts/check_preconditions.py` | 42 | 75 (help) | ya | Resolver; help |
+| ☑ | backenddev | `hooks/tech-lead-gate.sh` | 38, 39 | 76, 78 | — | Hapus; diganti `detect.py` (L1.2) |
+| ☑ | backenddev | `skills/_common/precondition_lib.py` | 67, 90 | 49, 69 | rumah | Tambah `PROFILE_DIR_REL`, `resolve_profile_dir`; `:67` → resolver, `:90` → `PROFILE_DIR_REL` |
+| ☑ | backenddev | `skills/analyst/scripts/check_preconditions.py` | 157 | 164 | **tidak** | Tambah bootstrap; resolver |
+| ☑ | backenddev | `skills/architect/scripts/check_preconditions.py` | 142 | 150 | **tidak** | Tambah bootstrap; resolver |
+| ☑ | backenddev | `skills/audit/scripts/check_preconditions.py` | 70, 116, 174 | 124 | ya | Resolver (3×) |
+| ☑ | backenddev | `skills/business-analysis/scripts/check_preconditions.py` | 147, 206 | 155 | ya | Resolver (2×) |
+| ☑ | backenddev | `skills/debug/scripts/check_preconditions.py` | 72, 167, 319 | 80 | ya | Resolver (3×) |
+| ☑ | backenddev | `skills/document-api/scripts/check_preconditions.py` | 71, 108 | — | ya | Resolver (2×) |
+| ☑ | backenddev | `skills/plan/scripts/check_preconditions.py` | 176, 398 | 184, 221 | ya | Resolver (2×) |
+| ☑ | backenddev | `skills/plan/scripts/validate_briefs.py` | 450, 1062, 1488 | 168, 1053 (docstring), 1088 | **tidak** | Tambah bootstrap; resolver (3×) |
+| ☑ | backenddev | `skills/profile/scripts/check_preconditions.py` | 50 (default `--profile-dir`) | 153 | ya | Default `PROFILE_DIR_REL`, tolak nilai lain, check kepemilikan + MIGRATE, check 1 via `detect_backend` |
+| ☑ | backenddev | `skills/report/scripts/check_preconditions.py` | 276 | 284 | **tidak** | Tambah bootstrap; resolver |
+| ☑ | backenddev | `skills/system-analysis/scripts/check_preconditions.py` | 187, 293 | 195 | ya | Resolver (2×) |
+| ☑ | backenddev | `skills/task/scripts/check_preconditions.py` | 212 | 219 | **tidak** | Tambah bootstrap; resolver |
+| ☑ | backenddev | `skills/tech-lead/scripts/check_preconditions.py` | 24 (prefix re-entry), 75, 332 | 85, 129, 338, 371 | ya | Prefix `.claude/profile/backenddev/`; resolver (2×) |
+| ☑ | frontenddev | `hooks/lead-gate.sh` | 44, 45, 76 | 3, 88, 96, 104 | — | Hapus; diganti `detect.py` (L1.2) |
+| ☑ | frontenddev | `skills/_common/precondition_lib.py` | (baru) `DEFAULT_PROFILE_DIR` | 12, 96 (docstring hook), 680 | rumah | Konstanta + resolver; pesan `:680` → `DEFAULT_PROFILE_DIR`; `:942` (`:(exclude).claude`) tidak berubah |
+| ☑ | frontenddev | `skills/architect/scripts/check_preconditions.py` | 71 | — | ya | Resolver |
+| ☑ | frontenddev | `skills/contract/scripts/check_preconditions.py` | 42 | 75 (help) | ya | Resolver; help |
+| ☑ | frontenddev | `skills/plan/scripts/check_preconditions.py` | 74 | 235 (help) | ya | Resolver; help |
+| ☑ | frontenddev | `skills/plan/scripts/validate_briefs.py` | 204 | 1094 (help) | ya | Resolver; help |
+| ☑ | frontenddev | `skills/profile/scripts/check_preconditions.py` | 44 (`DEFAULT_PROFILE_DIR`) | — | ya | Impor dari lib; hapus duplikat `PROFILE_FILES` `:48-50`; kepemilikan + MIGRATE di `_resolve_mode` |
+| ☑ | frontenddev | `skills/review/scripts/check_preconditions.py` | 62 | — | ya | Resolver |
+| ☑ | frontenddev | `skills/task/scripts/check_preconditions.py` | 48 | 126 (help) | ya | Resolver; help |
+| ☑ | frontenddev | `skills/ui-design/scripts/check_preconditions.py` | 42 | 75 (help) | ya | Resolver; help |
+| ☑ | frontenddev | `skills/ux-design/scripts/check_preconditions.py` | 42 | 75 (help) | ya | Resolver; help |
 
 #### Checklist titik sentuh — markdown (`md_grep ".claude/profile"`)
 
 | ☐ | Plugin | Berkas (relatif `src/plugins/<plugin>/`) | Baris |
 |---|---|---|---|
-| ☐ | backenddev | `agents/code-explorer.md` | 18 |
-| ☐ | backenddev | `agents/code-implementor.md` | 12 |
-| ☐ | backenddev | `agents/code-reviewer.md` | 25, 35, 60 |
-| ☐ | backenddev | `skills/architect/dispatcher/implementor.md` | 20, 40, 44 |
-| ☐ | backenddev | `skills/architect/dispatcher/reviewer.md` | 34, 40 |
-| ☐ | backenddev | `skills/audit/SKILL.md` | 36 |
-| ☐ | backenddev | `skills/audit/references/dimensions.md` | 5, 55, 78 |
-| ☐ | backenddev | `skills/business-analysis/SKILL.md` | 44, 108 |
-| ☐ | backenddev | `skills/business-analysis/dispatcher/explorer.md` | 61, 71, 73 |
-| ☐ | backenddev | `skills/debug/SKILL.md` | 114 |
-| ☐ | backenddev | `skills/debug/dispatcher/explorer.md` | 82, 92 |
-| ☐ | backenddev | `skills/document-api/SKILL.md` | 26 |
-| ☐ | backenddev | `skills/plan/SKILL.md` | 19 |
-| ☐ | backenddev | `skills/plan/dispatcher/explorer.md` | 77, 89, 91 |
-| ☐ | backenddev | `skills/plan/references/entry-rules.md` | 9 |
-| ☐ | backenddev | `skills/plan/references/review-and-commit.md` | 31, 46, 55, 70, 74 |
-| ☐ | backenddev | `skills/plan/references/slicing-and-scan.md` | 26 |
-| ☐ | backenddev | `skills/plan/templates/brief-template.md` | 172 |
-| ☐ | backenddev | `skills/profile/SKILL.md` | 3, 14, 26, 51, 86, 95, 99, 115, 124, 134, 138, 141, 146, 159 |
-| ☐ | backenddev | `skills/profile/references/convention-scan.md` | 3 |
-| ☐ | backenddev | `skills/profile/references/scan-guide.md` | 3 |
-| ☐ | backenddev | `skills/profile/stacks/_CONTRACT.md` | 9, 59, 74 (manual), 95 |
-| ☐ | backenddev | `skills/profile/templates/profile-template.md` | 1, 3, 4, 29, 48, 60, 76, 88, 100, 112, 127, 142, 159, 173, 180, 191, 200, 216, 230, 240, 252 |
-| ☐ | backenddev | `skills/report/SKILL.md` | 26 |
-| ☐ | backenddev | `skills/system-analysis/SKILL.md` | 15 |
-| ☐ | backenddev | `skills/system-analysis/dispatcher/explorer.md` | 181, 193, 195 |
-| ☐ | backenddev | `skills/system-analysis/references/analysis-protocol.md` | 47 |
-| ☐ | backenddev | `skills/task/SKILL.md` | 38 |
-| ☐ | backenddev | `skills/tech-lead/SKILL.md` | 51, 80, 141 |
-| ☐ | backenddev | `skills/tech-lead/dispatcher/explorer.md` | 63, 64, 78, 80 |
-| ☐ | backenddev | `skills/tech-lead/references/gate-scope.md` | 49, 120 |
-| ☐ | frontenddev | `README.md` | 10, 19, 62, 277 |
-| ☐ | frontenddev | `agents/code-explorer.md` | 36, 186 |
-| ☐ | frontenddev | `agents/code-implementor.md` | 25, 60 |
-| ☐ | frontenddev | `agents/code-reviewer.md` | 25, 33 |
-| ☐ | frontenddev | `agents/contract-reviewer.md` | 16 |
-| ☐ | frontenddev | `agents/doc-reviewer.md` | 23 |
-| ☐ | frontenddev | `skills/architect/SKILL.md` | 32 |
-| ☐ | frontenddev | `skills/contract/SKILL.md` | 36 |
-| ☐ | frontenddev | `skills/lead/SKILL.md` | 19, 37 |
-| ☐ | frontenddev | `skills/lead/dispatcher/explorer.md` | 78 |
-| ☐ | frontenddev | `skills/lead/references/lane-routing-matrix.md` | 11 |
-| ☐ | frontenddev | `skills/plan/dispatcher/reviewer.md` | 128 |
-| ☐ | frontenddev | `skills/profile/SKILL.md` | 3, 10, 20, 23, 92, 105, 123, 129, 148, 169, 175, 183 |
-| ☐ | frontenddev | `skills/profile/stacks/_CONTRACT.md` | 10 |
-| ☐ | frontenddev | `skills/profile/templates/profile-template.md` | 1, 39, 60, 75, 92, 110, 125, 145, 170, 181, 194 |
+| ☑ | backenddev | `agents/code-explorer.md` | 18 |
+| ☑ | backenddev | `agents/code-implementor.md` | 12 |
+| ☑ | backenddev | `agents/code-reviewer.md` | 25, 35, 60 |
+| ☑ | backenddev | `skills/architect/dispatcher/implementor.md` | 20, 40, 44 |
+| ☑ | backenddev | `skills/architect/dispatcher/reviewer.md` | 34, 40 |
+| ☑ | backenddev | `skills/audit/SKILL.md` | 36 |
+| ☑ | backenddev | `skills/audit/references/dimensions.md` | 5, 55, 78 |
+| ☑ | backenddev | `skills/business-analysis/SKILL.md` | 44, 108 |
+| ☑ | backenddev | `skills/business-analysis/dispatcher/explorer.md` | 61, 71, 73 |
+| ☑ | backenddev | `skills/debug/SKILL.md` | 114 |
+| ☑ | backenddev | `skills/debug/dispatcher/explorer.md` | 82, 92 |
+| ☑ | backenddev | `skills/document-api/SKILL.md` | 26 |
+| ☑ | backenddev | `skills/plan/SKILL.md` | 19 |
+| ☑ | backenddev | `skills/plan/dispatcher/explorer.md` | 77, 89, 91 |
+| ☑ | backenddev | `skills/plan/references/entry-rules.md` | 9 |
+| ☑ | backenddev | `skills/plan/references/review-and-commit.md` | 31, 46, 55, 70, 74 |
+| ☑ | backenddev | `skills/plan/references/slicing-and-scan.md` | 26 |
+| ☑ | backenddev | `skills/plan/templates/brief-template.md` | 172 |
+| ☑ | backenddev | `skills/profile/SKILL.md` | 3, 14, 26, 51, 86, 95, 99, 115, 124, 134, 138, 141, 146, 159 |
+| ☑ | backenddev | `skills/profile/references/convention-scan.md` | 3 |
+| ☑ | backenddev | `skills/profile/references/scan-guide.md` | 3 |
+| ☑ | backenddev | `skills/profile/stacks/_CONTRACT.md` | 9, 59, 74 (manual), 95 |
+| ☑ | backenddev | `skills/profile/templates/profile-template.md` | 1, 3, 4, 29, 48, 60, 76, 88, 100, 112, 127, 142, 159, 173, 180, 191, 200, 216, 230, 240, 252 |
+| ☑ | backenddev | `skills/report/SKILL.md` | 26 |
+| ☑ | backenddev | `skills/system-analysis/SKILL.md` | 15 |
+| ☑ | backenddev | `skills/system-analysis/dispatcher/explorer.md` | 181, 193, 195 |
+| ☑ | backenddev | `skills/system-analysis/references/analysis-protocol.md` | 47 |
+| ☑ | backenddev | `skills/task/SKILL.md` | 38 |
+| ☑ | backenddev | `skills/tech-lead/SKILL.md` | 51, 80, 141 |
+| ☑ | backenddev | `skills/tech-lead/dispatcher/explorer.md` | 63, 64, 78, 80 |
+| ☑ | backenddev | `skills/tech-lead/references/gate-scope.md` | 49, 120 |
+| ☑ | frontenddev | `README.md` | 10, 19, 62, 277 |
+| ☑ | frontenddev | `agents/code-explorer.md` | 36, 186 |
+| ☑ | frontenddev | `agents/code-implementor.md` | 25, 60 |
+| ☑ | frontenddev | `agents/code-reviewer.md` | 25, 33 |
+| ☑ | frontenddev | `agents/contract-reviewer.md` | 16 |
+| ☑ | frontenddev | `agents/doc-reviewer.md` | 23 |
+| ☑ | frontenddev | `skills/architect/SKILL.md` | 32 |
+| ☑ | frontenddev | `skills/contract/SKILL.md` | 36 |
+| ☑ | frontenddev | `skills/lead/SKILL.md` | 19, 37 |
+| ☑ | frontenddev | `skills/lead/dispatcher/explorer.md` | 78 |
+| ☑ | frontenddev | `skills/lead/references/lane-routing-matrix.md` | 11 |
+| ☑ | frontenddev | `skills/plan/dispatcher/reviewer.md` | 128 |
+| ☑ | frontenddev | `skills/profile/SKILL.md` | 3, 10, 20, 23, 92, 105, 123, 129, 148, 169, 175, 183 |
+| ☑ | frontenddev | `skills/profile/stacks/_CONTRACT.md` | 10 |
+| ☑ | frontenddev | `skills/profile/templates/profile-template.md` | 1, 39, 60, 75, 92, 110, 125, 145, 170, 181, 194 |
 
 `analyst` dan `quickdev`: nol rujukan `.claude/profile` (md_grep).
 
@@ -537,11 +537,20 @@ Konsekuensi: monorepo fullstack **hanya bisa punya satu profil**. Plugin kedua s
 - Perintah `perl` massal bisa mengubah contoh/penjelasan yang memang menyebut lokasi lama. Wajib tinjau diff.
 - Versi plugin campuran (backenddev baru + frontenddev lama) masih bisa bentrok: frontenddev lama tetap menulis ke lokasi lama. Naikkan versi kedua plugin bersamaan (L7.1).
 
+
+**Catatan implementasi (2026-09-25, branch `fix/l1-profil-hook-koeksistensi`):**
+- Kedua tabel checklist tercentang; `tests/test_profile_paths.py` hijau. Markdown: 46 berkas / 135 baris, sama dengan hitungan di atas.
+- Zona re-entry tech-lead mengizinkan penghapusan **seluruh** berkas profil backenddev di lokasi lama (`.claude/profile/<berkas>`, dibangun dari `PROFILE_FILES`), bukan hanya `index.json`, karena `git mv` meninggalkan penghapusan untuk tiap berkas yang dipindah.
+- `migrate_profile.py` dibuat identik byte-per-byte di kedua plugin (konstanta dibaca dari `precondition_lib`/`detect.py`); ditegakkan `test_migrate_profile_identik`. Ia menolak bila `.claude/profile/<plugin>/index.json` sudah ada.
+- Skrip hilir backenddev yang tidak punya status WARN menempelkan catatan MIGRATE ke ringkasan check PASS lewat `legacy_suffix()`.
+- **Belum dijalankan**: verifikasi manual 1–5 (sesi Claude Code nyata dengan plugin dari marketplace lokal).
+- Risiko terbuka: versi plugin campuran (L7.1) — versi backenddev/frontenddev di marketplace belum dinaikkan.
+
 ---
 
 ## L1.2 [Tinggi] Deteksi repo di hook berbasis grep dan tidak sama dengan versi Python
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev, frontenddev · **Estimasi:** 2 hari · **Bergantung pada:** K1 (tata letak profil), K3–K6 · **Memblokir:** L1.1 bagian hook, L1.3 (teks di `gate_text.py`), L5.5, L6.1 (test hook)
 
@@ -1430,6 +1439,12 @@ Pengguna diarahkan ke gerbang yang salah (B1, B10, F1–F3, F8, F9). Dua gerbang
 - **Waktu**: hook punya batas 5 detik (`hooks.json`); `git rev-parse` diberi batas 2 detik.
 - Pengecualian yang tak terduga ditelan dan hanya dilaporkan bila `.claude/profile/<plugin>/` ada, agar repo tak terkait tidak menerima noise.
 
+
+**Catatan implementasi (2026-09-25):**
+- `detect.py` = prototipe `proto/hooks/detect.py` apa adanya; seluruh tabel B1–B12, F1–F10, A1–A6, Q1–Q2 menjadi `tests/hooks/test_detect.py::test_case` dan hijau di Python 3.11, 3.12, 3.13.
+- `hooks.json` memakai `python3 "${CLAUDE_PLUGIN_ROOT}/hooks/detect.py" --plugin <plugin>`; README frontenddev mencatat prasyarat `python3`. backenddev belum punya README (L7), jadi catatan itu belum ada di sana.
+- **Belum dijalankan**: verifikasi manual 1–3 (sesi nyata, `claude --debug`, Windows).
+
 ---
 
 ## L1.3 [Tinggi] Hook membajak alur analyst dan quickdev; rujukan quickdev tanpa namespace
@@ -1527,38 +1542,38 @@ Perilaku model di sesi nyata (apakah `/quickdev:*` atau susulan analyst benar-be
 
 | ☐ | Berkas:baris | Teks sekarang (potongan) | Pengganti |
 |---|---|---|---|
-| ☐ | `clarify/SKILL.md:14` | "pada gate `explore` telah selesai" | "pada `quickdev:explore` telah selesai" |
-| ☐ | `clarify/SKILL.md:21` | "dari gate `explore` … laporan `explore` terakhir" | "dari `quickdev:explore` … laporan `quickdev:explore` terakhir" |
-| ☐ | `clarify/SKILL.md:23` | "path profil hasil gate `profile`" | "path profil hasil `quickdev:profile` (bukan `.claude/profile/` milik backenddev/frontenddev)" |
-| ☐ | `clarify/SKILL.md:24` | "langsung mengalirkan status `SKIPPED` ke gate berikutnya" | "melaporkan `SKIPPED` dan menawarkan `quickdev:plan`" |
-| ☐ | `clarify/SKILL.md:41` | "Teruskan eksekusi langsung ke gate `plan` tanpa menghentikan proses…" | "Laporkan `SKIPPED` dalam satu baris dan tawarkan `quickdev:plan`; jangan memanggilnya sebelum user setuju." |
-| ☐ | `clarify/SKILL.md:86` | "Alirkan spesifikasi terkunci ke gate berikutnya: `plan`." | "Tawarkan `quickdev:plan` dengan spesifikasi terkunci; tunggu user." |
-| ☐ | `clarify/SKILL.md:122` | "kembalikan alur kerja ke gate `explore`" | "tawarkan `quickdev:explore` ulang untuk area yang kurang" |
-| ☐ | `execute/SKILL.md:15` | "agar diff gate `review` hanya berisi hasil eksekusi" | "agar diff `quickdev:review` hanya berisi hasil eksekusi" |
-| ☐ | `execute/SKILL.md:17` | "arahkan pemanggil ke gate `profile`" | "arahkan pemanggil ke `quickdev:profile` (jangan `backenddev:profile`/`frontenddev:profile`)" |
-| ☐ | `execute/SKILL.md:23` | "path profil hasil gate `profile`" | "path profil hasil `quickdev:profile`" |
-| ☐ | `execute/SKILL.md:29` | "daftar temuan gate `review`" | "daftar temuan `quickdev:review`" |
-| ☐ | `execute/SKILL.md:60` | "(`require_test_plan: false` di gate `plan`)" | "(`require_test_plan: false` di `quickdev:plan`)" |
-| ☐ | `execute/SKILL.md:84` | "Serahkan handoff ke gate `review` … agar gate `review` dapat menilai" | "Tawarkan `quickdev:review` … agar `quickdev:review` dapat menilai" |
-| ☐ | `execute/SKILL.md:91` | "hanya membuka gate `review`" | "hanya membuka `quickdev:review`" |
-| ☐ | `execute/SKILL.md:104` | "membuka gate `review` … menahan `review` … tidak membuka `review` … revisi rencana di gate `plan`" | ganti keempatnya dengan `quickdev:review` / `quickdev:plan` |
-| ☐ | `execute/SKILL.md:120` | "persetujuan user di gate `plan`" | "persetujuan user di `quickdev:plan`" |
-| ☐ | `execute/SKILL.md:127` | "merevisi rencana di gate `plan`" | "merevisi rencana lewat `quickdev:plan`" |
-| ☐ | `explore/SKILL.md:26` | "path profil hasil gate `profile`" | "path profil hasil `quickdev:profile`" |
-| ☐ | `explore/SKILL.md:93` | "klarifikasi lebih lanjut di gate hilir" | "klarifikasi lebih lanjut di `quickdev:clarify`" |
-| ☐ | `explore/SKILL.md:95` | "Alirkan laporan hasil eksplorasi ke gate berikutnya: `clarify`." | "Tawarkan `quickdev:clarify` (atau `quickdev:plan` bila nol celah); tunggu user." |
-| ☐ | `explore/SKILL.md:135` | "mengeksekusi gate `profile` terlebih dahulu" | "menjalankan `quickdev:profile` terlebih dahulu" |
-| ☐ | `plan/SKILL.md:14` | "Gate `explore` dan `clarify` telah selesai" | "`quickdev:explore` dan `quickdev:clarify` telah selesai" |
-| ☐ | `plan/SKILL.md:17` | "arahkan pemanggil ke gate `profile`" | "arahkan pemanggil ke `quickdev:profile` (jangan `backenddev:profile`/`frontenddev:profile`)" |
-| ☐ | `plan/SKILL.md:24` | "path profil hasil gate `profile`" | "path profil hasil `quickdev:profile`" |
-| ☐ | `plan/SKILL.md:126` | "kembalikan sementara ke gate `clarify`" | "tawarkan `quickdev:clarify` untuk detail yang hilang" |
-| ☐ | `profile/SKILL.md:25` | "diteruskan sebagai `profile_path` ke gate hilir" | "diteruskan sebagai `profile_path` ke skill quickdev hilir (`quickdev:explore`, `quickdev:plan`, …)" |
-| ☐ | `profile/SKILL.md:100` | "Alirkan konteks profil … ke gate berikutnya: `explore`." | "Tawarkan `quickdev:explore`; tunggu user." |
-| ☐ | `review/SKILL.md:14` | "kembalikan pemanggil ke gate `execute`" | "kembalikan pemanggil ke `quickdev:execute`" |
-| ☐ | `review/SKILL.md:26` | "berkas baru hasil gate `execute`" | "berkas baru hasil `quickdev:execute`" |
-| ☐ | `review/SKILL.md:75` | "serahkan daftar temuan ke gate `execute` lewat parameter `review_findings`" | "tawarkan `quickdev:execute` dengan `review_findings` (dan `plan_path` yang sama); jalankan hanya bila user setuju" (beririsan D3) |
-| ☐ | `review/SKILL.md:120` | "**Gate execute belum COMPLETED** … di gate `execute`" | "**`quickdev:execute` belum COMPLETED** … di `quickdev:execute`" |
-| ☐ | `review/SKILL.md:123` | "menjalankan gate `profile` lebih dahulu" | "menjalankan `quickdev:profile` lebih dahulu" |
+| ☑ | `clarify/SKILL.md:14` | "pada gate `explore` telah selesai" | "pada `quickdev:explore` telah selesai" |
+| ☑ | `clarify/SKILL.md:21` | "dari gate `explore` … laporan `explore` terakhir" | "dari `quickdev:explore` … laporan `quickdev:explore` terakhir" |
+| ☑ | `clarify/SKILL.md:23` | "path profil hasil gate `profile`" | "path profil hasil `quickdev:profile` (bukan `.claude/profile/` milik backenddev/frontenddev)" |
+| ☑ | `clarify/SKILL.md:24` | "langsung mengalirkan status `SKIPPED` ke gate berikutnya" | "melaporkan `SKIPPED` dan menawarkan `quickdev:plan`" |
+| ☑ | `clarify/SKILL.md:41` | "Teruskan eksekusi langsung ke gate `plan` tanpa menghentikan proses…" | "Laporkan `SKIPPED` dalam satu baris dan tawarkan `quickdev:plan`; jangan memanggilnya sebelum user setuju." |
+| ☑ | `clarify/SKILL.md:86` | "Alirkan spesifikasi terkunci ke gate berikutnya: `plan`." | "Tawarkan `quickdev:plan` dengan spesifikasi terkunci; tunggu user." |
+| ☑ | `clarify/SKILL.md:122` | "kembalikan alur kerja ke gate `explore`" | "tawarkan `quickdev:explore` ulang untuk area yang kurang" |
+| ☑ | `execute/SKILL.md:15` | "agar diff gate `review` hanya berisi hasil eksekusi" | "agar diff `quickdev:review` hanya berisi hasil eksekusi" |
+| ☑ | `execute/SKILL.md:17` | "arahkan pemanggil ke gate `profile`" | "arahkan pemanggil ke `quickdev:profile` (jangan `backenddev:profile`/`frontenddev:profile`)" |
+| ☑ | `execute/SKILL.md:23` | "path profil hasil gate `profile`" | "path profil hasil `quickdev:profile`" |
+| ☑ | `execute/SKILL.md:29` | "daftar temuan gate `review`" | "daftar temuan `quickdev:review`" |
+| ☑ | `execute/SKILL.md:60` | "(`require_test_plan: false` di gate `plan`)" | "(`require_test_plan: false` di `quickdev:plan`)" |
+| ☑ | `execute/SKILL.md:84` | "Serahkan handoff ke gate `review` … agar gate `review` dapat menilai" | "Tawarkan `quickdev:review` … agar `quickdev:review` dapat menilai" |
+| ☑ | `execute/SKILL.md:91` | "hanya membuka gate `review`" | "hanya membuka `quickdev:review`" |
+| ☑ | `execute/SKILL.md:104` | "membuka gate `review` … menahan `review` … tidak membuka `review` … revisi rencana di gate `plan`" | ganti keempatnya dengan `quickdev:review` / `quickdev:plan` |
+| ☑ | `execute/SKILL.md:120` | "persetujuan user di gate `plan`" | "persetujuan user di `quickdev:plan`" |
+| ☑ | `execute/SKILL.md:127` | "merevisi rencana di gate `plan`" | "merevisi rencana lewat `quickdev:plan`" |
+| ☑ | `explore/SKILL.md:26` | "path profil hasil gate `profile`" | "path profil hasil `quickdev:profile`" |
+| ☑ | `explore/SKILL.md:93` | "klarifikasi lebih lanjut di gate hilir" | "klarifikasi lebih lanjut di `quickdev:clarify`" |
+| ☑ | `explore/SKILL.md:95` | "Alirkan laporan hasil eksplorasi ke gate berikutnya: `clarify`." | "Tawarkan `quickdev:clarify` (atau `quickdev:plan` bila nol celah); tunggu user." |
+| ☑ | `explore/SKILL.md:135` | "mengeksekusi gate `profile` terlebih dahulu" | "menjalankan `quickdev:profile` terlebih dahulu" |
+| ☑ | `plan/SKILL.md:14` | "Gate `explore` dan `clarify` telah selesai" | "`quickdev:explore` dan `quickdev:clarify` telah selesai" |
+| ☑ | `plan/SKILL.md:17` | "arahkan pemanggil ke gate `profile`" | "arahkan pemanggil ke `quickdev:profile` (jangan `backenddev:profile`/`frontenddev:profile`)" |
+| ☑ | `plan/SKILL.md:24` | "path profil hasil gate `profile`" | "path profil hasil `quickdev:profile`" |
+| ☑ | `plan/SKILL.md:126` | "kembalikan sementara ke gate `clarify`" | "tawarkan `quickdev:clarify` untuk detail yang hilang" |
+| ☑ | `profile/SKILL.md:25` | "diteruskan sebagai `profile_path` ke gate hilir" | "diteruskan sebagai `profile_path` ke skill quickdev hilir (`quickdev:explore`, `quickdev:plan`, …)" |
+| ☑ | `profile/SKILL.md:100` | "Alirkan konteks profil … ke gate berikutnya: `explore`." | "Tawarkan `quickdev:explore`; tunggu user." |
+| ☑ | `review/SKILL.md:14` | "kembalikan pemanggil ke gate `execute`" | "kembalikan pemanggil ke `quickdev:execute`" |
+| ☑ | `review/SKILL.md:26` | "berkas baru hasil gate `execute`" | "berkas baru hasil `quickdev:execute`" |
+| ☑ | `review/SKILL.md:75` | "serahkan daftar temuan ke gate `execute` lewat parameter `review_findings`" | "tawarkan `quickdev:execute` dengan `review_findings` (dan `plan_path` yang sama); jalankan hanya bila user setuju" (beririsan D3) |
+| ☑ | `review/SKILL.md:120` | "**Gate execute belum COMPLETED** … di gate `execute`" | "**`quickdev:execute` belum COMPLETED** … di `quickdev:execute`" |
+| ☑ | `review/SKILL.md:123` | "menjalankan gate `profile` lebih dahulu" | "menjalankan `quickdev:profile` lebih dahulu" |
 
    Rujukan generik yang boleh tetap: `review/SKILL.md:82` ("artefak gate hulu") dan `:133` ("konsisten dengan gate hulu").
 
@@ -1620,11 +1635,18 @@ Lingkungan: keempat plugin terpasang dari marketplace lokal.
 - `disable-model-invocation: true` menghapus kemampuan model menemukan quickdev secara otomatis. User yang belum tahu quickdev tidak akan ditawari. Ini disengaja (opt-in).
 - Edit teks quickdev beririsan dengan D3 (loop review ↔ execute), D5, D6, D7. Kerjakan dalam satu PR.
 
+
+**Catatan implementasi (2026-09-25):**
+- Tabel sub-tugas 3 tercentang; `src/plugins/quickdev/tests/test_skill_text.py` hijau; Q1/Q2 hijau.
+- Daftar pengecualian gerbang di `backenddev/skills/tech-lead/SKILL.md` (Gerbang Masuk butir 2) dan `references/gate-scope.md` bagian 1 ikut dinaikkan dari tiga ke empat agar sama dengan butir LEWATI keempat di hook.
+- Opt-out `.claude/workflow` terdokumentasi di README frontenddev, seksi Koeksistensi keenam SKILL quickdev, `quickdev:profile` Fase 4, `gate-scope.md`, dan README analyst. backenddev dan quickdev tidak punya README; pembuatannya milik L7.
+- Checkbox **Selesai** belum dicentang: kriteria "Selesai bila" butir 1–2 menuntut verifikasi manual 1, 3, 4 di sesi nyata, yang **belum dijalankan**.
+
 ---
 
 ## L1.4 [Rendah] Hook bertentangan dengan skill soal profil yang belum ada
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev, frontenddev · **Estimasi:** 0,25 hari · **Bergantung pada:** K9, L1.2 (`gate_text.py`), L2.8 (kalimat baca-kode) · **Memblokir:** —
 
@@ -1654,3 +1676,5 @@ SKILL (gerbang) menjadi sumber kebenaran; hook hanya merujuk ke gerbang (K9):
 ### Selesai bila
 
 Untuk setiap keadaan profil (absen, tidak sah, tidak lengkap, lokasi lama), teks hook dan `## Failure path`/Fase 0 SKILL gerbang menyebut tindakan yang sama. Diperiksa dengan membaca berdampingan tujuh cabang `_profile_note` di tiap `gate_text.py` terhadap SKILL, dan hasil pemeriksaannya dicatat di PR.
+
+**Catatan implementasi (2026-09-25):** pemeriksaan berdampingan tujuh cabang `_profile_note` terhadap `tech-lead` Fase 0 / `lead` Failure path 1–2 dan prasyarat `profile` menemukan satu selisih yang sudah diperbaiki: `index.json` lokasi lama yang bukan JSON valid kini berbunyi GENERATE di hook (sama dengan check 6 prasyarat profile), bukan REFRESH (`test_invalid_json_mode_matches_profile_script`). Kalimat "pertanyaan baca-kode dijawab tanpa profil" menunggu mode `--read-only` L2.8.
