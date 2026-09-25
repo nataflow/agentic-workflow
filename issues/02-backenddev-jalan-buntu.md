@@ -216,6 +216,23 @@ def run(repo, skill_script, *args):
                           cwd=repo, capture_output=True, text=True, env=env)
 ```
 
+## Catatan implementasi (2026-09-25)
+
+Keputusan D1–D7 diambil sesuai kolom rekomendasi. Satu commit per item, ditambah satu commit test e2e (`src/plugins/backenddev/tests/test_e2e_langkah2.py`). `pytest` seluruh repo: 255 lulus. Verifikasi manual di sesi Claude Code nyata **belum** dijalankan — yang lulus hanyalah test skrip.
+
+Penyimpangan dari rencana di bawah:
+
+- **Infrastruktur test**: fixture rantai (`chain_repo`, `brief`, `commit`, `be_run`, `be_checks`) ditambahkan ke `conftest.py` root yang sudah ada sejak Langkah 1, bukan ke `src/plugins/backenddev/tests/conftest.py`. Profil fixture memakai lokasi `.claude/profile/backenddev/` (L1.1).
+- **L2.1**: L3.6 (penolakan detached HEAD di reviewer) tidak dikerjakan bersamaan.
+- **L2.2**: `validate_links` menerima pengganti berstatus `SUPERSEDED` yang tautannya sendiri sah (rantai penggantian); pengganti `BLOCKED` tetap pelanggaran.
+- **L2.4**: `scaffold_brief.py` juga menolak baris `repairs` yang menunjuk brief bukan `DONE`.
+- **L2.7**: rekonstruksi matriks menyimpan penegasan `— (<alasan>)` di daftar `covers`/`fulfills` bila dokumen hulunya ada (bukan di `*_note`), agar brief lama tidak memicu "sumbu kosong"; kolom `supersedes`/`repairs` ikut direkonstruksi dari frontmatter.
+- **L2.10**: `landed_sha(root, brief_rel, commit_message)` mencari subjek persis hanya sesudah commit yang menambahkan berkas brief, supaya unit bernama sama di taskdir lain tidak ikut cocok.
+- **L2.9**: `symbol_map.py` menerima `--anchor` dan melaporkan `outside_anchor` (exit 1) serta `type_level_unanchored`; exit 2 = `DEGRADED`.
+- **L2.13**: `chain_counters.py --reset-hop <HOP>` ditambahkan dan dipanggil re-entry sesudah `--bump reentry`; tanpa itu hop yang dibuka ulang tidak mendapat ronde reviewer baru (`review_round:<HOP>` sudah 2/2). Loopnya tetap dibatasi plafon `reentry`.
+- **L2.8**: hook `tech-lead-gate.sh` sudah digantikan `hooks/detect.py` + `gate_text.py` di L1.2; teks read-only ditulis di `gate_text.py`. Mode `--read-only` juga melunakkan profil milik plugin lain (= profil backenddev absen). `tech-lead/SKILL.md` kini 13.988 byte; tabel Keputusan 1/2 di `decisions.md` bagian 6–7, tabel pengirim balik Fase 5 di `gate-lifecycle.md` bagian 6, jalur cepat di `references/explore-fact.md`.
+- Log Keputusan D3 di `ISSUES.md` tidak ditulis (berkas itu di-gitignore).
+
 ## Definisi selesai langkah ini
 
 1. Ke-13 item tercentang dan kriteria "Selesai bila" masing-masing terpenuhi.
@@ -246,7 +263,7 @@ def run(repo, skill_script, *args):
 ---
 
 ## L2.1 [Kritis] Reviewer meninggalkan `backenddev/issues/README.md` tanpa commit ✔ diverifikasi ulang
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 0,5 hari · **Bergantung pada:** — (sunting bersama L3.6; B1 menyusul) · **Memblokir:** L2.3 (review ulang harus berakhir bersih), skenario e2e langkah 11–12
 
@@ -373,7 +390,7 @@ Sesudah reviewer selesai, `git status --porcelain` bersih dan prasyarat `report`
 ---
 
 ## L2.2 [Kritis] Brief BLOCKED tidak bisa diubah aktor mana pun — taskdir macet permanen
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 3 hari · **Bergantung pada:** L2.11 (D1), L5.1 bila sudah ada · **Memblokir:** L2.3 (putaran perbaikan), L2.4 butir 3 & 5, L2.7, L2.12, skenario e2e
 
@@ -801,7 +818,7 @@ Skenario "brief-02 BLOCKED → plan `--append` brief pengganti → analyst predi
 ---
 
 ## L2.3 [Tinggi] Re-entry architect memakai REVIEW.md basi
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 0,75 hari · **Bergantung pada:** L2.2 (pustaka `brief_status.py`, helper `_add`), L2.11 · **Memblokir:** skenario e2e langkah 10–14
 
@@ -1001,7 +1018,7 @@ Fixture di atas menghasilkan titik masuk "Fase 4 (review ulang)", bukan "Lompat 
 ---
 
 ## L2.4 [Tinggi] Vonis gerbang kompilasi dan scope hanya ada di laporan, tidak di disk
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 2 hari · **Bergantung pada:** L2.2 (`supersedes`, `scan_briefs`, D2-A) · **Memblokir:** L2.9 (`verdict: SYMBOL`), L2.10 (`verdict: STRAY`)
 
@@ -1189,7 +1206,7 @@ Gerbang kompilasi merah di brief-02 → sesi baru → architect menolak lanjut k
 ---
 
 ## L2.5 [Tinggi] analyst tidak punya jalur resume saat TASK.md sudah ada
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 1 hari · **Bergantung pada:** — · **Memblokir:** L2.13 (Fase 0 membaca counter), skenario e2e langkah 3
 
@@ -1303,7 +1320,7 @@ Ketiga keadaan melanjutkan rantai tanpa memanggil `task`.
 ---
 
 ## L2.6 [Tinggi] Instruksi penandaan FIXED implementor bertentangan dengan aturan staging
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 1 hari · **Bergantung pada:** keputusan D3 (Log Keputusan ISSUES.md) · **Memblokir:** setiap rantai ber-`finding_source` (audit dan rute P1 L2.11)
 
@@ -1401,7 +1418,7 @@ Rantai dari `backenddev/issues/…` berjalan sampai `REPORT.md` tanpa `BLOCKED` 
 ---
 
 ## L2.7 [Tinggi] State plan disimpan di `.explore/` yang di-gitignore — scaffold buntu permanen
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 1,5 hari · **Bergantung pada:** L2.2 (`LOCKED`, `scan_briefs`) · **Memblokir:** skenario e2e langkah 5 (clone baru)
 
@@ -1560,7 +1577,7 @@ Skenario "laci dihapus" tetap bisa `--append`, dan plafon ronde tidak ter-reset.
 ---
 
 ## L2.8 [Tinggi] Gerbang tech-lead memblokir pertanyaan read-only dan terlalu berat untuk tiap permintaan
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 2 hari · **Bergantung pada:** koordinasi L1.3/L1.4 (hook sama), keputusan D7 · **Memblokir:** —
 
@@ -1714,7 +1731,7 @@ Pertanyaan baca-kode di tree kotor dijawab tanpa diminta stash/commit, dan ukura
 ---
 
 ## L2.9 [Tinggi] Cek "simbol di luar anchor" lewat hunk header tidak andal untuk method terindentasi
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 1,5 hari · **Bergantung pada:** L2.4 (`HALT.md verdict: SYMBOL`) · **Memblokir:** —
 
@@ -1917,7 +1934,7 @@ Fixture dua method menghasilkan dua simbol berbeda, perubahan di method yang tid
 ---
 
 ## L2.10 [Sedang] Celah matriks recovery
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 0,5 hari · **Bergantung pada:** L2.4 (`HALT.md`), keputusan D4 dan D6 · **Memblokir:** —
 
@@ -2030,7 +2047,7 @@ Tiap keadaan (commit + READY, commit + tree kotor, berkas liar) punya satu baris
 ---
 
 ## L2.11 [Sedang] Rute perbaikan P1 kontradiktif
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 0,25 hari · **Bergantung pada:** keputusan D1 · **Memblokir:** L2.2 (desain status mengandaikan taskdir sama), L2.3
 
@@ -2076,7 +2093,7 @@ Keempat dokumen menyebut satu rute (taskdir sama) dan parameter yang dibutuhkan 
 ---
 
 ## L2.12 [Sedang] Output architect tidak punya bentuk untuk rantai selesai ber-P2
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 0,25 hari · **Bergantung pada:** L2.2 (hitungan `SUPERSEDED` di baris output) · **Memblokir:** —
 
@@ -2119,7 +2136,7 @@ Rantai `P2` selesai memakai bentuk `COMPLETED (WARNING)` dan gerbang memetakanny
 ---
 
 ## L2.13 [Sedang] Plafon loop hanya tersimpan di ingatan sesi
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 1 hari · **Bergantung pada:** L2.5 (Fase 0 membaca counter), keputusan D5 · **Memblokir:** —
 
