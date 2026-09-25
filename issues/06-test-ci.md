@@ -46,6 +46,45 @@ Fondasi 0,5 hari · lint 1 hari · CI 0,5 hari · test per skrip ±6–8 hari to
 2. **Host CI:** repo tidak punya remote. YAML di L6.2 ditulis untuk GitHub Actions.
 3. **Versi Python minimum untuk pengguna:** skrip sekarang butuh ≥3.9 (`str.removeprefix`, `Path.is_relative_to`). Bila L1.2 memakai `tomllib`, minimum naik ke 3.11. Tentukan apakah pengguna dengan Python 3.9/3.10 (mis. python3 bawaan Xcode Command Line Tools di macOS, perlu dicek di mesin target) tetap didukung; bila ya, tambah 3.9 ke matriks CI dan beri fallback untuk `tomllib`.
 
+## Catatan implementasi (2026-09-25)
+
+Keputusan user: (1) `tests/` di root repo, (2) GitHub Actions, (3) Python ≥3.9. Ketiganya tercatat di `Log Keputusan` `ISSUES.md` (lokal). Suite dijalankan dengan `uvx --python <v> pytest -q` di 3.9, 3.10, 3.11, 3.12, dan 3.13, dan semuanya hijau. Di 3.11–3.13 hasilnya 862 lulus + 2 xfail (A5, A6). Di 3.9/3.10 hasilnya 861 lulus + 1 skip (`test_cargo_workspace_members`, butuh `tomllib`) + 2 xfail. Lint: `python3 scripts/lint_plugins.py` → 24 FAIL, 28 WARN; dengan `--ignore M3,M4,M5,R2` → 0 FAIL.
+
+Status per item:
+
+- **L6.1: bagian repo selesai.** Sisa regresi mengikuti PR Langkah 7–8.
+  - Test yang sudah ada (52 berkas dari L1–L5) dipindah dengan `git mv` dari `src/plugins/<p>/tests/` ke `tests/<p>/`. `conftest.py` akar ikut pindah ke `tests/`.
+  - `pytest.ini`: `testpaths = tests`, `pythonpath = tests`, `--import-mode=importlib -ra`, `xfail_strict = true`, dan marker `regression(id)`.
+  - `tests/test_smoke.py` mencakup **45** skrip ber-`__main__` × 4 keadaan repo (180 kasus). `test_inventaris_lengkap` memaksa skrip baru ikut terdaftar.
+  - Smoke langsung menangkap satu bug: `migrate_profile.py --json` (kedua plugin) mencetak stdout kosong dan pesan palsu "bukan milik <plugin>" di repo tanpa profil lama. Bug ini diperbaiki. Kini penyebabnya dibedakan (hilang/rusak/asing), dan kegagalan di mode `--json` tetap berupa JSON.
+  - Celah skrip tanpa test ditutup:
+    - `tests/analyst/test_ticket.py`: siklus `check → review → approve → reopen → cancel` dan `validate_doc` kedua kind, dengan contoh terisi diambil dari bagian 3 template saat test berjalan (E1, E4, E5, E6, E8, E9), plus A5/A6 sebagai `xfail`.
+    - `tests/frontenddev/test_gate_preconditions.py`: prasyarat `plan`, `ui-design`, `review`, dan `task`.
+- **L6.2: workflow ditulis, belum aktif.** `.github/workflows/ci.yml` punya empat job:
+  - `pytest`: 3.9–3.13 Linux + 3.13 macOS.
+  - `hooks`: JSON manifest/hooks.json, shellcheck `git ls-files '*.sh'`, dan test hook.
+  - `lint`: dengan `LINT_IGNORE` dan `--base origin/<base_ref>` di PR.
+  - `plugin-validate`: `continue-on-error`.
+
+  Workflow baru aktif setelah repo punya remote GitHub, dan branch protection diatur manual di sana. Syntax YAML sudah dicek dengan PyYAML, tetapi workflow belum pernah dijalankan di Actions.
+- **L6.3: selesai sebagai skrip.** `exit 0` tanpa `--ignore` menunggu L7.1 (M3/M4), L7.2 (M5), dan X1 (R2). Semua check di tabel sub-tugas 1 ada, termasuk M7 dan F3, dengan satu test per ID (`tests/test_lint_plugins.py`). `test_repo_ini_hanya_gagal_di_check_yang_dijadwalkan` mengunci daftar check yang ditunda, dan daftar itu wajib dikosongkan bersamaan dengan `LINT_IGNORE` CI.
+
+Penyimpangan dari rencana di bawah:
+
+- **Tanpa `tests/builders.py` dan `tests/fixtures/<plugin>/`.** Helper tetap di `tests/conftest.py` (`make_repo`, `be_profile`, `fe_profile`, `fe_chain_repo`, …) mengikuti konvensi L1–L5. Fixture frontenddev ada di `tests/frontenddev/fixtures/`. Fixture fungsi `env`/`git_repo`/`Repo` dari draf `conftest.py` tidak diadopsi, sebab `GIT_ENV` + `make_repo` yang sudah dipakai 800+ test setara fungsinya.
+- **Golden karakterisasi (sub-tugas 8) tidak direkam.** L5.5 sudah selesai tanpa golden (lihat catatan 05), jadi pembandingnya tidak lagi relevan.
+- **Hook bukan shell lagi.** Sejak L1.2 hook adalah `detect.py`/`guard_bash.py`. Job `hooks` tidak menjalankan shellcheck terhadap hook, melainkan terhadap skrip fixture `.sh`. Matriks macOS dipertahankan untuk git/filesystem BSD. Test kontrak `hooks.json` (sub-tugas 7) tidak dibuat terpisah: smoke menjalankan `detect.py`/`guard_bash.py` persis seperti perintah `hooks.json`, dan H1 memeriksa targetnya.
+- **Lint vs prototipe:**
+  - S1 kini berbasis AST, sehingga docstring/komentar yang *menyebut* `.gemini` tidak dihitung. Tiga baris di `backenddev/_common/precondition_lib.py` sebelumnya jadi false positive. Terhadap `34684ee`, hasilnya tetap 8 skrip dengan jumlah baris yang sama dengan keluaran prototipe.
+  - H1 memahami perintah `python3 "${CLAUDE_PLUGIN_ROOT}/…"`. Mode 100755 hanya ditagih untuk target yang dieksekusi langsung.
+  - Check baru **T1** menolak `tests/`, `fixtures/`, `conftest.py`, dan `test_*.py` di dalam plugin (keputusan 1).
+  - Regex path `${CLAUDE_PLUGIN_ROOT}` tidak lagi menelan backtick penutup, yang dulu membuat S2 tak pernah menyala.
+  - `--json` mengeluarkan `{fail, warn, items}`.
+  - S1 tidak lagi di-ignore karena L5.5 sudah bersih.
+- **Versi action:** `checkout@v5`, `setup-python@v6`, `setup-node@v5`, dengan Node 22.
+- **R2 = 17 baris** (15 di daftar X1 + `frontenddev/…/architect/references/execution-protocol.md:49` dan `:131` yang lahir di Langkah 3–4). Tetap milik X1.
+- **Belum dikerjakan:** version bump. M7 terhadap `ba91e7c` menandai keempat plugin karena test dipindah keluar dan `migrate_profile` diubah. Sumber versi menunggu keputusan L7.1.
+
 ---
 
 ## Inventaris skrip
@@ -125,7 +164,7 @@ Total Python: **36 berkas, 14.838 baris** (cocok dengan klaim ±14.800 di `ISSUE
 
 ## L6.1 [Tinggi] Tidak ada satu pun test otomatis
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** analyst, backenddev, frontenddev (+ hook) · **Estimasi:** fondasi 0,5 hari; matriks penuh ±6–8 hari tersebar · **Bergantung pada:** — · **Memblokir:** L6.2, refactor L5.5, verifikasi "Selesai bila" semua item skrip
 
@@ -841,7 +880,7 @@ Test dan lint baru berguna bila dijalankan otomatis di setiap perubahan. Hook sh
 
 ## L6.3 [Sedang] Skrip lint plugin
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** repo (keempat plugin) · **Estimasi:** 1 hari (prototipe sudah jalan) · **Bergantung pada:** keputusan L7.1 (semantik M3/M4) · **Memblokir:** job `lint` di L6.2; verifikasi "Selesai bila" L7.1, L7.2, L7.5, X1, X2, L5.5
 
