@@ -1,6 +1,7 @@
 ---
 name: explore
-description: Gunakan ketika permintaan user memerlukan penelusuran arsitektur kode dan pemetaan simbol - investigasi file dan dependensi, sebelum membuat rencana kerja tanpa pemahaman codebase yang utuh
+description: Alur ringan quickdev (repo-profile.md, plan/<task>.md, tanpa taskdir) — penelusuran arsitektur kode dan pemetaan simbol file:baris sebagai bahan quickdev:clarify/quickdev:plan; dipanggil eksplisit lewat /quickdev:explore.
+disable-model-invocation: true
 metadata:
   mode: standard
 ---
@@ -16,6 +17,15 @@ PENELUSURAN CODEBASE WAJIB MENGHASILKAN BUKTI FAKTUAL BERUPA PATH FILE DAN NOMOR
 3. Permintaan pengguna memiliki domain fitur, bug, atau area fungsional kode yang jelas untuk ditelusuri.
 4. Tool `Glob` (pola nama berkas), `Grep` (pencarian teks), dan `Read` (pembaca berkas) tersedia.
 
+## Koeksistensi [REQUIRED]
+
+- Skill ini bagian dari alur ringan `quickdev` (`repo-profile.md`, `plan/<task>.md`, tanpa taskdir). Setiap rujukan skill di berkas ini berarti `quickdev:*`. Dilarang memakai `backenddev:*` atau `frontenddev:*` sebagai pengganti: `backenddev:profile`/`frontenddev:profile` menulis `.claude/profile/<plugin>/`, bukan `repo-profile.md`, dan tidak memenuhi precondition skill ini.
+- Bila konteks sesi memuat blok `<backenddev-tech-lead-gate>` atau `<frontenddev-lead-gate>`:
+  - User memanggil `/quickdev:<skill>` secara eksplisit, atau melanjutkan artefak quickdev (`plan/<task>.md`, `repo-profile.md`) → lanjutkan skill ini. Blok gerbang itu mengecualikan alur plugin lain yang dipanggil eksplisit.
+  - Permintaan kerja baru tanpa pilihan alur → tanyakan sekali lewat `AskUserQuestion`: "Alur ringan quickdev (`plan/<task>.md`)" atau "Gerbang `<backenddev:tech-lead | frontenddev:lead>` (taskdir + brief)". Jangan memilih sendiri.
+- `.claude/workflow` ada dan tidak memuat kata `quickdev` → repo ini memilih alur lain; laporkan dan tanyakan dulu sebelum lanjut.
+- Penanda opt-out `.claude/workflow` (nama plugin yang boleh menggerbangi repo, dipisah spasi/baris): isi `quickdev` membuat hook SessionStart `backenddev`/`frontenddev` diam; isi `frontenddev quickdev` hanya menyalakan hook `frontenddev`.
+
 ## Parameter [REQUIRED]
 
 - `query` — string — `[REQUIRED]` — topik penelusuran, nama fitur, kata kunci simbol, atau deskripsi masalah yang ingin dieksplorasi di codebase.
@@ -23,7 +33,7 @@ PENELUSURAN CODEBASE WAJIB MENGHASILKAN BUKTI FAKTUAL BERUPA PATH FILE DAN NOMOR
 - `trace_depth` — integer — default `2` — kedalaman penelusuran pemanggil dan dependensi simbol (rentang 1 hingga 4).
 - `target_symbol` — string — default `""` — nama spesifik fungsi, kelas, interface, tipe, atau route handler yang menjadi fokus utama penelusuran.
 - `include_tests` — boolean — default `true` — indikasi apakah penelusuran wajib menyertakan file unit test dan integration test terkait.
-- `profile_path` — string — default `"repo-profile.md"` — path profil hasil gate `profile` (samakan dengan `target_path` di sana); bila tidak ditemukan, gunakan fallback `.dev/profile.md`.
+- `profile_path` — string — default `"repo-profile.md"` — path profil hasil `quickdev:profile` (samakan dengan `target_path` di sana); bila tidak ditemukan, gunakan fallback `.dev/profile.md`.
 
 ## Workflow
 
@@ -90,9 +100,9 @@ PENELUSURAN CODEBASE WAJIB MENGHASILKAN BUKTI FAKTUAL BERUPA PATH FILE DAN NOMOR
    - Diagram atau urutan alur data end-to-end (Data Flow Trace).
    - Analisis dampak ketergantungan dan daftar modul konsumen yang berpotensi terdampak.
    - Ringkasan cakupan pengujian eksisting dan file test yang perlu diperbarui.
-   - Catatan ketidakpastian, celah spesifikasi, atau asumsi yang memerlukan klarifikasi lebih lanjut di gate hilir.
+   - Catatan ketidakpastian, celah spesifikasi, atau asumsi yang memerlukan klarifikasi lebih lanjut di `quickdev:clarify`.
 2. Set status terminal `EXPLORED`.
-3. Alirkan laporan hasil eksplorasi ke gate berikutnya: `clarify`.
+3. Tawarkan `quickdev:clarify` (atau `quickdev:plan` bila nol celah); tunggu user.
 
 ## Guardrails
 
@@ -132,7 +142,7 @@ Skill ini menghasilkan laporan eksplorasi codebase terstruktur dan laporan termi
 
 1. **Simbol / Topik Tidak Ditemukan di Codebase**: Jika kueri pencarian tidak menghasilkan satu pun berkas atau kecocokan teks di codebase, perluas parameter `scope_dir` ke seluruh direktori root proyek, coba variasi sinonim kata kunci (contoh: `auth` vs `session` vs `jwt`, `order` vs `invoice` vs `checkout`), dan jika tetap tidak ditemukan, laporkan hasil temuan nol secara transparan beserta saran kata kunci alternatif untuk user.
 2. **Codebase Terlalu Besar / Ambiguitas Simbol Ganda**: Jika simbol ditemukan di lebih dari 10 modul yang berbeda (contoh: nama umum seperti `ConfigService`, `Button`, `Modal`, atau `BaseRepository`), gunakan parameter `scope_dir` untuk mempersempit area fokus dan minta konfirmasi user mengenai modul spesifik yang ditargetkan sebelum melanjutkan penelusuran mendalam.
-3. **Berkas Profil Repositori Tidak Ditemukan**: Jika `profile_path` maupun fallback-nya tidak ada, lakukan pemindaian heuristik mandiri pada struktur direktori `src/` dan file manifes root, sambil memberikan rekomendasi kepada pemanggil untuk mengeksekusi gate `profile` terlebih dahulu agar standar layer arsitektur terkunci.
+3. **Berkas Profil Repositori Tidak Ditemukan**: Jika `profile_path` maupun fallback-nya tidak ada, lakukan pemindaian heuristik mandiri pada struktur direktori `src/` dan file manifes root, sambil memberikan rekomendasi kepada pemanggil untuk menjalankan `quickdev:profile` terlebih dahulu agar standar layer arsitektur terkunci.
 4. **Izin Baca Filesystem Ditolak**: Jika terdapat folder yang terproteksi hak akses atau symlink rusak, catat direktori yang tidak dapat dibaca pada laporan dan lanjutkan eksplorasi pada modul lain yang dapat diakses di repositori.
 
 ## STYLE

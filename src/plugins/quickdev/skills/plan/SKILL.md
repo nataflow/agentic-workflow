@@ -1,6 +1,7 @@
 ---
 name: plan
-description: Gunakan ketika kebutuhan sudah jelas dan siap dirumuskan menjadi rencana kerja terstruktur - penyusunan dokumen rencana di plan folder, sebelum eksekusi perubahan kode tanpa review plan user
+description: Alur ringan quickdev (repo-profile.md, plan/<task>.md, tanpa taskdir) — menyusun satu berkas rencana plan/<task>.md dari kebutuhan yang sudah jelas lalu meminta approval user. Bukan brief taskdir backenddev/frontenddev; dipanggil eksplisit lewat /quickdev:plan.
+disable-model-invocation: true
 metadata:
   mode: standard
 ---
@@ -11,17 +12,26 @@ DILARANG MEMULAI IMPLEMENTASI ATAU MENULIS KODE SUMBER SEBELUM DOKUMEN RENCANA D
 
 ## Precondition [REQUIRED]
 
-1. Gate `explore` dan `clarify` telah selesai dengan status `EXPLORED` dan `CLARIFIED` (atau `SKIPPED`).
+1. `quickdev:explore` dan `quickdev:clarify` telah selesai dengan status `EXPLORED` dan `CLARIFIED` (atau `SKIPPED`).
 2. Spesifikasi kebutuhan fungsional, kontrak data API, skema payload, atau alur UI/UX telah terkunci tanpa ambiguitas yang tersisa.
 3. Direktori kerja repositori memiliki izin tulis aktif untuk membuat folder `plan/` dan berkas rencana implementasi markdown.
-4. Profil repositori pada `profile_path` tersedia sebagai panduan arsitektur dan baseline verifikasi; bila absen, hentikan dan arahkan pemanggil ke gate `profile` karena perintah baseline rencana wajib diambil dari profil.
+4. Profil repositori pada `profile_path` tersedia sebagai panduan arsitektur dan baseline verifikasi; bila absen, hentikan dan arahkan pemanggil ke `quickdev:profile` (jangan `backenddev:profile`/`frontenddev:profile`) karena perintah baseline rencana wajib diambil dari profil.
+
+## Koeksistensi [REQUIRED]
+
+- Skill ini bagian dari alur ringan `quickdev` (`repo-profile.md`, `plan/<task>.md`, tanpa taskdir). Setiap rujukan skill di berkas ini berarti `quickdev:*`. Dilarang memakai `backenddev:*` atau `frontenddev:*` sebagai pengganti: `backenddev:profile`/`frontenddev:profile` menulis `.claude/profile/<plugin>/`, bukan `repo-profile.md`, dan tidak memenuhi precondition skill ini.
+- Bila konteks sesi memuat blok `<backenddev-tech-lead-gate>` atau `<frontenddev-lead-gate>`:
+  - User memanggil `/quickdev:<skill>` secara eksplisit, atau melanjutkan artefak quickdev (`plan/<task>.md`, `repo-profile.md`) → lanjutkan skill ini. Blok gerbang itu mengecualikan alur plugin lain yang dipanggil eksplisit.
+  - Permintaan kerja baru tanpa pilihan alur → tanyakan sekali lewat `AskUserQuestion`: "Alur ringan quickdev (`plan/<task>.md`)" atau "Gerbang `<backenddev:tech-lead | frontenddev:lead>` (taskdir + brief)". Jangan memilih sendiri.
+- `.claude/workflow` ada dan tidak memuat kata `quickdev` → repo ini memilih alur lain; laporkan dan tanyakan dulu sebelum lanjut.
+- Penanda opt-out `.claude/workflow` (nama plugin yang boleh menggerbangi repo, dipisah spasi/baris): isi `quickdev` membuat hook SessionStart `backenddev`/`frontenddev` diam; isi `frontenddev quickdev` hanya menyalakan hook `frontenddev`.
 
 ## Parameter [REQUIRED]
 
 - `task_name` — string — `[REQUIRED]` — nama unik tugas dalam format kebab-case (contoh: `user-auth-jwt`, `order-status-filter`). Bila pemanggil tidak memberikannya, turunkan dari permintaan user dan konfirmasikan bersama draf di Fase 3.
 - `task_spec` — string — `[REQUIRED]` — spesifikasi yang disepakati di gate sebelumnya; bila tidak dikirim, ambil dari laporan `explore` dan spesifikasi `clarify` terakhir di percakapan.
 - `plan_dir` — string — default `"plan"` — direktori penyimpanan dokumen rencana implementasi di repositori.
-- `profile_path` — string — default `"repo-profile.md"` — path profil hasil gate `profile`; bila tidak ditemukan, gunakan fallback `.dev/profile.md`.
+- `profile_path` — string — default `"repo-profile.md"` — path profil hasil `quickdev:profile`; bila tidak ditemukan, gunakan fallback `.dev/profile.md`.
 - `require_test_plan` — boolean — default `true` — bila `true`, Section 4 wajib memuat skenario test unit/integration beserta langkah test di Section 3; bila `false`, Section 4 cukup memuat perintah verifikasi baseline.
 - `include_rollback` — boolean — default `true` — bila `false`, Section 5 (rollback) tidak ditulis.
 
@@ -123,7 +133,7 @@ Skill ini menghasilkan dokumen rencana implementasi terstruktur dan status termi
 
 1. **User Menolak Draf Rencana**: Jika user menolak rencana atau meminta perubahan besar pada arsitektur, jangan lanjutkan ke eksekusi; diskusikan alternatif pendekatan, perbarui dokumen draf rencana di `plan/<task-name>.md`, dan ajukan kembali untuk review hingga disetujui.
 2. **Nama Task Duplikat / Berkas Plan Sudah Ada**: Jika file `plan/<task-name>.md` telah ada dan berstatus `APPROVED` dari pekerjaan sebelumnya, tawarkan opsi nama task baru (misal: `<task-name>-v2`) atau minta izin eksplisit untuk menimpa draf lama.
-3. **Spesifikasi Masih Memiliki Celah / Ambiguitas**: Jika saat perumusan langkah ditemukan celah logika yang belum terjawab, tunda penyelesaian rencana dan kembalikan sementara ke gate `clarify` untuk mengonfirmasi detail yang hilang.
+3. **Spesifikasi Masih Memiliki Celah / Ambiguitas**: Jika saat perumusan langkah ditemukan celah logika yang belum terjawab, tunda penyelesaian rencana dan tawarkan `quickdev:clarify` untuk detail yang hilang.
 4. **Izin Tulis Direktori Plan Gagal**: Jika pembuatan folder `plan/` atau penulisan berkas gagal karena kendala hak akses, laporkan path tujuan dan instruksikan penyesuaian izin filesystem.
 
 ## STYLE

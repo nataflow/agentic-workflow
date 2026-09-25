@@ -1,6 +1,7 @@
 ---
 name: review
-description: Gunakan ketika perubahan kode uncommitted hasil gate execute siap dinilai - penilaian diff terhadap kontrak rencana dan konvensi profil repo, sebelum commit atau merge tanpa laporan temuan
+description: Alur ringan quickdev (repo-profile.md, plan/<task>.md, tanpa taskdir) — menilai diff uncommitted hasil quickdev:execute terhadap plan/<task>.md dan repo-profile.md sebelum commit; dipanggil eksplisit lewat /quickdev:review.
+disable-model-invocation: true
 metadata:
   mode: standard
 ---
@@ -11,11 +12,20 @@ DILARANG MELAPORKAN SATU TEMUAN PUN TANPA BUKTI PATH BERKAS DAN NOMOR BARIS NYAT
 
 ## Precondition [REQUIRED]
 
-1. Blok penutupan di `plan_path` memuat `Execution Status: COMPLETED`, atau `VERIFICATION_MANUAL_REQUIRED` yang hasil perintah manualnya sudah dikonfirmasi lolos oleh user; selain itu (blok absen atau status lain), hentikan review dan kembalikan pemanggil ke gate `execute`.
+1. Blok penutupan di `plan_path` memuat `Execution Status: COMPLETED`, atau `VERIFICATION_MANUAL_REQUIRED` yang hasil perintah manualnya sudah dikonfirmasi lolos oleh user; selain itu (blok absen atau status lain), hentikan review dan kembalikan pemanggil ke `quickdev:execute`.
 2. Direktori kerja adalah git repository valid (`git rev-parse --is-inside-work-tree` bernilai `true`); bila gagal, hentikan dan laporkan blocker environment.
 3. Terdapat minimal satu berkas berubah di luar `plan_path` dan `profile_path`, dihitung dari gabungan `git diff HEAD --name-only` dan `git ls-files --others --exclude-standard` (berkas untracked); bila nol, hentikan review dan laporkan status `NO_CHANGES` tanpa menulis temuan rekaan.
 4. Dokumen rencana pada `plan_path` (misal `plan/<task-name>.md`) tersedia di filesystem sebagai kontrak pembanding; bila hilang, hentikan dan minta path yang benar kepada user.
 5. Berkas profil pada `profile_path` (atau fallback-nya) tersedia sebagai acuan konvensi layer, penamaan, dan baseline verifikasi.
+
+## Koeksistensi [REQUIRED]
+
+- Skill ini bagian dari alur ringan `quickdev` (`repo-profile.md`, `plan/<task>.md`, tanpa taskdir). Setiap rujukan skill di berkas ini berarti `quickdev:*`. Dilarang memakai `backenddev:*` atau `frontenddev:*` sebagai pengganti: `backenddev:profile`/`frontenddev:profile` menulis `.claude/profile/<plugin>/`, bukan `repo-profile.md`, dan tidak memenuhi precondition skill ini.
+- Bila konteks sesi memuat blok `<backenddev-tech-lead-gate>` atau `<frontenddev-lead-gate>`:
+  - User memanggil `/quickdev:<skill>` secara eksplisit, atau melanjutkan artefak quickdev (`plan/<task>.md`, `repo-profile.md`) → lanjutkan skill ini. Blok gerbang itu mengecualikan alur plugin lain yang dipanggil eksplisit.
+  - Permintaan kerja baru tanpa pilihan alur → tanyakan sekali lewat `AskUserQuestion`: "Alur ringan quickdev (`plan/<task>.md`)" atau "Gerbang `<backenddev:tech-lead | frontenddev:lead>` (taskdir + brief)". Jangan memilih sendiri.
+- `.claude/workflow` ada dan tidak memuat kata `quickdev` → repo ini memilih alur lain; laporkan dan tanyakan dulu sebelum lanjut.
+- Penanda opt-out `.claude/workflow` (nama plugin yang boleh menggerbangi repo, dipisah spasi/baris): isi `quickdev` membuat hook SessionStart `backenddev`/`frontenddev` diam; isi `frontenddev quickdev` hanya menyalakan hook `frontenddev`.
 
 ## Parameter [REQUIRED]
 
@@ -23,7 +33,7 @@ DILARANG MELAPORKAN SATU TEMUAN PUN TANPA BUKTI PATH BERKAS DAN NOMOR BARIS NYAT
 - `profile_path` — string — default `repo-profile.md` — bila tidak ditemukan, gunakan fallback `.dev/profile.md`; bila keduanya absen, precondition 5 gagal.
 - `scope_paths` — array<string> — default `[]` — daftar path pembatas cakupan review; nilai kosong berarti seluruh berkas dalam diff dinilai. Setiap entri wajib berada di dalam daftar berkas hasil diff.
 - `strict` — bool — default `false` — bila `true`, temuan berseveritas `MINOR` ikut memblokir dan memaksa status `CHANGES_REQUIRED`.
-- `include_staged` — bool — default `true` — bila `true`, gunakan `git diff HEAD` (staged + unstaged); bila `false`, gunakan `git diff` (unstaged saja). Berkas untracked selalu ikut dinilai pada kedua nilai karena berkas baru hasil gate `execute` tidak pernah di-stage.
+- `include_staged` — bool — default `true` — bila `true`, gunakan `git diff HEAD` (staged + unstaged); bila `false`, gunakan `git diff` (unstaged saja). Berkas untracked selalu ikut dinilai pada kedua nilai karena berkas baru hasil `quickdev:execute` tidak pernah di-stage.
 
 ## Workflow
 
@@ -72,7 +82,7 @@ Untuk dimensi 7, telusuri pemanggil setiap simbol yang diubah menggunakan pencar
 
 1. Tentukan status terminal: `CHANGES_REQUIRED` bila terdapat minimal satu temuan `BLOCKER` atau `MAJOR`, atau bila `strict` bernilai `true` dan terdapat temuan `MINOR`. Selain itu `REVIEWED`.
 2. Sajikan daftar temuan terurut menurun berdasarkan severity, lalu tabel cakupan tujuh dimensi, lalu ringkasan akhir maksimal 17 baris.
-3. Bila status `CHANGES_REQUIRED`, serahkan daftar temuan ke gate `execute` lewat parameter `review_findings` (dengan `plan_path` yang sama) untuk remediasi; dilarang memperbaiki sendiri di sesi review.
+3. Bila status `CHANGES_REQUIRED`, tawarkan `quickdev:execute` dengan `review_findings` (dan `plan_path` yang sama) untuk remediasi; jalankan hanya bila user setuju; dilarang memperbaiki sendiri di sesi review.
 4. Bila status `REVIEWED`, nyatakan bahwa keputusan commit atau merge menunggu tindakan user.
 
 ## Guardrails
@@ -117,10 +127,10 @@ Skill ini menghasilkan laporan terminal saja tanpa artefak berkas.
 
 ## Failure path
 
-1. **Gate execute belum COMPLETED**: hentikan review, jangan baca diff, dan arahkan pemanggil menyelesaikan implementasi beserta verifikasi baseline di gate `execute`.
+1. **`quickdev:execute` belum COMPLETED**: hentikan review, jangan baca diff, dan arahkan pemanggil menyelesaikan implementasi beserta verifikasi baseline di `quickdev:execute`.
 2. **Working tree bersih**: bila `git diff HEAD` dan `git ls-files --others --exclude-standard` tidak memuat berkas di luar `plan_path` dan `profile_path`, laporkan status `NO_CHANGES` beserta kemungkinan penyebab (perubahan sudah ter-commit sehingga review perlu menargetkan rentang commit), lalu hentikan tanpa temuan rekaan.
 3. **Dokumen rencana hilang atau tidak terbaca**: hentikan dan minta `plan_path` yang benar; dilarang melanjutkan review kontrak berdasarkan rekonstruksi tebakan dari isi diff.
-4. **Berkas profil absen**: bila `profile_path` dan fallback `.dev/profile.md` sama-sama tidak ada, hentikan dan arahkan pemanggil menjalankan gate `profile` lebih dahulu.
+4. **Berkas profil absen**: bila `profile_path` dan fallback `.dev/profile.md` sama-sama tidak ada, hentikan dan arahkan pemanggil menjalankan `quickdev:profile` lebih dahulu.
 5. **Diff terlalu besar untuk dinilai utuh**: laporkan jumlah berkas dan baris terdampak, lalu minta user mempersempit lewat `scope_paths`; dilarang menilai sebagian secara diam-diam dan melaporkannya sebagai cakupan penuh.
 6. **Berkas biner atau berkas generated dalam diff**: lewati penilaian isi, catat sebagai `SKIPPED (binary/generated)` pada tabel cakupan, dan jangan hitung sebagai berkas bersih.
 7. **Bukti baris tidak terkonfirmasi saat Fase 4**: buang kandidat temuan tersebut dari laporan dan catat jumlah kandidat yang gugur pada baris cakupan.

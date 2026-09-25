@@ -78,6 +78,7 @@ Jalankan `ticket.py state --ready` dan bandingkan judul tiap baris dengan tujuan
 
 - **NOL BERKAS DI GATE**: intake tidak menjalankan `ticket.py new`, tidak menulis `TICKET.md`.
 - **NOL KODE**: dilarang `Read`/`Grep`/`Glob` atas kode repo untuk "memastikan" permintaan. Fakta tentang sistem datang dari peminta, dan yang tidak diketahui peminta menjadi pertanyaan elisitasi.
+- **GERBANG ENGINEER TIDAK BERLAKU**: blok `<backenddev-tech-lead-gate>`/`<frontenddev-lead-gate>` di konteks tidak berlaku untuk alur analyst yang dipanggil eksplisit; blok itu sendiri mengecualikan `/analyst:*` dan susulan di tengah elisitasi.
 - **PERMINTAAN VERBATIM**: `request` diteruskan tanpa parafrase; elisitasi mengutipnya sebagai `### Permintaan Asli` di `TICKET.md`.
 - **PERTANYAAN HEMAT**: maksimal satu `AskUserQuestion` per phase; pertanyaan isi (aturan, angka, aktor) milik `elicit`.
 - **RATIONALIZATION PREVENTION**:

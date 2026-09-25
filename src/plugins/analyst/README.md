@@ -118,8 +118,10 @@ jejak asal-usul tiap AC. Engineer menerbitkan `TASK.md` teknisnya sendiri —
 lengkap dengan `file:baris`, alat ukur teknis, dan ledger — dari tiket itu. Nama `TICKET.md` sengaja berbeda
 dari `TASK.md`: kontraknya bertolak belakang, dan keduanya tidak pernah tinggal di direktori yang sama.
 
-Di repo yang memasang `backenddev`/`frontenddev`, hook SessionStart kedua plugin itu mengarahkan permintaan
-kerja ke gerbang engineer. Panggil `/analyst:intake` secara eksplisit untuk menulis tiket di repo tersebut.
+Hook SessionStart `backenddev`/`frontenddev` mengecualikan permintaan yang memanggil atau melanjutkan
+`analyst:*`. Panggil `/analyst:intake` untuk memulai; susulan di tengah elisitasi tetap ditangani analyst.
+Untuk repo yang hanya memakai analyst, tulis `.claude/workflow` tanpa nama plugin engineer (mis. berisi
+`analyst`) — hook kedua plugin engineer lalu diam di repo itu.
 
 ## Batas Dengan Plugin Lain
 

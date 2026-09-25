@@ -1,6 +1,7 @@
 ---
 name: profile
-description: Gunakan ketika repo backend atau frontend belum memiliki berkas profil atau perlu diperbarui - pemindaian stack arsitektur dan baseline, sebelum memulai task development tanpa profil repo acuan
+description: Alur ringan quickdev (repo-profile.md, plan/<task>.md, tanpa taskdir) — dipanggil eksplisit lewat /quickdev:profile ketika repo belum punya repo-profile.md atau profilnya perlu diperbarui — pemindaian stack, layer, dan baseline verifikasi. Bukan untuk .claude/profile/ milik backenddev/frontenddev.
+disable-model-invocation: true
 metadata:
   mode: standard
 ---
@@ -16,13 +17,22 @@ DILARANG MEMBUAT ASUMSI STACK ATAU PERINTAH BASELINE TANPA BUKTI KONFIGURASI NYA
 3. Package manager dan runtime terkait (seperti `node`, `pnpm`, `npm`, `yarn`, `python`, `go`) telah terpasang di environment kerja.
 4. Berkas acuan template profil `references/backend-profile-template.md` dan `references/frontend-profile-template.md` tersedia di subdirektori references skill.
 
+## Koeksistensi [REQUIRED]
+
+- Skill ini bagian dari alur ringan `quickdev` (`repo-profile.md`, `plan/<task>.md`, tanpa taskdir). Setiap rujukan skill di berkas ini berarti `quickdev:*`. Dilarang memakai `backenddev:*` atau `frontenddev:*` sebagai pengganti: `backenddev:profile`/`frontenddev:profile` menulis `.claude/profile/<plugin>/`, bukan `repo-profile.md`, dan tidak memenuhi precondition skill ini.
+- Bila konteks sesi memuat blok `<backenddev-tech-lead-gate>` atau `<frontenddev-lead-gate>`:
+  - User memanggil `/quickdev:<skill>` secara eksplisit, atau melanjutkan artefak quickdev (`plan/<task>.md`, `repo-profile.md`) → lanjutkan skill ini. Blok gerbang itu mengecualikan alur plugin lain yang dipanggil eksplisit.
+  - Permintaan kerja baru tanpa pilihan alur → tanyakan sekali lewat `AskUserQuestion`: "Alur ringan quickdev (`plan/<task>.md`)" atau "Gerbang `<backenddev:tech-lead | frontenddev:lead>` (taskdir + brief)". Jangan memilih sendiri.
+- `.claude/workflow` ada dan tidak memuat kata `quickdev` → repo ini memilih alur lain; laporkan dan tanyakan dulu sebelum lanjut.
+- Penanda opt-out `.claude/workflow` (nama plugin yang boleh menggerbangi repo, dipisah spasi/baris): isi `quickdev` membuat hook SessionStart `backenddev`/`frontenddev` diam; isi `frontenddev quickdev` hanya menyalakan hook `frontenddev`.
+
 ## Parameter [REQUIRED]
 
 - `type` — string — default `"auto"` — tipe repositori yang dipindai (`"backend"`, `"frontend"`, `"auto"`). Jika `"auto"`, skill menentukan tipe secara otomatis dari dependensi utama.
 - `target_path` — string — default `"repo-profile.md"` — path file keluaran untuk profil repositori yang dihasilkan (contoh: `repo-profile.md` atau `.dev/profile.md`).
 - `mode` — string — default `"GENERATE"` — mode operasi pemindaian (`"GENERATE"` untuk pembuatan profil baru dari nol, `"REFRESH"` untuk pembaruan profil yang telah ada).
 - `skip_baseline_exec` — boolean — default `false` — bila `true`, melewati eksekusi perintah verifikasi runtime jika lingkungan berjalan pada restricted sandbox.
-- `workspace_dir` — string — default `""` — workspace yang diprofilkan pada monorepo (contoh: `apps/api`); satu workspace per profil, dengan `target_path` berbeda per workspace yang diteruskan sebagai `profile_path` ke gate hilir.
+- `workspace_dir` — string — default `""` — workspace yang diprofilkan pada monorepo (contoh: `apps/api`); satu workspace per profil, dengan `target_path` berbeda per workspace yang diteruskan sebagai `profile_path` ke skill quickdev hilir (`quickdev:explore`, `quickdev:plan`, …).
 
 ## Workflow
 
@@ -97,7 +107,8 @@ DILARANG MEMBUAT ASUMSI STACK ATAU PERINTAH BASELINE TANPA BUKTI KONFIGURASI NYA
    - Pastikan seluruh 6 section header hadir dan perintah baseline terbukti valid.
    - Pastikan ukuran berkas memenuhi batas kuota (< 10.000 karakter).
 2. Set status terminal `PROFILED` dan laporkan ringkasan metadata profil ke user.
-3. Alirkan konteks profil repositori yang terbentuk ke gate berikutnya: `explore`.
+3. Bila konteks sesi memuat blok `<backenddev-tech-lead-gate>` atau `<frontenddev-lead-gate>` (atau `python3 <plugin>/hooks/detect.py --explain` menunjukkan hook engineer aktif), tawarkan penulisan penanda opt-out `.claude/workflow` berisi `quickdev` (ditambah nama plugin engineer yang tetap boleh menggerbangi repo, bila ada) agar hook engineer diam di repo ini. Tulis berkas itu hanya dengan persetujuan user.
+4. Tawarkan `quickdev:explore`; tunggu user.
 
 ## Guardrails
 
