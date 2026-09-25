@@ -36,6 +36,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
+    profile_dir_for,
     TASKDIR_PATTERN,
     FrontmatterError,
     split_frontmatter,
@@ -201,7 +202,7 @@ class BriefValidator:
         self.brief_filter = brief_filter
         self.contract_mode = contract_mode
         self.max_files = max_files_per_unit
-        self.profile_dir = self.root / (profile_dir or ".claude/profile")
+        self.profile_dir = profile_dir_for(self.root, profile_dir)
         self.stacks_dir = Path(__file__).resolve().parents[2] / "profile" / "stacks"
         self.briefs: List[Dict[str, Any]] = []
         self.results: List[Dict[str, Any]] = []
@@ -1091,7 +1092,7 @@ def main() -> None:
     parser.add_argument("--max-files", type=int, default=5,
                         help="kuota berkas non-test per unit (default 5)")
     parser.add_argument("--profile-dir", default=None, dest="profile_dir",
-                        help="direktori profil, default .claude/profile")
+                        help="direktori profil, default .claude/profile/frontenddev (lokasi lama .claude/profile hanya dibaca untuk MIGRATE)")
     parser.add_argument("--root", default=None, help="root repo target")
     parser.add_argument("--json", action="store_true", help="keluaran JSON")
     args = parser.parse_args()

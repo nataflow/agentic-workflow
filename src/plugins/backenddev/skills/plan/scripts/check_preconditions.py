@@ -23,6 +23,9 @@ from typing import Any, Dict, List, Optional
 # ini, bukan terhadap cwd — skrip dipanggil dengan path absolut dari mana saja.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
+    resolve_profile_dir,
+    foreign_owner,
+    legacy_suffix,
     nearest_existing_ancestor as _nearest_existing_ancestor,
     probe_writable as _probe_writable,
     profile_staleness as _profile_staleness,
@@ -173,7 +176,7 @@ class PreconditionChecker:
     def _check_2_profile(self):
         check_id = 2
         name = "Profile Index & Documents"
-        profile_dir = self.root / ".claude" / "profile"
+        profile_dir, legacy_note = resolve_profile_dir(self.root)
         index_file = profile_dir / "index.json"
 
         if not index_file.exists():
@@ -181,8 +184,19 @@ class PreconditionChecker:
                 "id": check_id,
                 "name": name,
                 "status": "FAIL",
-                "summary": "Berkas .claude/profile/index.json tidak ditemukan",
+                "summary": "Berkas .claude/profile/backenddev/index.json tidak ditemukan",
                 "action": "Jalankan skill `backenddev:profile` untuk membuat profil repositori."
+            })
+            return
+
+        owner = foreign_owner(profile_dir)
+        if owner:
+            self.results.append({
+                "id": check_id,
+                "name": name,
+                "status": "FAIL",
+                "summary": f"Profil di {profile_dir.relative_to(self.root).as_posix()}/ milik `{owner}`; bukan profil backenddev",
+                "action": "Jangan membaca atau menimpa profil plugin lain; jalankan `backenddev:profile` (ditulis ke `.claude/profile/backenddev/`).",
             })
             return
 
@@ -218,7 +232,7 @@ class PreconditionChecker:
                 "name": name,
                 "status": "FAIL",
                 "summary": f"Dokumen profil belum lengkap: {', '.join(missing_docs)}",
-                "action": "Lengkapi berkas profil di .claude/profile/ atau jalankan `backenddev:profile`."
+                "action": "Lengkapi berkas profil di .claude/profile/backenddev/ atau jalankan `backenddev:profile`."
             })
             return
 
@@ -237,7 +251,7 @@ class PreconditionChecker:
             "id": check_id,
             "name": name,
             "status": "PASS",
-            "summary": f"Profil valid (stack: {data.get('stack', 'unknown')}, arch: {data.get('architecture', 'unknown')}, 4 dokumen profil lengkap){freshness_suffix}",
+            "summary": f"Profil valid (stack: {data.get('stack', 'unknown')}, arch: {data.get('architecture', 'unknown')}, 4 dokumen profil lengkap){freshness_suffix}" + legacy_suffix(legacy_note),
             "action": ""
         })
 
@@ -395,7 +409,7 @@ class PreconditionChecker:
     def _check_4_read_write_access(self):
         check_id = 4
         name = "Workspace Read & Taskdir Write"
-        profile_dir = self.root / ".claude" / "profile"
+        profile_dir = resolve_profile_dir(self.root)[0]
         index_file = profile_dir / "index.json"
 
         # Check source_root read access

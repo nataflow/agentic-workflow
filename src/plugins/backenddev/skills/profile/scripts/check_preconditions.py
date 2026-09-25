@@ -2,10 +2,12 @@
 """Profile Precondition Validator.
 
 Automates verification of repository preconditions before repository profiling execution.
-Runs checks 1 through 5 in a single pass and produces a compact, actionable report.
+Runs checks 1 through 6 in a single pass and produces a compact, actionable report.
+Check 6 menyelesaikan mode operasi (GENERATE / REFRESH / MIGRATE) dan kepemilikan
+profil, sehingga profil milik plugin lain tidak pernah dibaca sebagai REFRESH.
 Zero external dependencies (Python Standard Library only). Satu impor intra-plugin:
-`skills/_common/precondition_lib.py` untuk uji izin tulis, di-bootstrap relatif
-terhadap berkas ini.
+`skills/_common/precondition_lib.py` (uji izin tulis, resolver profil, dan deteksi
+`hooks/detect.py`), di-bootstrap relatif terhadap berkas ini.
 """
 
 import argparse
@@ -17,20 +19,16 @@ import subprocess
 import sys
 from typing import Any, Dict, List, Optional
 
-MANIFEST_MAP = [
-    (["pom.xml", "build.gradle", "build.gradle.kts"], "java-spring"),
-    (["go.mod"], "go"),
-    (["package.json"], "node"),  # or bun, resolved by stack adapter
-    (["Cargo.toml"], "rust"),
-    (["composer.json"], "php"),  # or php-codeigniter, resolved by stack adapter
-]
-
-
 # Helper izin tulis dipakai bersama lintas skrip prasyarat; rumah kanoniknya
 # `skills/_common/precondition_lib.py`. Bootstrap path relatif terhadap berkas
 # ini, bukan terhadap cwd — skrip dipanggil dengan path absolut dari mana saja.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
+    LEGACY_PROFILE_DIR_REL,
+    PLUGIN,
+    PROFILE_DIR_REL,
+    _detect,
+    foreign_owner,
     nearest_existing_ancestor as _nearest_existing_ancestor,
     probe_writable as _probe_writable,
 )
@@ -47,8 +45,9 @@ class PreconditionChecker:
         self.root = (target_root or self._find_repo_root()).resolve()
         self.mode_arg = mode
         self.stack_arg = stack
-        self.profile_dir_arg = profile_dir or ".claude/profile"
+        self.profile_dir_arg = profile_dir or PROFILE_DIR_REL
         self.results: List[Dict[str, Any]] = []
+        self.mode: str = ""
 
     def _find_repo_root(self) -> Path:
         """Find the git repository root or fallback to cwd."""
@@ -65,49 +64,41 @@ class PreconditionChecker:
         return Path.cwd()
 
     def run_all(self) -> bool:
-        """Run checks 1 through 5."""
+        """Run checks 1 through 6."""
         self._check_1_backend_manifest()
         self._check_2_stack_adapter()
         self._check_3_profile_dir_writable()
         self._check_4_git_worktree()
         self._check_5_references()
+        self._check_6_mode_ownership()
         return all(r["status"] == "PASS" for r in self.results)
 
     def _check_1_backend_manifest(self):
+        # Deteksi yang sama dengan hook SessionStart (`hooks/detect.py`): penanda
+        # framework server, bukan sekadar keberadaan manifest. Repo React murni
+        # yang hanya punya `package.json` tidak lolos.
         check_id = 1
         name = "Backend Manifest Detection"
-        found_manifests = []
-
-        # Scan root and 1-level submodules
-        scan_dirs = [self.root]
-        for child in self.root.iterdir():
-            if child.is_dir() and not child.name.startswith(".") and child.name not in {"node_modules", "vendor", "target", "build"}:
-                scan_dirs.append(child)
-
-        detected_stacks = set()
-        for d in scan_dirs:
-            for manifests, stack_name in MANIFEST_MAP:
-                for m in manifests:
-                    if (d / m).exists():
-                        rel = (d / m).relative_to(self.root)
-                        found_manifests.append(str(rel))
-                        detected_stacks.add(stack_name)
-
-        if not found_manifests:
+        hits = _detect.detect_backend(self.root)
+        if not hits:
             self.results.append({
                 "id": check_id,
                 "name": name,
                 "status": "FAIL",
-                "summary": "Tidak ditemukan berkas manifest backend (pom.xml, build.gradle, go.mod, package.json, Cargo.toml, composer.json)",
-                "action": "Pastikan repositori target merupakan proyek backend yang memuat manifest sah.",
+                "summary": "Nol penanda framework server backend di root, workspace, apps/*, packages/*, services/*, maupun anak langsung root",
+                "action": "Repo bukan target backenddev; jangan buat profil.",
             })
             return
 
+        stacks = sorted({h.stack for h in hits})
+        summary = ", ".join(f"{h.path} → {h.stack}" for h in hits[:4])
+        if len(stacks) > 1:
+            summary += " (monorepo multi-stack: pilih `stack`)"
         self.results.append({
             "id": check_id,
             "name": name,
             "status": "PASS",
-            "summary": f"Manifest backend terdeteksi: {', '.join(found_manifests[:4])}",
+            "summary": summary,
             "action": "",
         })
 
@@ -138,6 +129,15 @@ class PreconditionChecker:
     def _check_3_profile_dir_writable(self):
         check_id = 3
         name = "Profile Directory Write Access"
+        if self.profile_dir_arg.strip("/") != PROFILE_DIR_REL:
+            self.results.append({
+                "id": check_id,
+                "name": name,
+                "status": "FAIL",
+                "summary": f"`--profile-dir {self.profile_dir_arg}` ditolak; profil {PLUGIN} hanya sah di `{PROFILE_DIR_REL}/`",
+                "action": "Jalankan ulang tanpa `--profile-dir`.",
+            })
+            return
         target_dir = Path(self.profile_dir_arg)
         if not target_dir.is_absolute():
             target_dir = self.root / target_dir
@@ -150,7 +150,7 @@ class PreconditionChecker:
                 "name": name,
                 "status": "FAIL",
                 "summary": f"Direktori profil {target_dir} tidak memiliki izin tulis: {detail}",
-                "action": "Periksa hak akses penulisan ke direktori .claude/profile/.",
+                "action": f"Periksa hak akses penulisan ke direktori {PROFILE_DIR_REL}/.",
             })
             return
 
@@ -233,6 +233,57 @@ class PreconditionChecker:
             "action": "",
         })
 
+    def _check_6_mode_ownership(self):
+        """GENERATE / REFRESH / MIGRATE dan kepemilikan profil.
+
+        REFRESH hanya bila `.claude/profile/backenddev/index.json` ada dan milik
+        plugin ini. Profil backenddev di lokasi lama → MIGRATE. Profil milik plugin
+        lain tidak pernah menjadi REFRESH: di direktori sendiri FAIL, di lokasi
+        lama diabaikan (GENERATE ke direktori sendiri).
+        """
+        check_id = 6
+        name = "Mode & kepemilikan profil"
+        own = self.root / PROFILE_DIR_REL
+        if (own / "index.json").is_file():
+            owner = foreign_owner(own)
+            if owner:
+                self.results.append({
+                    "id": check_id,
+                    "name": name,
+                    "status": "FAIL",
+                    "summary": f"`{PROFILE_DIR_REL}/index.json` milik `{owner}`; bukan profil {PLUGIN}",
+                    "action": "Jangan menimpa profil plugin lain, juga dengan `force: true`. Laporkan ke user; profil itu salah tempat.",
+                })
+                return
+            actual, note = "REFRESH", "index.json ada"
+        else:
+            legacy = _detect.read_profile(self.root, PLUGIN)
+            if legacy.location == "legacy" and legacy.state not in ("ABSENT", "OTHER_OWNER", "INVALID_JSON"):
+                actual = "MIGRATE"
+                note = (f"profil {PLUGIN} masih di lokasi lama `{LEGACY_PROFILE_DIR_REL}/`; "
+                        f"pindahkan ke `{PROFILE_DIR_REL}/` lewat `migrate_profile.py`")
+            elif legacy.state == "OTHER_OWNER":
+                actual = "GENERATE"
+                note = (f"profil lama milik `{legacy.owner}` di `{LEGACY_PROFILE_DIR_REL}/` diabaikan; "
+                        f"profil {PLUGIN} ditulis ke `{PROFILE_DIR_REL}/`")
+            elif legacy.location == "legacy" and legacy.state == "INVALID_JSON":
+                actual = "GENERATE"
+                note = (f"`{LEGACY_PROFILE_DIR_REL}/index.json` bukan JSON valid dan tidak disentuh; "
+                        f"profil {PLUGIN} ditulis ke `{PROFILE_DIR_REL}/`")
+            else:
+                actual, note = "GENERATE", "index.json belum ada"
+        asked = (self.mode_arg or "auto").lower()
+        self.mode = actual
+        if asked in ("generate", "refresh", "migrate") and asked.upper() != actual:
+            note += f"; parameter `mode` = `{asked.upper()}` diabaikan, keadaan disk menang"
+        self.results.append({
+            "id": check_id,
+            "name": name,
+            "status": "PASS",
+            "summary": f"`{self.mode}` — {note}",
+            "action": "",
+        })
+
     def format_text(self) -> str:
         all_passed = all(r["status"] == "PASS" for r in self.results)
         passed_count = sum(1 for r in self.results if r["status"] == "PASS")
@@ -246,7 +297,7 @@ class PreconditionChecker:
             lines.append(f"[{r['id']}] {r['name']:<32} : {r['status']} ({r['summary']})")
             if r["status"] == "FAIL" and r["action"]:
                 lines.append(f"    * Tindakan: {r['action']}")
-
+        lines.append(f"Terselesaikan: mode `{self.mode or 'tidak terselesaikan'}`")
         return "\n".join(lines)
 
     def to_json(self) -> str:
@@ -257,15 +308,16 @@ class PreconditionChecker:
             "total_count": len(self.results),
             "root": str(self.root),
             "profile_dir": self.profile_dir_arg,
+            "mode": self.mode,
             "checks": self.results,
         }, indent=2)
 
 
 def main():
     parser = argparse.ArgumentParser(description="Profile Preconditions Checker")
-    parser.add_argument("--mode", type=str, default=None, help="Execution mode (auto, generate, refresh)")
+    parser.add_argument("--mode", type=str, default=None, help="Execution mode (auto, generate, refresh, migrate)")
     parser.add_argument("--stack", type=str, default=None, help="Stack identifier override")
-    parser.add_argument("--profile-dir", type=str, default=None, help="Target profile directory")
+    parser.add_argument("--profile-dir", type=str, default=None, help=f"Target profile directory; hanya {PROFILE_DIR_REL} yang diterima")
     parser.add_argument("--root", type=str, default=None, help="Target repo root directory")
     parser.add_argument("--json", action="store_true", help="Output JSON format")
     args = parser.parse_args()

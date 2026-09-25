@@ -7,14 +7,64 @@ berbeda, memberi pesan remediasi yang berbeda, dan menomori check-nya sendiri �
 menyatukannya akan menyeragamkan hal yang memang seharusnya berbeda.
 
 Yang diekstrak ke sini sengaja sempit: uji izin tulis beserta pencarian
-direktori induknya, dua fungsi yang tersalin apa adanya di sembilan skrip.
+direktori induknya, dua fungsi yang tersalin apa adanya di sembilan skrip; lalu
+resolver direktori profil `.claude/profile/backenddev/` beserta pemeriksa
+kepemilikannya, dan pembungkus deteksi `hooks/detect.py` (fungsi yang sama
+dengan yang dipakai hook SessionStart, sehingga vonis hook = vonis skrip).
 
 Zero external dependencies (Python Standard Library only).
 """
 
 import os
+import sys
 from pathlib import Path
 from typing import Tuple
+
+# Deteksi repo dan pembacaan profil tinggal di `hooks/detect.py` (identik di
+# backenddev dan frontenddev) — satu implementasi untuk hook dan skrip.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "hooks"))
+import detect as _detect  # noqa: E402
+
+# Tiap plugin engineer punya direktori profilnya sendiri. `.claude/profile/`
+# (tanpa subdirektori) adalah lokasi lama yang hanya dibaca selama masa transisi
+# dan selalu disertai catatan MIGRATE.
+PLUGIN = "backenddev"
+PROFILE_DIR_REL = f".claude/profile/{PLUGIN}"      # satu-satunya lokasi tulis
+LEGACY_PROFILE_DIR_REL = ".claude/profile"          # lokasi lama, dibaca hanya untuk MIGRATE
+PROFILE_FILES = _detect.PROFILE_FILES[PLUGIN]
+
+
+def resolve_profile_dir(root: Path) -> Tuple[Path, str]:
+    """(direktori profil yang dibaca, catatan untuk laporan prasyarat).
+
+    Lokasi baru selalu menang. Lokasi lama dipakai hanya bila `index.json`-nya
+    milik plugin ini (field `plugin`, atau `stack` anggota daftar backenddev),
+    dan selalu disertai catatan MIGRATE. Profil milik plugin lain tidak pernah
+    dikembalikan: skrip melihatnya sebagai profil yang tidak ada.
+    """
+    own = root / PROFILE_DIR_REL
+    if (own / "index.json").exists():
+        return own, ""
+    prof = _detect.read_profile(root, PLUGIN)
+    if prof.location == "legacy" and prof.state not in ("OTHER_OWNER", "ABSENT", "INVALID_JSON"):
+        return root / LEGACY_PROFILE_DIR_REL, (
+            "profil backenddev masih di lokasi lama `.claude/profile/`; "
+            "jalankan `backenddev:profile` mode MIGRATE")
+    return own, ""
+
+
+def legacy_suffix(note: str) -> str:
+    """Sufiks ringkasan check PASS saat profil masih dibaca dari lokasi lama."""
+    return f" — {note}" if note else ""
+
+
+def foreign_owner(profile_dir: Path) -> str:
+    """Nama plugin lain pemilik `<profile_dir>/index.json`, atau '' bila milik sendiri/tak terbaca."""
+    data, _state = _detect.read_index(profile_dir / "index.json")
+    if data is None:
+        return ""
+    owner = _detect.owner_of(data)
+    return owner if owner and owner != PLUGIN else ""
 
 
 def nearest_existing_ancestor(path: Path) -> Path:
@@ -46,7 +96,7 @@ def probe_writable(path: Path) -> Tuple[bool, str]:
 
 
 def profile_staleness(root: Path, source_root: str) -> Tuple[str, str]:
-    """Nilai kesegaran `.claude/profile/` terhadap kode yang dipetakannya.
+    """Nilai kesegaran profil backenddev terhadap kode yang dipetakannya.
 
     Profil yang tertinggal di belakang kode tidak pernah gagal dengan suara:
     `domain-map.md` yang basi melebarkan `Batas cakupan` explorer ke seluruh
@@ -64,9 +114,9 @@ def profile_staleness(root: Path, source_root: str) -> Tuple[str, str]:
     """
     import subprocess
 
-    profile_dir = root / ".claude" / "profile"
+    profile_dir, _note = resolve_profile_dir(root)
     if not profile_dir.is_dir():
-        return "TAK_TERNILAI", ".claude/profile/ tidak ada"
+        return "TAK_TERNILAI", f"{PROFILE_DIR_REL}/ tidak ada"
 
     sr = (source_root or "").strip().strip("/")
     if not sr:
@@ -87,7 +137,10 @@ def profile_staleness(root: Path, source_root: str) -> Tuple[str, str]:
     if _git("rev-parse", "--is-inside-work-tree") != "true":
         return "TAK_TERNILAI", "bukan repositori git"
 
-    profile_sha = _git("log", "-1", "--format=%H", "--", ".claude/profile")
+    # Hanya berkas profil backenddev: commit profil plugin lain (mis.
+    # `.claude/profile/frontenddev/`) tidak boleh me-reset vonis kesegaran.
+    rel = profile_dir.relative_to(root).as_posix()
+    profile_sha = _git("log", "-1", "--format=%H", "--", *(f"{rel}/{f}" for f in PROFILE_FILES))
     if not profile_sha:
         return "TAK_TERNILAI", "profil belum pernah masuk riwayat git"
 

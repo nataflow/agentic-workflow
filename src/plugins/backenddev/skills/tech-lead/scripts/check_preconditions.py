@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional
 # (references/gate-scope.md bagian 3). Pada mode re-entry berkas kotor di
 # bawah prefix ini menunggu commit Fase 5, jadi tidak menggagalkan check 3.
 RE_ENTRY_ALLOWED_PREFIXES = (
-    ".claude/profile/",
+    ".claude/profile/backenddev/",
     "backenddev/docs/",
     "backenddev/issues/",
     "docs/api/",
@@ -33,10 +33,19 @@ RE_ENTRY_ALLOWED_PREFIXES = (
 # ini, bukan terhadap cwd — skrip dipanggil dengan path absolut dari mana saja.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
+    resolve_profile_dir,
+    foreign_owner,
+    legacy_suffix,
     nearest_existing_ancestor as _nearest_existing_ancestor,
     probe_writable as _probe_writable,
     profile_staleness as _profile_staleness,
+    LEGACY_PROFILE_DIR_REL,
+    PROFILE_FILES,
 )
+
+# Selama masa transisi MIGRATE: `git mv` meninggalkan penghapusan berkas profil
+# backenddev di lokasi lama `.claude/profile/<berkas>`. Cabut di rilis berikutnya.
+RE_ENTRY_ALLOWED_PREFIXES += tuple(f"{LEGACY_PROFILE_DIR_REL}/{f}" for f in PROFILE_FILES)
 
 
 class PreconditionChecker:
@@ -72,7 +81,7 @@ class PreconditionChecker:
     def _check_1_profile(self):
         check_id = 1
         name = "Profile Index & Invariants"
-        profile_dir = self.root / ".claude" / "profile"
+        profile_dir, legacy_note = resolve_profile_dir(self.root)
         index_file = profile_dir / "index.json"
         module_file = profile_dir / "module-structure.md"
         invariants_file = profile_dir / "invariants.md"
@@ -82,8 +91,19 @@ class PreconditionChecker:
                 "id": check_id,
                 "name": name,
                 "status": "FAIL",
-                "summary": "Missing .claude/profile/index.json",
+                "summary": "Missing .claude/profile/backenddev/index.json",
                 "action": "Arahkan user ke `backenddev:profile` untuk inisialisasi profil repo."
+            })
+            return
+
+        owner = foreign_owner(profile_dir)
+        if owner:
+            self.results.append({
+                "id": check_id,
+                "name": name,
+                "status": "FAIL",
+                "summary": f"Profil di {profile_dir.relative_to(self.root).as_posix()}/ milik `{owner}`; bukan profil backenddev",
+                "action": "Jangan membaca atau menimpa profil plugin lain; jalankan `backenddev:profile` (ditulis ke `.claude/profile/backenddev/`).",
             })
             return
 
@@ -126,7 +146,7 @@ class PreconditionChecker:
                 "name": name,
                 "status": "FAIL",
                 "summary": f"Dokumen profil belum lengkap: {', '.join(missing_docs)}",
-                "action": "Lengkapi berkas profil di .claude/profile/ atau jalankan profile refresh."
+                "action": "Lengkapi berkas profil di .claude/profile/backenddev/ atau jalankan profile refresh."
             })
             return
 
@@ -145,7 +165,7 @@ class PreconditionChecker:
             "id": check_id,
             "name": name,
             "status": "PASS",
-            "summary": f"Profil valid (stack: {data.get('stack', 'unknown')}, base: {data.get('base_branch', 'unknown')}){freshness_suffix}",
+            "summary": f"Profil valid (stack: {data.get('stack', 'unknown')}, base: {data.get('base_branch', 'unknown')}){freshness_suffix}" + legacy_suffix(legacy_note),
             "action": ""
         })
 
@@ -329,13 +349,13 @@ class PreconditionChecker:
     def _check_5_commands(self):
         check_id = 5
         name = "Profile Commands"
-        commands_file = self.root / ".claude" / "profile" / "commands.md"
+        commands_file = resolve_profile_dir(self.root)[0] / "commands.md"
         if not commands_file.exists():
             self.results.append({
                 "id": check_id,
                 "name": name,
                 "status": "FAIL",
-                "summary": "Berkas .claude/profile/commands.md tidak ditemukan",
+                "summary": "Berkas .claude/profile/backenddev/commands.md tidak ditemukan",
                 "action": "Jalankan `backenddev:profile` untuk mencatat perintah build dan test."
             })
             return
@@ -368,7 +388,7 @@ class PreconditionChecker:
                 "name": name,
                 "status": "FAIL",
                 "summary": f"Gagal membaca commands.md: {e}",
-                "action": "Periksa permissions berkas .claude/profile/commands.md."
+                "action": "Periksa permissions berkas .claude/profile/backenddev/commands.md."
             })
 
     def _check_6_explorer_dispatcher(self):

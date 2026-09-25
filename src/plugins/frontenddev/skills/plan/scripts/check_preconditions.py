@@ -36,6 +36,7 @@ from typing import Any, Dict, List, Optional
 # Bootstrap path relatif terhadap berkas ini, bukan terhadap cwd.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
+    profile_dir_for,
     MINOR_LANE,
     check_adapter,
     check_chain_rows,
@@ -71,7 +72,7 @@ class PreconditionChecker:
         self.taskdir_rel = normalize_taskdir(taskdir)
         self.taskdir = self.root / self.taskdir_rel
         self.mode = (mode or "").strip().upper()
-        self.profile_dir = self.root / (profile_dir or ".claude/profile")
+        self.profile_dir = profile_dir_for(self.root, profile_dir)
         self.skill_dir = Path(__file__).resolve().parents[1]
         self.results: List[Dict[str, Any]] = []
         self.stack: str = ""
@@ -232,7 +233,7 @@ def main() -> None:
     parser.add_argument("--taskdir", required=True, help="path taskdir relatif root repo")
     parser.add_argument("--mode", required=True, help="CONTRACT, MINOR, REVISE, atau APPEND")
     parser.add_argument("--profile-dir", default=None, dest="profile_dir",
-                        help="direktori profil, default .claude/profile")
+                        help="direktori profil, default .claude/profile/frontenddev (lokasi lama .claude/profile hanya dibaca untuk MIGRATE)")
     parser.add_argument("--root", default=None, help="root repo target")
     parser.add_argument("--json", action="store_true", help="keluaran JSON")
     args = parser.parse_args()

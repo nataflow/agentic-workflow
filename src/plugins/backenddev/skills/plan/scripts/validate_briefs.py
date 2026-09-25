@@ -48,6 +48,14 @@ import subprocess
 import sys
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+# Resolver profil `.claude/profile/backenddev/` tinggal di
+# `skills/_common/precondition_lib.py`. Bootstrap path relatif terhadap berkas
+# ini, bukan terhadap cwd.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
+from precondition_lib import (  # noqa: E402
+    resolve_profile_dir,
+)
+
 # ---------------------------------------------------------------------------
 # Konstanta kanonik
 #
@@ -165,7 +173,7 @@ def _norm_heading(text: str) -> str:
 def _is_test_path(path: str, test_hint: Optional[str] = None) -> bool:
     """Vonis apakah sebuah path berkas test.
 
-    Resep penamaan dibaca dari baris `test:` `.claude/profile/code-conventions.md`
+    Resep penamaan dibaca dari baris `test:` `.claude/profile/backenddev/code-conventions.md`
     bila tersedia (`test_hint`); bila absen, turun ke heuristik nama yang berlaku
     lintas stack. Heuristik ini hanya memisahkan berkas test dari berkas kode
     untuk langit-langit slicing dan Check I — ia tidak pernah menuntut nama
@@ -447,7 +455,7 @@ class BriefValidator:
         return None
 
     def _load_test_hint(self):
-        conv = self.root / ".claude" / "profile" / "code-conventions.md"
+        conv = resolve_profile_dir(self.root)[0] / "code-conventions.md"
         text = self._read(conv)
         if not text:
             return
@@ -1050,7 +1058,7 @@ class BriefValidator:
         return out
 
     def _load_anti_patterns(self) -> List[Dict[str, str]]:
-        """Panen resep `deteksi` dari `.claude/profile/anti-patterns.md`.
+        """Panen resep `deteksi` dari `.claude/profile/backenddev/anti-patterns.md`.
 
         Formatnya sudah machine-readable sejak profil ditulis:
         `- <pola terlarang> (<sebaran>) → <pengganti> · deteksi `<pola> @ <cakupan>` · bukti …`
@@ -1059,7 +1067,7 @@ class BriefValidator:
         berjejak di kode — dan karena itu tidak dapat digerbangi di sini; ia tetap
         milik `brief-reviewer`.
         """
-        text = self._read(self.root / ".claude" / "profile" / "anti-patterns.md")
+        text = self._read(resolve_profile_dir(self.root)[0] / "anti-patterns.md")
         if not text:
             return []
         out: List[Dict[str, str]] = []
@@ -1085,7 +1093,7 @@ class BriefValidator:
         rules = self._load_anti_patterns()
         if not rules:
             self._add(cid, name, "SKIP",
-                      "`.claude/profile/anti-patterns.md` tidak ada atau nol baris ber-`deteksi`")
+                      "`.claude/profile/backenddev/anti-patterns.md` tidak ada atau nol baris ber-`deteksi`")
             return
 
         problems: List[str] = []
@@ -1485,7 +1493,7 @@ class BriefValidator:
     # -- Check J -----------------------------------------------------------
 
     def _orm_schema_declared(self) -> bool:
-        profile = self.root / ".claude" / "profile"
+        profile = resolve_profile_dir(self.root)[0]
         text = "\n".join(
             t for t in (self._read(profile / "invariants.md"), self._read(profile / "commands.md")) if t
         ).lower()

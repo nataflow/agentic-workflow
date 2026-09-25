@@ -7,7 +7,7 @@ ketersediaan worktree git, dan kelengkapan berkas referensi skill.
 
 Skrip ini juga **menyelesaikan dua fakta** yang dipakai Workflow dan
 mengembalikannya di footer: `<stack-id>` hasil deteksi dan mode operasi
-(`GENERATE` atau `REFRESH`). Keduanya deterministik; menyerahkannya ke
+(`GENERATE`, `REFRESH`, atau `MIGRATE`). Keduanya deterministik; menyerahkannya ke
 pembacaan model membuat repo yang sama divonis berbeda antar-sesi.
 
 Vonis `WARN` tidak menahan: repo non-git tetap dapat diprofil — hanya kolom
@@ -31,23 +31,29 @@ from typing import Any, Dict, List, Optional
 # dipanggil dengan path absolut dari mana saja.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
+    DEFAULT_PROFILE_DIR,
     KNOWN_STACKS,
+    LEGACY_PROFILE_DIR_REL,
+    PLUGIN,
+    PROFILE_FILES,
+    _detect,
     candidate_manifests,
     detect_stack,
-    is_next,
+    out_of_scope_reason,
     probe_writable,
+    profile_owner,
 )
 
 REFERENCES = ("references/framework-matrix.md", "templates/profile-template.md",
               "references/scan-guide.md")
 STACK_CONTRACT = "stacks/_CONTRACT.md"
-DEFAULT_PROFILE_DIR = ".claude/profile"
-# Sepuluh berkas profil. Berkas berdata nihil tetap ditulis berisi `tidak
-# terdeteksi`; yang absen dibaca sebagai profil rusak, bukan sebagai profil
-# tanpa data.
-PROFILE_FILES = ("index.json", "stack.md", "structure.md", "surface-map.md",
-                 "invariants.md", "commands.md", "layer-adoption.md", "visual.md",
-                 "drift.md", "manual-notes.md")
+# Alasan manifest di luar cakupan (`detect.frontend_from_package`) → kalimat laporan.
+OUT_OF_SCOPE = {
+    "next": "memuat `next` — Next.js di luar cakupan plugin",
+    "cra": "Create React App (`react-scripts`) tanpa Vite — di luar cakupan plugin",
+    "react-tanpa-vite": "memuat `react` tanpa penanda Vite — di luar cakupan plugin",
+    "svelte-tanpa-vite": "memuat `svelte` tanpa penanda Vite (mis. Rollup) — di luar cakupan plugin",
+}
 
 
 class PreconditionChecker:
@@ -59,6 +65,7 @@ class PreconditionChecker:
         self.profile_rel = profile_dir or DEFAULT_PROFILE_DIR
         self.profile_dir = self.root / self.profile_rel
         self.index_path = self.profile_dir / "index.json"
+        self.legacy_dir = self.root / LEGACY_PROFILE_DIR_REL
         self.skill_dir = Path(__file__).resolve().parents[1]
         self.stacks_dir = self.skill_dir / "stacks"
         self.results: List[Dict[str, Any]] = []
@@ -108,7 +115,8 @@ class PreconditionChecker:
         name = "Manifest frontend terdeteksi"
         manifests = candidate_manifests(self.root)
         if not manifests:
-            self._add(1, name, "FAIL", "nol `package.json` di root maupun `apps/*`, `packages/*`",
+            self._add(1, name, "FAIL", "nol `package.json` di root, workspace terdeklarasi, "
+                      "`apps/*`, `packages/*`, `services/*`, maupun anak langsung root",
                       "Target bukan proyek frontend Node.js. Hentikan; jangan buat profil palsu.")
             return
 
@@ -130,10 +138,11 @@ class PreconditionChecker:
             return
 
         self.detected = ""
-        nexts = [m for m in manifests if is_next(m)]
-        if nexts:
-            self._add(1, name, "FAIL",
-                      f"{self._rel(nexts[0])} memuat `next` — Next.js di luar cakupan plugin",
+        skipped = [(m, out_of_scope_reason(m)) for m in manifests]
+        skipped = [(m, why) for m, why in skipped if why in OUT_OF_SCOPE]
+        if skipped:
+            manifest, why = skipped[0]
+            self._add(1, name, "FAIL", f"{self._rel(manifest)} {OUT_OF_SCOPE[why]}",
                       "Hentikan rantai dan laporkan ke user; jangan buat profil untuk repo "
                       "yang tidak dilayani adapter mana pun.")
             return
@@ -179,6 +188,12 @@ class PreconditionChecker:
 
     def _check_3_profile_writable(self) -> None:
         name = "Direktori profil dapat ditulis"
+        if self.profile_rel.strip("/") != DEFAULT_PROFILE_DIR:
+            self._add(3, name, "FAIL",
+                      f"`--profile-dir {self.profile_rel}` ditolak; profil {PLUGIN} hanya sah di "
+                      f"`{DEFAULT_PROFILE_DIR}/`",
+                      "Jalankan ulang tanpa `--profile-dir`.")
+            return
         if self.profile_dir.exists() and not self.profile_dir.is_dir():
             self._add(3, name, "FAIL", f"`{self.profile_rel}` ada tetapi bukan direktori",
                       "Bereskan path itu; profil hanya sah ditulis sebagai satu direktori.")
@@ -238,22 +253,57 @@ class PreconditionChecker:
     # ------------------------------------------------------------------ mode
 
     def _resolve_mode(self) -> None:
-        """Selesaikan GENERATE vs REFRESH; ketidakcocokan jadi WARN, bukan FAIL."""
-        exists = self.index_path.is_file()
-        actual = "REFRESH" if exists else "GENERATE"
-        if self.mode_arg in ("generate", "refresh"):
+        """Selesaikan GENERATE / REFRESH / MIGRATE dan kepemilikan profil.
+
+        REFRESH hanya bila `.claude/profile/frontenddev/index.json` ada dan milik
+        plugin ini. Profil frontenddev di lokasi lama `.claude/profile/` → MIGRATE.
+        Profil milik plugin lain tidak pernah menjadi REFRESH: di direktori
+        sendiri FAIL, di lokasi lama diabaikan (GENERATE ke direktori sendiri).
+        Ketidakcocokan dengan parameter `mode` jadi WARN, bukan FAIL.
+        """
+        name = "Mode & kepemilikan profil"
+        note = ""
+        if self.index_path.is_file():
+            owner = profile_owner(self.profile_dir)
+            if owner and owner != PLUGIN:
+                self.mode = ""
+                self._add(6, name, "FAIL",
+                          f"`{self.profile_rel}/index.json` milik `{owner}`; bukan profil {PLUGIN}",
+                          "Jangan menimpa profil plugin lain, juga dengan `force: true`. Laporkan "
+                          "ke user; profil itu salah tempat.")
+                return
+            actual = "REFRESH"
+        else:
+            legacy = _detect.read_profile(self.root, PLUGIN)
+            if legacy.location == "legacy" and legacy.state not in ("ABSENT", "OTHER_OWNER", "INVALID_JSON"):
+                actual = "MIGRATE"
+                note = (f"profil {PLUGIN} masih di lokasi lama `{LEGACY_PROFILE_DIR_REL}/`; "
+                        f"pindahkan ke `{DEFAULT_PROFILE_DIR}/` lewat `migrate_profile.py`")
+            else:
+                actual = "GENERATE"
+                if legacy.state == "OTHER_OWNER":
+                    note = (f"profil lama milik `{legacy.owner}` di `{LEGACY_PROFILE_DIR_REL}/` diabaikan; "
+                            f"profil {PLUGIN} ditulis ke `{DEFAULT_PROFILE_DIR}/`")
+                elif legacy.location == "legacy" and legacy.state == "INVALID_JSON":
+                    note = (f"`{LEGACY_PROFILE_DIR_REL}/index.json` bukan JSON valid dan tidak "
+                            f"disentuh; profil {PLUGIN} ditulis ke `{DEFAULT_PROFILE_DIR}/`")
+                else:
+                    note = "index.json belum ada"
+        if actual == "REFRESH":
+            note = "index.json ada"
+        if self.mode_arg in ("generate", "refresh", "migrate"):
             asked = self.mode_arg.upper()
             self.mode = asked
             if asked != actual:
-                self._add(6, "Mode operasi selaras", "WARN",
-                          f"diminta `{asked}`, keadaan disk `{actual}`",
+                self._add(6, name, "WARN",
+                          f"diminta `{asked}`, keadaan disk `{actual}` ({note})",
                           "REFRESH tanpa profil lama berjalan sebagai GENERATE; GENERATE di "
-                          "atas profil yang ada akan menimpanya. Konfirmasikan ke user.")
+                          "atas profil yang ada akan menimpanya; profil di lokasi lama wajib "
+                          "MIGRATE. Konfirmasikan ke user.")
                 return
         else:
             self.mode = actual
-        self._add(6, "Mode operasi selaras", "PASS",
-                  f"`{self.mode}` — index.json {'ada' if exists else 'belum ada'}")
+        self._add(6, name, "PASS", f"`{self.mode}` — {note}")
 
     # ---------------------------------------------------------------- output
 
@@ -291,7 +341,7 @@ class PreconditionChecker:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Profile Preconditions Checker")
-    parser.add_argument("--mode", default=None, help="auto | generate | refresh")
+    parser.add_argument("--mode", default=None, help="auto | generate | refresh | migrate")
     parser.add_argument("--stack", default=None,
                         help="paksa <stack-id>; default auto (deteksi dari manifest)")
     parser.add_argument("--profile-dir", default=None, dest="profile_dir",

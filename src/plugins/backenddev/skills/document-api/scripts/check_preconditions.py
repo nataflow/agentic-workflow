@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Optional
 # ini, bukan terhadap cwd — skrip dipanggil dengan path absolut dari mana saja.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
+    resolve_profile_dir,
     nearest_existing_ancestor as _nearest_existing_ancestor,
     probe_writable as _probe_writable,
 )
@@ -68,7 +69,7 @@ class PreconditionChecker:
     def _check_1_source_root(self):
         check_id = 1
         name = "Source Root & Code Access"
-        profile_dir = self.root / ".claude" / "profile"
+        profile_dir = resolve_profile_dir(self.root)[0]
         index_file = profile_dir / "index.json"
 
         src_rel = "src"
@@ -105,7 +106,7 @@ class PreconditionChecker:
     def _check_2_profile_and_stack(self):
         check_id = 2
         name = "Profile & Stack Adapter"
-        profile_dir = self.root / ".claude" / "profile"
+        profile_dir = resolve_profile_dir(self.root)[0]
         index_file = profile_dir / "index.json"
 
         stack_id = self.stack_arg

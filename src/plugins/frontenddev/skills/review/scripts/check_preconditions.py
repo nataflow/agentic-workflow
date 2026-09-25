@@ -28,6 +28,7 @@ from typing import Any, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
+    profile_dir_for,
     TASKDIR_PATTERN,
     check_adapter,
     check_plugin_files,
@@ -59,7 +60,7 @@ class PreconditionChecker:
         self.path = path.strip().strip("/")
         self.taskdir_rel = normalize_taskdir(taskdir or "")
         self.write = write
-        self.profile_dir = self.root / (profile_dir or ".claude/profile")
+        self.profile_dir = profile_dir_for(self.root, profile_dir)
         self.skill_dir = Path(__file__).resolve().parents[1]
         self.results: List[Dict[str, Any]] = []
         self.stack = ""

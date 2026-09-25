@@ -8,10 +8,11 @@ menyatukannya akan menyeragamkan hal yang memang seharusnya berbeda.
 
 Isinya lima kelompok:
 
-1. **Stack & profil** — detektor stack yang **wajib** sepakat dengan
-   `detect_stack()` di `hooks/lead-gate.sh`, pembaca field `stack` profil, dan
-   uji izin tulis. Dua detektor yang berselisih menghasilkan repo yang lolos
-   gate tetapi ditolak skrip prasyarat tanpa satu pun pesan yang menyebut sebabnya.
+1. **Stack & profil** — pembungkus detektor stack di `hooks/detect.py` (fungsi
+   yang sama dengan yang dipakai hook SessionStart), resolver direktori profil
+   `.claude/profile/frontenddev/`, pembaca field `stack` profil, dan uji izin
+   tulis. Dua detektor yang berselisih menghasilkan repo yang lolos gate tetapi
+   ditolak skrip prasyarat tanpa satu pun pesan yang menyebut sebabnya.
 2. **Git & frontmatter** — akar repo, pemanggil git, satu parser frontmatter
    (`split_frontmatter`) untuk **semua** skrip termasuk validator, penyaring
    laci `.explore/`, dan uji ter-commit. Satu parser berarti status artefak yang
@@ -32,6 +33,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
@@ -73,79 +75,81 @@ def probe_writable(path: Path) -> Tuple[bool, str]:
     return True, str(anchor)
 
 
-def _deps(manifest: Path) -> set:
-    """Kumpulkan nama dependensi dari satu `package.json`; manifest rusak → kosong."""
-    try:
-        data = json.loads(manifest.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return set()
-    if not isinstance(data, dict):
-        return set()
-    names = set()
-    for field in ("dependencies", "devDependencies", "peerDependencies"):
-        block = data.get(field)
-        if isinstance(block, dict):
-            names.update(block.keys())
-    return names
+# Deteksi stack tinggal di `hooks/detect.py` (identik di kedua plugin) — satu
+# implementasi untuk hook dan skrip, sehingga vonis keduanya tidak bisa berselisih.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "hooks"))
+import detect as _detect  # noqa: E402
+
+# Tiap plugin engineer punya direktori profilnya sendiri. `.claude/profile/`
+# (tanpa subdirektori) adalah lokasi lama yang hanya dibaca selama masa transisi
+# dan selalu disertai catatan MIGRATE.
+PLUGIN = "frontenddev"
+PROFILE_DIR_REL = f".claude/profile/{PLUGIN}"
+LEGACY_PROFILE_DIR_REL = ".claude/profile"
+DEFAULT_PROFILE_DIR = PROFILE_DIR_REL
+
+
+def resolve_profile_dir(root: Path) -> Tuple[Path, str]:
+    """(direktori profil yang dibaca, catatan untuk laporan prasyarat).
+
+    Lokasi baru selalu menang. Lokasi lama dipakai hanya bila `index.json`-nya
+    milik plugin ini (field `plugin`, atau `stack` anggota daftar frontenddev),
+    dan selalu disertai catatan MIGRATE. Profil milik plugin lain tidak pernah
+    dikembalikan: skrip melihatnya sebagai profil yang tidak ada.
+    """
+    own = root / PROFILE_DIR_REL
+    if (own / "index.json").exists():
+        return own, ""
+    prof = _detect.read_profile(root, PLUGIN)
+    if prof.location == "legacy" and prof.state not in ("OTHER_OWNER", "ABSENT", "INVALID_JSON"):
+        return root / LEGACY_PROFILE_DIR_REL, (
+            "profil frontenddev masih di lokasi lama `.claude/profile/`; "
+            "jalankan `frontenddev:profile` mode MIGRATE")
+    return own, ""
+
+
+def profile_dir_for(root: Path, override: Optional[str] = None) -> Path:
+    """Direktori profil skrip: `--profile-dir` bila diberikan, selain itu resolver."""
+    return (root / override) if override else resolve_profile_dir(root)[0]
+
+
+def is_legacy_profile_dir(profile_dir: Path) -> bool:
+    """Benar bila `profile_dir` adalah lokasi lama `<root>/.claude/profile`."""
+    return profile_dir.parts[-2:] == (".claude", "profile")
 
 
 def detect_stack(manifest: Path) -> Optional[str]:
-    """Turunkan `<stack-id>` dari satu `package.json`, atau `None`.
-
-    Urutan pemutus dari yang paling spesifik, **byte-identik** dengan
-    `detect_stack()` di `hooks/lead-gate.sh`. Manifest yang memuat `next` bukan
-    repo plugin ini, apa pun penanda lain yang ikut hadir. Pembeda "di luar
-    cakupan" versus "bukan repo frontend" ditegakkan pemanggil lewat `is_next()`.
-    """
-    if not manifest.is_file():
-        return None
-    deps = _deps(manifest)
-    if "next" in deps:
-        return None
-    if deps & {"react-native", "expo"}:
-        return "react-native"
-    if "@sveltejs/kit" in deps:
-        return "sveltekit"
-    if "svelte" in deps:
-        return "svelte-vite"
-    if "react" in deps:
-        return "react-vite"
-    return None
+    """`<stack-id>` dari satu `package.json`, atau `None` (lihat `detect.frontend_from_package`)."""
+    return _detect.frontend_from_package(manifest)[0]
 
 
 def is_next(manifest: Path) -> bool:
-    """Benar bila manifest memuat `next` — repo di luar cakupan plugin."""
-    return manifest.is_file() and "next" in _deps(manifest)
+    return _detect.frontend_from_package(manifest)[1] == "next"
+
+
+def out_of_scope_reason(manifest: Path) -> str:
+    """`next` | `cra` | `react-tanpa-vite` | `svelte-tanpa-vite` | `manifest-rusak` | ''."""
+    return _detect.frontend_from_package(manifest)[1]
 
 
 def candidate_manifests(root: Path) -> list:
-    """Manifest yang layak diperiksa: root, lalu satu tingkat `apps/*`/`packages/*`."""
-    found = []
-    root_pkg = root / "package.json"
-    if root_pkg.is_file():
-        found.append(root_pkg)
-    for group in ("apps", "packages"):
-        base = root / group
-        if not base.is_dir():
-            continue
-        for child in sorted(base.iterdir()):
-            pkg = child / "package.json"
-            if pkg.is_file():
-                found.append(pkg)
-    return found
+    """Manifest yang diperiksa hook dan skrip: urutan `detect.candidate_dirs`."""
+    return [d / "package.json" for d in _detect.candidate_dirs(root) if (d / "package.json").is_file()]
 
 
 def read_profile_stack(profile_dir: Path) -> str:
     """Baca field `stack` dari `<profile_dir>/index.json`, atau string kosong."""
-    index = profile_dir / "index.json"
-    try:
-        data = json.loads(index.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return ""
-    if not isinstance(data, dict):
+    data, _state = _detect.read_index(profile_dir / "index.json")
+    if data is None:
         return ""
     stack = data.get("stack")
     return stack.strip() if isinstance(stack, str) else ""
+
+
+def profile_owner(profile_dir: Path) -> str:
+    """Pemilik profil di `<profile_dir>/index.json` (`plugin`, atau keanggotaan `stack`)."""
+    data, _state = _detect.read_index(profile_dir / "index.json")
+    return _detect.owner_of(data) if data is not None else ""
 
 
 def load_profile(profile_dir: Path, required: Tuple[str, ...]) -> Tuple[str, List[str]]:
@@ -677,8 +681,14 @@ def check_profile(add: AddFn, cid: int, profile_dir: Path, required: Tuple[str, 
     """Check profil; mengembalikan stack terbaca atau string kosong."""
     name = "Profil repo memuat berkas wajib"
     if not profile_dir.is_dir():
-        add(cid, name, "FAIL", "`.claude/profile/` tidak ada",
+        add(cid, name, "FAIL", f"`{DEFAULT_PROFILE_DIR}/` tidak ada",
             "Jalankan `frontenddev:profile` lebih dulu.")
+        return ""
+    owner = profile_owner(profile_dir)
+    if owner and owner != PLUGIN:
+        add(cid, name, "FAIL", f"profil milik `{owner}`; bukan profil {PLUGIN}",
+            f"Jangan membaca atau menimpa profil plugin lain; jalankan `frontenddev:profile` "
+            f"(ditulis ke `{DEFAULT_PROFILE_DIR}/`).")
         return ""
     stack, missing = load_profile(profile_dir, required)
     if missing:
@@ -689,7 +699,10 @@ def check_profile(add: AddFn, cid: int, profile_dir: Path, required: Tuple[str, 
         add(cid, name, "FAIL", "field `stack` tidak terbaca dari `index.json`",
             "`index.json` rusak atau tanpa field `stack`; jalankan `frontenddev:profile` mode REFRESH.")
         return ""
-    add(cid, name, "PASS", f"{len(required)} berkas wajib ada, stack `{stack}`")
+    note = ""
+    if is_legacy_profile_dir(profile_dir):
+        note = "; profil masih di lokasi lama `.claude/profile/` — jalankan `frontenddev:profile` mode MIGRATE"
+    add(cid, name, "PASS", f"{len(required)} berkas wajib ada, stack `{stack}`{note}")
     return stack
 
 
