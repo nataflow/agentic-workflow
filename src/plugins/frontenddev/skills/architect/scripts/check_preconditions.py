@@ -51,6 +51,7 @@ from precondition_lib import (  # noqa: E402
     read_status,
     report_json,
     review_is_fresh,
+    typecheck_per_brief,
 )
 
 VALIDATE_BRIEFS = Path(__file__).resolve().parents[2] / "plan" / "scripts" / "validate_briefs.py"
@@ -325,15 +326,19 @@ class PreconditionChecker:
 
     # ---------------------------------------------------------------- output
 
+    def tpb(self) -> str:
+        value, source = typecheck_per_brief(self.profile_dir, self.stack or "")
+        return f"{value} ({source})"
+
     def format_text(self) -> str:
         return format_report("architect" + (f" ingest brief-{self.brief_nn}" if self.brief_nn else ""),
                              self.results, {"fase": self.phase, "unit_berikutnya": self.next_unit,
-                                            "lane": self.lane or "-"})
+                                            "lane": self.lane or "-", "typecheck_per_brief": self.tpb()})
 
     def to_json(self) -> str:
         return report_json(self.results, root=str(self.root), taskdir=self.taskdir_rel,
                            brief=self.brief_nn, phase=self.phase, next_unit=self.next_unit,
-                           lane=self.lane, stack=self.stack)
+                           lane=self.lane, stack=self.stack, typecheck_per_brief=self.tpb())
 
 
 def main() -> None:

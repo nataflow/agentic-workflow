@@ -79,7 +79,7 @@ Muara tiap titik ke berkas profil ditetapkan oleh judul titik itu di `references
 
 Uji perintah hasil Phase 2 titik 2 di terminal sebelum ditulis ke `commands.md` [REQUIRED]:
 
-1. Eksekusi berurutan `typecheck`, `lint`, `test`, `build`. Tulis `tidak berlaku` bila perintah tidak punya padanan di stack ini. Baris keputusan `typecheck-per-brief` **disalin dari adapter tanpa dieksekusi** — ia menjawab cara pemakaian, bukan status jalan.
+1. Eksekusi berurutan `typecheck`, `lint`, `test`, `build`. Tulis `tidak berlaku` bila perintah tidak punya padanan di stack ini. Baris keputusan `typecheck-per-brief`: salin nilai adapter; profil boleh menaikkan/menurunkannya sesuai `stacks/_CONTRACT.md` §2 dengan durasi `typecheck` terukur di butir ini sebagai alasan (`ya — svelte-check 8 dtk`), tanpa menjalankan ulang typecheck khusus untuk keputusan ini. Nilai profil menang atas adapter — `architect` membacanya lewat prasyarat.
 2. Catat status tiap perintah:
    - `OK (0 errors)` atau `OK (N passing)` — exit code 0.
    - `FAIL (<n> errors)` beserta potongan pesan error ringkas — exit code bukan 0 karena kodenya merah.

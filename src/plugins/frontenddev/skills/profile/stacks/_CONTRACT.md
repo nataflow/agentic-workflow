@@ -81,15 +81,16 @@ Ditambah satu baris keputusan, bukan perintah:
 
 | Baris | Nilai | Konsumen |
 |---|---|---|
-| `typecheck-per-brief` | `ya \| tidak — <alasan>` | `frontenddev:architect` Phase 2 (gerbang kompilasi per-brief) |
+| `typecheck-per-brief` | `ya \| tidak — <alasan>` | `frontenddev:architect` Phase 0 (lewat `Terselesaikan:` prasyarat; gerbang kompilasi per-brief di Phase 2) |
 
 `ya` berarti perintah `typecheck` cukup murah untuk dijalankan sekali per unit **di main loop**,
 sesudah commit unit itu, dengan vonis **relatif baseline**: yang ditagih adalah nol galat *baru*,
 bukan hijau absolut. `tidak` berarti biayanya sepadan dengan menunda seluruh pembuktian ke penutup.
 Baris ini tidak mengubah IRON LAW `code-implementor` — subagent tetap nol terminal — dan tidak
 menyentuh lint, test, maupun build, yang selamanya milik verifikasi penutup. `profile` boleh
-menurunkan nilainya ke `tidak` bila durasi terukur di repo itu ternyata mahal, dan mencatat
-durasinya sebagai alasan.
+menurunkan nilainya ke `tidak` bila durasi terukur di repo itu ternyata mahal (atau menaikkannya ke
+`ya` bila murah), dan mencatat durasinya sebagai alasan; nilai di `commands.md` profil menang atas
+adapter.
 
 ### 3. `## Layer taxonomy` — konsumen: `agents/code-implementor.md` (lewat slot `{adapter_path}`), `frontenddev:contract`, `frontenddev:plan`
 

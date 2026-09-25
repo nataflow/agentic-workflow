@@ -9,7 +9,7 @@ metadata:
 
 - Jalankan brief satu per satu, sekuensial, lewat `code-implementor`; dilarang menyentuh `src/` dari main loop, dan dilarang mendispatch dua implementor bersamaan.
 - Status unit divonis dari **disk** — `report-<NN>.md`, `git status`, dan hunk anchor — bukan dari kata balikan subagent. Kenaikan status brief dan commit-nya adalah satu langkah.
-- Lint, test, dan build berjalan tepat sekali, di penutup; typecheck per unit hanya bila adapter menyatakan `typecheck-per-brief: ya`, dan divonis relatif baseline.
+- Lint, test, dan build berjalan tepat sekali, di penutup; typecheck per unit hanya bila `typecheck_per_brief` prasyarat bernilai `ya` (profil, fallback adapter), dan divonis relatif baseline.
 - Dispatch `code-reviewer` tepat sekali per penutup; `REVIEW.md` di-commit hanya sesudah `validate_review.py` `PASS`. Review ulang (sesudah brief perbaikan) menimpa `REVIEW.md` utuh.
 - Rantai yang berhenti `BLOCKED` tidak pernah direview dan tidak pernah dilaporkan tuntas. Cacat yang ditemukan di penutup diperbaiki di taskdir yang sama, tidak pernah dipindah ke taskdir baru.
 
@@ -29,7 +29,7 @@ metadata:
 
 ### Phase 0 — Serap Profil & Baseline
 
-1. Serap `stack` dari `.claude/profile/frontenddev/index.json`, perintah dari `commands.md`, dan baris `typecheck-per-brief` `## Commands` adapter `${CLAUDE_PLUGIN_ROOT}/skills/profile/stacks/<stack>.md`.
+1. Serap `stack` dari `.claude/profile/frontenddev/index.json`, perintah dari `commands.md`, dan `typecheck_per_brief` dari baris `Terselesaikan:` prasyarat (nilai profil `commands.md` bila ada, fallback baris `## Commands` adapter `${CLAUDE_PLUGIN_ROOT}/skills/profile/stacks/<stack>.md`); dilarang membaca adapter sendiri untuk keputusan ini.
 2. Ambil baseline seluruh perintah `commands.md` profil (typecheck, lint, test, build) sekali, sebelum implementor pertama: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/run_verification.py baseline --taskdir <taskdir> --cmd typecheck='<…>' --cmd lint='<…>' --cmd test='<…>' --cmd build='<…>'` lewat Bash `run_in_background: true`, lalu tunggu notifikasi selesainya. Skrip menyimpan exit code, durasi, dan tanda galat tiap perintah ke `{taskdir}/.explore/verification-baseline.json`; baseline yang sudah ada dipakai ulang (re-entry), tidak diukur ulang. Merah di sini bukan alasan berhenti — ia yang membuat gerbang kompilasi dan verifikasi penutup dapat memvonis galat **baru**.
 3. Sajikan rantai sebelum implementor pertama berangkat: tabel `NN`, unit, status, `files_touched`, `depends_on`. Dilarang menahan rantai untuk meminta otorisasi commit — persetujuan breakdown sudah dimateraikan di ledger.
 

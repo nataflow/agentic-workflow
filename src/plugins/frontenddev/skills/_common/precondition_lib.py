@@ -165,6 +165,32 @@ def adapter_path(stack: str) -> Path:
     return STACKS_DIR / f"{stack}.md"
 
 
+PROFILE_TPB = re.compile(r"^-\s*`typecheck-per-brief`\s*:\s*`?\s*(ya|tidak)\b", re.MULTILINE)
+ADAPTER_TPB = re.compile(r"^\|\s*typecheck-per-brief\s*\|\s*`?(ya|tidak)\b", re.MULTILINE)
+
+
+def typecheck_per_brief(profile_dir: Path, stack: str) -> Tuple[str, str]:
+    """`(nilai, sumber)` gerbang kompilasi per-brief — satu resolver untuk seluruh pembaca.
+
+    Profil menang bila `commands.md` menulis barisnya (keputusan berbasis durasi
+    terukur di repo itu, `stacks/_CONTRACT.md` §2); selain itu baris `## Commands`
+    adapter; selain itu `tidak`.
+    """
+    try:
+        m = PROFILE_TPB.search((profile_dir / "commands.md").read_text(encoding="utf-8"))
+        if m:
+            return m.group(1), "profil"
+    except OSError:
+        pass
+    try:
+        m = ADAPTER_TPB.search(adapter_path(stack).read_text(encoding="utf-8")) if stack else None
+        if m:
+            return m.group(1), "adapter"
+    except OSError:
+        pass
+    return "tidak", "bawaan"
+
+
 # ================================================================ 2. git & frontmatter
 
 

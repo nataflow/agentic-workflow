@@ -123,7 +123,7 @@ status: DONE | FAILED
 
 ## 5. Gerbang Kompilasi Per-Brief
 
-Baca baris `typecheck-per-brief` `## Commands` adapter.
+Pakai `typecheck_per_brief` dari baris `Terselesaikan:` prasyarat rantai (nilai profil `commands.md`, fallback adapter).
 
 | Nilai | Tindakan sesudah commit unit |
 |---|---|

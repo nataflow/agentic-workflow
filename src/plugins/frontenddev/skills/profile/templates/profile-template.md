@@ -134,7 +134,7 @@ Invariant yang repo-nya belum patuhi tetap ditulis sebagai invariant; ketidakpat
 
 Status sah: `OK (...)`, `FAIL (<n> errors)`, `UNVERIFIED_ENV_NOT_READY`, `TIMEOUT / UNVERIFIED`, `tidak berlaku`.
 
-- `typecheck-per-brief`: `<ya | tidak — alasan>` — disalin dari adapter **tanpa dieksekusi**; ia menjawab cara pemakaian, bukan status jalan.
+- `typecheck-per-brief`: `<ya | tidak — alasan>` — nilai adapter, atau dinaikkan/diturunkan profil sesuai `stacks/_CONTRACT.md` §2 dengan durasi `typecheck` baseline sebagai alasan (`ya — svelte-check 8 dtk`); ia menjawab cara pemakaian, bukan status jalan, dan menang atas adapter.
 
 > [!NOTE]
 > Jika baseline awal memuat error pre-existing, kriteria verifikasi implementasi berbunyi "nol error baru dibanding baseline", bukan "bersih total". `UNVERIFIED_ENV_NOT_READY` bukan utang kode: ia menandai dependensi belum terpasang, dan menagihnya sebagai utang menghentikan rantai yang sebenarnya sehat.
