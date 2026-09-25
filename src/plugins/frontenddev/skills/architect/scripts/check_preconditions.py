@@ -45,6 +45,7 @@ from precondition_lib import (  # noqa: E402
     find_repo_root,
     format_report,
     git,
+    is_committed,
     normalize_taskdir,
     parse_frontmatter,
     read_status,
@@ -142,7 +143,10 @@ class PreconditionChecker:
         self.stack = check_profile(self._add, 5, self.profile_dir, PROFILE_FILES)
         check_adapter(self._add, 6, self.stack)
         check_plugin_files(self._add, 7, self.skill_dir, PLUGIN_FILES)
-        check_worktree(self._add, 8, self.root)
+        # REPORT.md tertunda (tertulis, gagal di-commit) adalah satu-satunya kotoran yang boleh
+        # ada: architect Phase 5 butir 4 memvalidasi dan menguncinya.
+        check_worktree(self._add, 8, self.root,
+                       allow=[f"{self.taskdir_rel}/REPORT.md"] if self.phase == "LAPORAN TERTUNDA" else [])
         self._check_9_head()
         if self.brief_nn:
             self._check_10_target()
@@ -212,6 +216,8 @@ class PreconditionChecker:
             self.phase = "PENUTUP"
         elif not report.is_file():
             self.phase = "LAPORAN" if read_status(review, "verdict") in ("PASS", "WARNING") else "TERHENTI (REVIEW BLOCKED)"
+        elif not is_committed(self.root, f"{self.taskdir_rel}/REPORT.md"):
+            self.phase = "LAPORAN TERTUNDA"
         else:
             self.phase = "TUNTAS"
         self._add(4, name, "PASS", f"seluruh {len(states)} brief tertutup — fase {self.phase}")

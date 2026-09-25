@@ -17,7 +17,7 @@ metadata:
 
 1. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/architect/scripts/check_preconditions.py --taskdir <taskdir>`.
 2. `PASS` (9/9): lanjut. `FAIL`: hentikan dan kembalikan butir gagal beserta tindakannya ke `frontenddev:lead` — ledger belum tercentang atau berubah sesudah disetujui → gate pemiliknya atau `chain.py reopen`; brief `BLOCKED` tanpa remedi → `chain.py reopen --row BRIEF` lalu `plan` APPEND; profil/adapter → `frontenddev:profile`; tree kotor atau detached HEAD → laporkan ke user, jangan di-stash.
-3. Baris `Terselesaikan:` menetapkan titik masuk: `fase=EKSEKUSI` → Phase 1 dengan `unit_berikutnya`; `PENUTUP` → Phase 4 (juga `REVIEW.md` basi — lebih tua daripada `implement unit` terakhir — atau yang tidak lagi lolos `validate_review.py`, mis. sesudah amandemen SC; review ulang menimpanya); `LAPORAN` → Phase 5 butir 2; `TERHENTI (REVIEW BLOCKED)` → Phase 5 butir 1; `TERHENTI (brief-NN BLOCKED)` atau `TERHENTI (DAG)` → Check 4 `FAIL`, butir 2 berlaku; `TUNTAS` → laporkan apa adanya tanpa mendispatch siapa pun.
+3. Baris `Terselesaikan:` menetapkan titik masuk: `fase=EKSEKUSI` → Phase 1 dengan `unit_berikutnya`; `PENUTUP` → Phase 4 (juga `REVIEW.md` basi — lebih tua daripada `implement unit` terakhir — atau yang tidak lagi lolos `validate_review.py`, mis. sesudah amandemen SC; review ulang menimpanya); `LAPORAN` → Phase 5 butir 2; `TERHENTI (REVIEW BLOCKED)` → Phase 5 butir 1; `TERHENTI (brief-NN BLOCKED)` atau `TERHENTI (DAG)` → Check 4 `FAIL`, butir 2 berlaku; `LAPORAN TERTUNDA` → Phase 5 butir 4; `TUNTAS` → laporkan apa adanya tanpa mendispatch siapa pun.
 4. Skrip: `chain.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py`; `validate_review.py` = `${CLAUDE_PLUGIN_ROOT}/skills/architect/scripts/validate_review.py`.
 
 ## Parameter [REQUIRED]
@@ -59,7 +59,8 @@ Berkas yang muncul di diff unit, di galat kompilasi, atau di `REVIEW.md` sementa
 
 1. Verdict `BLOCKED` → rantai berhenti di sini dan kembali ke `frontenddev:lead`; perbaikannya di taskdir yang sama: `P1` dan SC `belum terbukti` → `chain.py reopen --row BRIEF` → `plan` APPEND brief perbaikan (tanpa `remedies`) → Phase 1 → Phase 4 ulang; berkas yatim → Phase 3. Dilarang memanggil `report`.
 2. Verdict `PASS`/`WARNING` → kumpulkan baris `preseden menyesatkan` dari seluruh `report-<NN>.md` dan `## Umpan balik profil` `REVIEW.md`. Ada isinya → tanyakan sekali lewat `AskUserQuestion`: tandai permanen di profil, atau buang. Yang disetujui diteruskan ke `frontenddev:profile` lewat `reported_drift`.
-3. Panggil `frontenddev:report` dengan `{ taskdir }`; ia menulis dan meng-commit `REPORT.md` sendiri. `REPORT.md` sudah ada → catat `dilewati (sudah terbit)`.
+3. Panggil `frontenddev:report` dengan `{ taskdir }`; ia menulis dan meng-commit `REPORT.md` sendiri. `REPORT.md` ada dan ter-commit → catat `dilewati (sudah terbit)`; ada tetapi belum ter-commit → butir 4.
+4. **Laporan tertunda** (fase `LAPORAN TERTUNDA` — `report` menulis `REPORT.md` tetapi commit-nya gagal): jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/report/scripts/validate_report.py --taskdir <taskdir>`. `PASS` → `git add {taskdir}/REPORT.md` lalu commit `docs(<slug>): laporkan hasil rantai <slug>`; commit gagal → periksa penyebabnya (hook/lock), ulangi sekali, dilarang `--no-verify`, tetap gagal → laporkan ke user. `FAIL` → hapus `REPORT.md` yang belum ter-track (ter-track: `git restore -- {taskdir}/REPORT.md`), panggil `frontenddev:report` sekali lagi; gagal lagi → laporkan ke user.
 
 ## Guardrails
 

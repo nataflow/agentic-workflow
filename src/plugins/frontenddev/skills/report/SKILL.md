@@ -49,7 +49,7 @@ metadata:
 ### Phase 4 — Penulisan, Validasi & Penguncian
 
 1. Tulis `{taskdir}/REPORT.md` mengikuti `templates/report-template.md` bagian 1.
-2. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/report/scripts/validate_report.py --taskdir <taskdir>`; `FAIL` → perbaiki berkasnya lalu ulangi sampai `PASS`.
+2. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/report/scripts/validate_report.py --taskdir <taskdir>`; `FAIL` → perbaiki berkasnya lalu ulangi, maksimal 2 putaran perbaikan; masih `FAIL` → hentikan tanpa commit, sajikan butir gagal di Output, dan serahkan ke user.
 3. Stage path eksplisit `{taskdir}/REPORT.md`, lalu commit `docs(<slug>): laporkan hasil rantai <slug>`. Dilarang `git add .` maupun `git add -A`.
 4. Catat SHA commit dan kembalikan kendali ke `frontenddev:architect`.
 
@@ -76,11 +76,11 @@ Tutup satu baris: `kembali ke frontenddev:architect | Taskdir: <path> | Laporan:
 
 ## Failure path
 
-1. **REPORT.md sudah ada**: hentikan tanpa menimpa, laporkan path-nya, dan serahkan keputusan penulisan ulang ke user.
+1. **REPORT.md sudah ada**: hentikan tanpa menimpa. Ter-commit → laporkan path-nya dan serahkan keputusan penulisan ulang ke user; belum ter-commit → tertunda, penguncian milik `architect` Phase 5 butir 4.
 2. **Taskdir tanpa TASK.md**: hentikan; tidak ada kriteria untuk dipasangkan — sejak v0.4.0 tidak ada taskdir sah tanpa akar.
 3. **Verdict BLOCKED**: hentikan sebelum menulis berkas; lead merutekan temuannya ke brief perbaikan di taskdir yang sama (`chain.py reopen --row BRIEF` → `plan` APPEND).
 4. **Nol berkas rantai**: hentikan dan laporkan `akar` serta slug terbaca. Dilarang mengarang butir dari isi brief.
-5. **Commit gagal**: pertahankan berkas di working tree, laporkan `Commit: GAGAL` beserta pesan git, serahkan penguncian ke `architect`.
+5. **Commit gagal**: pertahankan berkas di working tree, laporkan `Commit: GAGAL` beserta pesan git, serahkan penguncian ke `architect` (fase `LAPORAN TERTUNDA`, Phase 5 butir 4).
 
 ## STYLE
 

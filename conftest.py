@@ -244,3 +244,16 @@ def fe_approved_chain(repo: Path) -> None:
     run("_common/review_round.py", "commit", "--taskdir", FE_TD, "--gate", "plan",
         "--subject", "docs(orders-lacak): draft breakdown (1 briefs)")
     run("_common/chain.py", "approve", "--taskdir", FE_TD, "--row", "BRIEF", "--answer", "Setujui")
+
+
+FE_MINOR_TD = "frontenddev/docs/2609231200-order-checkout"
+
+
+@pytest.fixture
+def fe_minor_chain(tmp_path):
+    """Rantai HOTFIX_MINOR frontenddev: `closing review PASS` ter-commit, `REPORT.md` tertulis belum di-commit."""
+    root = tmp_path / "repo"
+    proc = subprocess.run(["bash", str(FE_FIX / "minor_chain_reviewed.sh"), str(root), str(FE_SKILLS)],
+                          capture_output=True, text=True, env={**os.environ, **GIT_ENV})
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    return root

@@ -138,7 +138,7 @@ Dan dua penjaga keadaan:
   FAIL (pulihkan dari `.bak`); `commit` meng-commit draft/batch hanya sesudah ronde `PASS` dengan trailer
   `Review-Round`, sehingga state yang hilang terdeteksi (`rebuild` memulihkan hitungannya).
 - `lead/scripts/taskdir_state.py` — memvonis keadaan tiap taskdir (`AKAR`, `GATE`, `DRIFT`,
-  `EKSEKUSI`, `TERHENTI`, `PENUTUP`, `TEMUAN`, `LAPORAN`, `TUNTAS`, `DITUTUP`, `RUSAK`) beserta satu
+  `EKSEKUSI`, `TERHENTI`, `PENUTUP`, `TEMUAN`, `LAPORAN`, `LAPORAN TERTUNDA`, `TUNTAS`, `DITUTUP`, `RUSAK`) beserta satu
   rute berikutnya, dari disk dan ledger — bukan dari ingatan sesi.
 
 Pasangan `(lane, sections)` ditegakkan di setiap gate: `HOTFIX_MINOR` ⇔ sections kosong;

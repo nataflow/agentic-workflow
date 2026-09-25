@@ -18,7 +18,9 @@ Urutan vonis (yang pertama cocok menang):
 8. `TEMUAN`     — `REVIEW.md` ber-verdict `BLOCKED` → kerja baru lewat lead (`finding_source`).
    Perbaikannya di taskdir yang sama: reopen BRIEF → `plan` APPEND → review ulang.
 9. `LAPORAN`    — `REVIEW.md` `PASS`/`WARNING`, `REPORT.md` absen → `frontenddev:report`.
-10. `TUNTAS`    — `REPORT.md` ada.
+10. `LAPORAN TERTUNDA` — `REPORT.md` tertulis tetapi belum ter-commit (commit report gagal)
+   → `frontenddev:architect` Phase 5 butir 4.
+11. `TUNTAS`    — `REPORT.md` ada dan ter-commit.
 
 Zero external dependencies (Python Standard Library only). Satu impor
 intra-plugin: `skills/_common/precondition_lib.py`.
@@ -146,7 +148,11 @@ def classify(root: Path, rel: str, successors: Optional[Dict[str, str]] = None) 
     if not (taskdir / "REPORT.md").is_file():
         out.update(state="LAPORAN", next="frontenddev:architect (Phase 5)", detail=f"REVIEW.md {verdict}")
         return out
-    out.update(state="TUNTAS", next="taskdir baru untuk permintaan baru", detail="REPORT.md ada")
+    if not is_committed(root, f"{rel}/REPORT.md"):
+        out.update(state="LAPORAN TERTUNDA", next="frontenddev:architect (Phase 5 butir 4)",
+                   detail="REPORT.md tertulis tetapi belum ter-commit")
+        return out
+    out.update(state="TUNTAS", next="taskdir baru untuk permintaan baru", detail="REPORT.md ter-commit")
     return out
 
 

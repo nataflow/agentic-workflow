@@ -50,6 +50,7 @@ Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/lead/scripts/taskdir_state.py`. T
 | `TERHENTI` | brief `BLOCKED` tanpa remedi → Phase 8 (re-entry BRIEF) → `plan` APPEND brief remedi |
 | `TEMUAN` | `REVIEW.md` `BLOCKED` → Phase 8: `chain.py reopen --row BRIEF` → `plan` APPEND brief perbaikan di taskdir yang sama → `architect` eksekusi dan review ulang |
 | `LAPORAN` | `frontenddev:architect` (Phase 5) — umpan balik profil dulu, lalu architect menyerahkan ke `report` |
+| `LAPORAN TERTUNDA` | `REPORT.md` tertulis tetapi commit-nya gagal → `frontenddev:architect` Phase 5 butir 4 (validasi lalu commit); dilarang membuka taskdir baru |
 | `DITUTUP` | `TASK.md` `status: ABANDONED` (`chain.py abandon`) — tidak tampil di pemindaian |
 | `RUSAK` | artefak tanpa `TASK.md`, pasangan lane/sections tidak sah, `lane`/`sections` berubah di luar commit akar (`kunci TASK`) atau `chain.py escalate`, atau ledger ≠ jadwal sections → laporkan ke user; dilarang menambal akar atau ledger dengan tangan |
 

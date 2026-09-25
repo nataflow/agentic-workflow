@@ -138,8 +138,13 @@ class PreconditionChecker:
         """REPORT.md belum ada"""
         name = self._check_5_absent.__doc__
         if (self.taskdir / "REPORT.md").is_file():
-            self._add(cid, name, "FAIL", "`REPORT.md` sudah ada",
-                      "Dilarang ditimpa; serahkan keputusan penulisan ulang ke user.")
+            if is_committed(self.root, f"{self.taskdir_rel}/REPORT.md"):
+                self._add(cid, name, "FAIL", "`REPORT.md` sudah terbit (ter-commit)",
+                          "Dilarang ditimpa; serahkan keputusan penulisan ulang ke user.")
+            else:
+                self._add(cid, name, "FAIL", "`REPORT.md` tertunda — tertulis tetapi belum ter-commit",
+                          "Jangan tulis ulang: kunci lewat `frontenddev:architect` Phase 5 butir 4 "
+                          "(validasi lalu commit).")
             return
         self._add(cid, name, "PASS", "siap ditulis baru")
 

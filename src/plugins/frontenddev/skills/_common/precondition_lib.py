@@ -739,13 +739,16 @@ def check_plugin_files(add: AddFn, cid: int, skill_dir: Path, files: Iterable[st
     return True
 
 
-def check_worktree(add: AddFn, cid: int, root: Path, taskdir_rel: str = "") -> bool:
+def check_worktree(add: AddFn, cid: int, root: Path, taskdir_rel: str = "",
+                   allow: Iterable[str] = ()) -> bool:
+    """Tree bersih; path di `allow` (mis. `REPORT.md` tertunda) tidak dihitung kotor."""
     name = "Working tree bersih"
     if not is_git_repo(root):
         add(cid, name, "FAIL", "git tidak dapat membaca repo (bukan repo git, atau ditolak git)",
             "Jalankan di root repo git yang sah; tree yang tak terbaca tidak pernah dianggap bersih.")
         return False
-    dirty = dirty_lines(root)
+    allowed = set(allow)
+    dirty = [l for l in dirty_lines(root) if l[3:].strip().strip('"') not in allowed]
     if dirty:
         paths = [l[3:].strip().strip('"') for l in dirty]
         preview = ", ".join(paths[:5])
