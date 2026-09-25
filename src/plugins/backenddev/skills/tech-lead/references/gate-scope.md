@@ -18,11 +18,12 @@ Setiap pesan user yang meminta pemahaman kode, perubahan perilaku, perbaikan bug
 
 Ukuran perubahan kecil bukan alasan melewati gerbang. Subagent yang sedang berjalan dilarang memproses permintaan baru di luar briefnya.
 
-### Tiga Pengecualian, dan Hanya Tiga:
+### Empat Pengecualian, dan Hanya Empat:
 
 1. **Jawaban User Memasok Informasi**: Jawaban langsung atas pertanyaan klarifikasi Fase 2 atau entri `## Open questions` pada alur yang rutenya sudah diputuskan.
 2. **Pertanyaan Pengetahuan Umum Non-Repo**: Penjelasan konsep umum bahasa atau framework tanpa menyentuh file repo.
 3. **Operasi VCS atas Kerja Selesai**: Permintaan murni VCS yang tidak menambah kode baru ("commit perubahan dengan pesan X").
+4. **Alur Plugin Lain yang Dipanggil Eksplisit**: Permintaan yang memanggil atau melanjutkan `/analyst:*` atau `/quickdev:*`, termasuk susulan di tengah skill `analyst:*`/`quickdev:*` yang sedang berjalan (elisitasi tiket, `plan/<task>.md`). Kerja itu milik plugin tersebut sampai user sendiri meminta pindah ke gerbang ini. Penanda `.claude/workflow` tanpa kata `backenddev` membuat hook gerbang ini diam di repo itu.
 
 ### Approval Bukan Pengecualian:
 

@@ -41,15 +41,15 @@ metadata:
 Evaluasi setiap pesan user, termasuk susulan di tengah sesi:
 
 1. Aktifkan gerbang dan lanjut ke Fase 0 untuk permintaan pemahaman kode, perubahan perilaku, bugfix, audit, eksekusi artefak, susulan cakupan, atau koreksi arah.
-2. Jawab langsung di main loop tanpa gerbang hanya untuk 3 pengecualian: jawaban klarifikasi Fase 2 / `## Open questions`, konsep umum bahasa/framework non-repo, atau operasi VCS murni atas kerja tuntas (`references/gate-scope.md` bagian 1).
+2. Jawab langsung di main loop tanpa gerbang hanya untuk 4 pengecualian: jawaban klarifikasi Fase 2 / `## Open questions`, konsep umum bahasa/framework non-repo, operasi VCS murni atas kerja tuntas, atau permintaan yang memanggil/melanjutkan alur plugin lain secara eksplisit (`/analyst:*`, `/quickdev:*`, susulan di tengah skill `analyst:*`/`quickdev:*` yang sedang berjalan) (`references/gate-scope.md` bagian 1).
 3. Jangan aktifkan gerbang pada persetujuan `BRD.md`/`PRD.md`: approval dokumen diminta, diproses, dan dikunci `backenddev:analyst` di dalam fase planning, dan rantai berlanjut di dalam skill itu sampai brief `READY` terbit (`references/gate-scope.md` bagian 1 dan 2). Jawaban approval user yang sampai ke main loop diteruskan ke `analyst`, bukan diproses gerbang.
 4. Tahan dan proses sebagai pemicu gerbang terpisah jika permintaan baru disisipkan saat rantai berjalan, atau jika objek kerja berupa berkas non-`src/` berefek runtime (`references/gate-lifecycle.md` bagian 5).
 
 ### Fase 0 — Verifikasi Prasyarat Profil Repositori
 
-1. Jalankan skrip `check_preconditions.py`. Hentikan eksekusi segera jika skrip menghasilkan `FAIL`.
-2. Baca `.claude/profile/backenddev/index.json` dan `.claude/profile/backenddev/invariants.md`.
-3. Hentikan gerbang dan arahkan ke `backenddev:profile` jika profil hilang atau field kritisnya corrupt.
+1. Jalankan skrip `check_preconditions.py`. `FAIL` pada check 1 (profil hilang, milik plugin lain, `index.json` rusak, atau field/dokumen wajib hilang) atau check 5 (`commands.md`) → rute `PROFILE` (Keputusan 1) ke `backenddev:profile` lebih dulu; mode GENERATE / REFRESH / MIGRATE diselesaikan skrip prasyarat `backenddev:profile` sendiri. Sesudah profil tertulis dan dikunci Fase 5, ulangi Fase 0 lalu lanjutkan rute tertunda. `FAIL` lain → hentikan eksekusi dan laporkan butir yang gagal.
+2. Baca `.claude/profile/backenddev/index.json` dan `.claude/profile/backenddev/invariants.md`. Check 1 `PASS` yang menyebut lokasi lama `.claude/profile/` → profil masih dibaca dari sana; rute `PROFILE` mode MIGRATE sebelum rute lain, dilarang REFRESH atau GENERATE di atasnya.
+3. Profil di `.claude/profile/` milik plugin lain (mis. `frontenddev`) bukan profil backenddev: jangan dibaca sebagai profil ini, jangan ditimpa.
 4. Catat invariant zona waktu, response wrapper, dan exception pattern sebagai baseline batas modul, lalu ke Fase 1.
 
 ### Fase 1 — Eksplorasi Kode Aktual Sebelum Memutuskan Rute
@@ -77,7 +77,7 @@ Pilih satu dari tujuh jalur kanonik berdasar fakta kode terverifikasi:
 
 | Jalur (Lane) | Kondisi Masuk | Rute Awal | Artefak |
 |---|---|---|---|
-| **PROFILE** | Profil tidak ada, atau 1 field wajibnya hilang | `profile` | `.claude/profile/backenddev/` |
+| **PROFILE** | Profil tidak ada, 1 field/dokumen wajibnya hilang, `index.json` tidak sah, atau profil masih di lokasi lama `.claude/profile/` (MIGRATE) | `profile` | `.claude/profile/backenddev/` |
 | **EXPLORE_FACT** | Pertanyaan faktual letak simbol/alur, tanpa mutasi | Selesai di Fase 1 | Jawaban di chat |
 | **PLANNING** | Permintaan mengubah perilaku sistem dan brief `READY`-nya belum terbit | `analyst` | `TASK.md` → `BRD.md`/`PRD.md` → `brief-<NN>-<unit>.md` |
 | **DEFECT_RCA** | Ada error/stacktrace/test merah, penyebab belum terbukti | `debug` | `RCA.md` |

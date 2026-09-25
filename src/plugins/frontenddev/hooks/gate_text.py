@@ -36,9 +36,12 @@ def _profile_note(v) -> str:
             note += (f" `.claude/profile/` berisi profil milik `{p.owner}` (stack `{p.stack}`) — biarkan; "
                      "jangan dibaca sebagai profil frontenddev, jangan ditimpa; `force: true` tidak berlaku atasnya.")
         return note
+    if p.state == "INVALID_JSON" and p.location == "legacy":
+        return (f"Profil `{PROFILE_DIR}` BELUM DIBUAT; `.claude/profile/index.json` lama bukan JSON valid dan "
+                f"tidak disentuh. {lead} (`frontenddev:profile` mode GENERATE) lebih dulu, lalu melanjutkan "
+                "rute tertunda.")
     if p.state == "INVALID_JSON":
-        where = PROFILE_DIR if p.location == "own" else ".claude/profile/"
-        return (f"`{where}index.json` bukan JSON valid; semua skrip prasyarat frontenddev akan FAIL. "
+        return (f"`{PROFILE_DIR}index.json` bukan JSON valid; semua skrip prasyarat frontenddev akan FAIL. "
                 f"{lead} mode REFRESH sebelum rute lain.")
     if p.state in ("NO_STACK", "UNKNOWN_STACK"):
         return (f"`{PROFILE_DIR}index.json` TIDAK SAH: field `stack` = `{p.stack or 'kosong'}`, di luar "

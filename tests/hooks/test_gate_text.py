@@ -74,3 +74,11 @@ def test_no_berhenti_segera_in_hooks():
     for path in PLUGINS.glob("*/hooks/*"):
         if path.is_file() and path.suffix in (".py", ".json", ".sh"):
             assert "BERHENTI SEGERA" not in path.read_text(encoding="utf-8"), path
+
+
+@pytest.mark.parametrize("plugin", list(GATES))
+@pytest.mark.parametrize("location,mode", [("own", "REFRESH"), ("legacy", "GENERATE")])
+def test_invalid_json_mode_matches_profile_script(plugin, location, mode):
+    """Hook dan prasyarat `profile` sepakat: index.json rusak milik sendiri → REFRESH; lokasi lama → GENERATE."""
+    text = _load(plugin, "gate_text").render(_verdict(plugin, "INVALID_JSON", location=location))
+    assert mode in text

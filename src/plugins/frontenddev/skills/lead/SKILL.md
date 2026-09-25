@@ -59,7 +59,7 @@ Permintaan baru saat ada taskdir terbuka → tanyakan lewat `AskUserQuestion`: l
 
 | Lane | Pemicu | Rute awal |
 |---|---|---|
-| `PROFILE` | profil belum ada / perlu refresh | `frontenddev:profile` |
+| `PROFILE` | profil belum ada / tidak sah / tidak lengkap / masih di lokasi lama `.claude/profile/` (MIGRATE) | `frontenddev:profile` |
 | `FULL_PIPELINE` | fitur baru, perombakan alur atau layout | `task` → `ux-design` dan/atau `ui-design` |
 | `FAST_FORWARD` | endpoint/logic data baru tanpa ubah alur & layout | `task` → `contract` |
 | `REFACTOR_ARCH` | restrukturisasi layer | `task` → `contract` |
@@ -155,8 +155,8 @@ Handoff ke gate berikutnya — tutup satu baris: `LEAD — <lane> · sections <n
 
 ## Failure path
 
-1. **Profil tidak ada**: rute `PROFILE` ke `frontenddev:profile` mode `GENERATE` tanpa titik henti konfirmasi; `force: true` hanya bila rute ini menyala di atas profil yang ternyata ada.
-2. **Stack tidak didukung**: manifest memuat `next` atau `stack` profil di luar `stacks/_CONTRACT.md` → hentikan, jangan buat taskdir.
+1. **Profil tidak ada, tidak sah, tidak lengkap, atau di lokasi lama**: rute `PROFILE` ke `frontenddev:profile` tanpa titik henti konfirmasi — mode GENERATE (belum ada), REFRESH (`index.json` bukan JSON valid, `stack` di luar kontrak, atau berkas hilang), atau MIGRATE (profil frontenddev di `.claude/profile/` lama), sesuai baris `Terselesaikan:` skrip prasyaratnya — lalu lanjutkan rute tertunda. `force: true` hanya bila rute REFRESH menyala di atas profil frontenddev sendiri; tidak pernah atas profil milik plugin lain atau lokasi lama. Profil milik plugin lain di `.claude/profile/` dibiarkan dan dianggap tidak ada.
+2. **Stack tidak didukung**: manifest memuat `next`, atau React/Svelte tanpa Vite (CRA, Rollup) → hentikan, jangan buat taskdir. `stack` profil di luar `stacks/_CONTRACT.md` bukan cabang ini: itu profil tidak sah → Failure path 1 (REFRESH).
 3. **Ambiguitas monorepo**: fitur sama di lebih dari satu app → `AskUserQuestion` sebelum slug.
 4. **Taskdir RUSAK**: laporkan detail `taskdir_state.py` ke user; dilarang menulis ulang akar atau ledger.
 5. **Izin tulis ditolak**: laporkan galat OS; minta user memeriksa izin direktori.
