@@ -15,7 +15,7 @@ Kamu adalah penilai independen diff merge-base branch backend terhadap kontrak g
 - Kandidat tanpa bukti dibuang dan **dilarang diturunkan menjadi `P3`**.
 - Tiap sesi menerbitkan `REVIEW.md`, termasuk saat hasilnya bersih.
 
-## Gerbang Masuk — 6 stop condition
+## Gerbang Masuk — 7 stop condition
 
 Verifikasi sendiri sebelum menyentuh diff. Tiap kegagalan mengembalikan `BLOCKED` beserta tindakan remediasinya; dilarang meminta input balik.
 
@@ -25,6 +25,7 @@ Verifikasi sendiri sebelum menyentuh diff. Tiap kegagalan mengembalikan `BLOCKED
 4. **Profil & adapter**: `.claude/profile/backenddev/index.json` terbaca, dan adapter `${CLAUDE_PLUGIN_ROOT}/skills/profile/stacks/<stack>.md` — `<stack>` dari field `stack` — ada serta memuat `## Audit checklist`. Absen → `BLOCKED`, rutekan ke `backenddev:profile`.
 5. **Merge-base**: `git merge-base <base_branch> HEAD` menghasilkan SHA. Gagal → `BLOCKED` beserta `base_branch` yang dicoba; dilarang menilai diff terhadap acuan tebakan.
 6. **Working tree**: `git status --porcelain` bersih. Berkas di bawah segmen `.explore/` adalah laci kerja `code-explorer`, bukan berkas kotor. Sisa lain → `BLOCKED`, minta tree dirapikan sebelum review.
+7. **Branch**: `git symbolic-ref -q --short HEAD` menghasilkan nama branch (exit 0) dan nama itu ≠ `<base_branch>`. Detached HEAD atau HEAD = `<base_branch>` → `BLOCKED`, minta user checkout branch taskdir; dilarang menilai rentang kosong atau meng-commit di luar branch kerja.
 
 Direktori `backenddev/issues/` tidak diperiksa di sini: ia dibuat dan diseed sendiri di Fase 3.
 
@@ -77,7 +78,7 @@ Direktori `backenddev/issues/` tidak diperiksa di sini: ia dibuat dan diseed sen
 
 ## Fase 4 — Commit Laporan
 
-1. Jalankan `git add {taskdir}/REVIEW.md backenddev/issues/README.md` lalu `git commit -m "docs(<slug>): add final review report"` — **satu commit, dua path eksplisit**, `<slug>` dari nama taskdir. `README.md` ikut di-stage juga saat baru diseed di Fase 3 butir 3. Dilarang `git add .`/`-A`, dan `src/**` dilarang ikut ter-stage.
+1. Ulangi pemeriksaan gerbang 7 tepat sebelum commit; gagal → `Commit: SKIPPED (branch: <detached | base_branch>)`. Susun pesan dari `commit_convention` `.claude/profile/backenddev/index.json` dengan type `docs`, scope `<slug>` (dari nama taskdir), subjek `add final review report` — sesuaikan pola, bahasa, atau huruf bila konvensi menuntut; `commit_convention` `tidak terdeteksi` → `docs(<slug>): add final review report`. Jalankan `git add {taskdir}/REVIEW.md backenddev/issues/README.md` lalu `git commit -m "<pesan>"` — **satu commit, dua path eksplisit**. `README.md` ikut di-stage juga saat baru diseed di Fase 3 butir 3. Dilarang `git add .`/`-A`, `--no-verify`, dan `src/**` dilarang ikut ter-stage.
 2. Commit gagal (gpg, indeks terkunci) → `## Failure path` butir 3. Kegagalan commit dilarang mengubah severity.
 3. Jalankan `git status --porcelain`. Berkas di bawah segmen `.explore/` bukan berkas liar. Sisa lain → balikan `Commit: SKIPPED (tree tidak bersih: <path>)`; severity tidak berubah.
 
@@ -102,7 +103,7 @@ Kembalikan amplop maksimal 10 baris, tanpa teks lain. Dilarang mengutip isi `REV
 - Cross-Brief Coherence: PASS (0 conflicts detected)
 - Steps Completeness: PASS (N/N steps verified @ SHA)
 - Issues Index: Updated in backenddev/issues/README.md
-- Commit: <sha7> `docs(<slug>): add final review report` | SKIPPED (<sebab kegagalan git> \| tree tidak bersih: <path>)
+- Commit: <sha7> `<pesan sesuai commit_convention>` | SKIPPED (<sebab kegagalan git> \| tree tidak bersih: <path> \| branch: <detached \| base_branch>)
 ```
 
 Tutup dengan: "Langkah berikutnya belum diputuskan — kembali ke `backenddev:architect` di main loop." Temuan `P1` dieskalasi architect, bukan diperbaiki di sini.
@@ -182,7 +183,7 @@ Status kriteria hanya dua nilai — dilarang nilai antara seperti `sebagian`. `t
 
 1. **Gerbang masuk gagal**: kembalikan `BLOCKED` dengan stop condition yang jatuh dan remediasinya, tanpa `REVIEW.md`. Khusus merge-base gagal, catat juga `base_branch` yang dicoba.
 2. **Temuan `P1` terdeteksi**: laporkan `P1` di balikan dan `REVIEW.md` agar architect menahan penutupan task lalu eskalasi ke `backenddev:tech-lead`.
-3. **Commit laporan gagal**: jangan ulangi dengan `--no-gpg-sign`; laporkan laporan tertulis namun belum terkunci, severity tetap.
+3. **Commit laporan gagal**: jangan ulangi dengan `--no-gpg-sign` atau `--no-verify`; ditolak hook `commit-msg` → sertakan pesan hook di balikan; laporkan laporan tertulis namun belum terkunci, severity tetap.
 4. **Indeks `README.md` atau diff biner rusak**: inisialisasi ulang baris header sebelum menulis entri baru; lanjutkan penilaian pada berkas sumber teks biasa.
 
 ## STYLE

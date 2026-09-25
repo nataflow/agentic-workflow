@@ -221,6 +221,15 @@ class PreconditionChecker:
             "action": "",
         })
 
+    def _profile_base_branch(self) -> Optional[str]:
+        """Field `base_branch` index.json profil; `None` bila tak terbaca (check 2 yang memvonisnya)."""
+        try:
+            profile_dir, _ = resolve_profile_dir(self.root)
+            value = json.loads((profile_dir / "index.json").read_text(encoding="utf-8")).get("base_branch")
+            return value if isinstance(value, str) and value.strip() else None
+        except (OSError, ValueError):
+            return None
+
     def _add(self, cid: int, name: str, status: str, summary: str, action: str = "", entry: str = ""):
         self.results.append({
             "id": cid,
@@ -348,6 +357,31 @@ class PreconditionChecker:
                     "status": "FAIL",
                     "summary": "Operasi git rebase sedang berlangsung",
                     "action": "Selesaikan atau batalkan git rebase sebelum melanjutkan.",
+                })
+                return
+
+            # Commit brief dan REVIEW.md wajib mendarat di branch kerja: detached HEAD
+            # membuatnya hilang saat user kembali ke branch, dan HEAD = base branch
+            # membuat rentang merge-base..HEAD kosong sementara commit langsung ke base.
+            branch = subprocess.run(["git", "symbolic-ref", "-q", "--short", "HEAD"], cwd=self.root,
+                                    capture_output=True, text=True).stdout.strip()
+            if not branch:
+                self.results.append({
+                    "id": check_id,
+                    "name": name,
+                    "status": "FAIL",
+                    "summary": "Detached HEAD",
+                    "action": "Checkout branch kerja taskdir sebelum orkestrasi.",
+                })
+                return
+            base = self.base_branch_arg or self._profile_base_branch()
+            if base and branch == base:
+                self.results.append({
+                    "id": check_id,
+                    "name": name,
+                    "status": "FAIL",
+                    "summary": f"HEAD berada di base branch `{base}`",
+                    "action": "Buat/checkout branch kerja taskdir; rentang review kosong di base branch.",
                 })
                 return
 

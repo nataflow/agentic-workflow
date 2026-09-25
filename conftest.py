@@ -138,7 +138,7 @@ def be_checks(repo: Path, skill_script: str, *args: str) -> Dict[int, dict]:
 
 @pytest.fixture
 def chain_repo(make_repo):
-    """Repo ber-profil backenddev (stack go) dengan `{TD}/TASK.md` ter-commit di branch `main`."""
+    """Repo ber-profil backenddev (stack go), `{TD}/TASK.md` ter-commit di `main`; HEAD di branch kerja `fix/order-fix`."""
     root = make_repo({
         ".gitignore": ".explore/\n",
         f"{TD}/TASK.md": ("---\nchain: BRIEF\nrisk: MINOR\nstatus: ACTIVE\n---\n# Order fix\n"
@@ -150,4 +150,5 @@ def chain_repo(make_repo):
     write_files(root, {".claude/profile/backenddev/commands.md":
                        "## Commands\n- build: go build ./...\n- test: go test ./...\n"})
     commit(root, "init")
+    git(root, "checkout", "-q", "-b", "fix/order-fix")   # rantai berjalan di branch kerja, bukan base
     return root

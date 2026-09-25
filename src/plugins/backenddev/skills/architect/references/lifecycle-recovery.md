@@ -72,7 +72,7 @@ itu mendarat dan diff-nya tidak melewati `## File scope`.
 | --- | --- | --- |
 | `src/**` + brief, brief sukses | `code-implementor` | `commit_message` frontmatter brief |
 | `src/**` + brief + report, brief terblokir | `code-implementor` | `wip(<domain>): brief-<NN>-<unit> [BLOCKED]` |
-| `{taskdir}/REVIEW.md` + baris riwayat review di `backenddev/issues/README.md` | `code-reviewer` | `docs(<slug>): add final review report` |
+| `{taskdir}/REVIEW.md` + baris riwayat review di `backenddev/issues/README.md` | `code-reviewer` | `docs(<slug>): add final review report`, dibentuk dari `commit_convention` profil |
 | `{taskdir}/HALT.md`, rantai ditahan gerbang kompilasi/scope/simbol/berkas liar | `architect` | `chore(<slug>): tahan rantai di brief-NN (<verdict>)` |
 | `{taskdir}/brief-NN-<unit>.md` saja, koreksi `READY → DONE` (commit ada, status tertinggal) | `architect` | `chore(<slug>): koreksi status brief-NN ke DONE (<sha7>)` |
 | Penguncian susulan saat commit hilir terbukti gagal | `architect` | ulangi pesan milik penulisnya, catat penyimpangan |

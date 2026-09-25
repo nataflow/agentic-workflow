@@ -58,7 +58,7 @@ Setiap artefak ditutup dengan `git commit` di titik ia menjadi keputusan final:
 | `backenddev/docs/<taskdir>/brief-*.md` | Self-review `brief-reviewer` BRIEF batch lolos | **`plan`** | `docs(plan): add <N> briefs for <slug>` |
 | `backenddev/issues/<file>.md` + `README.md` | Laporan audit selesai ditulis | `tech-lead` | `docs(audit): record findings for <target>` |
 | `backenddev/docs/<taskdir>/RCA.md` | Root cause disetujui user / `INCONCLUSIVE` | `tech-lead` | `docs(rca): record root cause for <slug>` |
-| `{taskdir}/REVIEW.md` + baris riwayat review di `backenddev/issues/README.md` | Reviewer selesai menilai seluruh rantai | **`code-reviewer`** | `docs(<slug>): add final review report` |
+| `{taskdir}/REVIEW.md` + baris riwayat review di `backenddev/issues/README.md` | Reviewer selesai menilai seluruh rantai | **`code-reviewer`** | `docs(<slug>): add final review report`, dibentuk dari `commit_convention` profil |
 | `src/**` + berkas briefnya | Tiap brief selesai atau terblokir | **`code-implementor`** | `commit_message` frontmatter brief |
 | `{taskdir}/HALT.md` | Gerbang kompilasi, scope, simbol, atau berkas liar menahan rantai | **`architect`** | `chore(<slug>): tahan rantai di brief-NN (<verdict>)` |
 | `{taskdir}/brief-NN-<unit>.md` koreksi `READY → DONE` | Commit brief mendarat tetapi status tertinggal | **`architect`** | `chore(<slug>): koreksi status brief-NN ke DONE (<sha7>)` |

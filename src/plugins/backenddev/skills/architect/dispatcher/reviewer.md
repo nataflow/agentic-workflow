@@ -20,7 +20,8 @@ Review seluruh branch pekerjaan untuk satu direktori tugas.
 - Balikan: HANYA path `{taskdir}/REVIEW.md` dan tingkat severity tertinggi (`P1`, `P2`, `P3`, atau
   `CLEAN`). Jangan kutip isi file review ke chat.
 - Commit: Commit sendiri `{taskdir}/REVIEW.md` **dan** `backenddev/issues/README.md` dalam satu
-  commit berpesan `docs(<slug>): add final review report` sesudah laporan selesai ditulis.
+  commit sesudah laporan selesai ditulis, hanya di branch kerja (bukan detached, bukan `{base_branch}`),
+  dengan pesan yang disusun dari `commit_convention` profil (default `docs(<slug>): add final review report`).
 - Stop Condition: Dilarang melebar mengaudit kode di luar rentang diff; sweep konvensi umum adalah
   milik `audit`. Gerbang masuk lengkap ada di definisi agent-mu — BERHENTI dan lapor sesuai jalur
   gagal di sana, jangan menebak.
@@ -51,7 +52,7 @@ Review seluruh branch pekerjaan untuk satu direktori tugas.
 | Path `REVIEW.md` + severity `CLEAN`, `P3`, atau `P2` | Serap ke laporan penutup apa adanya. Severity berada di luar sistem status brief dan dilarang dipaksa jadi `BLOCKED` |
 | Severity `P1` | Jangan perbaiki di tempat. Catat di laporan akhir dan arahkan user kembali ke gerbang `tech-lead` — `## Failure path` butir 5 |
 | `{taskdir}/REVIEW.md` tidak ada di disk | Cacat kerja subagent. Ulangi dispatch maksimum sekali; tetap gagal → laporkan review tidak tuntas ke gerbang. Dilarang menulis `REVIEW.md` sendiri atau mengarang verdict |
-| Balikan menyebut `git commit` gagal, atau `REVIEW.md`/`backenddev/issues/README.md` ada tetapi uncommitted | Kunci sendiri **kedua** berkas itu dalam satu commit dengan staging path eksplisit dan pesan `docs(<slug>): add final review report`, lalu catat penyimpangannya — `## Failure path` butir 6 |
+| Balikan menyebut `git commit` gagal, atau `REVIEW.md`/`backenddev/issues/README.md` ada tetapi uncommitted | Kunci sendiri **kedua** berkas itu dalam satu commit dengan staging path eksplisit dan pesan dari `commit_convention` profil (default `docs(<slug>): add final review report`); ditolak hook `commit-msg` → laporkan pesan hook ke user, dilarang mengulang pesan yang sama atau `--no-verify`. Catat penyimpangannya — `## Failure path` butir 6 |
 | Payload kosong, format rusak, atau subagent error | Kegagalan dispatch, bukan cacat kerja subagent. Periksa disk lebih dulu lewat matriks bukti `references/lifecycle-recovery.md` sebelum menyimpulkan review tidak pernah berjalan |
 
 **Batas serap.** Verdict reviewer diteruskan utuh ke laporan penutup, tanpa parafrase maupun penyaringan temuan. Guardrail **STRICT NON-AUTHORING** berlaku penuh: temuan severity apa pun dilarang ditambal `architect` sendiri di `src/`, dan perbaikan `P1` berjalan di **taskdir yang sama** lewat gerbang (`tech-lead` Fase 5 butir 4 → lane `PLANNING` → `analyst` re-entry → `plan --append`), lalu satu review baru di putaran berikutnya (`REVIEW.md` basi, `references/lifecycle-recovery.md` bagian 1).
