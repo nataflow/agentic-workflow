@@ -52,7 +52,8 @@ konfigurasi driver DB, dan pemakaian `new Date()` vs penyimpanan `timestamptz`.
 | lint | `<pm> run lint`, atau `npx eslint .` |
 | test | `<pm> test` (`jest`, `vitest run`, atau `node --test`) |
 | test-single | `npx jest <pola>` / `npx vitest run <berkas> -t "<nama>"` |
-| migration | `npx prisma migrate deploy`, `npx typeorm migration:run`, atau `npx drizzle-kit migrate` |
+| migration-status | `npx --no-install prisma migrate status`, `npx --no-install typeorm migration:show -d <datasource>`, `npx --no-install drizzle-kit check` (tanpa DB), atau `npx --no-install knex migrate:status` — `profile` menjalankannya hanya sesudah izin user |
+| migration-apply | `npx prisma migrate deploy`, `npx typeorm migration:run`, `npx drizzle-kit migrate`, atau `npx knex migrate:latest` — **dicatat untuk manusia, tidak pernah dijalankan plugin** |
 
 `<pm>` diambil dari lockfile. Skrip di `package.json` menang atas perintah generik di atas.
 

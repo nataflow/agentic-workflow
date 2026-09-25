@@ -61,10 +61,14 @@ Gaya arsitektur **bukan** stack: satu `<stack-id>` boleh melayani lebih dari sat
 
 ### 2. `## Commands` — konsumen: `backenddev:profile`, `backenddev:architect`
 
-Enam baris perintah: `build`, `test`, `test-single`, `lint`, `typecheck`, `migration`. Tulis
-`tidak berlaku` bila stack tidak punya padanannya — dilarang mengarang perintah. `profile`
-mengeksekusi tiap perintah minimal sekali sebelum menuliskannya ke profil; `architect` memakainya di
-gerbang verifikasi penutup taskdir.
+Sembilan baris perintah: `build`, `test`, `test-single`, `lint`, `typecheck`, `typecheck-scoped`,
+`typecheck-per-brief`, `migration-status`, `migration-apply`. Tulis `tidak berlaku` bila stack tidak
+punya padanannya — dilarang mengarang perintah. `migration-status` wajib read-only (hanya membaca
+tabel versi atau berkas migrasi). `migration-apply` dicatat untuk manusia dan **tidak pernah
+dieksekusi** skill atau agent mana pun. `profile` mengeksekusi perintah lain — kecuali
+`typecheck-scoped` dan `typecheck-per-brief` yang disalin apa adanya — minimal sekali sebelum
+menuliskannya ke profil; perintah yang menyentuh DB, jaringan, atau docker (`migration-status`, test
+integrasi) hanya sesudah izin user. `architect` memakainya di gerbang verifikasi penutup taskdir.
 
 ### 3. `## Layer taxonomy` — konsumen: `agents/code-implementor.md` (lewat slot `{adapter_path}`), `backenddev:plan`, `backenddev:audit`
 
@@ -120,7 +124,7 @@ Adapter baru boleh dipakai hanya bila seluruhnya benar:
 
 1. Tujuh seksi hadir, judul persis, berurutan, tanpa seksi tambahan.
 2. `## Audit checklist` memenuhi ambang ≥12 butir / ≥4 dimensi.
-3. Seluruh perintah di `## Commands` sudah dieksekusi minimal sekali di repo nyata stack itu.
+3. Seluruh perintah di `## Commands` kecuali `migration-apply` sudah dieksekusi minimal sekali di repo nyata stack itu; `migration-apply` hanya diuji penulis adapter terhadap DB sekali pakai.
 4. Tidak ada butir yang identik dengan butir di adapter lain.
 5. `<stack-id>` terdaftar di `## Detection` milik `backenddev:profile`.
 6. Jika adapter mendeklarasikan penanda `hexagonal`: `## Layer taxonomy` memuat sub-bagian per

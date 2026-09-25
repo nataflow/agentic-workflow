@@ -46,16 +46,20 @@ Penanda zona waktu runtime: `date.timezone` di `php.ini`, `config/app.php` kunci
 
 | Perintah | Laravel | Symfony |
 |---|---|---|
-| build | `composer install --no-dev --optimize-autoloader` | sama |
+| build | `composer install --optimize-autoloader --no-interaction` (dengan dev; `--no-dev` hanya untuk artefak deploy, tidak pernah dipakai plugin) | sama |
 | typecheck | `vendor/bin/phpstan analyse` atau `vendor/bin/psalm` | sama |
 | typecheck-scoped | `vendor/bin/phpstan analyse <path>` | sama |
 | typecheck-per-brief | `tidak` — phpstan bukan compiler; vonisnya baseline-relatif dan konfigurasinya tidak selalu ada | sama |
 | lint | `vendor/bin/pint --test`, atau `vendor/bin/php-cs-fixer fix --dry-run` | sama |
 | test | `php artisan test`, atau `vendor/bin/phpunit` | `vendor/bin/phpunit` |
 | test-single | `php artisan test --filter=<NamaTest>` | `vendor/bin/phpunit --filter=<NamaTest>` |
-| migration | `php artisan migrate` | `php bin/console doctrine:migrations:migrate` |
+| migration-status | `php artisan migrate:status` — `profile` menjalankannya hanya sesudah izin user | `php bin/console doctrine:migrations:status` — idem |
+| migration-apply | `php artisan migrate` — **dicatat untuk manusia, tidak pernah dijalankan plugin** | `php bin/console doctrine:migrations:migrate` — idem |
 
 Skrip di `composer.json` bagian `scripts` dan `Makefile` repo menang atas perintah generik di atas.
+
+`--no-dev` adalah flag artefak deploy. Build verifikasi wajib mempertahankan dependensi dev karena
+`typecheck`, `lint`, dan `test` memanggil `vendor/bin/*`.
 
 Migrasi: Laravel di `database/migrations/{Y_m_d_His}_{nama}.php`; Doctrine di
 `migrations/Version{timestamp}.php`. High-water mark = timestamp tertinggi.

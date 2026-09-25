@@ -151,8 +151,8 @@ Blueprint perintah build, verifikasi, dan manajemen migrasi:
 
 build: <command> [OK|FAIL|tidak berlaku] · typecheck: <command> [status] · lint: <command> [status]
 typecheck-scoped: <command berplaceholder target> [status|tidak berlaku] · typecheck-per-brief: <ya|tidak — alasan>
-test: <command> [status] · test-single: <command dengan placeholder target> [status]
-migration: <command> · folder <path> · pola <format nama berkas>
+test: <command> [OK|FAIL|TIMEOUT|UNVERIFIED_ENV_NOT_READY|DILEWATI (tanpa izin)] · test-single: <command dengan placeholder target> [status]
+migration-status: <command read-only> [OK|FAIL|TIMEOUT|DILEWATI (tanpa izin)|tidak berlaku] · migration-apply: <command> [tidak dijalankan plugin] · folder <path> · pola <format nama berkas>
 ```
 
 ---
@@ -259,5 +259,5 @@ test: <nama>_test.go bersebelahan dengan berkas ujinya, table-driven · contoh i
 build: go build ./... [OK] · typecheck: go vet ./... [OK] · lint: golangci-lint run [FAIL]
 typecheck-scoped: go build ./<paket>/... [OK] · typecheck-per-brief: ya — inkremental, biayanya mendekati nol
 test: go test ./... [OK] · test-single: go test ./internal/order -run <TestName> [OK]
-migration: migrate -path db/migrations -database $DATABASE_URL up · folder db/migrations · pola {n}_{deskripsi}.up.sql
+migration-status: migrate -path db/migrations -database $DATABASE_URL version [DILEWATI (tanpa izin)] · migration-apply: migrate -path db/migrations -database $DATABASE_URL up [tidak dijalankan plugin] · folder db/migrations · pola {n}_{deskripsi}.up.sql
 ```

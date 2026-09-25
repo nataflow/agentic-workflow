@@ -91,6 +91,7 @@ Pindai folder migrasi menurut letak dan format yang disebut adapter:
 
 - Catat nama tool migrasi, lokasi folder migrasi, dan format pola penamaan file migrasi (misal `{n}_{deskripsi}.up.sql` atau `V{version}__{description}.sql`).
 - Catat berkas master/changelog bila tool migrasinya memakainya.
+- Catat perintah status (`migration-status`) dan apply (`migration-apply`) terpisah; apply tidak pernah dijalankan.
 - **Larangan data dinamis:** dilarang mencatat *high-water mark* atau versi migrasi terakhir; cukup blueprint lokasi dan pola berkas migrasi.
 
 ---
@@ -99,9 +100,9 @@ Pindai folder migrasi menurut letak dan format yang disebut adapter:
 
 Adapter: `## Commands`.
 
-Ambil enam perintah dari adapter, lalu sesuaikan ke skrip nyata repo — `Makefile`, `Justfile`, `scripts` pada manifest, `CLAUDE.md`. Skrip repo menang atas perintah generik adapter.
+Ambil perintah dari adapter, lalu sesuaikan ke skrip nyata repo — `Makefile`, `Justfile`, `scripts` pada manifest, `CLAUDE.md`. Skrip repo menang atas perintah generik adapter.
 
-Enam perintah dieksekusi: `build`, `typecheck`, `lint`, `test`, `test-single`, `migration`. Perintah yang tidak punya padanan di stack ini ditulis `tidak berlaku`. Seluruhnya dijalankan di Fase 4 `SKILL.md` sebelum ditulis ke profil.
+Enam perintah dieksekusi: `build`, `typecheck`, `lint`, `test`, `test-single`, `migration-status` — yang menyentuh DB hanya sesudah izin user (Fase 4 `SKILL.md`). Perintah yang tidak punya padanan di stack ini ditulis `tidak berlaku`. `migration-apply` disalin dari adapter tanpa dieksekusi: plugin tidak pernah menerapkan migrasi.
 
 Dua baris tambahan **disalin dari adapter tanpa dieksekusi**, karena keduanya menjawab "bagaimana perintahnya dipakai", bukan "apakah perintahnya jalan":
 

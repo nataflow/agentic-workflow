@@ -64,7 +64,8 @@ atau `time::OffsetDateTime` versus tipe naif tanpa zona.
 | lint | `cargo clippy --all-targets -- -D warnings` |
 | test | `cargo test` |
 | test-single | `cargo test <nama_test> -- --exact` |
-| migration | `sqlx migrate run`, `diesel migration run`, atau `refinery` sesuai crate yang dipakai |
+| migration-status | `sqlx migrate info`, `diesel migration list`, atau `sea-orm-cli migrate status`; `refinery`: `tidak berlaku` (tanpa subperintah status) — `profile` menjalankannya hanya sesudah izin user |
+| migration-apply | `sqlx migrate run`, `diesel migration run`, `sea-orm-cli migrate up`, atau `refinery migrate` — **dicatat untuk manusia, tidak pernah dijalankan plugin** |
 
 Skrip di `Makefile`, `Justfile`, atau alias `cargo` di `.cargo/config.toml` menang atas perintah di atas.
 
@@ -74,6 +75,8 @@ Migrasi: `sqlx` di `migrations/{timestamp}_{nama}.sql`; `diesel` di
 > `sqlx` dengan makro `query!` memvalidasi SQL saat kompilasi terhadap skema nyata. Karena itu di
 > repo semacam ini `cargo check` **ikut gagal** bila migrasi belum dijalankan atau `SQLX_OFFLINE`
 > tidak disiapkan — kegagalan build bisa berarti masalah skema, bukan masalah kode.
+>
+> Pakai `SQLX_OFFLINE=true` bila `.sqlx/` ada; dilarang menjalankan migrasi agar `cargo check` hijau.
 
 ## Layer taxonomy
 

@@ -49,7 +49,8 @@ Penanda zona waktu runtime: `TimeZone.setDefault` di kelas `@SpringBootApplicati
 | lint | `./mvnw checkstyle:check` bila plugin terpasang | `./gradlew check -x test` |
 | test | `./mvnw test` | `./gradlew test` |
 | test-single | `./mvnw test -Dtest=<Class>#<method>` | `./gradlew test --tests <Class>.<method>` |
-| migration | Flyway `./mvnw flyway:migrate`; Liquibase `./mvnw liquibase:update` | tugas Gradle padanannya |
+| migration-status | Flyway `./mvnw flyway:info`; Liquibase `./mvnw liquibase:status` — `profile` menjalankannya hanya sesudah izin user | Flyway `./gradlew flywayInfo`; Liquibase tugas `status` plugin Liquibase — idem |
+| migration-apply | Flyway `./mvnw flyway:migrate`; Liquibase `./mvnw liquibase:update` — **dicatat untuk manusia, tidak pernah dijalankan plugin** | `./gradlew flywayMigrate`; Liquibase tugas `update` — idem |
 
 Migrasi: Flyway di `src/main/resources/db/migration/` pola `V{n}__{deskripsi}.sql`; Liquibase di
 `src/main/resources/db/changelog/` dengan master `db.changelog-master.yaml|xml`. High-water mark =

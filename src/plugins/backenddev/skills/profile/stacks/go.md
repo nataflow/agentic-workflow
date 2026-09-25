@@ -65,7 +65,8 @@ dan pemakaian `time.Now()` vs `time.Now().UTC()` di lapisan penulisan data.
 | lint | `golangci-lint run` bila `.golangci.yml` ada; jika tidak, `gofmt -l .` |
 | test | `go test ./...` |
 | test-single | `go test ./<paket> -run <NamaTest>` |
-| migration | sesuai tool: `migrate -path <dir> -database $DATABASE_URL up`, atau `goose -dir <dir> up` |
+| migration-status | sesuai tool: `migrate -path <dir> -database "$DATABASE_URL" version`, `goose -dir <dir> status`, atau `atlas migrate status --dir file://<dir> --url "$DATABASE_URL"` — membaca tabel versi DB; `profile` menjalankannya hanya sesudah izin user |
+| migration-apply | `migrate -path <dir> -database "$DATABASE_URL" up`, `goose -dir <dir> up`, atau `atlas migrate apply` — **dicatat untuk manusia, tidak pernah dijalankan plugin** |
 
 Skrip di `Makefile` atau `Justfile` repo menang atas perintah generik di atas.
 

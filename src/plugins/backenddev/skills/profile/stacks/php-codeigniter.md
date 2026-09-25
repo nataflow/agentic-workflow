@@ -43,17 +43,22 @@ Penanda zona waktu runtime: `$appTimezone` di `app/Config/App.php` (`.env` `app.
 
 | Perintah | CodeIgniter 4 |
 |---|---|
-| build | `composer install --no-dev --optimize-autoloader`; tambah `php spark optimize` bila pipeline deploy repo memakainya |
+| build | `composer install --optimize-autoloader --no-interaction` (dengan dev) |
 | typecheck | `vendor/bin/phpstan analyse` dengan `vendor/codeigniter/phpstan-codeigniter/extension.neon` di `includes` |
 | typecheck-scoped | `vendor/bin/phpstan analyse <path>` |
 | typecheck-per-brief | `tidak` — phpstan bukan compiler; appstarter bersih pun melaporkan puluhan error level 5 di `app/Views/errors/`, jadi vonisnya baseline-relatif |
 | lint | `vendor/bin/php-cs-fixer fix --dry-run --diff` dengan `.php-cs-fixer.dist.php` berbasis `codeigniter/coding-standard` |
 | test | `vendor/bin/phpunit` (appstarter: `composer test`) |
 | test-single | `vendor/bin/phpunit --filter=<NamaTest>` |
-| migration | `php spark migrate`; status per berkas `php spark migrate:status` |
+| migration-status | `php spark migrate:status` — `profile` menjalankannya hanya sesudah izin user |
+| migration-apply | `php spark migrate` — **dicatat untuk manusia, tidak pernah dijalankan plugin** |
 
 Skrip `composer.json` bagian `scripts` dan `Makefile` repo menang atas perintah di atas. Tidak ada
 `php spark test`; test basis data memakai grup koneksi `tests` di `app/Config/Database.php`.
+
+`--no-dev` adalah flag artefak deploy. Build verifikasi wajib mempertahankan dependensi dev karena
+`typecheck`, `lint`, dan `test` memanggil `vendor/bin/*`.
+`php spark optimize` adalah langkah deploy, bukan bagian build verifikasi; plugin tidak menjalankannya.
 
 Migrasi: `app/Database/Migrations/{Y-m-d-His}_{Nama}.php` dari `php spark make:migration <Nama>`.
 High-water mark = prefix timestamp tertinggi. Seeder di `app/Database/Seeds/` (`php spark db:seed <Nama>`).

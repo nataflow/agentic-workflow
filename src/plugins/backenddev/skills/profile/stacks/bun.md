@@ -50,7 +50,8 @@ Penanda zona waktu runtime: `TZ` di `.env` atau `Dockerfile`, dan opsi zona pada
 | lint | `bunx eslint .`, atau `bunx biome check .` bila `biome.json` ada |
 | test | `bun test` |
 | test-single | `bun test <pola-berkas> -t "<nama test>"` |
-| migration | `bunx drizzle-kit migrate`, `bunx prisma migrate deploy`, atau skrip `bun run` repo |
+| migration-status | `bunx prisma migrate status`; Drizzle: `bunx drizzle-kit check` (konsistensi berkas migrasi, tanpa DB) — `profile` menjalankannya hanya sesudah izin user |
+| migration-apply | `bunx drizzle-kit migrate`, `bunx prisma migrate deploy`, atau skrip `bun run` repo yang memanggil salah satunya — **dicatat untuk manusia, tidak pernah dijalankan plugin** |
 
 Skrip di `package.json` menang atas perintah generik di atas.
 

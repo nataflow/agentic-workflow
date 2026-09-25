@@ -9,7 +9,8 @@ metadata:
 
 - Tulis fakta apa adanya; dilarang mengarang asumsi tanpa bukti konfigurasi aktual.
 - Baris konvensi wajib bercontoh anchor `<file>#<simbol>`, baris anti-pattern bersumber repo wajib ber-`deteksi` yang berhit dan baris bersumber user wajib bertanda `bukti user`; yang tidak terbukti dihapus, bukan ditebak dari kelaziman stack.
-- Setiap perintah di `commands.md` wajib dieksekusi minimal sekali sebelum ditulis ke profil.
+- Setiap perintah di `commands.md` wajib dieksekusi minimal sekali sebelum ditulis ke profil, **kecuali `migration-apply`**, yang hanya dicatat. Dilarang menjalankan perintah yang mengubah skema atau data (`migrate`, `up`, `deploy`, `push`, `seed`, `reset`, `fresh`) dalam kondisi apa pun, termasuk untuk menghijaukan baseline.
+- Perintah yang menyentuh DB, jaringan, atau docker dijalankan hanya sesudah user menyetujui daftarnya lewat `AskUserQuestion`.
 - Profiling read-only mutlak: dilarang mengubah, membuat, atau memperbaiki kode di source root.
 - Profil hanya sah ditulis ke `.claude/profile/backenddev/` (`index.json` + 8 berkas `.md`), wajib memuat field `stack`, dan pada mode refresh ditulis ulang penuh tanpa merge parsial.
 
@@ -75,12 +76,13 @@ Muara tiap titik ke berkas profil ditetapkan oleh judul seksi di kedua berkas re
 
 ### Fase 4 — Eksekusi Baseline Verifikasi Nyata
 
-Uji enam perintah hasil Fase 2 titik 7 sebelum ditulis ke `commands.md`:
+Uji perintah hasil Fase 2 titik 7 sebelum ditulis ke `commands.md`:
 
-1. Eksekusi berurutan `build`, `typecheck`, `lint`, `test`, `test-single`, `migration`. Tulis `tidak berlaku` bila perintah tidak berlaku di stack ini. Baris `typecheck-scoped` dan `typecheck-per-brief` **disalin dari adapter tanpa dieksekusi** — keduanya menjawab cara pemakaian, bukan status jalan (`references/scan-guide.md`).
-2. Catat status tiap perintah: `OK` (exit 0), `FAIL` (exit bukan 0), atau `UNVERIFIED_ENV_NOT_READY` bila kegagalan berasal dari dependensi belum terpasang.
-3. Perbaiki perintahnya lalu uji ulang bila gagal karena sintaks salah (bukan karena kodenya merah). Tulis `tidak terdeteksi` bila tetap salah sintaks.
-4. Dilarang memperbaiki kode sumber agar baseline hijau.
+1. Susun daftar eksekusi: `build`, `typecheck`, `lint`, `test`, `test-single`, `migration-status`. Tulis `tidak berlaku` bila perintah tidak berlaku di stack ini. Baris `migration-apply`, `typecheck-scoped`, dan `typecheck-per-brief` **disalin dari adapter tanpa dieksekusi** — `migration-apply` karena plugin tidak pernah menerapkan migrasi, dua lainnya karena menjawab cara pemakaian, bukan status jalan (`references/scan-guide.md`).
+2. Tandai perintah yang menyentuh DB/jaringan/docker: `migration-status` selalu; `test`/`test-single` bila repo memuat test integrasi (mis. `@SpringBootTest`, `RefreshDatabase`, `DatabaseTestTrait`, Testcontainers, docker-compose di skrip test). Ajukan **satu** `AskUserQuestion`: daftar perintah bertanda, target DB/host yang terbaca dari konfigurasi (tanpa kredensial), risikonya, dan opsi `jalankan semua` · `hanya yang offline` · `batal`.
+3. Eksekusi yang diizinkan, satu per satu, dengan `timeout` tool Bash 300000 ms. Catat status: `OK` (exit 0), `FAIL` (exit bukan 0), `TIMEOUT`, `UNVERIFIED_ENV_NOT_READY` (dependensi belum terpasang), atau `DILEWATI (tanpa izin)`.
+4. Perbaiki perintah lalu uji ulang hanya bila gagal karena sintaks salah (bukan karena kodenya merah); tulis `tidak terdeteksi` bila tetap salah sintaks. Dilarang mengganti perintah status dengan varian apply, menambah flag paksa (`--force`, `-y`), atau menjalankan migrasi agar `build`/`test` hijau — catat `FAIL` apa adanya.
+5. Dilarang memperbaiki kode sumber agar baseline hijau.
 
 ### Fase 5 — Verifikasi State Git & Pemasangan Gitignore
 

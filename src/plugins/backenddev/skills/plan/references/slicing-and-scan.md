@@ -16,7 +16,7 @@ Jalankan checklist ini secara penuh untuk **setiap unit kerja** sebelum menyusun
 2. **Callers**: `Grep` nama method/endpoint di `source_root`; catat seluruh caller (`file:line`) dan periksa apakah berjalan di dalam atau di luar batas transactional.
 3. **Mirrored paths**: cari consumer queue, scheduler, websocket, atau changelog terkait memakai resep di `## Navigation recipes` adapter; masukkan berkasnya ke `## File scope`.
 4. **Configuration**: periksa berkas konfigurasi runtime untuk setelan yang mengubah semantik penyimpanan, sesuai daftar di `## Detection` adapter.
-5. **Database migration**: definisi skema persistensi berubah → tetapkan nama berkas migrasi mengikuti pola `migration:` profil berbasis penanda versi tertinggi, masukkan ke `## File scope` (`create`); tidak berubah → tulis "tidak perlu" beserta alasan di `## Migration`.
+5. **Database migration**: definisi skema persistensi berubah → tetapkan nama berkas migrasi mengikuti pola berkas migrasi di `commands.md` profil (baris `migration-status`/`migration-apply`, atau `migration:` pada profil lama) berbasis penanda versi tertinggi, masukkan ke `## File scope` (`create`); tidak berubah → tulis "tidak perlu" beserta alasan di `## Migration`.
 6. **Sibling patterns**: identifikasi modul lain berpola serupa yang belum terproteksi; catat di `## Analysis trace` sebagai backlog audit berikutnya, jangan diperbaiki di batch ini.
 7. **`PLAUSIBLE` findings** (hanya saat `finding_source` terisi): temuan `PLAUSIBLE` yang blocker-nya belum dijawab user → tandai `DROPPED` dan catat di `## Analysis trace`.
 8. **Work-unit grouping**: dua unit kerja yang menyentuh method atau class yang sama wajib digabung ke dalam brief yang sama secara berurutan.
