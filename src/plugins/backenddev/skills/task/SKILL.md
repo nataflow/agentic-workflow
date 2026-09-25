@@ -75,7 +75,7 @@ Tulis minimal satu butir berformat `- <yang tidak dikerjakan> — <alasan>` dari
 
 1. Baca `templates/task-template.md` bagian 1, isi placeholder dari Fase 1–4, tulis ke `{taskdir}/TASK.md` dengan `status: ACTIVE`.
 2. `chain` terisi: tulis frontmatter `chain:` bernilai persis itu dan seksi `## Chain` berisi tepat hop chain tersebut, seluruhnya belum tercentang, mengikuti bagian 2 `analyst/references/chain-rules.md`. `chain` kosong: hilangkan baris frontmatter dan seksi itu sepenuhnya.
-3. **Self-test akar**: loloskan seluruh butir bagian 2 berkas itu sebelum butir 4 berangkat; satu butir gagal → perbaiki `TASK.md`, ulangi dari butir 1. Rumah kanonik predikatnya di sana, dilarang ditulis ulang di sini.
+3. **Self-test akar**: sebelum butir 4 berangkat, jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/validate_doc.py --kind task --taskdir <taskdir> --fresh [--finding-source <finding_source>]`. `FAIL` → perbaiki seluruh pelanggaran satu keluaran, lalu jalankan sekali lagi. Butir `MANUAL` (T3b, T4, T9) dinilai sendiri memakai predikat bagian 2 berkas itu; rumah kanonik predikatnya di sana, dilarang ditulis ulang di sini.
 4. Stage eksplisit `{taskdir}/TASK.md`, lalu commit dengan `commit_convention` profil bersubjek `docs(<slug>): kunci TASK sebagai akar rantai`.
 5. Catat SHA commit dan kembalikan kendali ke pemanggilnya — `backenddev:analyst` pada lane planning, `backenddev:tech-lead` pada lane lainnya.
 

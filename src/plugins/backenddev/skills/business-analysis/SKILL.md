@@ -69,7 +69,7 @@ Tulis tepat satu `{taskdir}/BRD.md` mengikuti `templates/brd-template.md`; tulis
 
 ### Fase 5 — Self-Review, Commit & Serah Terima
 
-1. **Self-test mekanis**: loloskan seluruh butir `## Self-test struktural` `templates/brd-template.md`; satu gagal → perbaiki BRD, ulangi dari butir 1.
+1. **Self-test mekanis**: jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/validate_doc.py --kind brd --taskdir <taskdir>`. `FAIL` → perbaiki seluruh pelanggaran satu keluaran, lalu jalankan sekali lagi; `WARN` (B3, B9) diperiksa dan diperbaiki bila benar. Butir `MANUAL` (B7b, B12) dinilai sendiri memakai `## Self-test struktural` `templates/brd-template.md`.
 2. Sebelum tiap ronde, jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/analyst/scripts/chain_counters.py --taskdir <taskdir> --bump review_round:BRD`; `FAIL` → plafon ronde habis, jalankan `## Failure path` butir 6. Lalu muat `dispatcher/reviewer.md`, hidrasi slot `taskdir`, `chain`, dan `ronde` (nilai dari keluaran `--bump`), panggil `brd-reviewer`. Tangkap `## BRD Review`, perbaiki isu, tahan `DRAFT` tanpa commit selama isu kritis terbuka. Gagal: `## Failure path` butir 6.
 3. Verdict `Approved`: `git add {taskdir}/BRD.md` lalu `git commit -m "docs(spec): draft BRD <slug>"`. Verdict lain: lewati commit, laporkan `BRD.md` belum terkunci di git.
 4. Sajikan `## Output [REQUIRED]` **beserta blok `## BRD Review` reviewer apa adanya**, lalu kembalikan rute ke `backenddev:analyst`. Approval user diminta di gerbang dokumennya, bukan di sini.

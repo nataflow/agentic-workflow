@@ -130,7 +130,7 @@ Prosedur transisi:
 1. Verifikasi pasangan `(risk, chain)` hasil transisi terhadap tabel bagian 1.4. Pasangan tidak sah → hentikan lewat `## Failure path` butir 5; dilarang menerbitkan hop di atas pasangan ilegal.
 2. Tulis ulang frontmatter `TASK.md`: `chain:` bernilai hasil transisi, `risk:` bernilai hasil kolom terakhir, `lane:` bernilai lane terminal chain baru.
 3. Sisipkan baris hop baru ke ledger `## Chain` **sebelum** hop yang belum tercentang, pertahankan centang hop yang sudah tuntas.
-4. Tulis ulang klausa `— verifikasi:` tiap `SC-{n}` agar cocok dengan kolom alat ukur lane baru pada tabel Fase 3 `task/SKILL.md`, **tanpa mengubah prosa hasil yang diukur**. Lalu jalankan ulang butir 2–4 **dan butir 8a** `## Self-test Akar` `task/templates/task-template.md` atas berkas hasilnya. Butir 8a ikut karena transisi inilah satu-satunya mutasi yang menulis ulang ledger, `lane:`, dan pasangan `(risk, chain)` sekaligus; butir 8b dilewati karena ledger pasca-transisi memang sudah membawa centang hop yang tuntas.
+4. Tulis ulang klausa `— verifikasi:` tiap `SC-{n}` agar cocok dengan kolom alat ukur lane baru pada tabel Fase 3 `task/SKILL.md`, **tanpa mengubah prosa hasil yang diukur**. Lalu jalankan ulang `skills/_common/validate_doc.py --kind task --taskdir <taskdir>` (tanpa `--fresh`) atas berkas hasilnya; check T8a ikut karena transisi inilah satu-satunya mutasi yang menulis ulang ledger, `lane:`, dan pasangan `(risk, chain)` sekaligus; T8b dilewati karena ledger pasca-transisi memang sudah membawa centang hop yang tuntas.
 5. Commit pembaruan dengan staging path eksplisit `{taskdir}/TASK.md` dan subjek `docs(<slug>): eskalasi chain <asal> ke <hasil>`.
 6. Berangkatkan hop baru dari Fase 3.
 

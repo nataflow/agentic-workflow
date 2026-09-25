@@ -108,7 +108,7 @@ Dijalankan saat laporan hop mana pun melaporkan aturan atau kontrak yang menyent
 ### Fase 5 — Evaluasi Eskalasi Chain
 
 1. Sandingkan laporan hop dengan empat pemicu bagian 3 `references/chain-rules.md`. Nol pemicu aktif → kembali ke Fase 3.
-2. Pemicu aktif → jalankan prosedur transisi enam langkah bagian itu apa adanya: verifikasi pasangan `(risk, chain)` hasil transisi terhadap tabel bagian 1.4 lebih dulu, tulis ulang frontmatter dan ledger `## Chain`, tulis ulang klausa `— verifikasi:` tiap `SC-{n}` agar cocok lane baru tanpa mengubah prosa hasilnya, jalankan ulang butir 2–4 **dan butir 8a** self-test akar, lalu commit dengan staging path eksplisit.
+2. Pemicu aktif → jalankan prosedur transisi enam langkah bagian itu apa adanya: verifikasi pasangan `(risk, chain)` hasil transisi terhadap tabel bagian 1.4 lebih dulu, tulis ulang frontmatter dan ledger `## Chain`, tulis ulang klausa `— verifikasi:` tiap `SC-{n}` agar cocok lane baru tanpa mengubah prosa hasilnya, jalankan ulang `validate_doc.py --kind task` tanpa `--fresh` (self-test akar, termasuk T8a), lalu commit dengan staging path eksplisit.
 3. Kembali ke Fase 3 pada hop baru yang belum tercentang; hop yang sudah tercentang beserta artefaknya dipertahankan apa adanya.
 4. Plafon dua transisi `chain` per taskdir: sebelum butir 2 menulis ulang ledger, jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/analyst/scripts/chain_counters.py --taskdir <taskdir> --bump chain_transition`; `FAIL` → `## Failure path` butir 5. Kenaikan `risk` tanpa transisi chain (pemicu 4) tidak dihitung.
 

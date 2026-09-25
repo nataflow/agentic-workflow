@@ -76,24 +76,23 @@ Kategori nihil: <kategori tanpa kasus beserta alasannya>, atau "tidak ada"
 
 ## Self-test struktural
 
-Dijalankan `business-analysis` atas `BRD.md` yang baru ditulis, sebelum `brd-reviewer` didispatch. Ini penyaring mekanis, bukan penilaian: tiap butir dijawab dengan `Grep`, dan satu butir gagal berarti BRD diperbaiki seketika lalu rangkaian diulang dari butir 1.
+Dijalankan `business-analysis` atas `BRD.md` yang baru ditulis, sebelum `brd-reviewer` didispatch, lewat `skills/_common/validate_doc.py --kind brd --taskdir <taskdir>`. Validator menagih butir mekanis (ID check di kurung siku); `WARN` adalah heuristik yang diperiksa penulis; butir `MANUAL` dinilai penulis memakai prosa di bawah. Satu `FAIL` berarti BRD diperbaiki seketika lalu validator dijalankan ulang.
 
-1. **Struktur**: frontmatter memuat `title`, `requester`, dan `status: DRAFT`; sembilan seksi baku hadir dengan nama dan urutan persis template (`Problem`, `Actors`, `Current state`, `Target state`, `Business rules`, `Edge cases`, `Business metrics`, `Out of scope`, `Open questions`). Seksi yang hilang, tertukar urutannya, atau bertambah adalah kegagalan.
-2. **Penomoran**: `## Business rules` berisi baris `- **BR-{n}**:` berurutan tanpa lompatan dan tanpa nomor ganda; `## Edge cases` demikian pula untuk `EC-{n}`, atau tepat satu baris `EC-0` beralasan; `## Business metrics` demikian pula untuk `BM-{n}`, atau tepat satu baris `BM-0` beralasan. Entri `BM-LUAR-RANTAI: BM-{n}` tidak memperkenalkan nomor baru — ia menunjuk `BM-{n}` yang sudah ada di daftar dan tidak dihitung sebagai lompatan penomoran. Nomor yang sudah dipensiunkan dilarang muncul lagi sebagai aturan aktif.
-3. **Observasi vs aturan**: tiap kalimat hasil membaca kode berlabel `Observasi kode:` beserta `file:baris`. Klaim tentang perilaku sistem tanpa label itu di `## Current state` adalah kegagalan.
-4. **Nol placeholder**: `Grep` seluruh berkas atas `TBD`, `TODO`, dan `diisi nanti`. Satu kecocokan di seksi substantif mana pun adalah kegagalan.
-5. **Seksi nihil tetap bersuara**: `## Edge cases`, `## Business metrics`, `## Out of scope`, dan `## Open questions` dilarang kosong — masing-masing berisi item atau penegasan eksplisitnya (`EC-0`, `BM-0`, "Tidak ada pengecualian yang disepakati sejauh ini", "Tidak ada pertanyaan terbuka").
-6. **Anggaran Open questions**: maksimal tiga entri, tiap entri memuat `terdampak:` dan `sementara dipakai:`. Entri yang `terdampak:`-nya menyebut `## Business rules` atau `## Target state` bersifat memblokir — BRD tetap `DRAFT` dan approval tidak diajukan.
-7. **Batas akar**: bila `{taskdir}/TASK.md` ada, tiap `BR-{n}` terpetakan ke minimal satu `SC-{n}` `## Success Criteria`-nya dan tidak ada aturan yang menyentuh `## Out of Scope`-nya. Tiap `BM-{n}` selain `BM-0` memikul baris `digerakkan:` yang menyebut minimal satu `SC-{n}` nyata, atau ditulis sebagai entri `BM-LUAR-RANTAI: BM-{n}` beralasan; nomor `SC-{n}` yang tidak ada di `TASK.md` adalah rujukan hantu dan sama-sama gagal. Aturan yang menyentuh `## Out of Scope` dikembalikan ke `backenddev:analyst` sebagai permintaan amandemen akar, bukan dibuang sendiri. `TASK.md` absen: butir ini dilewati.
-8. **Taksonomi kasus batas**: tiap baris `EC-{n}` membawa tepat satu slug kategori dari lima yang sah (`data-hilang`, `duplikasi`, `in-flight`, `timeout`, `status-eksternal`), dan kelimanya tersapu — kategori tanpa kasus disebut namanya beserta alasannya di baris `Kategori nihil:`. Slug asing, slug ganda, kategori yang tidak disebut di kedua tempat, dan baris `EC-0` tanpa penafian kelima kategori adalah kegagalan.
-9. **Aktor & aksi terlarang**: tiap baris `## Actors` membawa jenis peran (`primer`/`approver`/`sistem`/`terlarang`) beserta `boleh:` dan `dilarang:`, dan minimal satu baris berjenis `terlarang` hadir. `Grep` seksi ini atas kata "user" berdiri sendiri tanpa kualifikasi peran; satu kecocokan adalah kegagalan.
-10. **Biaya pembiaran terkuantifikasi**: `## Problem` memuat ketiga baris `Finansial:`, `Operasional:`, dan `Integritas data:`, masing-masing berangka, bersatuan, atau bernilai "nihil" beserta alasannya, ditambah frekuensi bernilai `tiap transaksi`, `beban puncak`, atau `insidental`. Sumbu yang hilang atau berisi kata sifat tanpa indikator adalah kegagalan.
+1. **Struktur** [B1]: frontmatter `title`, `requester`, `status: DRAFT`; tepat satu H1 `# BRD: …`; sembilan seksi baku dengan nama dan urutan persis template.
+2. **Penomoran** [B2]: `BR-{n}`, `EC-{n}`, `BM-{n}` masing-masing urut tanpa lompatan dan tanpa ganda — `EC-0`/`BM-0` hanya sebagai satu-satunya baris. Nomor pensiun (baris `Pensiun:`) mengisi celah penomoran dan dilarang muncul lagi sebagai aturan aktif. `BM-LUAR-RANTAI: BM-{n}` menunjuk `BM-{n}` yang ada dan tidak menambah nomor.
+3. **Observasi vs aturan** [B3]: tiap `file:baris` di `## Current state` berlabel `Observasi kode:` pada baris yang sama (FAIL); berkas yang tidak ada di repo adalah `WARN`.
+4. **Nol placeholder** [B4]: nol `TBD`, `TODO`, `diisi nanti` di luar blok kode.
+5. **Seksi nihil tetap bersuara** [B5]: `## Edge cases`, `## Business metrics`, `## Out of scope`, `## Open questions` berisi item atau penegasan eksplisitnya (`EC-0`, `BM-0`, "Tidak ada pengecualian yang disepakati sejauh ini", "Tidak ada pertanyaan terbuka").
+6. **Anggaran Open questions** [B6]: maksimal tiga entri, tiap entri memuat `terdampak:` dan `sementara dipakai:`. Entri yang `terdampak:`-nya menyebut `## Business rules` atau `## Target state` memblokir — BRD tetap `DRAFT` dan approval tidak diajukan.
+7. **Batas akar** [B7a: `digerakkan:` BM → SC nyata, rujukan `SC-{n}` hantu; B7b MANUAL: BR → SC dan sentuhan `## Out of Scope`]: bila `{taskdir}/TASK.md` ada, tiap `BR-{n}` terpetakan ke minimal satu `SC-{n}` `## Success Criteria`-nya dan tidak ada aturan yang menyentuh `## Out of Scope`-nya. Tiap `BM-{n}` selain `BM-0` memikul baris `digerakkan:` yang menyebut minimal satu `SC-{n}` nyata, atau ditulis sebagai entri `BM-LUAR-RANTAI: BM-{n}` beralasan; nomor `SC-{n}` yang tidak ada di `TASK.md` adalah rujukan hantu dan sama-sama gagal. Aturan yang menyentuh `## Out of Scope` dikembalikan ke `backenddev:analyst` sebagai permintaan amandemen akar, bukan dibuang sendiri. `TASK.md` absen: butir ini dilewati.
+8. **Taksonomi kasus batas** [B8]: tiap `EC-{n}` membawa tepat satu slug dari lima yang sah (`data-hilang`, `duplikasi`, `in-flight`, `timeout`, `status-eksternal`), dan kelimanya tersapu — dipakai `EC-{n}` atau disebut beserta alasannya di baris `Kategori nihil:`.
+9. **Aktor & aksi terlarang** [B9]: tiap baris `## Actors` berbentuk `- **<peran>** (<primer|approver|sistem|terlarang>) — boleh: …; dilarang: …`, minimal satu `terlarang`; kata "user" berdiri sendiri adalah `WARN`.
+10. **Biaya pembiaran terkuantifikasi** [B10]: `## Problem` memuat baris `Finansial:`, `Operasional:`, `Integritas data:` yang terisi, dan frekuensi `tiap transaksi`, `beban puncak`, atau `insidental`. Isi tiap sumbu berangka, bersatuan, atau "nihil" beralasan — kata sifat tanpa indikator adalah kegagalan yang dinilai penulis.
+11. **Nol heading tabrakan** [B11]: tidak ada `## Success criteria`/`## Success Criteria` — heading itu milik `TASK.md`.
 
-11. **Nol heading tabrakan**: `Grep` berkas atas heading `## Success criteria` dan `## Success Criteria`. Satu kecocokan adalah kegagalan — heading itu milik `TASK.md`, dan BRD memakai `## Business metrics`.
+12. **Kecukupan aturan** [B12 MANUAL] — arah balik butir 7, dan tidak pernah dilewati: butir 7 memvonis aturan yang menembus batas akar, butir ini memvonis aturan yang tidak punya akar sama sekali. Sandingkan tiap `BR-{n}` dengan akarnya — `SC-{n}` `## Success Criteria` bila `TASK.md` ada, jawaban elisitasi Fase 2 bila absen — lalu periksa masing-masing menutup bagian akar yang belum ditutup `BR-{n}` lain. Aturan kedua di atas akar yang sudah tertutup penuh wajib menyebut bagian yang belum tertutup itu di prosanya. `Grep` `## Business rules` atas aturan yang tak berpasangan dengan satu pun akar — pengetatan yang tidak diminta, kewajiban audit/log/notifikasi yang tak disinggung, dan aturan bersyarat masa depan ("bila nanti", "untuk berjaga-jaga") — satu kecocokan adalah kegagalan: hapus aturannya, dilarang dicarikan akar susulan. Aturan yang benar-benar dibutuhkan tetapi akarnya belum ada bukan pengecualian butir ini: ia permintaan amandemen akar, dan rutenya butir 7.
 
-12. **Kecukupan aturan** — arah balik butir 7, dan tidak pernah dilewati: butir 7 memvonis aturan yang menembus batas akar, butir ini memvonis aturan yang tidak punya akar sama sekali. Sandingkan tiap `BR-{n}` dengan akarnya — `SC-{n}` `## Success Criteria` bila `TASK.md` ada, jawaban elisitasi Fase 2 bila absen — lalu periksa masing-masing menutup bagian akar yang belum ditutup `BR-{n}` lain. Aturan kedua di atas akar yang sudah tertutup penuh wajib menyebut bagian yang belum tertutup itu di prosanya. `Grep` `## Business rules` atas aturan yang tak berpasangan dengan satu pun akar — pengetatan yang tidak diminta, kewajiban audit/log/notifikasi yang tak disinggung, dan aturan bersyarat masa depan ("bila nanti", "untuk berjaga-jaga") — satu kecocokan adalah kegagalan: hapus aturannya, dilarang dicarikan akar susulan. Aturan yang benar-benar dibutuhkan tetapi akarnya belum ada bukan pengecualian butir ini: ia permintaan amandemen akar, dan rutenya butir 7.
-
-Hasilnya dilaporkan sebagai satu baris per butir (`butir <n>: lolos` atau `butir <n>: gagal — <rincian>`), dan dispatch `brd-reviewer` dilarang berangkat sebelum kedua belasnya lolos.
+Hasilnya: keluaran validator ditambah satu baris per butir `MANUAL` (`butir <n>: lolos` atau `butir <n>: gagal — <rincian>`), dan dispatch `brd-reviewer` dilarang berangkat sebelum seluruhnya lolos.
 
 ## Contoh terisi — `orders-api` (dipangkas, tidak tersalin ke artefak)
 
@@ -117,7 +116,7 @@ Biaya pembiaran:
 ## Actors
 - **Pemilik toko** (primer) — boleh: membatalkan order `PAID` miliknya yang stoknya belum dikurangi; dilarang: membatalkan order toko lain
 - **Sistem payment** (sistem) — boleh: menerima sinyal pembatalan; dilarang: mengubah status order
-- **Pembeli** (terlarang) — dilarang: membatalkan order `PAID`
+- **Pembeli** (terlarang) — boleh: melihat status order miliknya; dilarang: membatalkan order `PAID`
 
 ## Current state
 Order `PAID` hanya berubah ke `FULFILLED` lewat job pengiriman. Observasi kode: `internal/order/state.go:27` — transisi keluar dari `PAID` hanya `FULFILLED`.
@@ -134,7 +133,7 @@ Pensiun: tidak ada
 ## Edge cases
 - **EC-1** [status-eksternal]: job pengiriman mengubah order ke `FULFILLED` di tengah permintaan pembatalan → pembatalan ditolak, status tetap `FULFILLED`
 
-Kategori nihil: `input-tidak-valid` — pembatalan tidak menerima payload
+Kategori nihil: `data-hilang` — pembatalan tidak menerima payload; `duplikasi` — permintaan kedua atas order `CANCELLED` jatuh ke EC-1 yang sama; `in-flight` — pengembalian stok dan perubahan status satu transaksi DB; `timeout` — tidak ada alokasi berbatas waktu
 
 ## Business metrics
 - **BM-1**: order `PAID` dibatalkan manual oleh CS — baseline: ±20/minggu; target: 0; diobservasi: CS lead dari log SQL manual; digerakkan: SC-1
