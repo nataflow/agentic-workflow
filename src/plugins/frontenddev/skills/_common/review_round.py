@@ -20,7 +20,8 @@ Subperintah:
              non-MINOR: ditolak kecuali ronde terakhir `PASS` atas konten disk dan epoch
              sekarang. Commit-nya membawa trailer `Review-Round: <gate> r<n> t<total>
              PASS <sidik>` — jejak ronde yang ikut ter-commit.
-- `status` — cetak ronde dan sisa plafon.
+- `status` — cetak ronde, sisa plafon, dan `siap commit`. `--ready`: exit 1 bila belum siap
+             (ronde terakhir bukan `PASS` atas konten disk dan epoch sekarang).
 - `rebuild` — state hilang padahal trailer mencatat ronde: tulis ulang hitungan taskdir
              dari trailer (ronde sesudah commit terakhir tidak terpulihkan).
 
@@ -338,6 +339,7 @@ class Rounds:
 
     def status(self) -> str:
         state = self.load()
+        problem = self.ready(state)
         c = self.counts(state)
         lines = [f"REVIEW ROUND STATUS: {self.gate} — putaran {c['cycle']}/{MAX_PER_CYCLE}, "
                  f"taskdir {c['taskdir']}/{MAX_PER_TASKDIR}"]
@@ -346,6 +348,7 @@ class Rounds:
                      else f"format lama {r.get('generation', '-')}")
             lines.append(f"- ronde {r.get('round')} [{where}] → {r.get('verdict') or 'terbuka'}"
                          + (f" (mekanis {r.get('mechanical')}, semantik {r.get('semantic')})" if r.get("verdict") else ""))
+        lines.append("siap commit: ya" if not problem else f"siap commit: tidak — {problem}")
         return "\n".join(lines)
 
 
@@ -371,6 +374,7 @@ def main() -> None:
     parser.add_argument("--semantic", type=nonneg, default=0)
     parser.add_argument("--evidence", default="", help="gate contract: balikan reviewer di .explore/")
     parser.add_argument("--subject", default="", help="commit: subjek Phase 6 contract / Phase 4 plan")
+    parser.add_argument("--ready", action="store_true", help="status: exit 1 bila belum siap commit")
     args = parser.parse_args()
     rounds = Rounds(args.taskdir, args.gate, Path(args.root) if args.root else None)
     if args.cmd == "open":
@@ -384,7 +388,10 @@ def main() -> None:
     elif args.cmd == "rebuild":
         print(rounds.rebuild())
     else:
-        print(rounds.status())
+        out = rounds.status()
+        print(out)
+        if args.ready and not out.endswith("siap commit: ya"):
+            sys.exit(1)
 
 
 if __name__ == "__main__":

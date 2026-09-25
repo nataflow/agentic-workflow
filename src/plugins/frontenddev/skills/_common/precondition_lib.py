@@ -751,8 +751,12 @@ def check_worktree(add: AddFn, cid: int, root: Path, taskdir_rel: str = "") -> b
         preview = ", ".join(paths[:5])
         own = bool(taskdir_rel) and all(p.startswith(taskdir_rel + "/") for p in paths)
         add(cid, name, "FAIL", f"{len(dirty)} berkas belum bersih: {preview}",
-            "Seluruhnya artefak taskdir ini yang tertunda dari sesi lalu — commit draft/brief itu "
-            "dengan subjek gate pemiliknya (`draft`/`revise`), lalu ulangi prasyarat."
+            "Seluruhnya artefak taskdir ini dari sesi lalu. `CONTRACT.md` atau batch brief lane "
+            "non-MINOR: commit hanya lewat `review_round.py commit --gate <contract|plan> --subject "
+            "\"<subjek gate pemiliknya>\"` — skrip menolak bila ronde reviewer terakhir belum `PASS` "
+            "atas konten itu (cek dulu: `review_round.py status --ready`); ditolak → **jangan commit**, "
+            "lanjutkan dari validator + ronde reviewer gate itu. Brief lane MINOR dan `FLOW.md`/`UI.md` "
+            "(tanpa ronde): commit hanya bila validator gate itu `PASS`. Lalu ulangi prasyarat."
             if own else
             "Commit atomik gate ini menuntut tree bersih. Kotoran yang bukan milik rantai "
             "adalah kerja user — laporkan, jangan di-stash sendiri.")
@@ -947,9 +951,32 @@ def check_pending(add: AddFn, cid: int, root: Path, taskdir_rel: str, doc: str) 
             "Gate ini sudah tuntas. Revisi atas dokumen yang disetujui hanya lewat "
             "`chain.py reopen` di `frontenddev:lead`.")
         return
+    if doc == "CONTRACT.md":
+        ready = contract_review_ready(root, taskdir_rel)
+        if ready:
+            add(cid, name, "WARN", f"`{doc}` tertunda berstatus `{status}`; belum layak diajukan: {ready}",
+                "Jangan commit dan jangan ajukan ke user: lanjutkan perbaikan draft, `validate_doc.py` "
+                "sampai `PASS`, lalu ronde reviewer (Phase 5 butir 2–3) sebelum diajukan.")
+            return
+        add(cid, name, "WARN", f"`{doc}` tertunda berstatus `{status}`; ronde terakhir `PASS` atas konten ini",
+            "Belum ter-commit → `review_round.py commit` (Phase 6 butir 1). Lalu tanyakan ke user "
+            "apakah draft diputuskan (setuju/revisi) atau ditulis ulang, sebelum Phase 0 berjalan.")
+        return
     add(cid, name, "WARN", f"`{doc}` sudah ada berstatus `{status}`",
         "Lanjutkan dari draft itu: tanyakan ke user apakah draft diputuskan (setuju/revisi) "
         "atau ditulis ulang, sebelum Phase 0 berjalan.")
+
+
+def contract_review_ready(root: Path, taskdir_rel: str) -> str:
+    """Alasan `CONTRACT.md` di disk belum lolos ronde reviewer, atau kosong bila siap diajukan."""
+    common = str(Path(__file__).resolve().parent)
+    if common not in sys.path:
+        sys.path.insert(0, common)
+    from review_round import Rounds   # impor lambat: review_round mengimpor modul ini
+    try:
+        return Rounds(taskdir_rel, "contract", root).ready()
+    except SystemExit as exc:
+        return str(exc)
 
 
 def task_root_sha(root: Path, taskdir_rel: str) -> str:

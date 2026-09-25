@@ -245,3 +245,31 @@ def test_plan_record_menolak_verdict_laporan_berbeda(fe_chain_repo):
     r = rr(repo, "record", "--verdict", "PASS", gate="plan")
     assert r.returncode == 1 and "verdict: BLOCKED" in r.out
     assert b1
+
+
+# ------------------------------------------------------------------ L4.8 — artefak tertunda tidak di-commit tanpa PASS
+
+
+def test_status_ready_blocked_exit1(fe_chain_repo):
+    round_(fe_chain_repo, "BLOCKED", semantic=2)
+    r = rr(fe_chain_repo, "status", "--ready")
+    assert r.returncode == 1 and "ronde review `contract` terakhir ber-verdict `BLOCKED`" in r.out
+
+
+def test_status_ready_pass_konten_berubah_exit1(fe_chain_repo):
+    round_(fe_chain_repo); edit(fe_chain_repo)
+    r = rr(fe_chain_repo, "status", "--ready")
+    assert r.returncode == 1 and "konten berubah" in r.out
+
+
+def test_status_ready_pass_sama_exit0(fe_chain_repo):
+    round_(fe_chain_repo)
+    r = rr(fe_chain_repo, "status", "--ready")
+    assert r.returncode == 0 and r.out.strip().endswith("siap commit: ya")
+
+
+def test_prasyarat_contract_tidak_menyuruh_commit_draft_blocked(fe_chain_repo):
+    round_(fe_chain_repo, "BLOCKED", semantic=2)
+    r = fe_run(fe_chain_repo, "contract/scripts/check_preconditions.py", "--taskdir", FE_TD)
+    assert "review_round.py status --ready" in r.out and "jangan commit" in r.out
+    assert "belum layak diajukan" in r.out
