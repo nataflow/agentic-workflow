@@ -1,8 +1,6 @@
 ---
 name: intake
 description: Gunakan ketika ada permintaan, keluhan, atau laporan dari pengguna/stakeholder yang perlu dijadikan tiket (fitur baru, perbaikan, bug dari sisi pengguna), atau tiket analyst yang sudah ada perlu dilanjutkan atau diubah - klasifikasi tipe, cek duplikat, pecah permintaan besar, dan tentukan rute, sebelum pertanyaan elisitasi diajukan atau TICKET.md ditulis
-metadata:
-  mode: standard
 ---
 
 ## THE IRON LAW

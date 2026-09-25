@@ -1,8 +1,7 @@
 ---
 name: task
 description: Dipanggil frontenddev:lead Phase 7 sesudah lane dan taskdir ditetapkan pada lane FULL_PIPELINE, FAST_FORWARD, REFACTOR_ARCH, atau HOTFIX_MINOR - perumusan akar rantai TASK.md berisi kriteria sukses dan batas kerja, ditulis sebelum satu pun gate hilir berangkat
-metadata:
-  mode: compact
+user-invocable: false
 ---
 
 ## THE IRON LAW

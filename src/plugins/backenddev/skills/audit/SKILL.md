@@ -1,8 +1,6 @@
 ---
 name: audit
 description: Gunakan ketika kode backend perlu disapu terhadap 6 konvensi arsitektur - evaluasi bukti konkret file:line dan pencatatan issues, sebelum perbaikan kode dimulai tanpa laporan audit
-metadata:
-  mode: standard
 ---
 
 ## THE IRON LAW

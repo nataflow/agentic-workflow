@@ -1,8 +1,7 @@
 ---
 name: plan
 description: Dipanggil frontenddev:lead sesudah hop CONTRACT tercentang di ledger, atau langsung pada lane HOTFIX_MINOR, atau sesudah hop BRIEF dibuka ulang - memecah kerja jadi brief READY atomik dengan rekonsiliasi 3-check, Gate Plan Review, dan approval user, sebelum kode di src ditulis tanpa brief
-metadata:
-  mode: standard
+user-invocable: false
 ---
 
 ## THE IRON LAW

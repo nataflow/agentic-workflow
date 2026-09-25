@@ -1,8 +1,7 @@
 ---
 name: plan
 description: Dipanggil backenddev:analyst (entry_mode PRD sesudah PRD APPROVED, atau LANGSUNG pada chain BRIEF) dan gerbang backenddev:tech-lead (entry_mode RCA dari RCA.md terkonfirmasi) - perencana brief READY sebelum kode disentuh
-metadata:
-  mode: standard
+user-invocable: false
 ---
 
 ## THE IRON LAW

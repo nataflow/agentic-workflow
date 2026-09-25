@@ -1,8 +1,6 @@
 ---
 name: lead
 description: Gunakan ketika ada permintaan kerja baru atau susulan di repo frontend (desain UI/UX, fitur, refaktor, bugfix, explore, review) - routing lane, sections, dan taskdir diputuskan dari kode, akar dikunci, lalu rantai diserahkan ke gate pemiliknya, sebelum satu berkas src/ disentuh
-metadata:
-  mode: extended
 ---
 
 ## THE IRON LAW

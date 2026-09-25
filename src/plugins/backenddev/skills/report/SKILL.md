@@ -1,8 +1,7 @@
 ---
 name: report
 description: Dipanggil backenddev:architect sesudah REVIEW.md terbit dan seluruh brief tertutup - perumusan REPORT.md dari diff merge-base yang dipasangkan dengan Success Criteria TASK.md, dikunci satu commit sebelum rantai dinyatakan selesai
-metadata:
-  mode: compact
+user-invocable: false
 ---
 
 ## THE IRON LAW

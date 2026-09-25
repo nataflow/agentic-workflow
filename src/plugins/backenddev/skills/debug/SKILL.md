@@ -1,8 +1,6 @@
 ---
 name: debug
 description: Gunakan ketika ada stacktrace, exception, HTTP 5xx, atau test merah yang penyebabnya belum diketahui - pembuktian rantai kausal file:line di RCA.md, sebelum menulis brief perbaikan atau menyentuh src/
-metadata:
-  mode: standard
 ---
 
 ## THE IRON LAW

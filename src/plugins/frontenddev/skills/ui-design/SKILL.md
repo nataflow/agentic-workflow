@@ -1,8 +1,7 @@
 ---
 name: ui-design
 description: Dipanggil frontenddev:lead ketika sections TASK.md memuat ui, sesudah hop FLOW tercentang bila flow ikut dijadwalkan - merancang layout visual, prioritas P1-P3, dan enam cabang state ke UI.md yang disetujui user di Gate Design, sebelum kontrak teknis atau kode komponen ditulis
-metadata:
-  mode: standard
+user-invocable: false
 ---
 
 ## THE IRON LAW

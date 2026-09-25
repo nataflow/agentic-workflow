@@ -1,8 +1,7 @@
 ---
 name: spec
 description: Dipanggil analyst:elicit sesudah elisitasi CLOSED, atau analyst:intake untuk ticketdir berkeadaan SPEC/DRAFT/DRIFT dan perubahan tiket READY - menyusun kartu TICKET.md non-teknis (user story, acceptance criteria Given/When/Then, aturan bisnis), lolos ticket-reviewer dan persetujuan user, sebelum tiket diserahkan ke engineer
-metadata:
-  mode: standard
+user-invocable: false
 ---
 
 ## THE IRON LAW

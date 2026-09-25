@@ -1,8 +1,6 @@
 ---
 name: profile
 description: Gunakan ketika repo backend belum punya .claude/profile/backenddev/ atau konfigurasi berubah - deteksi stack, pemindaian arsitektur, sebelum mengedit kode atau menjalankan task tanpa profile
-metadata:
-  mode: standard
 ---
 
 ## THE IRON LAW

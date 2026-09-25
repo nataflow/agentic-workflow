@@ -2,8 +2,6 @@
 name: execute
 description: Alur ringan quickdev (repo-profile.md, plan/<task>.md, tanpa taskdir) — menerapkan plan/<task>.md berstatus APPROVED ke kode dan menjalankan verifikasi baseline repo-profile.md; dipanggil eksplisit lewat /quickdev:execute.
 disable-model-invocation: true
-metadata:
-  mode: standard
 ---
 
 ## THE IRON LAW

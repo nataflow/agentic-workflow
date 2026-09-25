@@ -2,8 +2,6 @@
 name: profile
 description: Alur ringan quickdev (repo-profile.md, plan/<task>.md, tanpa taskdir) — dipanggil eksplisit lewat /quickdev:profile ketika repo belum punya repo-profile.md atau profilnya perlu diperbarui — pemindaian stack, layer, dan baseline verifikasi. Bukan untuk .claude/profile/ milik backenddev/frontenddev.
 disable-model-invocation: true
-metadata:
-  mode: standard
 ---
 
 ## THE IRON LAW

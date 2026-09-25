@@ -1,8 +1,7 @@
 ---
 name: contract
 description: Dipanggil frontenddev:lead pada setiap lane non-MINOR sesudah hop FLOW/UI yang dijadwalkan tercentang - merancang data contract backend dan arsitektur layer 5-tier ke CONTRACT.md, lolos contract-reviewer dan approval user, sebelum brief implementasi dipecah plan
-metadata:
-  mode: standard
+user-invocable: false
 ---
 
 ## THE IRON LAW

@@ -1,8 +1,6 @@
 ---
 name: tech-lead
 description: Gunakan ketika ada permintaan kerja baru atau susulan di repo backend - routing lane, risk level, dan taskdir diputuskan dari kode, sebelum brief ditulis atau file src/ diedit
-metadata:
-  mode: extended
 ---
 
 ## THE IRON LAW

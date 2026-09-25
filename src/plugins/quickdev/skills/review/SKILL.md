@@ -2,8 +2,6 @@
 name: review
 description: Alur ringan quickdev (repo-profile.md, plan/<task>.md, tanpa taskdir) — menilai diff uncommitted hasil quickdev:execute terhadap plan/<task>.md dan repo-profile.md sebelum commit; dipanggil eksplisit lewat /quickdev:review.
 disable-model-invocation: true
-metadata:
-  mode: standard
 ---
 
 ## THE IRON LAW

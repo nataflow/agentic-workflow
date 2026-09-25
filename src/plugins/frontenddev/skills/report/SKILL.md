@@ -1,8 +1,7 @@
 ---
 name: report
 description: Dipanggil frontenddev:architect Phase 5 sesudah REVIEW.md penutup lolos validate_review.py, ter-commit dengan verdict PASS atau WARNING, dan seluruh brief tertutup - perumusan REPORT.md dari berkas rantai sejak commit akar dan vonis Success Criteria REVIEW.md, dikunci satu commit sebagai penanda tuntas taskdir
-metadata:
-  mode: compact
+user-invocable: false
 ---
 
 ## THE IRON LAW

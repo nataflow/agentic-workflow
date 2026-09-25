@@ -2,8 +2,6 @@
 name: explore
 description: Alur ringan quickdev (repo-profile.md, plan/<task>.md, tanpa taskdir) — penelusuran arsitektur kode dan pemetaan simbol file:baris sebagai bahan quickdev:clarify/quickdev:plan; dipanggil eksplisit lewat /quickdev:explore.
 disable-model-invocation: true
-metadata:
-  mode: standard
 ---
 
 ## THE IRON LAW

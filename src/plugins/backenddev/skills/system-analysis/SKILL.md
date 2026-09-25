@@ -1,8 +1,7 @@
 ---
 name: system-analysis
 description: Dipanggil backenddev:analyst pada hop PRD chain BRD_PRD_BRIEF (sesudah BRD APPROVED) atau PRD_BRIEF (tanpa BRD, risk MAJOR/BREAKING) - mengunci kontrak API, state lifecycle, validasi, permission, dan impact map ke PRD.md DRAFT sebelum brief ditulis
-metadata:
-  mode: compact
+user-invocable: false
 ---
 
 ## THE IRON LAW

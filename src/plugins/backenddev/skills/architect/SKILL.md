@@ -1,8 +1,6 @@
 ---
 name: architect
 description: Gunakan ketika direktori taskdir berisi brief READY siap dieksekusi atau rantai terputus - orkestrasi sekuensial brief dan review penutup, sebelum mengeksekusi tanpa verifikasi dan atomic commit.
-metadata:
-  mode: standard
 ---
 
 ## THE IRON LAW

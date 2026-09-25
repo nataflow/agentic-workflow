@@ -2,8 +2,6 @@
 name: plan
 description: Alur ringan quickdev (repo-profile.md, plan/<task>.md, tanpa taskdir) — menyusun satu berkas rencana plan/<task>.md dari kebutuhan yang sudah jelas lalu meminta approval user. Bukan brief taskdir backenddev/frontenddev; dipanggil eksplisit lewat /quickdev:plan.
 disable-model-invocation: true
-metadata:
-  mode: standard
 ---
 
 ## THE IRON LAW

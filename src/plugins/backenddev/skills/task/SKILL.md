@@ -1,8 +1,7 @@
 ---
 name: task
 description: Dipanggil backenddev:analyst pada lane planning, atau gerbang backenddev:tech-lead pada lane DEFECT_RCA dan backfill EXEC_BRIEF - perumusan akar rantai TASK.md berisi kriteria sukses dan batas kerja, ditulis sebelum satu pun skill hilir berangkat
-metadata:
-  mode: compact
+user-invocable: false
 ---
 
 ## THE IRON LAW

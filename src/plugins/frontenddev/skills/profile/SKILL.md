@@ -1,8 +1,6 @@
 ---
 name: profile
 description: Gunakan ketika .claude/profile/frontenddev/ belum ada atau perlu diperbarui - deteksi stack, pemetaan surface map, dan invariant, sebelum implementasi kode tanpa verifikasi baseline
-metadata:
-  mode: standard
 ---
 
 ## THE IRON LAW

@@ -1,8 +1,7 @@
 ---
 name: architect
 description: Dipanggil frontenddev:lead ketika ledger taskdir tercentang penuh dan brief READY siap dieksekusi, atau rantai terputus di tengah eksekusi - orkestrasi sekuensial implementor, gerbang kompilasi, verifikasi penutup, dan satu review independen, sebelum rantai dilaporkan tanpa bukti disk
-metadata:
-  mode: standard
+user-invocable: false
 ---
 
 ## THE IRON LAW

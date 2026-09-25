@@ -1,8 +1,7 @@
 ---
 name: business-analysis
 description: Dipanggil backenddev:analyst sebagai hop BRD pada chain BRD_PRD_BRIEF - elisitasi terarah masalah domain, aktor, dan business rules ke BRD.md DRAFT di taskdir, sebelum system-analysis menyusun kontrak teknis
-metadata:
-  mode: compact
+user-invocable: false
 ---
 
 ## THE IRON LAW

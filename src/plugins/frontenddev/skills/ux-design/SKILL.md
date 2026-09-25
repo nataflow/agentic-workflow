@@ -1,8 +1,7 @@
 ---
 name: ux-design
 description: Dipanggil frontenddev:lead ketika sections TASK.md memuat flow - merancang alur pengguna, rute navigasi, deep-link, penanganan batal, dan data demands ke FLOW.md yang disetujui user di Gate Flow, sebelum mockup UI atau kontrak teknis dirancang
-metadata:
-  mode: standard
+user-invocable: false
 ---
 
 ## THE IRON LAW

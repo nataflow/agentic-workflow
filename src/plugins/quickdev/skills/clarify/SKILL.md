@@ -2,8 +2,6 @@
 name: clarify
 description: Alur ringan quickdev (repo-profile.md, plan/<task>.md, tanpa taskdir) — klarifikasi celah spesifikasi dari laporan quickdev:explore sebelum quickdev:plan; dipanggil eksplisit lewat /quickdev:clarify.
 disable-model-invocation: true
-metadata:
-  mode: standard
 ---
 
 ## THE IRON LAW

@@ -1,8 +1,6 @@
 ---
 name: document-api
 description: Gunakan ketika user eksplisit meminta dokumentasi API untuk endpoint yang sudah ada di kode - endpoint nyata dipetakan jadi docs/api/, sebelum merilis API tanpa dokumen terverifikasi
-metadata:
-  mode: standard
 ---
 
 ## THE IRON LAW

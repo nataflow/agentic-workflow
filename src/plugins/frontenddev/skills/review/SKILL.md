@@ -1,8 +1,6 @@
 ---
 name: review
 description: Gunakan ketika kode frontend di luar rantai taskdir aktif perlu dinilai (lane REVIEW_AUDIT) - rentang commit, direktori fitur, atau taskdir yang sudah tuntas dinilai terhadap 9 dimensi dan konvensi profile, sebelum perbaikan diajukan sebagai kerja baru; review penutup taskdir aktif milik frontenddev:architect
-metadata:
-  mode: standard
 ---
 
 ## THE IRON LAW

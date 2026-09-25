@@ -1,8 +1,7 @@
 ---
 name: analyst
 description: Dipanggil gerbang backenddev:tech-lead sesudah lane PLANNING ditetapkan dan taskdir terprovisi - orkestrasi rantai TASK/BRD/PRD/brief beserta gerbang approval dokumen, sebelum brief READY diserahkan ke fase eksekusi
-metadata:
-  mode: standard
+user-invocable: false
 ---
 
 ## THE IRON LAW
