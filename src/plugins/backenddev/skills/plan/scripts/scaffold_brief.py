@@ -41,10 +41,8 @@ Zero external dependencies (Python Standard Library only).
 
 import argparse
 import json
-import os
 from pathlib import Path
 import re
-import subprocess
 import sys
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -52,8 +50,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from brief_status import (  # noqa: E402
     HALT_FILE, LOCKED, SUPERSEDABLE, halted_nn, read_frontmatter, scan_briefs, set_frontmatter,
 )
+from precondition_lib import (  # noqa: E402
+    VALID_RISKS, find_repo_root, frontmatter_field, parse_enum, read_text, resolve_taskdir,
+)
 
-VALID_RISKS = ["BREAKING", "MAJOR", "MINOR"]
 RISK_ORDER = {"MINOR": 1, "MAJOR": 2, "BREAKING": 3}
 
 # Laci kerja taskdir. Direktori ini sudah dikecualikan tiap gerbang git di
@@ -91,23 +91,11 @@ SECTIONS = [
 ]
 
 
-def _find_repo_root() -> Path:
-    try:
-        out = subprocess.check_output(
-            ["git", "rev-parse", "--show-toplevel"],
-            stderr=subprocess.DEVNULL, universal_newlines=True,
-        ).strip()
-        if out and os.path.isdir(out):
-            return Path(out)
-    except Exception:
-        pass
-    return Path.cwd()
-
-
 def _read(path: Path) -> Optional[str]:
+    """Isi berkas ternormalisasi (BOM dibuang, CRLF → LF), atau None bila tak terbaca."""
     try:
-        return path.read_text(encoding="utf-8")
-    except Exception:
+        return read_text(path)
+    except (OSError, UnicodeDecodeError):
         return None
 
 
@@ -144,9 +132,8 @@ def _doc_section(text: Optional[str], title: str) -> Optional[str]:
 
 class MatrixTool:
     def __init__(self, taskdir: str, target_root: Optional[Path] = None):
-        self.root = (target_root or _find_repo_root()).resolve()
-        td = Path(taskdir)
-        self.taskdir = td if td.is_absolute() else self.root / td
+        self.root = (target_root or find_repo_root()).resolve()
+        self.taskdir = resolve_taskdir(self.root, taskdir)
         self.task_text = _read(self.taskdir / "TASK.md")
         self.prd_text = _read(self.taskdir / "PRD.md")
 
@@ -281,13 +268,14 @@ class MatrixTool:
     def risk_ceiling(self, override: Optional[str]) -> Optional[str]:
         if override and override.strip().upper() not in ("", "-", "—"):
             return override.strip().upper()
-        if not self.task_text:
+        # Hanya frontmatter TASK.md: baris `risk:` di badan atau blok kode tidak terbaca.
+        raw = frontmatter_field(self.taskdir / "TASK.md", "risk")
+        if raw is None:
             return None
-        m = re.search(r"^risk:\s*([A-Za-z_-]+)\s*$", self.task_text, re.MULTILINE)
-        if not m:
-            return None
-        val = m.group(1).strip().upper()
-        return "MINOR" if val in ("-", "—") else val
+        if raw.strip() in ("-", "—"):
+            return "MINOR"
+        val, _err = parse_enum(raw, VALID_RISKS, "risk")
+        return val or raw.strip().upper()
 
     # -- penulisan matriks -------------------------------------------------
 
