@@ -25,6 +25,9 @@ from precondition_lib import (  # noqa: E402
     legacy_suffix,
 )
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import chain_counters as _counters  # noqa: E402
+
 VALID_RISKS = {"BREAKING", "MAJOR", "MINOR"}
 
 VALID_CHAINS = {"BRD_PRD_BRIEF", "PRD_BRIEF", "BRIEF"}
@@ -460,6 +463,9 @@ class PreconditionChecker:
                 summary = "Resume: ledger tercentang penuh — butuh reentry_reason (Fase 3 butir 0)"
             else:
                 summary = "Resume: TASK.md tanpa ledger `## Chain` — laporkan ke gerbang (lane non-planning)"
+        if task and task.exists():
+            counters = _counters.parse(task.read_text(encoding="utf-8"))
+            summary += f" · Counters: {_counters.summary(counters)}"
         self.results.append({
             "id": check_id,
             "name": name,

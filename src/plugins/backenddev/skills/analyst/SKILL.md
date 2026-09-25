@@ -39,7 +39,7 @@ Jalankan sebelum Fase 1 tiap kali skill ini berangkat.
 1. `{taskdir}/TASK.md` tidak ada (check 7: `rantai baru`) → lanjut ke Fase 1.
 2. `TASK.md` ada → **dilarang memanggil `backenddev:task`** dan dilarang menurunkan `chain` ulang: Fase 1 dan 2 dilewati. Pakai `chain:` dan `risk:` frontmatter; parameter gerbang yang berbeda sudah ditolak prasyarat check 4. Baca baris `Resume:` check 7 prasyarat.
 3. Titik masuk dari ledger `## Chain`: ada hop `[ ]`/`[~]` (`Resume: hop <HOP>`) → Fase 3 pada hop teratas itu, dan artefak hop yang sudah ada (`BRD.md`/`PRD.md` `DRAFT` ter-commit penulisnya) langsung masuk Fase 4 atasnya alih-alih ditulis ulang; ledger tercentang penuh (`butuh reentry_reason`) → Fase 3 butir 0 dengan `reentry_reason` (kosong → `## Failure path` butir 9).
-4. Plafon yang berjalan dibaca dari `## Counters` `TASK.md`, bukan dari ingatan sesi.
+4. Plafon yang berjalan dibaca dari baris `Counters:` check 7 (tabel `## Counters` `TASK.md`), bukan dari ingatan sesi. Seluruh plafon Fase 3–5 dimateraikan lewat `scripts/chain_counters.py`; perubahan tabelnya ikut commit pembaruan `TASK.md` berikutnya milik skill ini (staging path eksplisit `{taskdir}/TASK.md`).
 
 Tiga keadaan normal masuk lewat jalur ini: taskdir ber-`BRD.md`/`PRD.md` `DRAFT` yang dirutekan gerbang, keberangkatan ulang sesudah amandemen akar, dan keberangkatan ulang sesudah rantai tertahan atau kegagalan hilir.
 
@@ -71,12 +71,13 @@ Jalankan hop belum tercentang paling atas pada ledger `## Chain`, satu hop per g
 
    1. Tetapkan **satu** hop pemilik kegagalannya dari laporan masuk: predikat atau berkas yang gagal menunjuk `brief-*.md` → hop `BRIEF`; menunjuk kontrak, `AC-{n}`, atau permukaan PRD → hop `PRD`; menunjuk aturan bisnis `BR-{n}` → hop `BRD`. Kegagalan yang menunjuk dua hop sekaligus dibuka pada hop **paling hulu**.
    2. Ubah centang hop itu menjadi `- [~] <HOP> — <skill> → <artefak> @ re-entry <n> (was <sha lama>)`. Hop di bawahnya yang sudah tercentang ikut dibuka menjadi `- [ ]` tanpa penanda: artefaknya tidak dibatalkan, tetapi ia wajib berangkat ulang di atas hasil hop hulu yang baru.
-   3. Commit pembaruan dengan staging path eksplisit `{taskdir}/TASK.md` dan subjek `docs(<slug>): re-entry hop <HOP> ke-<n>`.
-   4. Lanjutkan ke butir 1; hop `[~]` diperlakukan persis seperti hop belum tercentang, dan kembali `[x]` bersha baru saat ia tuntas.
+   3. Materaikan hitungan sebelum membuka hop: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/analyst/scripts/chain_counters.py --taskdir <taskdir> --bump reentry`; `FAIL` → `## Failure path` butir 9. Lolos → `python3 ${CLAUDE_PLUGIN_ROOT}/skills/analyst/scripts/chain_counters.py --taskdir <taskdir> --reset-hop <HOP>` supaya revisi hop yang dibuka mendapat jatah ronde reviewer, penolakan, dan pengembalian baru.
+   4. Commit pembaruan dengan staging path eksplisit `{taskdir}/TASK.md` dan subjek `docs(<slug>): re-entry hop <HOP> ke-<n>`, `<n>` dari keluaran `--bump`.
+   5. Lanjutkan ke butir 1; hop `[~]` diperlakukan persis seperti hop belum tercentang, dan kembali `[x]` bersha baru saat ia tuntas.
 
    **Artefak hop yang dibuka tidak dihapus dan tidak diturunkan statusnya.** `BRD.md`/`PRD.md` `APPROVED` bertahan `APPROVED` sampai hop itu menerbitkan revisinya, lalu gerbang dokumen Fase 4 berjalan ulang atasnya. Brief `DONE` **tidak pernah** dibuka: ia sudah dieksekusi, dan sisa pekerjaannya adalah brief tambahan pada taskdir yang sama — bukan penulisan ulang riwayat. Brief `BLOCKED` juga tidak dibuka: `plan` menutupnya jadi `SUPERSEDED` lewat brief pengganti.
 
-   **Plafon dua re-entry per taskdir**, dihitung terpisah dari eskalasi chain Fase 5 dan amandemen akar Fase 4a. Permintaan ketiga → `## Failure path` butir 9.
+   **Plafon dua re-entry per taskdir**, dihitung terpisah dari eskalasi chain Fase 5 dan amandemen akar Fase 4a, dan dimateraikan `chain_counters.py` di `## Counters` `TASK.md` — bukan di ingatan sesi. Permintaan ketiga → `## Failure path` butir 9.
 
 1. Serahkan `taskdir`, `chain`, dan `risk` ke tiap skill hop tanpa kecuali; `system-analysis` menerima `risk` bernama `risk_level`, dan `plan` menerima `entry_mode`, `file_scope`, beserta `finding_source` menurut bagian 2.1 `references/chain-rules.md`. Dilarang membiarkan hop menyimpulkan `chain` dari keberadaan berkas.
 2. Tangkap laporan penutup skill hop **beserta blok `## <BRD|PRD|Brief> Review` reviewer-nya apa adanya**. Laporan menyatakan artefaknya tidak terbit, commit-nya gagal, verdict reviewer bukan `Approved`, atau blok review-nya tidak dilampirkan → `## Failure path` butir 3.
@@ -90,10 +91,10 @@ Dijalankan atas tiap `BRD.md` dan `PRD.md` sebelum hop berikutnya berangkat, men
 
 0. Predikat masuk: laporan hop menyatakan self-review lolos dan melampirkan blok review reviewer-nya. Verifikasi klaim itu lewat jejak yang penulis tidak dapat karang — `git log --oneline -1 -- {taskdir}/<artefak>` wajib menunjukkan commit draft berformat pesan penulisnya, karena penulis dilarang meng-commit sebelum verdict `Approved`. Salah satu tidak terpenuhi → fase ini tidak berangkat sama sekali; rutekan ke `## Failure path` butir 3. Artefak yang tertahan karena verdict gagal bukan draft yatim.
 1. Kunci draft yatim: periksa `git status --porcelain` atas artefak hop; belum terkunci → commit seketika memakai format pesan penulisnya, tanpa menunggu persetujuan siapa pun.
-2. Verifikasi `## Open questions` artefak: maksimal tiga entri dan tidak satu pun memblokir menurut predikat rumah kanoniknya. Ada yang memblokir → kembalikan poin revisinya ke skill hop, pertahankan `DRAFT`, ulangi Fase 3 pada hop yang sama. Plafon dua pengembalian per hop; pengembalian ketiga → `## Failure path` butir 7.
+2. Verifikasi `## Open questions` artefak: maksimal tiga entri dan tidak satu pun memblokir menurut predikat rumah kanoniknya. Ada yang memblokir → jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/analyst/scripts/chain_counters.py --taskdir <taskdir> --bump oq_return:<HOP>` lebih dulu (`FAIL` → `## Failure path` butir 7), lalu kembalikan poin revisinya ke skill hop, pertahankan `DRAFT`, ulangi Fase 3 pada hop yang sama. Plafon dua pengembalian per hop.
 3. Sajikan ringkasan eksekutif artefak — termasuk enumerasi tiap `BR-DISANGGAH: BR-{n}` PRD dan tiap asumsi aktif `sementara dipakai:` — lalu mintakan persetujuan eksplisit user lewat `AskUserQuestion`.
 4. User menyetujui → tulis `status: APPROVED` di frontmatter, commit approval seketika dengan staging path eksplisit, lalu centang hop itu di ledger `## Chain` beserta sha commit tersebut dan commit pembaruan `TASK.md`-nya. Urutan itu tidak dapat dipadatkan jadi satu commit: baris centang memuat sha yang belum ada saat berkasnya di-stage (`references/chain-rules.md` bagian 4 butir 5). Lanjut ke hop berikutnya.
-5. User menolak → pertahankan `DRAFT`, teruskan poin revisi ke skill hop, ulangi Fase 3 pada hop yang sama. Dilarang mengubah commit draft yang sudah mendarat.
+5. User menolak → jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/analyst/scripts/chain_counters.py --taskdir <taskdir> --bump reject:<HOP>` lebih dulu (`FAIL` → `## Failure path` butir 4), lalu pertahankan `DRAFT`, teruskan poin revisi ke skill hop, ulangi Fase 3 pada hop yang sama. Dilarang mengubah commit draft yang sudah mendarat.
 
 ### Fase 4a — Kanal Amandemen Akar
 
@@ -103,14 +104,14 @@ Dijalankan saat laporan hop mana pun melaporkan aturan atau kontrak yang menyent
 2. Sajikan butir akar yang tersentuh beserta aturan atau kontrak penyentuhnya lewat `AskUserQuestion`, dengan dua konsekuensi eksplisit: akar diamandemen, atau butir hilir dibuang.
 3. User membuang butir hilir → teruskan keputusannya apa adanya ke skill hop, ulangi Fase 3 pada hop yang sama, catat butirnya di slot `Keputusan Lingkup`.
 4. User memilih amandemen → hentikan rantai, serahkan rumusan amandemennya ke gerbang. Dilarang menulis ulang `## Success Criteria` maupun `## Out of Scope` sendiri; mutasi `TASK.md` milik skill ini terbatas pada pencentangan ledger dan transisi eskalasi.
-5. Plafon dua amandemen per taskdir; permintaan ketiga → `## Failure path` butir 8.
+5. Plafon dua amandemen per taskdir: sebelum butir 2, jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/analyst/scripts/chain_counters.py --taskdir <taskdir> --bump root_amendment`; `FAIL` → `## Failure path` butir 8.
 
 ### Fase 5 — Evaluasi Eskalasi Chain
 
 1. Sandingkan laporan hop dengan empat pemicu bagian 3 `references/chain-rules.md`. Nol pemicu aktif → kembali ke Fase 3.
 2. Pemicu aktif → jalankan prosedur transisi enam langkah bagian itu apa adanya: verifikasi pasangan `(risk, chain)` hasil transisi terhadap tabel bagian 1.4 lebih dulu, tulis ulang frontmatter dan ledger `## Chain`, tulis ulang klausa `— verifikasi:` tiap `SC-{n}` agar cocok lane baru tanpa mengubah prosa hasilnya, jalankan ulang butir 2–4 **dan butir 8a** self-test akar, lalu commit dengan staging path eksplisit.
 3. Kembali ke Fase 3 pada hop baru yang belum tercentang; hop yang sudah tercentang beserta artefaknya dipertahankan apa adanya.
-4. Plafon dua transisi `chain` per taskdir; kenaikan `risk` tanpa transisi chain (pemicu 4) tidak dihitung. Transisi ketiga → `## Failure path` butir 5.
+4. Plafon dua transisi `chain` per taskdir: sebelum butir 2 menulis ulang ledger, jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/analyst/scripts/chain_counters.py --taskdir <taskdir> --bump chain_transition`; `FAIL` → `## Failure path` butir 5. Kenaikan `risk` tanpa transisi chain (pemicu 4) tidak dihitung.
 
 ### Fase 6 — Gerbang `READY_FOR_IMPLEMENTATION` & Serah Terima
 

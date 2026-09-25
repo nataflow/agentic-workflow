@@ -1,6 +1,6 @@
 # TASK Template & Self-test Akar — `task`
 
-Dipakai di Fase 5 (`SKILL.md`) sebagai isi berkas `backenddev/docs/<YYMMDDhhmm>-<slug>/TASK.md`. Ikuti bagian 1 persis — satu H1 dan empat heading, tidak lebih: begitu dokumen menuntut sub-heading di luar keempatnya, isinya milik `business-analysis`, `system-analysis`, atau `plan`. Bagian 2 tidak ikut tersalin ke artefak.
+Dipakai di Fase 5 (`SKILL.md`) sebagai isi berkas `backenddev/docs/<YYMMDDhhmm>-<slug>/TASK.md`. Ikuti bagian 1 persis — satu H1 dan empat heading (ditambah `## Counters` penutup milik skrip), tidak lebih: begitu dokumen menuntut sub-heading di luar keempatnya, isinya milik `business-analysis`, `system-analysis`, atau `plan`. Bagian 2 tidak ikut tersalin ke artefak.
 
 ______________________________________________________________________
 
@@ -41,7 +41,14 @@ created: <YYYY-MM-DD>
 ## Out of Scope
 
 - <yang tidak dikerjakan> — <alasan: batas modul | opsi yang ditolak | eskalasi ditunda>
+
+## Counters
+
+| Kunci | Nilai | Plafon |
+|---|---|---|
 ````
+
+`## Counters` ditulis `task` berisi header tabel saja dan hanya diisi `analyst/scripts/chain_counters.py` (plafon loop re-entry, transisi chain, amandemen akar, penolakan user, pengembalian Open questions, ronde reviewer BRD/PRD); dilarang disunting tangan. Lane non-planning ikut memuatnya.
 
 ______________________________________________________________________
 
@@ -49,7 +56,7 @@ ______________________________________________________________________
 
 Dijalankan `task` atas `TASK.md` yang baru ditulis, sebelum commit Fase 5 berangkat. Butir 2–4 dan 8a dipanggil ulang `backenddev:analyst` sesudah transisi eskalasi chain (`analyst/references/chain-rules.md` bagian 3 langkah 4); sisanya milik `task` sendiri. Ini penyaring mekanis, bukan penilaian: tiap butir dijawab dengan `Grep` atau `Read` bertarget, dan satu butir gagal berarti `TASK.md` diperbaiki seketika lalu rangkaian diulang dari butir 1. `TASK.md` adalah akar rantai — cacat di sini menular ke BRD, PRD, dan tiap brief tanpa satu pun gerbang hilir yang memeriksanya kembali.
 
-1. **Struktur & frontmatter**: frontmatter memuat `status: ACTIVE`, `lane` bernilai salah satu dari 4 enum, `risk` bernilai salah satu dari 4 enum, dan `created` berformat `YYYY-MM-DD`. Body memuat tepat satu H1 dan tepat empat heading `## Chain`, `## Description`, `## Success Criteria`, `## Out of Scope` dengan nama dan urutan persis bagian 1 — tiga heading tanpa `## Chain` pada lane non-planning. Heading yang hilang, tertukar, atau bertambah adalah kegagalan.
+1. **Struktur & frontmatter**: frontmatter memuat `status: ACTIVE`, `lane` bernilai salah satu dari 4 enum, `risk` bernilai salah satu dari 4 enum, dan `created` berformat `YYYY-MM-DD`. Body memuat tepat satu H1 dan tepat empat heading `## Chain`, `## Description`, `## Success Criteria`, `## Out of Scope` dengan nama dan urutan persis bagian 1 — tiga heading tanpa `## Chain` pada lane non-planning — boleh diikuti `## Counters` penutup milik skrip, yang dikecualikan dari hitungan ini dan dari butir 7. Heading lain yang hilang, tertukar, atau bertambah adalah kegagalan.
 2. **Penomoran `SC-{n}`**: baris `- [ ] **SC-{n}**:` berurut mulai `SC-1` tanpa lompatan dan tanpa nomor ganda, berjumlah 1–7 butir. Butir tanpa ID atau bernomor ganda adalah kegagalan: seluruh hilir merujuk nomor ini.
 
    > Lantai satu butir, bukan tiga. Cakupanlah yang menentukan jumlahnya, dan butir 9 di bawah yang menggerbanginya — lantai yang lebih tinggi daripada permukaan yang benar-benar diminta memaksa penambalan yang justru gugur di butir itu. Perbaikan satu temuan, satu bugfix lokal, dan satu rename bermuara di satu butir; itu bentuk normalnya, bukan akar yang kurang lengkap.

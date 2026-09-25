@@ -80,7 +80,7 @@ Fase ini berdiri **sesudah** PRD ditulis, bukan sebelumnya. Ditempatkan sebelum 
 ### Fase 8 — Self-Review, Commit Draft & Serah Terima
 
 1. **Self-test mekanis**: loloskan tiga belas butir `## Self-test pra-reviewer` `templates/prd-template.md` sebelum butir 2 berangkat; satu gagal → perbaiki PRD, ulangi dari butir 1.
-2. **Self-review**: muat `dispatcher/reviewer.md`, hidrasi slot `taskdir`, `chain`, dan `ronde`, panggil `prd-reviewer`. Perbaiki isu `## PRD Review`; pertahankan `DRAFT` tanpa commit selama isu kritis terbuka. Gagal: `## Failure path` butir 2.
+2. **Self-review**: sebelum tiap ronde, jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/analyst/scripts/chain_counters.py --taskdir <taskdir> --bump review_round:PRD`; `FAIL` → plafon ronde habis, jalankan `## Failure path` butir 2. Lalu muat `dispatcher/reviewer.md`, hidrasi slot `taskdir`, `chain`, dan `ronde` (nilai dari keluaran `--bump`), panggil `prd-reviewer`. Perbaiki isu `## PRD Review`; pertahankan `DRAFT` tanpa commit selama isu kritis terbuka. Gagal: `## Failure path` butir 2.
 3. **Commit draft**, bukan approval. `Approved`: `git add {taskdir}/PRD.md` lalu `git commit -m "docs(spec): draft PRD <slug>"`. Selain itu lewati commit dan laporkan PRD belum terkunci di git. Exit code bukan nol: butir 3.
 4. Sajikan `## Output [REQUIRED]` **beserta blok `## PRD Review` reviewer apa adanya**, lalu kembalikan rute ke `backenddev:analyst`. Dilarang meminta persetujuan user: approval dan penulisan `status: APPROVED` adalah wewenang tunggal `analyst` di gerbang dokumennya.
 

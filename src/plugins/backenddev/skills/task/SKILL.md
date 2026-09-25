@@ -82,7 +82,7 @@ Tulis minimal satu butir berformat `- <yang tidak dikerjakan> — <alasan>` dari
 
 ## Guardrails
 
-- **AKAR, BUKAN ANALISIS**: dilarang menulis aktor, business rule, kontrak API, skema DTO, atau pemecahan unit kerja. Batas mekanisnya — begitu dokumen butuh sub-heading di luar empat yang ditetapkan, isinya milik `business-analysis`, `system-analysis`, atau `plan`.
+- **AKAR, BUKAN ANALISIS**: dilarang menulis aktor, business rule, kontrak API, skema DTO, atau pemecahan unit kerja. Batas mekanisnya — begitu dokumen butuh sub-heading di luar empat yang ditetapkan (tabel `## Counters` penutup milik `analyst/scripts/chain_counters.py` bukan isi dokumen), isinya milik `business-analysis`, `system-analysis`, atau `plan`.
 - **TASK.md EKSISTING TAK TERSENTUH**: amandemen `## Success Criteria`/`## Out of Scope`, pembaruan `risk` saat eskalasi dinamis, dan backfill taskdir lama adalah wewenang gerbang; skill ini hanya menulis berkas yang belum ada. Permintaan amandemen dari skill hop tidak pernah sampai ke gerbang langsung — ia mengalir lewat kanal `backenddev:analyst` Fase 4a supaya keputusan lingkupnya diputuskan user satu kali (`analyst/references/chain-rules.md` bagian 5). Pencentangan ledger `## Chain` dan penulisan ulangnya saat eskalasi chain adalah wewenang `backenddev:analyst`, bukan skill ini.
 - **NOL SENTUHAN KODE**: dilarang membaca-tulis di bawah `source_root`, menjalankan build atau test, dan membuat berkas di luar `{taskdir}/TASK.md`.
 - **GIT TERBATAS**: dilarang `git push`, `git merge`, `git rebase`, `gh pr create`, dan staging wildcard (`git add .` atau `git add -A`).
