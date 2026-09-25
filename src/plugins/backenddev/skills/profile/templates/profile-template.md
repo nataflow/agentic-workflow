@@ -39,6 +39,7 @@ Metadata konfigurasi dan identitas repositori dalam format JSON valid:
   "root_namespace": "<package/module/namespace dasar aplikasi>",
   "source_root": "<path/relatif/ke/source-root>",
   "commit_convention": "<pola pesan commit repo ini, mis. 'conventional: <type>(<scope>): <subject>'>",
+  "commit_template": "<template berslot {type} {scope} {subject} {ticket}, mis. '{type}({scope}): {subject}'; kosong bila pola tak terbaca>",
   "base_branch": "<branch titik cabang pekerjaan sekaligus titik banding review, mis. main atau dev>",
   "branch_convention": "<pola nama branch memuat placeholder <slug>, mis. feat/<slug>>"
 }
@@ -168,6 +169,7 @@ migration-status: <command read-only> [OK|FAIL|TIMEOUT|DILEWATI (tanpa izin)|tid
   "root_namespace": "github.com/acme/orders-api",
   "source_root": "internal",
   "commit_convention": "conventional: <type>(<scope>): <subject> — subject bahasa Inggris huruf kecil",
+  "commit_template": "{type}({scope}): {subject}",
   "base_branch": "main",
   "branch_convention": "feat/<slug>"
 }

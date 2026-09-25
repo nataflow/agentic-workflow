@@ -19,6 +19,7 @@ source: <path artefak asal + tanggal, atau kutipan permintaan user>
 risk: BREAKING | MAJOR | MINOR
 status: READY
 commit_message: "feat(order): implement order lock service"
+commit_scope: order
 ---
 
 # Brief: <title> — <yyyy-mm-dd>
@@ -103,7 +104,7 @@ ______________________________________________________________________
 
 ## 2. Authoring & Validation Rules
 
-1. **Pesan Commit (`commit_message`)**: Ditulis `backenddev:plan` dari `commit_convention` profil, berbentuk `<type>(<domain>): implement <unit>`. Eksekutor memakainya apa adanya; varian gagal diturunkan darinya menjadi `wip(<domain>): brief-<NN>-<unit> [BLOCKED]`.
+1. **Pesan Commit (`commit_message`, `commit_scope`)**: diturunkan dari `commit_template` profil lewat `scripts/scaffold_brief.py` (`skills/_common/commit_lib.py`; template absen → `<type>(<scope>): implement <unit>`), dan dicocokkan Check S dengan regex dari template yang sama. `type` default `fix` pada lane `DEFECT_RCA` atau akar ber-`finding_source`, selain itu `feat`. `commit_scope` menyimpan `<scope>` apa adanya, juga saat template tanpa `{scope}`. Eksekutor memakai `commit_message` apa adanya; varian gagal menjadi `wip(<commit_scope>): brief-<NN>-<unit> [BLOCKED]`.
 
 2. **Status Siklus Hidup Brief (Frontmatter)** — empat nilai, tiap transisi punya satu penulis:
 

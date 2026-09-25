@@ -127,12 +127,13 @@ Pindai domain yang diproses lebih dari satu jalur runtime: HTTP, consumer antrea
 
 ---
 
-## 10. Commit Message Convention → `index.json` (`commit_convention`)
+## 10. Commit Message Convention → `index.json` (`commit_convention`, `commit_template`)
 
 Pindai `git log -n 20 --oneline`.
 
 - Ambil pola subjek: prefix Conventional Commits (`feat(order): ...`), prefix tiket (`OMS-123: ...`), kapitalisasi, dan bahasa.
-- Tulis ringkasan pola satu baris sebagai acuan architect.
+- Tulis ringkasan pola satu baris ke `commit_convention` sebagai acuan manusia dan subagent (reviewer, report).
+- Terjemahkan pola dominan ke `commit_template` berslot `{type}`, `{scope}`, `{subject}`, `{ticket}` — `{subject}` wajib, slot lain dilarang. Conventional Commits → `"{type}({scope}): {subject}"`; prefix tiket tanpa type → `"{ticket}: {subject}"`. `backenddev:plan` merender `commit_message` brief darinya (`skills/_common/commit_lib.py`). Pola tak terbaca atau repo non-git → tulis `""`; plan jatuh ke Conventional Commits.
 
 ---
 

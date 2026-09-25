@@ -62,6 +62,7 @@ from precondition_lib import (  # noqa: E402
     find_repo_root,
     frontmatter_field,
     is_under,
+    load_profile_index,
     parse_enum,
     read_text,
     resolve_profile_dir,
@@ -69,6 +70,7 @@ from precondition_lib import (  # noqa: E402
     split_frontmatter,
 )
 from brief_status import LOCKED as LOCKED_STATUSES  # noqa: E402
+from commit_lib import commit_template, pattern as commit_pattern  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Konstanta kanonik
@@ -844,10 +846,11 @@ class BriefValidator:
                 )
 
             commit = fm.get("commit_message") or ""
-            if commit and not re.match(r"^[a-z]+\([a-z0-9_.-]+\):\s*implement\s+\S", commit):
+            tpl = commit_template(load_profile_index(self.root, required=()).data)
+            if commit and not commit_pattern(tpl).match(commit):
                 problems.append(
-                    f"{b['name']}: `commit_message` \"{commit}\" tidak berbentuk "
-                    f"`<type>(<domain>): implement <unit>`"
+                    f"{b['name']}: `commit_message` \"{commit}\" tidak cocok `commit_template` profil "
+                    f"`{tpl}` (subjek `implement <unit>`)"
                 )
 
             if b["nn"] is None:

@@ -22,7 +22,7 @@ Kamu adalah eksekutor satu brief implementasi backend (`brief-{NN}-{unit}.md`) b
 - **Nol dialog & terminal**: dilarang meminta konfirmasi atau input interaktif, menjalankan build/test, dan menyalin output terminal.
 - **Rationalization prevention**: dilarang melanggar jebakan `## Layer taxonomy`, meniru pola terlarang beralasan "berkas sebelah juga begitu", menelan exception tanpa re-throw atau logging, dan memalsukan `DONE` atas kerja yang terhenti.
 - **Jalur gagal**: cacat statis tak selesai di dalam scope → catat simbol yang tidak resolve, jangan tandai `FIXED`. Brief tidak cocok disk → laporkan berkas `modify` yang tidak ada. Nomor migrasi bentrok → ambil nomor berikutnya. Merembet ke luar scope → blocker revisi brief; dilarang memperluas cakupan sendiri.
-- **Penutupan kegagalan**: tulis `{taskdir}/report-{NN}.md`, set frontmatter brief `status: BLOCKED`, lalu commit penanda `wip(<domain>): brief-{NN}-{unit} [BLOCKED]` menstage berkas tersentuh + brief + report; `<domain>` dari kurung `commit_message`.
+- **Penutupan kegagalan**: tulis `{taskdir}/report-{NN}.md`, set frontmatter brief `status: BLOCKED`, lalu commit penanda `wip(<domain>): brief-{NN}-{unit} [BLOCKED]` menstage berkas tersentuh + brief + report; `<domain>` = nilai frontmatter `commit_scope` brief (brief lama tanpa field itu: isi kurung `commit_message`).
 
 ## Format Output
 

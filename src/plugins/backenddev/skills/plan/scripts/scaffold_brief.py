@@ -51,8 +51,9 @@ from brief_status import (  # noqa: E402
     HALT_FILE, LOCKED, SUPERSEDABLE, halted_nn, read_frontmatter, scan_briefs, set_frontmatter,
 )
 from precondition_lib import (  # noqa: E402
-    VALID_RISKS, find_repo_root, frontmatter_field, parse_enum, read_text, resolve_taskdir,
+    VALID_RISKS, find_repo_root, frontmatter_field, load_profile_index, parse_enum, read_text, resolve_taskdir,
 )
+from commit_lib import COMMIT_TYPES, commit_template, default_commit_type, render  # noqa: E402
 
 RISK_ORDER = {"MINOR": 1, "MAJOR": 2, "BREAKING": 3}
 
@@ -136,6 +137,11 @@ class MatrixTool:
         self.taskdir = resolve_taskdir(self.root, taskdir)
         self.task_text = _read(self.taskdir / "TASK.md")
         self.prd_text = _read(self.taskdir / "PRD.md")
+        self.commit_template = commit_template(load_profile_index(self.root, required=()).data)
+
+    def default_commit_type(self, finding_source: Optional[str]) -> str:
+        lane = frontmatter_field(self.taskdir / "TASK.md", "lane") if self.task_text else None
+        return default_commit_type(lane, finding_source)
 
     # -- sumbu hulu --------------------------------------------------------
 
@@ -302,6 +308,13 @@ class MatrixTool:
             unit = str(b.get("unit") or "")
             if unit and not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", unit):
                 problems.append(f"brief {label}: `unit` \"{unit}\" bukan kebab-case")
+
+            ctype = str(b.get("commit_type") or "").strip()
+            if ctype and ctype not in COMMIT_TYPES:
+                problems.append(f"brief {label}: `commit_type` \"{ctype}\" di luar {', '.join(COMMIT_TYPES)}")
+            if "{ticket}" in self.commit_template and not str(b.get("ticket") or spec.get("ticket") or "").strip():
+                problems.append(f"brief {label}: `commit_template` profil memuat {{ticket}} — isi `ticket` "
+                                f"(mis. `OMS-412`) di baris ini atau di tingkat atas spec")
 
             risk = str(b.get("risk") or "").upper()
             if risk and risk not in VALID_RISKS:
@@ -535,8 +548,13 @@ class MatrixTool:
 
         covers = ", ".join(row.get("covers") or []) or row.get("covers_note") or "— (tidak memikul AC)"
         fulfills = ", ".join(row.get("fulfills") or []) or row.get("fulfills_note") or "— (akar absen)"
-        commit_type = row.get("commit_type") or "feat"
-        domain = row.get("domain") or unit.split("-")[0]
+        ctype = row.get("commit_type") or self.default_commit_type(matrix.get("finding_source"))
+        scope = row.get("domain") or unit.split("-")[0]
+        try:
+            commit_message = render(self.commit_template, ctype=ctype, scope=scope, unit=unit,
+                                    ticket=row.get("ticket") or matrix.get("ticket"))
+        except ValueError as exc:
+            raise SystemExit(f"commit_message brief-{nn} tidak dapat dirender: {exc}")
 
         lines = [
             "---",
@@ -544,7 +562,8 @@ class MatrixTool:
             f"source: {row.get('source') or matrix.get('source') or 'TASK.md'}",
             f"risk: {str(row['risk']).upper()}",
             "status: READY",
-            f'commit_message: "{commit_type}({domain}): implement {unit}"',
+            f'commit_message: "{commit_message}"',
+            f"commit_scope: {scope}",
             *([f"supersedes: {', '.join(f'brief-{s}' for s in sup)}"] if sup else []),
             *([f"repairs: brief-{_repairs(row)}"] if _repairs(row) else []),
             *([f"finding_source: {matrix['finding_source']}"] if matrix.get("finding_source") else []),

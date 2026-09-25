@@ -85,7 +85,7 @@ Uji perintah hasil Fase 2 titik 7 sebelum ditulis ke `commands.md`:
 
 Satu-satunya berkas di luar `.claude/profile/backenddev/` yang boleh disentuh adalah `.gitignore`:
 
-1. `git rev-parse --git-dir`. Bila gagal, catat status non-git dan tulis `commit_convention`, `base_branch`, serta `branch_convention` sebagai `tidak terdeteksi`.
+1. `git rev-parse --git-dir`. Bila gagal, catat status non-git dan tulis `commit_convention`, `base_branch`, serta `branch_convention` sebagai `tidak terdeteksi` dan `commit_template` sebagai `""`.
 2. `git check-ignore -q backenddev`. Bila exit code 0, peringatkan bahwa artefak `backenddev/` berstatus lokal dan tidak di-track git.
 3. `git check-ignore -q .backenddev`. Bila exit code bukan 0, tambahkan baris `.backenddev/` di akhir `.gitignore` akar repo (buat berkas bila belum ada); lewati bila exit code 0.
 4. `git check-ignore -q backenddev/docs/x/.explore/y`. Bila exit code bukan 0, tambahkan baris `.explore/` di akhir `.gitignore` akar repo; lewati bila exit code 0.
@@ -100,7 +100,7 @@ Tulis `<repo>/.claude/profile/backenddev/` persis mengikuti skema, format, dan b
 
 | Berkas | Isi |
 |---|---|
-| `index.json` | `project`, `stack`, `architecture`, `root_namespace`, `source_root`, `commit_convention`, `base_branch`, `branch_convention` |
+| `index.json` | `project`, `stack`, `architecture`, `root_namespace`, `source_root`, `commit_convention`, `commit_template`, `base_branch`, `branch_convention` |
 | `stack.md` | framework, bahasa/runtime, package manager & lockfile, database & migration tool, messaging, cache, websocket, codegen |
 | `module-structure.md` | pola pengelompokan modul, arsitektur layer + bukti, anatomi layer per taksonomi adapter, tipe batas, shared modules |
 | `domain-map.md` | modul bisnis: path · permukaan aktif · entry `<file>#<simbol>` |
