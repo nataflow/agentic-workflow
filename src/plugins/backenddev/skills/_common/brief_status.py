@@ -162,6 +162,21 @@ def landed_sha(root: Path, brief_rel: str, commit_message: str) -> str:
     return ""
 
 
+FIXED_MARKER = re.compile(r"^> Status: FIXED\b")
+
+
+def finding_diff_ok(root: Path, sha: str, path: str) -> bool:
+    """Diff `path` di commit `sha` hanya menambah baris `> Status: FIXED …`.
+
+    Berkas `finding_source` sah ikut commit implementor hanya dalam bentuk ini;
+    perubahan lain atas berkas temuan tetap pelanggaran scope.
+    """
+    diff = git(root, "show", sha, "-U0", "--format=", "--", path)
+    changed = [l for l in diff.splitlines()
+               if l[:1] in "+-" and not l.startswith(("+++", "---"))]
+    return bool(changed) and all(l.startswith("+") and FIXED_MARKER.match(l[1:]) for l in changed)
+
+
 # -- penanda henti ----------------------------------------------------------------------------
 
 

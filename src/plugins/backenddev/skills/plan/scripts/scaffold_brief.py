@@ -236,6 +236,7 @@ class MatrixTool:
         problems += self._check_supersedes(incoming)
 
         merged = dict(existing)
+        merged.update({k: v for k, v in spec.items() if k != "briefs"})   # finding_source, date, …
         merged["briefs"] = kept + [b for b in incoming if str(b.get("nn") or "") not in kept_nn]
         return merged, kept_nn, problems
 
@@ -558,6 +559,7 @@ class MatrixTool:
             f'commit_message: "{commit_type}({domain}): implement {unit}"',
             *([f"supersedes: {', '.join(f'brief-{s}' for s in sup)}"] if sup else []),
             *([f"repairs: brief-{_repairs(row)}"] if _repairs(row) else []),
+            *([f"finding_source: {matrix['finding_source']}"] if matrix.get("finding_source") else []),
             "---",
             "",
             f"# Brief: {row['title']} — {matrix.get('date', '<yyyy-mm-dd>')}",

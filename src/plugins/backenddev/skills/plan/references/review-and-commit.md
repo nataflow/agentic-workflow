@@ -123,7 +123,7 @@ matriks alokasi terkunci → tiap brief lolos gerbang per-brief Fase 3
    `<N>` diisi jumlah brief yang benar-benar terbit pada batch ini (brief `SUPERSEDED` tidak dihitung); `<slug>` diambil dari nama direktori taskdir tanpa awalan timestamp.
 3. **Eksekusi seketika saat `Approved`**, tanpa menunggu persetujuan user, gerbang, maupun main loop — self-review satu-satunya prasyarat commit. Sebaliknya, tahan commit tanpa pengecualian bila status belum `Approved`.
 4. **Dilarang staging wildcard.** `git add .` dan `git add -A` berisiko menarik berkas scratch, log, atau pekerjaan user yang belum di-commit.
-5. **Batas kewenangan.** Commit ini satu-satunya mutasi git milik `plan` dan hanya memuat `brief-*.md` pada taskdir aktif — brief baru, brief yang baru ditandai `SUPERSEDED`, dan penghapusan `HALT.md` yang dicabut baris `repairs`; berkas lain milik skill penulisnya. `git push`, `git merge`, `git rebase`, `git branch`, dan `git checkout` terlarang tanpa kecuali.
+5. **Batas kewenangan.** Commit ini satu-satunya mutasi git milik `plan` dan hanya memuat `brief-*.md` pada taskdir aktif — brief baru, brief yang baru ditandai `SUPERSEDED`, penghapusan `HALT.md` yang dicabut baris `repairs`, dan berkas `finding_source` di bawah `backenddev/issues/` bila Fase 2 menambahkan penanda `OBSOLETE`/`DROPPED` (staging path eksplisit); berkas lain milik skill penulisnya. `git push`, `git merge`, `git rebase`, `git branch`, dan `git checkout` terlarang tanpa kecuali.
 
 ### Kegagalan Commit & Mitigasi Mandiri
 
