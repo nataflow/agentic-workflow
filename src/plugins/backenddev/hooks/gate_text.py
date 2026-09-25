@@ -7,7 +7,8 @@ sebelum skill backenddev lain, sebelum menelusuri repo, sebelum menulis kode. Ge
 explore kodenya lalu bertanya; rute diputuskan sesudah itu, bukan sebelum.
 
 WAJIB lewat gerbang:
-- permintaan kerja apa pun: memahami, mengubah, menambah, memperbaiki, mengaudit, mendokumentasikan
+- permintaan kerja: mengubah, menambah, memperbaiki, mengaudit, mendokumentasikan
+- pertanyaan memahami kode — lewat jalur cepat read-only; tidak menuntut tree bersih atau branch
 - susulan di tengah sesi, sekecil apa pun — "sekalian ganti X", "oh iya Y juga"
 - menjalankan artefak backenddev yang sudah ada (brief, `TASK.md`, `RCA.md`) — apa pun statusnya
 
@@ -34,8 +35,10 @@ def _profile_note(v) -> str:
                 f"`backenddev:profile` mode MIGRATE (pindah ke `{PROFILE_DIR}`) sebelum rute lain; "
                 "dilarang REFRESH atau GENERATE di atasnya.")
     if p.state in ("ABSENT", "OTHER_OWNER"):
-        note = (f"Profil `{PROFILE_DIR}` BELUM ADA. Permintaan kerja tetap lewat `backenddev:tech-lead`; "
-                "gerbang merutekan `backenddev:profile` (GENERATE) lebih dulu, lalu melanjutkan rute tertunda.")
+        note = (f"Profil `{PROFILE_DIR}` BELUM ADA. Permintaan kerja tetap lewat `backenddev:tech-lead`: "
+                "pertanyaan baca-kode dijawab lewat jalur cepat read-only gerbang (terdegradasi, tanpa profil); "
+                "rute yang mengubah kode dirutekan ke `backenddev:profile` (GENERATE) lebih dulu, lalu "
+                "melanjutkan rute tertunda. Tawarkan `backenddev:profile` di giliran ini juga.")
         if p.state == "OTHER_OWNER":
             note += (f" `.claude/profile/` berisi profil milik `{p.owner}` (stack `{p.stack}`) — "
                      "biarkan; jangan dibaca sebagai profil backenddev, jangan ditimpa.")

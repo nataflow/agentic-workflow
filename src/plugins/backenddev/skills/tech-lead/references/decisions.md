@@ -141,3 +141,40 @@ Branch kerja **selalu** bercabang dari `base_branch` profile; dilarang mencabang
 
 ______________________________________________________________________
 
+## 6. Keputusan 1 — Tabel Lane, Presedensi, dan Batas Lane `PLANNING`
+
+Pilih satu dari tujuh jalur kanonik berdasar fakta kode terverifikasi:
+
+| Jalur (Lane) | Kondisi Masuk | Rute Awal | Artefak |
+|---|---|---|---|
+| **PROFILE** | Profil tidak ada, 1 field/dokumen wajibnya hilang, `index.json` tidak sah, atau profil masih di lokasi lama `.claude/profile/` (MIGRATE) | `profile` | `.claude/profile/backenddev/` |
+| **EXPLORE_FACT** | Pertanyaan faktual letak simbol/alur, tanpa mutasi | Selesai di Fase 1 | Jawaban di chat |
+| **PLANNING** | Permintaan mengubah perilaku sistem dan brief `READY`-nya belum terbit | `analyst` | `TASK.md` → `BRD.md`/`PRD.md` → `brief-<NN>-<unit>.md` |
+| **DEFECT_RCA** | Ada error/stacktrace/test merah, penyebab belum terbukti | `debug` | `RCA.md` |
+| **EXEC_BRIEF** | Eksekusi brief `READY` di taskdir eksisting | `architect` | `REVIEW.md` |
+| **AUDIT_SWEEP** | Audit kode terhadap 6 dimensi tanpa brief | `audit` | `backenddev/issues/<file>.md` |
+| **API_DOCS** | Dokumentasi API diminta, endpoint sudah ada di kode | `document-api` | `docs/api/<slug>.md` |
+
+**Presedensi Lane**: Pilih prioritas menurun jika lebih dari satu kondisi masuk terpenuhi: `PROFILE` → `EXEC_BRIEF` → `AUDIT_SWEEP` → `DEFECT_RCA` → `PLANNING` → `API_DOCS` → `EXPLORE_FACT`. Sebutkan lane yang dikalahkan beserta alasannya di slot `Justifikasi Rute`.
+
+Lane `PLANNING` menampung seluruh kerja perancangan tanpa memilah artefaknya di sini: panjang rantai (`TASK` saja, plus `PRD`, atau plus `BRD`) adalah keputusan `backenddev:analyst` di Fase 1-nya, diturunkan dari `risk` Keputusan 2 dan kepastian kontrak yang terbukti di bukti Fase 1 gerbang. Dilarang menetapkan chain di gerbang atau memanggil `business-analysis`, `system-analysis`, `task`, maupun `plan` secara langsung pada lane ini. Gerbang memanggil `task` sendiri hanya pada lane `DEFECT_RCA` dan backfill `EXEC_BRIEF` (`SKILL.md` Fase 3 butir 1).
+
+Perbaikan temuan terpilih dari `backenddev/issues/` dan `{taskdir}/REVIEW.md` masuk lewat lane ini juga, bukan lewat rute tersendiri: gerbang menyerahkan temuannya sebagai `request` beserta `evidence`, dan `finding_source` menandai berkas asalnya.
+
+Dilarang mengarang lane baru; turun ke `EXPLORE_FACT` untuk kumpulkan bukti lalu evaluasi ulang tabel.
+
+## 7. Keputusan 2 — Level Risiko, `strict_mode`, dan Batas Wewenang
+
+Klasifikasikan permintaan yang mengubah kode (lane `PROFILE` dan `EXPLORE_FACT` tanpa risk level; katalog di bagian 3):
+
+| Level | Pemicu ringkas |
+|---|---|
+| **`BREAKING`** | Kontrak eksternal berubah: endpoint/DTO eksisting, field wajib baru, transisi status terekspos, event ber-consumer, migrasi destruktif, auth |
+| **`MAJOR`** | Validasi bisnis, batas transaksi, query kompleks, field opsional baru |
+| **`MINOR`** | Rename lokal, refactor private, tambah test, log tracing, bugfix lokal |
+
+1. **Prinsip Eskalasi**: Pilih level lebih tinggi jika ragu di antara dua klasifikasi.
+2. **`strict_mode`**: Naikkan klasifikasi dasar 1 tingkat (`MINOR`→`MAJOR`, `MAJOR`→`BREAKING`, `BREAKING` tetap) jika bernilai `true`, jalankan rute Keputusan 1 dengan level hasilnya, dan laporkan kenaikan secara eksplisit.
+3. **Batas Wewenang**: Serahkan `risk` hasil klasifikasi ini ke `backenddev:analyst` sebagai parameter. Panjang rantai perancangan dan eskalasi dinamisnya (DTO atau kolom DB baru yang muncul di tengah pengerjaan) adalah wewenang `analyst`; gerbang tidak memutuskannya dan tidak mengamandemen `TASK.md` karenanya.
+4. **Satu rute langsung ke `plan`**: `plan` dipanggil gerbang hanya pada satu jalur di luar lane `PLANNING` — `RCA.md` bervonis `ROOT_CAUSE_CONFIRMED` dari `debug`. Slot `First Action` blok Output `SKILL.md` **wajib menyebut `entry_mode: RCA` eksplisit**; parameter itu tidak punya nilai bawaan dan tidak pernah disimpulkan `plan` dari artefak yang ada di taskdir, sehingga gerbang yang lupa menyebutnya membuat `plan` berhenti di check 3 prasyaratnya. Taskdir wajib sudah berakar `TASK.md` sebelum `plan` berangkat, dan jalur ini memakainya sejak provisioning `DEFECT_RCA`.
+5. **Temuan bukan rute langsung**: temuan terpilih dari `backenddev/issues/` maupun `{taskdir}/REVIEW.md` dirutekan ke lane `PLANNING`, dan panjang rantainya diputuskan `backenddev:analyst` dari dua sumbu — bukan ditetapkan gerbang. Temuan yang menyentuh kontrak API, transisi status, aturan validasi, atau permission menerbitkan `PRD.md` lewat sumbu kontrak (`analyst/references/chain-rules.md` bagian 1.2 butir 1 dan 2; `risk: BREAKING` menuntutnya tanpa syarat lain), dan temuan yang membuka aturan bisnis belum disepakati menambah `BRD.md` lewat sumbu bisnis. Gerbang meneruskan `risk` hasil Keputusan 2 ini apa adanya dan berhenti di situ.

@@ -3,6 +3,11 @@
 
 Automates verification of repository preconditions before tech-lead gateway execution.
 Runs checks 1 through 6 in a single pass and produces a compact, actionable report.
+
+Mode `--read-only` (jalur baca-kode, Fase 0 tiap permintaan): tree kotor, HEAD
+detached, izin tulis, `commands.md`, dan profil yang belum ada tidak dinilai —
+ketiganya tidak relevan untuk "di mana X dipanggil?". Prasyarat penuh (tanpa
+flag) dijalankan Fase 3 butir 0 sebelum taskdir/branch diprovisi.
 Zero external dependencies (Python Standard Library only). Satu impor intra-plugin:
 `skills/_common/precondition_lib.py` untuk uji izin tulis, di-bootstrap relatif
 terhadap berkas ini.
@@ -49,10 +54,21 @@ RE_ENTRY_ALLOWED_PREFIXES += tuple(f"{LEGACY_PROFILE_DIR_REL}/{f}" for f in PROF
 
 
 class PreconditionChecker:
-    def __init__(self, target_root: Optional[Path] = None, re_entry: bool = False):
+    def __init__(self, target_root: Optional[Path] = None, re_entry: bool = False, read_only: bool = False):
         self.root = (target_root or self._find_repo_root()).resolve()
         self.re_entry = re_entry
+        self.read_only = read_only
         self.results: List[Dict[str, Any]] = []
+
+    def _soft(self, check_id: int, name: str, summary: str):
+        """PASS yang tidak dinilai di mode read-only; kondisinya tetap tertulis."""
+        self.results.append({
+            "id": check_id,
+            "name": name,
+            "status": "PASS",
+            "summary": f"{summary} (tidak dinilai: mode read-only)",
+            "action": "",
+        })
 
     def _find_repo_root(self) -> Path:
         """Find the git repository root or fallback to cwd."""
@@ -87,6 +103,9 @@ class PreconditionChecker:
         invariants_file = profile_dir / "invariants.md"
 
         if not index_file.exists():
+            if self.read_only:
+                return self._soft(check_id, name, "Profil absen — jawab dari sapuan manual (TERDEGRADASI), "
+                                                  "tawarkan `backenddev:profile`")
             self.results.append({
                 "id": check_id,
                 "name": name,
@@ -97,6 +116,9 @@ class PreconditionChecker:
             return
 
         owner = foreign_owner(profile_dir)
+        if owner and self.read_only:
+            return self._soft(check_id, name, f"Profil backenddev absen (`.claude/profile/` milik `{owner}`) — "
+                                              "jawab dari sapuan manual (TERDEGRADASI), tawarkan `backenddev:profile`")
         if owner:
             self.results.append({
                 "id": check_id,
@@ -189,14 +211,19 @@ class PreconditionChecker:
                 })
                 return
 
-            branch_out = subprocess.check_output(
+            # `symbolic-ref -q` keluar 1 pada HEAD detached; `check_output` akan
+            # melempar dan pesan "HEAD detached" tidak pernah tercapai.
+            ref = subprocess.run(
                 ["git", "symbolic-ref", "-q", "--short", "HEAD"],
                 cwd=self.root,
-                stderr=subprocess.DEVNULL,
-                universal_newlines=True
-            ).strip()
+                capture_output=True,
+                text=True,
+            )
+            branch_out = ref.stdout.strip() if ref.returncode == 0 else ""
 
             if not branch_out:
+                if self.read_only:
+                    return self._soft(check_id, name, "HEAD detached")
                 self.results.append({
                     "id": check_id,
                     "name": name,
@@ -263,6 +290,9 @@ class PreconditionChecker:
                 if ".explore" not in p.rstrip("/").split("/")
             ]
 
+            if dirty_paths and self.read_only:
+                return self._soft(check_id, name, f"{len(dirty_paths)} berkas uncommitted")
+
             if dirty_paths:
                 if self.re_entry:
                     outside = [p for p in dirty_paths if not p.startswith(RE_ENTRY_ALLOWED_PREFIXES)]
@@ -317,6 +347,8 @@ class PreconditionChecker:
     def _check_4_write_access(self):
         check_id = 4
         name = "Workspace Write Access"
+        if self.read_only:
+            return self._soft(check_id, name, "Izin tulis zona artefak")
         test_dirs = [self.root / "backenddev" / "docs", self.root / "backenddev" / "issues"]
         unwritable = []
 
@@ -349,6 +381,8 @@ class PreconditionChecker:
     def _check_5_commands(self):
         check_id = 5
         name = "Profile Commands"
+        if self.read_only:
+            return self._soft(check_id, name, "Perintah build/test commands.md")
         commands_file = resolve_profile_dir(self.root)[0] / "commands.md"
         if not commands_file.exists():
             self.results.append({
@@ -446,6 +480,7 @@ class PreconditionChecker:
         status_label = "PASS" if all_passed else "FAIL"
 
         mode_label = " · mode: re-entry" if self.re_entry else ""
+        mode_label += " · mode: read-only" if self.read_only else ""
         lines = [
             f"PRECONDITION CHECK: tech-lead [{status_label}] ({passed_count}/{total} passed){mode_label}",
         ]
@@ -468,6 +503,7 @@ class PreconditionChecker:
             "total_count": len(self.results),
             "root": str(self.root),
             "re_entry": self.re_entry,
+            "read_only": self.read_only,
             "profile_freshness": getattr(self, "profile_freshness", ("TAK_TERNILAI", "belum dinilai"))[0],
             "checks": self.results
         }, indent=2)
@@ -481,11 +517,16 @@ def main():
         action="store_true",
         help="Re-entry mode: berkas kotor di zona artefak gerbang tidak menggagalkan check 3"
     )
+    parser.add_argument(
+        "--read-only",
+        action="store_true",
+        help="Jalur baca-kode: tree kotor, detached HEAD, izin tulis, commands.md, dan profil absen tidak dinilai"
+    )
     parser.add_argument("--json", action="store_true", help="Output JSON format")
     args = parser.parse_args()
 
     target_root = Path(args.root) if args.root else None
-    checker = PreconditionChecker(target_root=target_root, re_entry=args.re_entry)
+    checker = PreconditionChecker(target_root=target_root, re_entry=args.re_entry, read_only=args.read_only)
     passed = checker.run_all()
 
     if args.json:
