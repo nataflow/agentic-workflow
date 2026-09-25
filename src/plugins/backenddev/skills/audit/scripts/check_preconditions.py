@@ -182,12 +182,15 @@ class PreconditionChecker:
 
         dim_ref = skill_dir / "references" / "dimensions.md"
         tpl_file = skill_dir / "templates" / "issues-template.md"
+        contract = skill_dir / "references" / "findings-contract.md"
 
         missing = []
         if not dim_ref.exists():
             missing.append("references/dimensions.md")
         if not tpl_file.exists():
             missing.append("templates/issues-template.md")
+        if not contract.exists():
+            missing.append("references/findings-contract.md")
 
         if missing:
             self.results.append({
@@ -203,7 +206,7 @@ class PreconditionChecker:
             "id": check_id,
             "name": name,
             "status": "PASS",
-            "summary": "Referensi dimensions.md dan issues-template.md tersedia",
+            "summary": "Referensi dimensions.md, findings-contract.md, dan issues-template.md tersedia",
             "action": "",
         })
 

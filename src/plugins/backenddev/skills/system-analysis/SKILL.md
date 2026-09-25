@@ -97,7 +97,7 @@ Fase ini berdiri **sesudah** PRD ditulis, bukan sebelumnya. Ditempatkan sebelum 
 
 ## Output [REQUIRED]
 
-Artefak `{taskdir}/PRD.md` (DRAFT) mengikuti `templates/prd-template.md`. Self-review PASS, Open Qs 0, dan draft ter-commit → tutup satu baris tanpa blok: `### SYSTEM ANALYSIS SUMMARY — PRD.md DRAFT @ <sha> · <n> endpoint terkunci · <n> langkah breakdown · Open Qs 0 · Self-review PASS`, ditambah baris `BR Disanggah` bila ada. Selain itu, sajikan:
+Artefak `{taskdir}/PRD.md` (DRAFT) mengikuti `templates/prd-template.md`. Verdict `Approved`, Open Qs 0, dan draft ter-commit → tutup satu baris tanpa blok: `### SYSTEM ANALYSIS SUMMARY — PRD.md DRAFT @ <sha> · <n> endpoint terkunci · <n> langkah breakdown · Open Qs 0 · Self-review Approved`, ditambah baris `BR Disanggah` bila ada. Selain itu, sajikan:
 
 ```markdown
 ### SYSTEM ANALYSIS SUMMARY — TERTAHAN

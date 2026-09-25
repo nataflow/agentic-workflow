@@ -198,13 +198,13 @@ ______________________________________________________________________
 
 ## 4. Review Severity Triage & Hand-off Matrix
 
-Hasil review branch penutup diklasifikasikan ke dalam 4 tingkatan tindakan:
+Hasil review branch penutup diklasifikasikan ke dalam 4 tingkatan tindakan. Definisi severity: `skills/audit/references/findings-contract.md` bagian 1 — tabel ini hanya memetakan tindakannya.
 
-| Severity    | Definisi Temuan                                             | Tindakan Architect                                     | Aksi Handoff Lanjutan                                  |
-| ----------- | ----------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------ |
-| **`P1`**    | Pelanggaran kontrak, file di luar scope, regresi fungsional | Laporkan di summary akhir; `REVIEW.md` sudah di-commit reviewer | Eskalasi ke `tech-lead`; ia merutekannya ke lane `PLANNING` **pada taskdir yang sama** dengan `finding_source` `{taskdir}/REVIEW.md` dan `reentry_reason` |
-| **`P2`**    | Pelanggaran invariant arsitektur, anti-pola stack         | Laporkan di summary akhir (baris indeks sudah ditulis dan di-commit `code-reviewer`) | Ditangani pada siklus perbaikan rilis berikutnya       |
-| **`P3`**    | Style konvensi lokal, redundansi minor                      | Laporkan di summary akhir (baris indeks sudah ditulis dan di-commit `code-reviewer`) | Non-blocking backlog                                   |
-| **`CLEAN`** | 0 pelanggaran terhadap union brief                          | Nyatakan review bersih penuh                           | Siap untuk user membuat PR / merge                     |
+| Severity    | Tindakan Architect                                     | Aksi Handoff Lanjutan                                  |
+| ----------- | ------------------------------------------------------ | ------------------------------------------------------ |
+| **`P1`**    | Laporkan di summary akhir; `REVIEW.md` sudah di-commit reviewer | Eskalasi ke `tech-lead`; ia merutekannya ke lane `PLANNING` **pada taskdir yang sama** dengan `finding_source` `{taskdir}/REVIEW.md` dan `reentry_reason` |
+| **`P2`**    | Laporkan di summary akhir (baris indeks sudah ditulis dan di-commit `code-reviewer`) | Ditangani pada siklus perbaikan rilis berikutnya       |
+| **`P3`**    | Laporkan di summary akhir (baris indeks sudah ditulis dan di-commit `code-reviewer`) | Non-blocking backlog                                   |
+| **`CLEAN`** | Nyatakan review bersih penuh (0 pelanggaran terhadap union brief) | Siap untuk user membuat PR / merge                     |
 
 > [!NOTE] Temuan `P1` **dilarang diperbaiki langsung** di dalam siklus architect. Perbaikan wajib melalui perencanaan brief terisolasi via `plan`.

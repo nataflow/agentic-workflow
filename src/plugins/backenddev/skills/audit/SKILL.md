@@ -31,7 +31,7 @@ Penyisiran dan audit kualitas arsitektur dieksekusi sekuensial melalui 6 fase te
 ### Fase 0 — Penentuan Cakupan & Enumerasi Berkas Target (Scoping)
 
 1. Jalankan skrip `check_preconditions.py` dengan parameter `target_scope` dan `dimensions`. Hentikan eksekusi segera jika skrip menghasilkan `FAIL`.
-2. Baca `.claude/profile/backenddev/index.json` dan `.claude/profile/backenddev/{module-structure,anti-patterns,invariants}.md`. Catat `stack`, `source_root`, batasan modul pada `module-structure.md`, aturan `invariants.md` (pelanggaran invariant otomatis menjadi blocker kepatuhan), dan tiap baris `anti-patterns.md` sebagai pola terlarang khas repo ini.
+2. Baca `.claude/profile/backenddev/index.json` dan `.claude/profile/backenddev/{module-structure,anti-patterns,invariants}.md`. Catat `stack`, `source_root`, batasan modul pada `module-structure.md`, aturan `invariants.md` (pelanggarannya `P1`, `references/findings-contract.md` bagian 1), dan tiap baris `anti-patterns.md` sebagai pola terlarang khas repo ini.
 3. Baca `../profile/stacks/<stack>.md` dari field `stack` di `index.json`. Seksi `## Audit checklist` di sana adalah sumber tunggal butir pemeriksaan. Dilarang memakai butir stack lain atau mengarangnya sendiri. Hentikan audit jika berkas adapter tidak ditemukan, lalu rutekan ke `backenddev:profile`.
 4. Jalankan `Glob` seluruh berkas sumber stack ini di bawah path direktori target, memakai ekstensi dan konvensi penamaan dari `## Layer taxonomy` adapter. Hentikan sweep jika `target_scope` menunjuk diff branch atau PR; arahkan penilaian diff ke subagent `code-reviewer` lewat `backenddev:architect` Fase 4.
 5. Identifikasi berkas konfigurasi runtime yang relevan dengan modul target menurut `## Detection` adapter. Dilarang mempersempit daftar berkas secara spekulatif di luar cakupan yang ditentukan.
@@ -66,11 +66,7 @@ Jalankan evaluasi ketat untuk setiap kandidat temuan sebelum dicatat ke laporan:
 2. **PLAUSIBLE**: Ada `file:line` pemicunya, tapi dampaknya bergantung nilai runtime yang tidak terbaca dari kode; sebutkan fakta yang belum terbukti secara eksplisit di temuan.
 3. **DIBUANG (DROPPED)**: Tidak terbukti secara konkret dari kode aktual repositori.
    - **THE IRON LAW**: Dilarang menurunkan kandidat tanpa bukti menjadi `P3`; buang kandidat tanpa bukti sepenuhnya dan catat di ringkasan pembuangan.
-4. Tetapkan tingkat keparahan definitif:
-   - **P1 (Critical)**: Kerusakan data, celah keamanan fatal, atau transaksi bocor di produksi.
-   - **P2 (Major)**: Bottleneck performa query, N+1 query, ketidakpatuhan invariant profil, atau kode yang cocok dengan baris `## Anti-patterns` profil.
-   - Temuan anti-pattern wajib mengutip **dua** bukti: `file:line` kode pelanggar dan baris profil yang dilanggar. Dilarang menaikkan anti-pattern ke P1.
-   - **P3 (Minor)**: Duplikasi kode, inkonsistensi penamaan, atau dead code terisolasi.
+4. Tetapkan severity menurut `references/findings-contract.md` bagian 1 — satu-satunya definisi; dilarang memakai tangga lain. Temuan anti-pattern wajib mengutip **dua** bukti: `file:line` kode pelanggar dan baris profil yang dilanggar; plafonnya `P2`.
 
 ### Fase 4 — Penerbitan Artefak Laporan & Pembaruan Indeks
 
@@ -79,7 +75,7 @@ Tulis dokumen laporan hasil audit mengacu pada struktur template `templates/issu
 1. Cari indeks file tertinggi hari ini menggunakan `Glob backenddev/issues/{yyyy-mm-dd}-*-issues.md`.
 2. Tulis berkas laporan ke `backenddev/issues/{yyyy-mm-dd}-{NNN}-issues.md` (`NNN` urut 3-digit).
 3. Tulis berkas laporan dengan status bersih jika tidak ditemukan temuan. Berkas laporan tetap wajib diterbitkan.
-4. Perbarui `backenddev/issues/README.md` dengan menambahkan baris indeks baru. Kolom `Target` wajib menyebutkan path konkret modul/package (bukan label abstrak).
+4. Tambahkan satu baris di `backenddev/issues/README.md` persis skema `references/findings-contract.md` bagian 4 (kolom `File` = path relatif root berkas laporan, `Target` = path konkret modul/package tanpa label).
 5. Verifikasi bahwa format tabel indeks tetap rapi dan tidak merusak struktur markdown.
 
 ### Fase 5 — Laporan Penutupan & Serah Terima Gerbang
@@ -87,7 +83,7 @@ Tulis dokumen laporan hasil audit mengacu pada struktur template `templates/issu
 Sajikan laporan deterministik kepada main loop:
 
 1. Konfirmasikan path berkas laporan: `backenddev/issues/{yyyy-mm-dd}-{NNN}-issues.md`.
-2. Rangkum jumlah temuan per tingkat keparahan: P1 (Critical), P2 (Major), P3 (Minor).
+2. Rangkum jumlah temuan per severity: P1 (Blocker), P2 (Should fix), P3 (Nice to have).
 3. Sajikan daftar temuan ringkas memuat: ID Temuan, Severity, Lokasi (`file:line`), dan Judul.
 4. Tegaskan bahwa berkas laporan belum di-commit dan menunggu commit dari gerbang `tech-lead`. Dilarang mengusulkan temuan mana yang dikerjakan lebih dulu: seleksinya milik user di gerbang, berplafon tujuh temuan per taskdir.
 5. Serahkan kembali kendali eksekusi tanpa menjalankan perbaikan kode mandiri.
@@ -115,7 +111,7 @@ Artefak mengikuti `templates/issues-template.md`. Nihil temuan → tutup satu ba
 ### BACKEND AUDIT SUMMARY
 - **Artefak**: backenddev/issues/<yyyy-mm-dd>-<NNN>-issues.md · <path-target> · <n> berkas dievaluasi
 - **Temuan** : P1 <n> · P2 <n> · P3 <n> — seluruhnya OPEN
-- **P1 & P2**: `[P1] SEC-01` <judul singkat> · `<path/ke/Berkas>:45` — satu baris per temuan
+- **P1 & P2**: `P1-1` <judul singkat> · `<path/ke/Berkas>:45` — satu baris per temuan
 ```
 
 Daftar `P1 & P2` dipakai user memilih temuan di gerbang (plafon tujuh per taskdir) — tulis utuh, dan dilarang mengusulkan mana yang dikerjakan lebih dulu. Bukti tiap temuan hidup di berkas issues; dilarang mengulangnya di laporan.
@@ -126,7 +122,7 @@ Daftar `P1 & P2` dipakai user memilih temuan di gerbang (plafon tujuh per taskdi
 
 1. **Target Cakupan Tidak Ditemukan**: Hentikan proses, laporkan path tidak valid, dan minta verifikasi direktori target kepada user.
 2. **Profil Repositori Hilang**: Tunda audit dan sarankan inisialisasi profil terlebih dahulu via skill `backenddev:profile`.
-3. **Indeks Issues Rusak**: Inisialisasi ulang tabel header indeks sebelum menambahkan entri baru jika `backenddev/issues/README.md` tidak dapat dibaca.
+3. **Indeks Issues Rusak atau Berskema Lama**: Jangan menulis ulang header maupun menghapus baris lama; tambahkan tabel baru berheader `references/findings-contract.md` bagian 4 di bawahnya, lalu tulis baris baru ke tabel itu.
 4. **Ketiadaan Berkas Sumber pada Target**: Laporkan bahwa direktori target tidak memuat berkas sumber stack ini dan hentikan sweep tanpa membuat laporan palsu.
 5. **Konflik ID Temuan**: Lakukan re-numbering sebelum menerbitkan laporan akhir jika ID temuan bertabrakan dengan laporan lain.
 6. **Kegagalan Akses File**: Laporkan kendala izin sistem ke main loop bila file target tidak memiliki izin baca.
