@@ -55,7 +55,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/architect/scripts/validate_review.py --task
 
 | Keadaan | Penanganan `architect` |
 | --- | --- |
-| Validator `PASS`, verdict `PASS`/`WARNING` | Commit `REVIEW.md` (dan `{finding_source}` bila ber-`FIXED` baru): `docs(<slug>): closing review <verdict>`, lalu Phase 5 |
+| Validator `PASS`, verdict `PASS`/`WARNING` | Commit `REVIEW.md` (dan `{finding_source}` bila ber-`FIXED` baru **dan** `validate_audit.py --path {finding_source} --only-status-changed` `PASS`; `FAIL` → `git restore -- {finding_source}`, catat di Output): `docs(<slug>): closing review <verdict>`, lalu Phase 5 |
 | Validator `PASS`, verdict `BLOCKED` | Commit `REVIEW.md` apa adanya, rantai berhenti; kembalikan ke `frontenddev:lead` untuk diperbaiki **di taskdir yang sama**: `P1` dan SC `belum terbukti` → `chain.py reopen --row BRIEF` → `plan` APPEND brief perbaikan (tanpa `remedies`) → eksekusi → review ulang; berkas yatim → rute kontrak (`references/execution-protocol.md` bagian 7) |
 | Validator `FAIL` | Laporan tidak sah. Ulangi dispatch maksimal sekali dengan slot yang sama; tetap `FAIL` → review tidak tuntas: bersihkan tree dulu (lihat di bawah), lalu laporkan ke user. Dilarang menyunting `REVIEW.md` sendiri agar lolos |
 | `REVIEW.md` tidak ada | Cacat kerja subagent: ulangi maksimal sekali; tetap gagal → review tidak tuntas: bersihkan tree dulu (lihat di bawah). Dilarang menulis `REVIEW.md` sendiri atau mengarang verdict |

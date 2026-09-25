@@ -992,7 +992,10 @@ def taskdir_slug(taskdir_rel: str) -> str:
 
 
 def chain_files(root: Path, taskdir_rel: str) -> List[str]:
-    """Berkas di luar `frontenddev/docs` yang diubah commit rantai sesudah akar.
+    """Berkas di luar `frontenddev/docs`, `frontenddev/reviews`, dan `.claude` yang diubah commit rantai sesudah akar.
+
+    Laci audit dikecualikan: `finding_source` ikut commit `closing review` hanya
+    untuk menutup baris `> Status:`-nya, bukan sebagai kerja rantai.
 
     Commit rantai dikenali dari `(<slug>)` di subjeknya — konvensi commit
     plugin ini — sehingga commit user lain di rentang yang sama tidak terhitung.
@@ -1019,7 +1022,7 @@ def chain_files_since(root: Path, taskdir_rel: str, since: str) -> List[str]:
     files: List[str] = []
     for sha in chain_commits(root, taskdir_rel, since):
         out = git(root, "show", "--name-only", "--format=", sha, "--", ".",
-                  ":(exclude)frontenddev/docs", ":(exclude).claude")
+                  ":(exclude)frontenddev/docs", ":(exclude)frontenddev/reviews", ":(exclude).claude")
         files += [l.strip() for l in out.splitlines() if l.strip()]
     return files
 

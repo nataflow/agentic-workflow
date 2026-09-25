@@ -128,6 +128,7 @@ Di atasnya lima validator:
 | `task/scripts/validate_task.py` | struktur akar, pasangan lane/sections, `SC` ber-alat-ukur, bukti `file:baris` nyata, ledger `[ ]` (`--amend`: amandemen akar oleh `lead`, ledger boleh bercentang) |
 | `architect/scripts/validate_review.py` | tiap `SC` dan `AC` divonis dengan bukti; hitungan temuan; `base` = commit akar `TASK.md`; **verdict diturunkan**: `BLOCKED` ⇔ P1 / SC belum terbukti / verifikasi merah (`TIMEOUT` atau galat baru > 0; `MERAH` bergalat baru 0 adalah warisan baseline) |
 | `report/scripts/validate_report.py` | perubahan berakar berkas rantai; tiap SC `PERLU VERIFIKASI MANUAL` tercatat |
+| `review/scripts/validate_audit.py` | berkas audit `frontenddev/reviews/`: ID `P{n}-{m}` berurutan, hitungan `p1/p2/p3`, `verdict` turunan, `> Status:` ber-enum, jangkar `file:baris`; `--only-status-changed` menolak diff `finding_source` yang menyentuh baris selain `> Status:` |
 
 Dan dua penjaga keadaan:
 

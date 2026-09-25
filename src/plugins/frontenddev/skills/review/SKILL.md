@@ -46,7 +46,7 @@ P1 blokir merge (DTO bocor, side-effect API layer, `any`, test tanpa assertion, 
 ### Phase 4 — Laporan
 
 - Tanpa `write`: sajikan laporan chat mengikuti `references/review-checklist.md` bagian 2.
-- `write: true`: tulis `frontenddev/reviews/<YYMMDDhhmm>-<slug>.md` persis `templates/audit-template.md` — temuan ber-ID `P{n}-{m}` ber-`> Status: PLANNED` — lalu `git add <berkas>` dan commit `docs(review): audit <slug>`. Sebut path-nya sebagai calon `finding_source` untuk `frontenddev:lead`.
+- `write: true`: tulis `frontenddev/reviews/<YYMMDDhhmm>-<slug>.md` persis `templates/audit-template.md` — temuan ber-ID `P{n}-{m}` ber-`> Status: PLANNED` — lalu `python3 ${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/validate_audit.py --path <berkas>` sampai `PASS`, `git add <berkas>`, dan commit `docs(review): audit <slug>`. Sebut path-nya sebagai calon `finding_source` untuk `frontenddev:lead`.
 
 ## Guardrails
 
