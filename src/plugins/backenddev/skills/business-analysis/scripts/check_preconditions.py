@@ -55,13 +55,13 @@ class PreconditionChecker:
         self.td = check_taskdir(self.root, taskdir)
         self.results: List[Dict[str, Any]] = []
 
-    def _declared_chain(self):
+    def _task_chain(self):
         """(chain, galat) dari frontmatter TASK.md bila berkasnya sudah ada."""
         return declared_chain(self.td.path) if self.td.ok else (None, "")
 
     def _effective_chain(self) -> Optional[str]:
         """Parameter menang atas frontmatter; keduanya kosong berarti rantai tak terbaca."""
-        return self.chain_arg or self._declared_chain()[0]
+        return self.chain_arg or self._task_chain()[0]
 
     def run_all(self) -> bool:
         """Run checks 1 through 8."""
@@ -278,7 +278,7 @@ class PreconditionChecker:
                 "summary": summary, "action": action,
             })
 
-        declared, declared_err = self._declared_chain()
+        declared, declared_err = self._task_chain()
         chain_err = self.chain_err or (declared_err if not self.chain_arg else "")
         if chain_err:
             fail(chain_err, 'Gunakan enum kanonik `analyst/references/chain-rules.md` bagian 1.3 (huruf besar-kecil dan kutip dinormalkan; tanda hubung tidak). Nilai asing di TASK.md berarti salah rute: laporkan ke `backenddev:analyst`.')

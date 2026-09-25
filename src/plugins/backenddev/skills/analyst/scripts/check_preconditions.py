@@ -90,7 +90,7 @@ class PreconditionChecker:
         self._check_7_resume_point()
         return all(r["status"] == "PASS" for r in self.results)
 
-    def _declared_chain(self):
+    def _task_chain(self):
         """(chain, galat) dari frontmatter TASK.md bila berkasnya sudah ada."""
         return declared_chain(self.td.path) if self.td.ok else (None, "")
 
@@ -198,7 +198,7 @@ class PreconditionChecker:
             })
             return
 
-        declared, declared_err = self._declared_chain()
+        declared, declared_err = self._task_chain()
         if declared_err:
             self.results.append({
                 "id": check_id,
@@ -241,7 +241,7 @@ class PreconditionChecker:
             return
         taskdir_path = self.td.path
 
-        declared, declared_err = self._declared_chain()
+        declared, declared_err = self._task_chain()
         if self.chain_arg in VALID_CHAINS:
             effective_chain = self.chain_arg
         elif self.chain_err or declared_err:
