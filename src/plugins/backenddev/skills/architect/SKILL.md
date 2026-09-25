@@ -145,7 +145,7 @@ Sajikan laporan deterministik kepada main loop:
 
 ## Output [REQUIRED]
 
-Verifikasi PASS, seluruh brief DONE, dan review CLEAN/P3 → tutup satu baris tanpa blok: `### ARCHITECT EXECUTION REPORT — COMPLETED · <taskdir> · Branch <nama> · Brief <n>/<n> DONE · Verifikasi PASS · Review <CLEAN | P3 (<n>)> · REVIEW.md @ <sha> · REPORT.md @ <sha>`, ditambah baris `Umpan balik profil` bila ada. Selain itu, sajikan blok berikut dan hapus tiap baris bernilai `—`:
+Verifikasi PASS, seluruh brief tertutup, dan review `CLEAN`/`P3`/`P2` → tutup satu baris tanpa blok: `### ARCHITECT EXECUTION REPORT — <COMPLETED | COMPLETED (WARNING)> · <taskdir> · Branch <nama> · Brief <n> DONE (+<m> SUPERSEDED) · Verifikasi PASS · Review <CLEAN | P3 (<n>) | P2 (<n>): <ID, ID>> · REVIEW.md @ <sha> · REPORT.md @ <sha>`, ditambah baris `Umpan balik profil` bila ada. `COMPLETED (WARNING)` dipakai tepat bila severity tertinggi `P2`; daftar ID `P2` wajib tertulis, dan `report` membawanya ke `## Catatan`. Hapus `(+<m> SUPERSEDED)` bila `m` nol. Blok di bawah hanya untuk `BLOCKED | TERTAHAN`; hapus tiap baris bernilai `—`:
 
 ```markdown
 ### ARCHITECT EXECUTION REPORT — <BLOCKED | TERTAHAN>
@@ -153,7 +153,7 @@ Verifikasi PASS, seluruh brief DONE, dan review CLEAN/P3 → tutup satu baris ta
 - **Verifikasi**: FAIL (cacat eksekusi di brief-NN — <perintah yang merah>) | FAIL (cacat perencanaan — <n> berkas yatim) | tidak dijalankan (rantai terhenti)
 - **Berkas yatim**: <path · brief penyentuh terakhir @ sha> | —
 - **Simbol di luar anchor**: <brief-NN · simbol · file:baris> | —
-- **Review**: P2 | P1 (wajib eskalasi) | tidak dinilai · REVIEW.md @ <sha> | dilewati (<alasan>)
+- **Review**: P1 (wajib eskalasi) | tidak dinilai · REVIEW.md @ <sha> | dilewati (<alasan>)
 - **Umpan balik profil**: <`file:baris` + pola preseden menyesatkan, dari baris `Umpan balik profil:` report-NN.md> | —
 ```
 
