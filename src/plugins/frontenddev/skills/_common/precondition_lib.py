@@ -286,14 +286,52 @@ class FrontmatterError(ValueError):
     pass
 
 
+BOM = chr(0xFEFF)
+_FENCE = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
+
+
+def fenced_mask(lines: List[str]) -> List[bool]:
+    """Per baris: True bila baris itu pagar atau isi blok kode berpagar ``` / ~~~.
+
+    Panjang pagar dihormati: blok ```` ```` ```` yang memuat ```` ``` ```` baru ditutup
+    oleh pagar sejenis yang sama panjang atau lebih panjang tanpa info string.
+    """
+    mask: List[bool] = []
+    fence = ""
+    for line in lines:
+        m = _FENCE.match(line)
+        if m and not fence:
+            fence = m.group(1)
+            mask.append(True)
+            continue
+        if m and fence:
+            tok = m.group(1)
+            if tok[0] == fence[0] and len(tok) >= len(fence) and not line.strip()[len(tok):].strip():
+                fence = ""
+                mask.append(True)
+                continue
+        mask.append(bool(fence))
+    return mask
+
+
+def outside_fences(lines: List[str]) -> List[str]:
+    """Baris di luar blok kode berpagar (baris pagar ikut dibuang).
+
+    Log build atau perintah reproduksi ber-`# komentar` di dalam blok kode bukan heading.
+    """
+    return [l for l, fenced in zip(lines, fenced_mask(lines)) if not fenced]
+
+
 def split_frontmatter(text: str, strict: bool = False) -> Tuple[Dict[str, Any], str]:
     """Parse subset YAML frontmatter → `(data, body)`.
 
     Mendukung skalar, list inline `[a, b]`, `[]`/`{}` kosong, list blok `- x`,
     dan komentar `#`. `strict=True` melempar `FrontmatterError` bila pagar `---`
     tidak lengkap — dipakai validator, yang harus memvonis berkas rusak sebagai
-    rusak, bukan sebagai berkas tanpa field.
+    rusak, bukan sebagai berkas tanpa field. BOM (U+FEFF) di awal berkas dibuang
+    lebih dulu: pagar `---` sesudah BOM tetap pagar.
     """
+    text = text.lstrip(BOM)
     if not text.startswith("---"):
         if strict:
             raise FrontmatterError("frontmatter tidak dibuka dengan `---`")
@@ -351,7 +389,12 @@ def read_status(path: Path, field: str = "status") -> str:
 
 
 def set_frontmatter_field(text: str, key: str, value: str) -> str:
-    """Ganti (atau sisipkan di akhir frontmatter) satu field skalar."""
+    """Ganti (atau sisipkan di akhir frontmatter) satu field skalar.
+
+    BOM di awal berkas dipertahankan, supaya diff suntingan tidak menyentuh baris pertama.
+    """
+    bom = BOM if text.startswith(BOM) else ""
+    text = text[len(bom):]
     if not text.startswith("---"):
         raise FrontmatterError("frontmatter tidak dibuka dengan `---`")
     end = text.find("\n---", 3)
@@ -363,7 +406,7 @@ def set_frontmatter_field(text: str, key: str, value: str) -> str:
         head = pattern.sub(f"{key}: {value}", head, count=1)
     else:
         head = head.rstrip("\n") + f"\n{key}: {value}"
-    return "---" + head + text[end:]
+    return bom + "---" + head + text[end:]
 
 
 def section_lines(body: str, heading: str) -> List[str]:

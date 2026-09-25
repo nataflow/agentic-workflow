@@ -36,6 +36,7 @@ from precondition_lib import (  # noqa: E402
     find_repo_root,
     is_manual_cell,
     normalize_taskdir,
+    outside_fences,
     parse_sections,
     section_lines,
     split_frontmatter,
@@ -93,17 +94,6 @@ ST_HEAD = re.compile(r"^###\s+(ST-\d+)\.\s")
 AC_ROW = re.compile(r"^\|\s*`?(AC-\d+)`?\s*\|(.*)\|\s*$")
 TOKEN = re.compile(r"\b(SC|DD|ST)-\d+\b")
 FILES_ROW = re.compile(r"^\s*[-*]\s+`(CREATE|MODIFY)`\s+`[^`<>]+`")
-
-
-def outside_fences(lines: List[str]) -> List[str]:
-    out, fence = [], False
-    for line in lines:
-        if line.strip().startswith("```"):
-            fence = not fence
-            continue
-        if not fence:
-            out.append(line)
-    return out
 
 
 def body_after(heading: str, body: str) -> List[str]:

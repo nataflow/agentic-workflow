@@ -23,11 +23,14 @@ from typing import Any, Dict, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
+    BOM,
     chain_files,
     find_repo_root,
+    fenced_mask,
     format_report,
     is_manual,
     normalize_taskdir,
+    outside_fences,
     report_json,
     section_lines,
     split_frontmatter,
@@ -82,8 +85,9 @@ class ReportValidator:
     def _sections(text: str) -> Dict[str, List[str]]:
         out: Dict[str, List[str]] = {}
         current = None
-        for line in text.splitlines():
-            if line.startswith("## "):
+        lines = text.splitlines()
+        for line, fenced in zip(lines, fenced_mask(lines)):
+            if line.startswith("## ") and not fenced:
                 current = line.strip()
                 out[current] = []
             elif current:
@@ -96,8 +100,8 @@ class ReportValidator:
             self._add(1, "REPORT.md & TASK.md terbaca", False, "salah satu berkas tidak ada",
                       "Tulis REPORT.md di taskdir yang berakar TASK.md.")
             return False
-        self.text = report.read_text(encoding="utf-8")
-        self.task = task.read_text(encoding="utf-8")
+        self.text = report.read_text(encoding="utf-8").lstrip(BOM)
+        self.task = task.read_text(encoding="utf-8").lstrip(BOM)
         self.sec = self._sections(self.text)
         self._check_1_title()
         self._check_2_headings()
@@ -108,8 +112,9 @@ class ReportValidator:
         return all(r["status"] == "PASS" for r in self.results)
 
     def _check_1_title(self) -> None:
-        h1 = [l[2:].strip() for l in self.text.splitlines() if l.startswith("# ")]
-        task_h1 = [l[2:].strip() for l in self.task.splitlines() if l.startswith("# ")]
+        h1 = [l[2:].strip() for l in outside_fences(self.text.splitlines()) if l.startswith("# ")]
+        task_h1 = [l[2:].strip() for l in outside_fences(split_frontmatter(self.task)[1].splitlines())
+                   if l.startswith("# ")]
         want = f"{task_h1[0]} — Report" if task_h1 else ""
         ok = len(h1) == 1 and bool(want) and h1[0] == want
         self._add(1, "Judul dari H1 TASK.md", ok, f"H1 {h1}" if not ok else "lolos",

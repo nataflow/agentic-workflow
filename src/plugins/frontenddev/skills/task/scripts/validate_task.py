@@ -23,14 +23,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
     expected_rows,
     find_repo_root,
+    fenced_mask,
     format_report,
     lane_sections_problem,
     normalize_taskdir,
-    parse_frontmatter,
+    outside_fences,
     parse_sections,
     read_chain,
     report_json,
     find_placeholders,
+    split_frontmatter,
 )
 
 HEADINGS = ("## Description", "## Success Criteria", "## Out of Scope", "## Chain")
@@ -60,9 +62,7 @@ class TaskValidator:
                       "Tulis TASK.md lebih dulu (Phase 4 butir 2).")
             return False
         text = self.path.read_text(encoding="utf-8")
-        self.fm = parse_frontmatter(text)
-        end = text.find("\n---", 3)
-        self.body = text[end + 4:] if text.startswith("---") and end != -1 else text
+        self.fm, self.body = split_frontmatter(text)
         self.sections = self._split_sections()
         self._check_1_structure()
         self._check_2_numbering()
@@ -76,8 +76,9 @@ class TaskValidator:
     def _split_sections(self) -> Dict[str, List[str]]:
         sections: Dict[str, List[str]] = {}
         current = None
-        for line in self.body.splitlines():
-            if line.startswith("## "):
+        lines = self.body.splitlines()
+        for line, fenced in zip(lines, fenced_mask(lines)):
+            if line.startswith("## ") and not fenced:
                 current = line.strip()
                 sections[current] = []
             elif current:
@@ -98,10 +99,11 @@ class TaskValidator:
             errors.append(problem)
         if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(self.fm.get("created", ""))):
             errors.append("created bukan YYYY-MM-DD")
-        h1 = [l for l in self.body.splitlines() if l.startswith("# ")]
+        code = outside_fences(self.body.splitlines())
+        h1 = [l for l in code if l.startswith("# ")]
         if len(h1) != 1:
             errors.append(f"{len(h1)} H1, wajib tepat satu")
-        h2 = [l.strip() for l in self.body.splitlines() if l.startswith("## ")]
+        h2 = [l.strip() for l in code if l.startswith("## ")]
         if tuple(h2) != HEADINGS:
             errors.append(f"heading {h2} bukan {list(HEADINGS)}")
         self._add(1, "Struktur & frontmatter", not errors, "; ".join(errors) or "lolos",

@@ -44,6 +44,7 @@ from precondition_lib import (  # noqa: E402
     git,
     is_manual,
     normalize_taskdir,
+    outside_fences,
     profile_dir_for,
     read_profile_stack,
     section_lines,
@@ -159,7 +160,7 @@ class ReviewValidator:
 
     def _check_structure(self) -> None:
         p = []
-        lines = self.body.splitlines()
+        lines = outside_fences(self.body.splitlines())
         h1 = [l for l in lines if l.startswith("# ")]
         want = f"# Review Findings — {taskdir_slug(self.taskdir_rel)}"
         if len(h1) != 1 or h1[0].strip() != want:

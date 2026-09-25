@@ -264,3 +264,73 @@ def test_validate_task_sc_perbandingan_bukan_placeholder(make_repo):
 def test_validate_task_slug_dalam_backtick_ditolak(make_repo):
     c7 = promo_task_check7(make_repo(), description_extra="Berkas `src/features/<slug>/api.ts` dibuat.")
     assert c7["status"] == "FAIL" and "<slug>" in c7["summary"], c7
+
+
+# --- L5.9 (frontenddev) code fence dan BOM --------------------------------------------------
+
+BOM = "﻿"
+
+
+def review_checks(repo) -> dict:
+    r = fe_run(repo, "architect/scripts/validate_review.py", "--taskdir", FE_MINOR_TD, "--json")
+    return {c["id"]: c for c in json.loads(r.stdout)["checks"]}
+
+
+def test_review_log_build_ber_hash_di_code_fence(fe_minor_chain):
+    review = fe_review_md(fe_minor_chain).replace(
+        "\n## Cakupan Success Criteria",
+        "\n```bash\n# log build\npnpm build\n## bukan heading\n```\n\n## Cakupan Success Criteria")
+    write_files(fe_minor_chain, {f"{FE_MINOR_TD}/REVIEW.md": review})
+    checks = review_checks(fe_minor_chain)
+    assert all(c["status"] != "FAIL" for c in checks.values()), checks
+
+
+def test_review_bom(fe_minor_chain):
+    write_files(fe_minor_chain, {f"{FE_MINOR_TD}/REVIEW.md": BOM + fe_review_md(fe_minor_chain)})
+    checks = review_checks(fe_minor_chain)
+    assert all(c["status"] != "FAIL" for c in checks.values()), checks
+
+
+def test_taskdir_state_task_bom_bukan_rusak(fe_minor_chain):
+    task = fe_minor_chain / FE_MINOR_TD / "TASK.md"
+    task.write_text(BOM + task.read_text(encoding="utf-8"), encoding="utf-8")
+    commit(fe_minor_chain, "docs(order-checkout): bom")
+    r = fe_run(fe_minor_chain, "lead/scripts/taskdir_state.py", "--root", str(fe_minor_chain),
+               "--taskdir", FE_MINOR_TD)
+    assert r.returncode == 0 and FE_MINOR_TD in r.out and "RUSAK" not in r.out, r.out
+
+
+def test_validate_task_h1_di_code_fence_diabaikan(make_repo):
+    text = PROMO_TASK.format(measure="test `promo.test.tsx` hijau").replace(
+        "Perbaiki banner.", "Perbaiki banner.\n\n```bash\n# reproduksi\nnpm run dev\n```")
+    root = make_repo({f"{PROMO_TD}/TASK.md": BOM + text})
+    c1 = validate_task(root)[1]
+    assert c1["status"] == "PASS", c1
+
+
+def test_report_heading_di_code_fence_diabaikan(promo_repo):
+    c4 = report_check4(promo_repo, "- Tambah terjemahan bahasa Prancis (src/i18n)\n"
+                                   "- Tambah tab beranda baru (app/(tabs))\n"
+                                   "- Tambah kartu promo baru (src/components/Kartu Promo.tsx)\n\n"
+                                   "## Catatan\n\n```\n# bukan judul\n## bukan heading\n```")
+    report = (promo_repo / PROMO_TD / "REPORT.md").read_text(encoding="utf-8")
+    write_files(promo_repo, {f"{PROMO_TD}/REPORT.md": BOM + report})
+    r = fe_run(promo_repo, "report/scripts/validate_report.py", "--taskdir", PROMO_TD, "--json")
+    checks = {c["id"]: c for c in json.loads(r.stdout)["checks"]}
+    assert c4["status"] == "PASS" and checks[1]["status"] == "PASS" and checks[2]["status"] == "PASS", checks
+
+
+def test_split_frontmatter_bom():
+    fm, body = FE_LIB.split_frontmatter(BOM + "---\nstatus: ACTIVE\n---\n# x\n", strict=True)
+    assert fm == {"status": "ACTIVE"} and body == "\n# x\n"
+
+
+def test_set_frontmatter_field_mempertahankan_bom():
+    out = FE_LIB.set_frontmatter_field(BOM + "---\nstatus: DRAFT\n---\n# x\n", "status", "APPROVED")
+    assert out == BOM + "---\nstatus: APPROVED\n---\n# x\n"
+    assert out.encode("utf-8")[:3] == b"\xef\xbb\xbf"
+
+
+def test_outside_fences_pagar_bersarang():
+    lines = ["````md", "```", "# x", "```", "````", "# y", "~~~", "# z", "~~~"]
+    assert FE_LIB.outside_fences(lines) == ["# y"]
