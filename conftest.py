@@ -101,3 +101,51 @@ def make_repo(tmp_path):
         write_files(root, files or {})
         return root
     return _make
+
+
+# --- Rantai backenddev (Langkah 2) -------------------------------------------------------------
+
+BE_SKILLS = PLUGINS / "backenddev" / "skills"
+TD = "backenddev/docs/2609240900-order-fix"
+
+
+def brief(repo: Path, nn: str, unit: str, status: str, **extra: str) -> Path:
+    """Tulis `{TD}/brief-<nn>-<unit>.md` berfrontmatter minimal; `extra` menambah field."""
+    fm = "".join(f"{k}: {v}\n" for k, v in extra.items())
+    path = repo / TD / f"brief-{nn}-{unit}.md"
+    path.write_text(f"---\ntitle: {unit}\nsource: TASK.md\nrisk: MINOR\nstatus: {status}\n"
+                    f'commit_message: "fix(order): implement {unit}"\n{fm}---\n# Brief\n', encoding="utf-8")
+    return path
+
+
+def commit(repo: Path, msg: str, *paths: str) -> str:
+    git(repo, "add", *(paths or ("-A",)))
+    git(repo, "commit", "-qm", msg)
+    return git(repo, "rev-parse", "--short=7", "HEAD").strip()
+
+
+def be_run(repo: Path, skill_script: str, *args: str) -> subprocess.CompletedProcess:
+    """Jalankan `skills/<skill_script>` dengan cwd = repo."""
+    return run_script(BE_SKILLS / skill_script, *args, cwd=repo)
+
+
+def be_checks(repo: Path, skill_script: str, *args: str) -> Dict[int, dict]:
+    """Jalankan skrip prasyarat ber-`--json`, kembalikan {id: check}."""
+    proc = be_run(repo, skill_script, "--json", *args)
+    assert proc.stdout.strip(), proc.stderr
+    return {c["id"]: c for c in json.loads(proc.stdout)["checks"]}
+
+
+@pytest.fixture
+def chain_repo(make_repo):
+    """Repo ber-profil backenddev (stack go) dengan `{TD}/TASK.md` ter-commit di branch `main`."""
+    root = make_repo({
+        ".gitignore": ".explore/\n",
+        f"{TD}/TASK.md": ("---\nchain: BRIEF\nrisk: MINOR\nstatus: ACTIVE\n---\n# Order fix\n"
+                          "## Success Criteria\n- SC-1 lock\n- SC-2 endpoint\n"),
+        "src/order.go": "package order\n",
+    })
+    git(root, "checkout", "-q", "-b", "main")
+    be_profile(root, "go")
+    commit(root, "init")
+    return root

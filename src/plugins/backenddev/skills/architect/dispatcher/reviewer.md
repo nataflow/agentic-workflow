@@ -19,8 +19,8 @@ Review seluruh branch pekerjaan untuk satu direktori tugas.
 - Di Luar Penilaian: Perubahan di bawah `backenddev/` dan `.claude/`.
 - Balikan: HANYA path `{taskdir}/REVIEW.md` dan tingkat severity tertinggi (`P1`, `P2`, `P3`, atau
   `CLEAN`). Jangan kutip isi file review ke chat.
-- Commit: Commit sendiri `{taskdir}/REVIEW.md` dengan pesan `docs(<slug>): add final review report`
-  sesudah laporan selesai ditulis.
+- Commit: Commit sendiri `{taskdir}/REVIEW.md` **dan** `backenddev/issues/README.md` dalam satu
+  commit berpesan `docs(<slug>): add final review report` sesudah laporan selesai ditulis.
 - Stop Condition: Dilarang melebar mengaudit kode di luar rentang diff; sweep konvensi umum adalah
   milik `audit`. Gerbang masuk lengkap ada di definisi agent-mu — BERHENTI dan lapor sesuai jalur
   gagal di sana, jangan menebak.
@@ -39,7 +39,7 @@ Review seluruh branch pekerjaan untuk satu direktori tugas.
 - **Sesudah verifikasi penutup hijau**: build dan test Fase 4 butir 1 lulus lebih dulu. Mendispatch reviewer di atas branch yang buildnya merah menghasilkan temuan yang tak dapat dipisahkan dari kegagalan build.
 - **Dilarang menyalin isi berkas**: jangan salin isi brief, diff, atau `.claude/profile/backenddev/` ke dalam prompt. Sebutkan path-nya; subagent membacanya sendiri secara terisolasi.
 - **Audit hidrasi sebelum berangkat**: batalkan dispatch bila prompt masih memuat slot kurung kurawal `{...}` mentah atau placeholder `TBD`/`TODO`.
-- **Read-only terhadap `src/`**: reviewer tidak pernah memperbaiki kode atau menjalankan build/test; ia hanya menulis dan meng-commit laporannya sendiri.
+- **Read-only terhadap `src/`**: reviewer tidak pernah memperbaiki kode atau menjalankan build/test; ia hanya menulis dan meng-commit laporannya sendiri beserta baris indeks `backenddev/issues/README.md`.
 - **Dispatch langsung tanpa skill pembungkus**: seluruh doktrin review — gerbang masuk, lima pemeriksaan, kontrak `REVIEW.md`, dan amplop balikan — duduk di `agents/code-reviewer.md`. Dilarang memanggil skill perantara atau menyalin potongan doktrin itu ke dalam prompt.
 
 ### Penanganan Balikan
@@ -51,7 +51,7 @@ Review seluruh branch pekerjaan untuk satu direktori tugas.
 | Path `REVIEW.md` + severity `CLEAN`, `P3`, atau `P2` | Serap ke laporan penutup apa adanya. Severity berada di luar sistem status brief dan dilarang dipaksa jadi `BLOCKED` |
 | Severity `P1` | Jangan perbaiki di tempat. Catat di laporan akhir dan arahkan user kembali ke gerbang `tech-lead` — `## Failure path` butir 5 |
 | `{taskdir}/REVIEW.md` tidak ada di disk | Cacat kerja subagent. Ulangi dispatch maksimum sekali; tetap gagal → laporkan review tidak tuntas ke gerbang. Dilarang menulis `REVIEW.md` sendiri atau mengarang verdict |
-| Balikan menyebut `git commit` gagal, atau `REVIEW.md` ada tetapi uncommitted | Kunci sendiri berkas itu dengan staging path eksplisit dan pesan `docs(<slug>): add final review report`, lalu catat penyimpangannya — `## Failure path` butir 6 |
+| Balikan menyebut `git commit` gagal, atau `REVIEW.md`/`backenddev/issues/README.md` ada tetapi uncommitted | Kunci sendiri **kedua** berkas itu dalam satu commit dengan staging path eksplisit dan pesan `docs(<slug>): add final review report`, lalu catat penyimpangannya — `## Failure path` butir 6 |
 | Payload kosong, format rusak, atau subagent error | Kegagalan dispatch, bukan cacat kerja subagent. Periksa disk lebih dulu lewat matriks bukti `references/lifecycle-recovery.md` sebelum menyimpulkan review tidak pernah berjalan |
 
 **Batas serap.** Verdict reviewer diteruskan utuh ke laporan penutup, tanpa parafrase maupun penyaringan temuan. Guardrail **STRICT NON-AUTHORING** berlaku penuh: temuan severity apa pun dilarang ditambal `architect` sendiri di `src/`, dan perbaikannya berjalan sebagai taskdir baru lewat gerbang.

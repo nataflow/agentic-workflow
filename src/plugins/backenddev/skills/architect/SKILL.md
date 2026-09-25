@@ -105,6 +105,7 @@ Verifikasi berkumpul di sini, tepat satu kali sesudah brief `NN` tertinggi berst
 2. **Dispatch Code Reviewer**: Muat template prompt dari `dispatcher/reviewer.md`, hidrasi slot `taskdir` dan `base_branch`, lalu panggil subagent `code-reviewer` secara langsung tepat **satu kali**.
    - Subagent mengevaluasi diff `git merge-base {base_branch} HEAD`..`HEAD`, menerbitkan `{taskdir}/REVIEW.md`, lalu meng-commit laporannya sendiri.
    - Tangkap balikan berupa path `REVIEW.md` dan satu tingkat severity tertinggi, lalu petakan lewat `### Penanganan Balikan` template itu. Ambil SHA laporan dari `git log`, bukan dari balikan.
+   - Sesudah balikan, pastikan `git status --porcelain` kosong di luar `.explore/`. Sisa `{taskdir}/REVIEW.md` atau `backenddev/issues/README.md` → baris commit gagal `### Penanganan Balikan`.
 3. **Triase Temuan Review**:
    - Dilarang memperbaiki temuan langsung jika severity tertinggi `P1`. Laporkan temuannya dan kembalikan kendali ke gerbang `tech-lead`.
    - Rangkum hasilnya di laporan penutupan jika severity `P2`/`P3`/`CLEAN`.
@@ -127,7 +128,7 @@ Sajikan laporan deterministik kepada main loop:
 - **SEKUENSIAL MUTLAK**: Dilarang mendispatch implementor paralel; subagent berikutnya berangkat hanya setelah subagent sebelumnya tuntas dan commit mendarat.
 - **SATU KALI REVIEW DI AKHIR**: Reviewer didispatch tepat sekali di akhir rantai.
 - **TEST DI PENUTUP, KOMPILASI PER BRIEF**: Test suite dijalankan tepat sekali di Fase 4 butir 1. Kompilasi berjalan sesudah tiap brief pada stack yang `typecheck-per-brief`-nya `ya` (Fase 3 butir 3b) — lantai "titik hijau mandiri" menuntutnya, dan pada stack inkremental biayanya mendekati nol. Stack yang kompilasinya build penuh menundanya ke penutup, dan konsekuensinya diterima apa adanya: brief yang memecahkan kompilasi di sana baru ketahuan di Fase 4, dengan diagnosis lewat `git log` Failure path butir 4.
-- **COMMIT MILIK PENULISNYA**: Skill ini tidak meng-commit `src/**`, `{taskdir}/REVIEW.md`, maupun `{taskdir}/REPORT.md`. Jalankan commit susulan hanya saat commit hilir terbukti gagal, dengan staging path eksplisit tanpa wildcard (`git add .`/`-A` dilarang keras).
+- **COMMIT MILIK PENULISNYA**: Skill ini tidak meng-commit `src/**`, `{taskdir}/REVIEW.md`, `backenddev/issues/README.md`, maupun `{taskdir}/REPORT.md`. Jalankan commit susulan hanya saat commit hilir terbukti gagal, dengan staging path eksplisit tanpa wildcard (`git add .`/`-A` dilarang keras).
 - **LARANGAN GIT MUTASI REMOTE**: Dilarang `git push`, `git merge`, `git rebase`, atau `gh pr create` tanpa instruksi eksplisit user.
 - **DISPATCH LEWAT TEMPLATE RESMI**: Panggil `code-implementor` langsung via template `dispatcher/implementor.md` dan `code-reviewer` langsung via template `dispatcher/reviewer.md`. Dilarang menyusun prompt dispatch di luar template resminya maupun menyalin isi brief ke dalam prompt.
 - **FAIL-FAST ON BLOCKED**: Hentikan rantai seketika jika terjadi status `BLOCKED` pada satu brief. Dilarang melompati brief yang gagal.

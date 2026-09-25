@@ -59,7 +59,7 @@ itu mendarat dan diff-nya tidak melewati `## File scope`.
 | --- | --- | --- |
 | `src/**` + brief, brief sukses | `code-implementor` | `commit_message` frontmatter brief |
 | `src/**` + brief + report, brief terblokir | `code-implementor` | `wip(<domain>): brief-<NN>-<unit> [BLOCKED]` |
-| `{taskdir}/REVIEW.md` | `code-reviewer` | `docs(<slug>): add final review report` |
+| `{taskdir}/REVIEW.md` + baris riwayat review di `backenddev/issues/README.md` | `code-reviewer` | `docs(<slug>): add final review report` |
 | Penguncian susulan saat commit hilir terbukti gagal | `architect` | ulangi pesan milik penulisnya, catat penyimpangan |
 
 Seluruh staging wajib menyebut path satu per satu:
@@ -146,8 +146,8 @@ Hasil review branch penutup diklasifikasikan ke dalam 4 tingkatan tindakan:
 | Severity    | Definisi Temuan                                             | Tindakan Architect                                     | Aksi Handoff Lanjutan                                  |
 | ----------- | ----------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------ |
 | **`P1`**    | Pelanggaran kontrak, file di luar scope, regresi fungsional | Laporkan di summary akhir; `REVIEW.md` sudah di-commit reviewer | Eskalasi ke `tech-lead`; ia merutekannya ke lane `PLANNING` dengan `finding_source` `{taskdir}/REVIEW.md` |
-| **`P2`**    | Pelanggaran invariant arsitektur, anti-pola stack         | Laporkan di summary akhir, catat ke `issues/README.md` | Ditangani pada siklus perbaikan rilis berikutnya       |
-| **`P3`**    | Style konvensi lokal, redundansi minor                      | Laporkan di summary akhir, catat ke `issues/README.md` | Non-blocking backlog                                   |
+| **`P2`**    | Pelanggaran invariant arsitektur, anti-pola stack         | Laporkan di summary akhir (baris indeks sudah ditulis dan di-commit `code-reviewer`) | Ditangani pada siklus perbaikan rilis berikutnya       |
+| **`P3`**    | Style konvensi lokal, redundansi minor                      | Laporkan di summary akhir (baris indeks sudah ditulis dan di-commit `code-reviewer`) | Non-blocking backlog                                   |
 | **`CLEAN`** | 0 pelanggaran terhadap union brief                          | Nyatakan review bersih penuh                           | Siap untuk user membuat PR / merge                     |
 
 > [!NOTE] Temuan `P1` **dilarang diperbaiki langsung** di dalam siklus architect. Perbaikan wajib melalui perencanaan brief terisolasi via `plan`.
