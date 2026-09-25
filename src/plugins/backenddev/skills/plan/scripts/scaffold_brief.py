@@ -28,7 +28,8 @@ menyusul**.
   `<!-- scaffold: ... -->` yang wajib dihapus penulis saat mengisinya;
   `validate_briefs.py` menolak brief yang masih menyisakan penanda itu. Baris
   ber-`supersedes` sekaligus menandai brief lama `SUPERSEDED` + `superseded_by` —
-  satu-satunya penulis transisi itu.
+  satu-satunya penulis transisi itu. Baris ber-`repairs` memperbaiki brief `DONE`
+  yang ditahan `{taskdir}/HALT.md` dan mencabut penanda itu saat kerangkanya ditulis.
 
 Alasan urutannya: alokasi `AC`/`SC` adalah keputusan slicing. Menentukannya
 sesudah delapan brief ditulis berarti coverage yang bolong menuntut pembongkaran
@@ -48,7 +49,9 @@ import sys
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
-from brief_status import LOCKED, SUPERSEDABLE, scan_briefs, set_frontmatter  # noqa: E402
+from brief_status import (  # noqa: E402
+    HALT_FILE, LOCKED, SUPERSEDABLE, halted_nn, scan_briefs, set_frontmatter,
+)
 
 VALID_RISKS = ["BREAKING", "MAJOR", "MINOR"]
 RISK_ORDER = {"MINOR": 1, "MAJOR": 2, "BREAKING": 3}
@@ -112,6 +115,12 @@ def _supersedes(row: Dict[str, Any]) -> List[str]:
     if isinstance(raw, (str, int)):
         raw = [raw]
     return [m for t in raw for m in re.findall(r"(?<!\d)(\d{2})(?!\d)", str(t))]
+
+
+def _repairs(row: Dict[str, Any]) -> str:
+    """Kolom spec `repairs` (`"02"` atau `"brief-02"`) -> "02", atau ""."""
+    m = re.search(r"(?<!\d)(\d{2})(?!\d)", str(row.get("repairs") or ""))
+    return m.group(1) if m else ""
 
 
 def _doc_section(text: Optional[str], title: str) -> Optional[str]:
@@ -229,12 +238,13 @@ class MatrixTool:
         return merged, kept_nn, problems
 
     def _check_supersedes(self, incoming: List[Dict[str, Any]]) -> List[str]:
-        """Batch `--append` wajib menutup brief `BLOCKED` dan menerbitkan ulang `READY` hilirnya.
+        """Batch `--append` wajib menutup brief `BLOCKED`/`HALT.md` dan menerbitkan ulang `READY` hilirnya.
 
         Urutan `NN` adalah urutan eksekusi (D2-A): brief `READY` yang bernomor
-        sesudah brief terblokir akan berjalan **sebelum** pengganti bernomor
+        sesudah brief terblokir — atau sesudah brief `DONE` yang ditahan
+        `HALT.md` — akan berjalan **sebelum** pengganti/perbaikan bernomor
         tertinggi, di atas kode yang belum diperbaiki. Karena itu ia ikut
-        digantikan dan diterbitkan ulang sesudah pengganti.
+        digantikan dan diterbitkan ulang sesudahnya.
         """
         problems: List[str] = []
         disk = {b["nn"]: b for b in scan_briefs(self.taskdir)}
@@ -245,7 +255,18 @@ class MatrixTool:
                 if st not in SUPERSEDABLE:
                     problems.append(f"brief {b.get('nn')}: `supersedes` brief-{t} berstatus `{st}` — "
                                     f"hanya BLOCKED atau READY yang dapat digantikan")
+        held = halted_nn(self.taskdir)
+        for b in incoming:
+            r = _repairs(b)
+            if r and disk.get(r, {}).get("status") != "DONE":
+                problems.append(f"brief {b.get('nn')}: `repairs` brief-{r} berstatus "
+                                f"`{disk.get(r, {}).get('status', 'tidak ada')}` — hanya brief DONE yang diperbaiki")
+        if held is not None and not any(_repairs(b) == held for b in incoming):
+            problems.append(f"HALT.md menahan brief-{held} — batch --append wajib memuat baris "
+                            f"`\"repairs\": \"{held}\"`")
         pivot = min((int(n) for n, b in disk.items() if b["status"] == "BLOCKED"), default=None)
+        if pivot is None and held is not None:
+            pivot = int(held)
         for n, b in sorted(disk.items()):
             if b["status"] == "BLOCKED" and n not in claimed:
                 problems.append(f"brief-{n} BLOCKED belum digantikan — tambah baris ber-`supersedes: [\"{n}\"]`")
@@ -399,7 +420,8 @@ class MatrixTool:
                 "{consumes} | {produces} |".format(
                     nn=b.get("nn", ""),
                     unit=b.get("unit", ""),
-                    sup="".join(f" · menggantikan `brief-{s}`" for s in _supersedes(b)),
+                    sup="".join(f" · menggantikan `brief-{s}`" for s in _supersedes(b))
+                        + (f" · memperbaiki `brief-{_repairs(b)}`" if _repairs(b) else ""),
                     covers=", ".join(b.get("covers") or []) or "—",
                     fulfills=", ".join(b.get("fulfills") or []) or "—",
                     risk=str(b.get("risk", "")).upper(),
@@ -493,6 +515,7 @@ class MatrixTool:
             "status: READY",
             f'commit_message: "{commit_type}({domain}): implement {unit}"',
             *([f"supersedes: {', '.join(f'brief-{s}' for s in sup)}"] if sup else []),
+            *([f"repairs: brief-{_repairs(row)}"] if _repairs(row) else []),
             "---",
             "",
             f"# Brief: {row['title']} — {matrix.get('date', '<yyyy-mm-dd>')}",
@@ -531,6 +554,9 @@ class MatrixTool:
             old = disk[s]
             set_frontmatter(old["path"], status="SUPERSEDED", superseded_by=f"brief-{nn}")
             staged.append(old["name"])
+        if _repairs(row) and halted_nn(self.taskdir) == _repairs(row):
+            (self.taskdir / HALT_FILE).unlink()
+            staged.append(f"{HALT_FILE} (dihapus — stage dengan `git rm -q {HALT_FILE}`)")
         explore = row.get("explore")
         note = (
             f"Panen `{LACI}/{explore}.md` lebih dulu sebelum mengisi `## File scope` "

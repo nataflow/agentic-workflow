@@ -111,6 +111,7 @@ ______________________________________________________________________
    - `DONE`: Ditulis `code-implementor` sesudah seluruh `## Steps` tuntas, tepat sebelum ia meng-commit brief bersama perubahan `src/**`-nya. Koreksi `READY → DONE` oleh `architect` sah hanya pada baris "commit ada, status tertinggal" matriks bukti disk (`architect/references/lifecycle-recovery.md` bagian 3).
    - `BLOCKED`: Ditulis `code-implementor` saat terhenti oleh *stop condition*. Brief `BLOCKED` menahan rantai sampai digantikan.
    - `SUPERSEDED`: Ditulis **hanya** oleh `scaffold_brief.py --nn <NN-pengganti>` atas brief yang disebut kolom `supersedes` baris pengganti. Asal sah: `BLOCKED`, atau `READY` hilir yang diterbitkan ulang sesudah perbaikan supaya urutan `NN` tetap urutan eksekusi. Brief lama menerima `superseded_by: brief-<NN>`, brief pengganti membawa `supersedes: brief-<NN>[, brief-<NN>]`. `SUPERSEDED` tertutup: dilewati traversal `architect`, tidak dihitung predikat cakupan `Covers:`/`Fulfills:`, dan tidak pernah kembali ke status lain.
+   - Field `repairs: brief-<NN>` (bukan status): brief perbaikan atas brief `DONE` yang ditahan `{taskdir}/HALT.md` (gerbang kompilasi, scope, simbol, atau berkas liar `architect`). Ditulis `scaffold_brief.py --nn` dari kolom spec `repairs`, yang sekaligus mencabut `HALT.md`.
 
    *(Dilarang memakai `DRAFT` atau `APPROVED` pada brief — approval berhenti di BRD dan PRD — dan dilarang menulis `SUPERSEDED` dengan tangan: Check C `validate_briefs.py` menolak tautan yang tidak dua arah.)*
 

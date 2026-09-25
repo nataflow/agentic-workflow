@@ -116,12 +116,13 @@ matriks alokasi terkunci → tiap brief lolos gerbang per-brief Fase 3
 2. **Staging eksplisit per path**, tiap berkas brief yang baru terbit **dan** tiap brief lama yang baru ditandai `SUPERSEDED` (baris `Stage bersama di commit agregat` keluaran `scaffold_brief.py --nn`) disebut satu per satu:
    ```
    git add {taskdir}/brief-02-<unit>.md {taskdir}/brief-03-<unit>.md {taskdir}/brief-04-<unit>.md {taskdir}/brief-05-<unit>.md
+   git rm -q {taskdir}/HALT.md        # hanya bila keluaran --nn menyebut HALT.md dihapus (baris `repairs`)
    git commit -m "docs(plan): add <N> briefs for <slug>"
    ```
    `<N>` diisi jumlah brief yang benar-benar terbit pada batch ini (brief `SUPERSEDED` tidak dihitung); `<slug>` diambil dari nama direktori taskdir tanpa awalan timestamp.
 3. **Eksekusi seketika saat `Approved`**, tanpa menunggu persetujuan user, gerbang, maupun main loop — self-review satu-satunya prasyarat commit. Sebaliknya, tahan commit tanpa pengecualian bila status belum `Approved`.
 4. **Dilarang staging wildcard.** `git add .` dan `git add -A` berisiko menarik berkas scratch, log, atau pekerjaan user yang belum di-commit.
-5. **Batas kewenangan.** Commit ini satu-satunya mutasi git milik `plan` dan hanya memuat `brief-*.md` pada taskdir aktif — brief baru dan brief yang baru ditandai `SUPERSEDED`; berkas lain milik skill penulisnya. `git push`, `git merge`, `git rebase`, `git branch`, dan `git checkout` terlarang tanpa kecuali.
+5. **Batas kewenangan.** Commit ini satu-satunya mutasi git milik `plan` dan hanya memuat `brief-*.md` pada taskdir aktif — brief baru, brief yang baru ditandai `SUPERSEDED`, dan penghapusan `HALT.md` yang dicabut baris `repairs`; berkas lain milik skill penulisnya. `git push`, `git merge`, `git rebase`, `git branch`, dan `git checkout` terlarang tanpa kecuali.
 
 ### Kegagalan Commit & Mitigasi Mandiri
 

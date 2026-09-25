@@ -2,7 +2,7 @@
 """Architect Precondition Validator.
 
 Automates verification of repository preconditions before architect skill execution.
-Runs checks 1 through 6 in a single pass and produces a compact, actionable report.
+Runs checks 1 through 7 in a single pass and produces a compact, actionable report.
 Zero external dependencies (Python Standard Library only).
 """
 
@@ -24,7 +24,9 @@ from precondition_lib import (  # noqa: E402
     foreign_owner,
     legacy_suffix,
 )
-from brief_status import BRIEF_STATUSES, CLOSED, review_freshness, scan_briefs, validate_links  # noqa: E402
+from brief_status import (  # noqa: E402
+    BRIEF_STATUSES, CLOSED, read_halt, review_freshness, scan_briefs, validate_links,
+)
 
 
 def _strip_explore_scratch(status_out: str) -> str:
@@ -76,13 +78,14 @@ class PreconditionChecker:
         return Path.cwd()
 
     def run_all(self) -> bool:
-        """Run checks 1 through 6."""
+        """Run checks 1 through 7."""
         self._check_1_taskdir()
         self._check_2_profile()
         self._check_3_brief_readiness()
         self._check_4_git_worktree()
         self._check_5_dispatchers()
         self._check_6_lifecycle_recovery()
+        self._check_7_halt_marker()
         return all(r["status"] == "PASS" for r in self.results)
 
     def _resolve_taskdir(self) -> Optional[Path]:
@@ -459,6 +462,25 @@ class PreconditionChecker:
             "summary": "Referensi pemulihan state lifecycle-recovery.md tersedia",
             "action": "",
         })
+
+    def _check_7_halt_marker(self):
+        """`{taskdir}/HALT.md` ter-commit menahan rantai lintas sesi.
+
+        Vonis gerbang kompilasi, scope, simbol, dan berkas liar jatuh sesudah
+        brief ter-commit `DONE`; tanpa penanda di disk sesi berikutnya memilih
+        `NN+1` dan melanjutkan di atas kode yang diketahui rusak.
+        """
+        cid, name = 7, "Halt Marker"
+        td = self._resolve_taskdir()
+        fm = read_halt(td) if td else None
+        if fm is not None:
+            return self._add(
+                cid, name, "FAIL",
+                f"HALT.md menahan rantai di {fm.get('brief', '?')} "
+                f"(verdict {fm.get('verdict', '?')} @ {fm.get('sha', '?')})",
+                "Kembalikan ke `backenddev:tech-lead`: SCOPE → tanya user terima/reset; COMPILE/SYMBOL/STRAY → "
+                "lane PLANNING taskdir sama, `plan` menambah baris `repairs`. Architect dilarang menghapus HALT.md.")
+        self._add(cid, name, "PASS", "Tidak ada HALT.md")
 
     def format_text(self) -> str:
         all_passed = all(r["status"] == "PASS" for r in self.results)

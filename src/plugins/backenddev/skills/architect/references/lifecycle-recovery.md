@@ -71,6 +71,7 @@ itu mendarat dan diff-nya tidak melewati `## File scope`.
 | `src/**` + brief, brief sukses | `code-implementor` | `commit_message` frontmatter brief |
 | `src/**` + brief + report, brief terblokir | `code-implementor` | `wip(<domain>): brief-<NN>-<unit> [BLOCKED]` |
 | `{taskdir}/REVIEW.md` + baris riwayat review di `backenddev/issues/README.md` | `code-reviewer` | `docs(<slug>): add final review report` |
+| `{taskdir}/HALT.md`, rantai ditahan gerbang kompilasi/scope/simbol/berkas liar | `architect` | `chore(<slug>): tahan rantai di brief-NN (<verdict>)` |
 | Penguncian susulan saat commit hilir terbukti gagal | `architect` | ulangi pesan milik penulisnya, catat penyimpangan |
 
 Seluruh staging wajib menyebut path satu per satu:
@@ -117,6 +118,42 @@ bukan pula dipindahkan ke taskdir baru.
 > `reentry_reason` menyebut brief yang terblokir → `plan` menerbitkan brief pengganti ber-`supersedes`
 > di `NN` berikutnya pada taskdir yang sama; `scaffold_brief.py` menandai brief `BLOCKED` (dan brief
 > `READY` hilirnya yang diterbitkan ulang) `SUPERSEDED`.
+
+### 3a. Penanda Henti `{taskdir}/HALT.md`
+
+Vonis gerbang kompilasi per-brief (Fase 3 butir 3b), scope, dan simbol (butir 4) jatuh **sesudah**
+implementor meng-commit brief sebagai `DONE`. Vonis yang hanya hidup di laporan percakapan hilang saat
+sesi putus: sesi berikutnya melihat brief itu `DONE`, memilih `NN+1`, dan melanjutkan di atas kode yang
+diketahui rusak. `HALT.md` mencatat vonis itu di disk dan ter-commit; check 7 skrip prasyarat menolak
+setiap sesi selama berkas itu ada.
+
+```markdown
+---
+brief: brief-02-endpoint.md
+verdict: COMPILE | SCOPE | SYMBOL | STRAY
+sha: <sha7 commit brief yang divonis>
+baseline: <sha7 merge-base> · <hijau | merah (n galat) | TERDEGRADASI (alasan)>
+---
+# HALT — brief-02-endpoint
+
+## Galat
+<maks 40 baris: keluaran kompilator | berkas/simbol di luar scope beserta file:baris | path berkas liar>
+
+## Rute
+COMPILE/SYMBOL/STRAY → tech-lead → PLANNING taskdir sama (reentry_reason = berkas ini) → plan: baris `repairs: "02"` + terbit ulang brief READY hilir.
+SCOPE → tech-lead tanyakan ke user: terima (cabut HALT) atau reset.
+```
+
+Kunci dengan `git add {taskdir}/HALT.md && git commit -m "chore(<slug>): tahan rantai di brief-NN (<verdict>)"`.
+
+| Pencabut | Kapan | Mekanisme |
+| --- | --- | --- |
+| `plan` | Brief perbaikan ber-`repairs: brief-NN` ditulis `scaffold_brief.py --nn` | Skrip menghapus `HALT.md`; `git rm -q {taskdir}/HALT.md` ikut commit agregat `plan` |
+| `tech-lead` | `SCOPE`/`SYMBOL` diterima user | `git rm -q {taskdir}/HALT.md` + `docs(<slug>): cabut HALT brief-NN (scope diterima user)` |
+| `architect` | tidak pernah | — |
+
+`HALT.md` berada di bawah `backenddev/`, sehingga commit-nya tidak membuat `REVIEW.md` basi dan termasuk
+zona artefak `tech-lead --re-entry`.
 
 ### Matriks Bukti Disk untuk Amplop `BLOCKED`
 
