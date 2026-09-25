@@ -30,7 +30,7 @@ metadata:
 ### Phase 0 — Serap Profil & Baseline
 
 1. Serap `stack` dari `.claude/profile/frontenddev/index.json`, perintah dari `commands.md`, dan baris `typecheck-per-brief` `## Commands` adapter `${CLAUDE_PLUGIN_ROOT}/skills/profile/stacks/<stack>.md`.
-2. `typecheck-per-brief: ya` → jalankan `typecheck` sekali sekarang dan simpan jumlah galatnya sebagai baseline gerbang kompilasi. Merah di sini bukan alasan berhenti — ia yang membuat gerbang dapat memvonis galat **baru**.
+2. Ambil baseline seluruh perintah `commands.md` profil (typecheck, lint, test, build) sekali, sebelum implementor pertama: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/run_verification.py baseline --taskdir <taskdir> --cmd typecheck='<…>' --cmd lint='<…>' --cmd test='<…>' --cmd build='<…>'` lewat Bash `run_in_background: true`, lalu tunggu notifikasi selesainya. Skrip menyimpan exit code, durasi, dan tanda galat tiap perintah ke `{taskdir}/.explore/verification-baseline.json`; baseline yang sudah ada dipakai ulang (re-entry), tidak diukur ulang. Merah di sini bukan alasan berhenti — ia yang membuat gerbang kompilasi dan verifikasi penutup dapat memvonis galat **baru**.
 3. Sajikan rantai sebelum implementor pertama berangkat: tabel `NN`, unit, status, `files_touched`, `depends_on`. Dilarang menahan rantai untuk meminta otorisasi commit — persetujuan breakdown sudah dimateraikan di ledger.
 
 ### Phase 1 — Ingest
@@ -51,7 +51,7 @@ Berkas yang muncul di diff unit, di galat kompilasi, atau di `REVIEW.md` sementa
 
 ### Phase 4 — Verifikasi Penutup & Review Tunggal
 
-1. Jalankan seluruh perintah `commands.md` profil plus `verification` brief yang belum tercakup, sekali, dipipe `2>&1 | tail -40`; tulis tabel hasilnya ke `{taskdir}/.explore/closing-verification.md` (bagian 7). Merah berarti `TIMEOUT` atau galat baru > 0 dibanding baseline; `MERAH` bergalat baru 0 adalah warisan baseline, bukan alasan berhenti. Merah → klasifikasikan tiap berkas galat: cacat eksekusi (di dalam union → `chain.py reopen --row BRIEF` → `plan` APPEND brief perbaikan, di taskdir yang sama) atau berkas yatim (di luar union → Phase 3), lalu berhenti tanpa reviewer.
+1. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/run_verification.py closing --taskdir <taskdir> --cmd <nama>='<perintah>' …` untuk seluruh perintah `commands.md` profil (nama sama dengan baseline Phase 0) plus `verification` brief yang belum tercakup, sekali, lewat Bash `run_in_background: true`. Dilarang memipe keluaran ke `tail`/`head` atau menyimpulkan vonis dari teks log. Skrip menulis `{taskdir}/.explore/closing-verification.md` (bagian 7); exit 0 = tidak ada merah baru, exit 1 = `TIMEOUT` atau galat baru > 0, exit 2 = pemanggilan salah. `MERAH` bergalat baru 0 adalah warisan baseline, bukan alasan berhenti. Exit 1 → klasifikasikan tiap berkas galat: cacat eksekusi (di dalam union → `chain.py reopen --row BRIEF` → `plan` APPEND brief perbaikan, di taskdir yang sama) atau berkas yatim (di luar union → Phase 3), lalu berhenti tanpa reviewer.
 2. Hijau → hidrasi `dispatcher/reviewer.md` dengan `{ taskdir, base, verification_log, template, finding_source }` — `base` = commit akar `TASK.md`, divonis `validate_review.py` — dan dispatch `code-reviewer` (`subagent_type`: `frontenddev:code-reviewer`) tepat sekali.
 3. Jalankan `validate_review.py` dan petakan hasilnya lewat `### Penanganan Balikan` template itu. `PASS` → `git add {taskdir}/REVIEW.md [<finding_source>]` lalu commit `docs(<slug>): closing review <verdict>`.
 
@@ -99,7 +99,7 @@ Rantai bersih — seluruh brief `DONE`, verifikasi hijau, review `PASS`/`WARNING
 2. **Laporan unit absen atau rusak, tree selain itu bersih**: kegagalan dispatch — hapus `report-<NN>.md` rusak yang belum ter-commit (Check 12 menuntut ia absen), lalu ulangi sebanyak `max_dispatch_retry` dengan slot sama; brief tetap `READY`.
 3. **Laporan unit absen, tree kotor**: HENTIKAN, tampilkan berkas kotor, eskalasi ke user; dilarang retry, rollback otomatis, dan commit.
 4. **Commit unit gagal** (hook, lock): ulangi sekali sesudah memeriksa penyebabnya; tetap gagal → hentikan dan serahkan riwayat git ke user. Dilarang `--no-verify`.
-5. **Verifikasi penutup macet** (>5 menit): tandai perintah itu `TIMEOUT` di log — bernilai merah; klasifikasi Phase 4 butir 1 tetap berjalan.
+5. **Perintah verifikasi melewati batas waktu**: `run_verification.py` membunuh pohon prosesnya pada `--timeout` (default 300 detik) dan mencatat `TIMEOUT` — bernilai merah; klasifikasi Phase 4 butir 1 tetap berjalan.
 6. **Reviewer gagal dua kali**: sebelum berhenti, bersihkan tree — buang `REVIEW.md` yang tidak sah (`git restore -- {taskdir}/REVIEW.md` bila ter-track, hapus bila baru) dan pulihkan suntingan `finding_source` yang belum ter-commit (`git restore -- <finding_source>`); lalu laporkan review tidak tuntas. `REPORT.md` tidak dipanggil.
 7. **Detached HEAD atau rebase berjalan**: hentikan di Precondition; minta user kembali ke branch sah.
 
