@@ -64,6 +64,20 @@ Menutup jalur tempat plugin bisa merusak data atau kerja user — migrasi DB saa
 4. **L3.1** — `migration-status` dijalankan sesudah izin, atau tidak pernah dijalankan (cukup dicatat).
 5. **L3.2** — `composer install --optimize-autoloader` (default usulan) atau `composer dump-autoload -o` (tanpa jaringan, tidak menyentuh `vendor/`).
 
+## Catatan implementasi (2026-09-25)
+
+Keputusan user: (1) L3.4 frontenddev Opsi B, backenddev Opsi A; (2) baseline L3.3 dijalankan penuh di awal rantai; (3) skrip bersama di `skills/_common/` tiap plugin, salinan identik + test paritas; (4) `migration-status` dijalankan sesudah izin; (5) build PHP `composer install --optimize-autoloader`. Satu commit per item (L3.1 dan L3.2 satu commit karena menyunting tabel yang sama). `pytest` seluruh repo lulus. Verifikasi manual di sesi Claude Code nyata **belum** dijalankan — termasuk bukti empiris `agent_type` di input hook (L3.4 Verifikasi manual 1), prasyarat sebelum Opsi A diandalkan.
+
+Penyimpangan dari rencana di bawah:
+
+- **Letak test**: `test_adapter_commands.py` (L3.1 + L3.2, termasuk reproduksi composer offline yang di-skip bila `composer` absen), `test_l34_guard_bash.py`, `test_l36_reviewer_branch.py` di `src/plugins/backenddev/tests/`; `test_run_verification.py` (paritas + kompatibilitas `validate_review.py`) dan `test_l34_implementor_no_bash.py` di `src/plugins/frontenddev/tests/`. Cek teks L3.5 menumpang di `quickdev/tests/test_skill_text.py`, bukan `scripts/lint_plugins.py` (belum ada).
+- **L3.1**: `_CONTRACT.md` kini menyebut sembilan baris perintah (termasuk `typecheck-scoped`/`typecheck-per-brief`). Baris status `node.md` memakai `npx --no-install`; sisa `npx` adapter (typecheck/lint, juga frontenddev) belum diubah — temuan Langkah 8. `slicing-and-scan.md` plan menunjuk pola berkas migrasi baris baru. `gofmt -l .` (L3.3 Risiko) juga belum diubah.
+- **L3.3**: judul ekor log di `closing-verification.md` memakai `###` agar tetap di dalam `## Verifikasi Penutup` saat disalin reviewer ke `REVIEW.md`. Baseline backenddev mempertahankan kunci merge-base L2 (worktree sementara bila HEAD ≠ merge-base) dan kini mengukur `build`+`test` (+`typecheck` bila per-brief `ya`) ke `verification-baseline.json`; berkas `baseline-<sha7>.txt` tidak dipakai lagi. Gerbang per brief kedua plugin memakai `closing --out .explore/gate-NN.md`.
+- **L3.4**: `guard_bash.py` hanya ada di backenddev (tanpa `--plugin`), matcher `Bash|Edit|Write` (A4 ikut dikerjakan), perintah hook memakai bentuk `command` string seperti entri `SessionStart` yang ada. Allowlist Bash: git baca (hanya `--output`/`--ext-diff` yang ditolak), `git add <path lease>` tanpa flag/glob, `git commit -m`. Lease memuat `finding_source` (L2.6/D3). Parser scope ada di `_common/verify_scope.py` (membaca `files_touched` dan tabel `## File scope`), dipakai ulang `guard_bash.py`; `verify_scope.py` juga memvonis `finding_source` = hanya baris `> Status: FIXED`, menggantikan pipeline `grep -vc` architect.
+- **L3.5**: guardrail lama "tidak mengabaikan baseline" dipertahankan dengan tambahan "atau ditolak user".
+- **L3.6**: cek branch di check 4 prasyarat architect; `--base-branch` menang atas `index.json`. Fixture `chain_repo` kini berpindah ke branch `fix/order-fix` sesudah commit awal.
+- Log Keputusan L3.4 di `ISSUES.md` diisi lokal (berkas itu di-gitignore).
+
 ## Definisi selesai langkah ini
 
 - Keenam checkbox tercentang, masing-masing memenuhi **Selesai bila**-nya.
@@ -76,7 +90,7 @@ Menutup jalur tempat plugin bisa merusak data atau kerja user — migrasi DB saa
 
 ## L3.1 [Tinggi] Profiling backenddev bisa menerapkan migrasi database ✔ diverifikasi ulang
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev (cek silang frontenddev, quickdev) · **Estimasi:** 4–5 jam · **Bergantung pada:** — · **Memblokir:** L3.5 (memakai pola izin yang sama)
 
@@ -263,7 +277,7 @@ Harapan: `AskUserQuestion` muncul memuat `migration-status`; opsi `hanya yang of
 
 ## L3.2 [Tinggi] Build adapter PHP menghapus dependensi dev ✔ diverifikasi ulang
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 1 jam · **Bergantung pada:** — · **Memblokir:** — (memberi fixture PHP untuk test L3.3)
 
@@ -360,7 +374,7 @@ Urutan build → test di fixture PHP hijau (baris [3] reproduksi), dan test lint
 
 ## L3.3 [Sedang] Verifikasi penutup menelan exit code
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev, frontenddev · **Estimasi:** 1,5 hari · **Bergantung pada:** — (lunak: L6.1) · **Memblokir:** — (membantu L2.4, L4.2)
 
@@ -706,7 +720,7 @@ Sesudah itu, jalankan satu rantai frontenddev dan satu backenddev di repo contoh
 
 ## L3.4 [Tinggi] Bash di code-implementor tanpa pagar mekanis
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev, frontenddev · **Estimasi:** Opsi A 2 hari · Opsi B frontenddev 2–3 jam, backenddev 1 hari · **Bergantung pada:** keputusan user (Log Keputusan L3.4), L2.6 (path `finding_source` di lease/daftar staging), L1.2/L1.3 (menyunting `hooks/hooks.json` yang sama) · **Memblokir:** —
 
@@ -1121,7 +1135,7 @@ FAIL scope worktree: 1 berkas di luar scope: src/other/leak.ts (exit 1)
 
 ## L3.5 [Sedang] quickdev:profile menjalankan test/build tanpa konfirmasi
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** quickdev · **Estimasi:** 2 jam · **Bergantung pada:** L3.1 (teks pola izin) · **Memblokir:** —
 
@@ -1208,7 +1222,7 @@ quickdev:profile tidak mengeksekusi perintah apa pun sebelum izin user, setiap p
 
 ## L3.6 [Sedang] Commit laporan code-reviewer backenddev tanpa pemeriksaan branch dan konvensi
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 2–3 jam · **Bergantung pada:** L2.1 (baris yang sama: `code-reviewer.md:80`) · **Memblokir:** —
 
