@@ -184,7 +184,7 @@ def lint_plugin(root: Path, pdir: Path, rep: Report, modes: Dict[str, str]) -> N
         if "metadata" in fm and not isinstance(fm["metadata"], dict):
             rep.add("WARN", "F1", where, "metadata bukan map (dibuang Claude Code)")
         if INVOKED.match(fm.get("description", "")) and fm.get("user-invocable") != "false":
-            rep.add("WARN", "F3", where, "skill \"Dipanggil …\" tanpa `user-invocable: false` (L7.4)")
+            rep.add("FAIL", "F3", where, "skill \"Dipanggil …\" tanpa `user-invocable: false` (L7.4)")
     # F2 — frontmatter agent
     for agent_md in sorted(pdir.glob("agents/*.md")):
         where = rel(root, agent_md)

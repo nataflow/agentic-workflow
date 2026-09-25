@@ -125,8 +125,8 @@ def test_f2_agent(tmp_path):
 def test_f3_dipanggil_tanpa_user_invocable_false(tmp_path):
     p = "src/plugins/demo/skills/plan/SKILL.md"
     body = "---\nname: plan\ndescription: Dipanggil lead sesudah kontrak.\n{extra}---\n"
-    assert ("WARN", "F3") in found(mini(tmp_path, **{p: body.format(extra="")}))
-    assert ("WARN", "F3") not in found(mini(tmp_path, **{p: body.format(extra="user-invocable: false\n")}))
+    assert ("FAIL", "F3") in found(mini(tmp_path, **{p: body.format(extra="")}))
+    assert ("FAIL", "F3") not in found(mini(tmp_path, **{p: body.format(extra="user-invocable: false\n")}))
 
 
 def test_r1_rujukan_hilang_dan_singkat(tmp_path):
@@ -212,10 +212,10 @@ def test_cli_ignore_strict_json(tmp_path):
 
 
 def test_repo_ini_hanya_gagal_di_check_yang_dijadwalkan():
-    """Repo sendiri: FAIL hanya boleh dari check yang ditunda (M3/M4 ← L7.1, M5 ← L7.2, R2 ← X1).
+    """Repo sendiri: FAIL hanya boleh dari check yang ditunda (R2 ← X1).
 
     Hapus ID dari DEFERRED di PR yang memperbaikinya, bersamaan dengan LINT_IGNORE di CI.
     """
-    deferred = {"M3", "M4", "M5", "R2"}
+    deferred = {"R2"}
     fails = {i["check"] for i in lint_mod.lint(REPO).items if i["level"] == "FAIL"}
     assert fails <= deferred, fails - deferred

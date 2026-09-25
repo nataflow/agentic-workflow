@@ -14,6 +14,11 @@ from typing import Dict, Optional
 
 import pytest
 
+# Jangan tinggalkan __pycache__ di src/plugins/ (lint G1): berlaku untuk import di proses
+# pytest dan untuk subprocess yang mewarisi os.environ.
+sys.dont_write_bytecode = True
+os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
+
 REPO = Path(__file__).resolve().parents[1]
 PLUGINS = REPO / "src" / "plugins"
 
