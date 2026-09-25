@@ -46,11 +46,18 @@ untuk traversal dan memverifikasi commit-nya mendarat — tidak pernah menulisny
    ada. Memvonis tuntas atas `REVIEW.md` saja membuat `report` yang gagal commit — atau tak pernah
    berangkat karena sesi sebelumnya putus di antara Fase 4 dan Fase 5 — tidak pernah dijemput siapa pun.
 
-   | Seluruh brief tertutup (`DONE`/`SUPERSEDED`) | `REVIEW.md` | `REPORT.md` | Titik masuk sesi ini |
-   | --- | --- | --- | --- |
-   | ya | tidak ada | — | Fase 4 — jalankan gerbang verifikasi lalu review penutup |
-   | ya | ada | tidak ada | Fase 5 — panen laporan rantai lewat `backenddev:report`; commit trail direkonstruksi dari `git log`, severity dibaca dari `REVIEW.md`, dan tidak ada satu pun subagent didispatch ulang |
-   | ya | ada | ada | Rantai tuntas — laporkan apa adanya, jangan menulis ulang artefak yang sudah terbit |
+   | Seluruh brief tertutup (`DONE`/`SUPERSEDED`) | `REVIEW.md` | Segar (check 3)? | `REPORT.md` | Titik masuk sesi ini |
+   | --- | --- | --- | --- | --- |
+   | ya | tidak ada | — | — | Fase 4 — jalankan gerbang verifikasi lalu review penutup |
+   | ya | ada | **tidak** (commit brief/kode sesudahnya) | — | Fase 4 — verifikasi lalu **satu review baru**; `REVIEW.md` lama ditimpa reviewer |
+   | ya | ada | ya | tidak ada | Fase 5 — panen laporan rantai lewat `backenddev:report`; commit trail direkonstruksi dari `git log`, severity dibaca dari `REVIEW.md`, dan tidak ada satu pun subagent didispatch ulang |
+   | ya | ada | ya | ada | Rantai tuntas — laporkan apa adanya, jangan menulis ulang artefak yang sudah terbit |
+
+   Kesegaran dibaca dari riwayat git, bukan dari teks `range:` yang ditulis reviewer: `REVIEW.md` basi
+   bila ada commit yang menyentuh `{taskdir}/brief-*.md` atau kode di luar `backenddev/` dan `.claude/`
+   sesudah commit terakhir `REVIEW.md`. Commit `REPORT.md`, `HALT.md`, `TASK.md`, profil, dan indeks
+   issues tidak membuatnya basi. Tanpa aturan ini `REVIEW.md` ber-`P1` yang basi memutar rantai tanpa
+   ujung: architect lompat ke Fase 5, `report` menolak `P1`, gerbang merutekan `P1` ke `PLANNING` lagi.
 
 ______________________________________________________________________
 

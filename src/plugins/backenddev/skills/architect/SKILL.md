@@ -11,7 +11,7 @@ metadata:
 - Dilarang menjalankan implementor secara paralel atau meneruskan brief jika terdapat status `BLOCKED`.
 - Commit dikerjakan penulisnya, bukan oleh skill ini.
 - Verifikasi tiap commit benar-benar mendarat dan diff-nya tidak melewati file scope sebelum melanjutkan.
-- Dispatch `code-reviewer` tepat satu kali di akhir rantai atas merge-base `base_branch` HEAD.
+- Dispatch `code-reviewer` tepat satu kali di akhir tiap putaran rantai atas merge-base `base_branch` HEAD; putaran baru dimulai saat `REVIEW.md` basi.
 
 ## Precondition [REQUIRED]
 
@@ -48,8 +48,8 @@ Pindai direktori tugas untuk menentukan titik awal eksekusi deterministik:
    - `BLOCKED`: Hentikan eksekusi, laporkan ke gerbang. Brief itu ditutup `plan` lewat brief pengganti, bukan oleh skill ini — skrip sudah `FAIL` di check 3 sekalipun ada brief `READY` sesudahnya.
    - Nilai di luar `READY|DONE|BLOCKED|SUPERSEDED`: Hentikan eksekusi, laporkan nilai terbaca beserta path briefnya.
    - Seluruh brief tertutup (`DONE`/`SUPERSEDED`): ikuti `entry` check 3. Rantai dinyatakan tuntas hanya ketika `REVIEW.md` **dan** `REPORT.md` sama-sama ada.
-     - `FASE_4` — `REVIEW.md` belum ada: Lompat ke Fase 4 untuk verifikasi penutup lalu review.
-     - `FASE_5` — `REVIEW.md` ada, `REPORT.md` belum ada: Lompat ke Fase 5 untuk memanen laporan rantai yang belum terbit — `report` yang gagal commit atau tidak pernah berangkat di sesi sebelumnya dijemput persis di sini. Rekonstruksi tabel commit trail dari `git log` dan severity dari `REVIEW.md`; dilarang mendispatch ulang implementor maupun reviewer yang keluarannya sudah mendarat.
+     - `FASE_4` — `REVIEW.md` belum ada **atau basi** (commit brief/kode mendarat sesudah commit `REVIEW.md`): Lompat ke Fase 4 untuk verifikasi penutup lalu satu review baru. Dilarang menilai kesegaran `REVIEW.md` sendiri dari keberadaan berkasnya — skrip membacanya dari riwayat git.
+     - `FASE_5` — `REVIEW.md` segar, `REPORT.md` belum ada: Lompat ke Fase 5 untuk memanen laporan rantai yang belum terbit — `report` yang gagal commit atau tidak pernah berangkat di sesi sebelumnya dijemput persis di sini. Rekonstruksi tabel commit trail dari `git log` dan severity dari `REVIEW.md`; dilarang mendispatch ulang implementor maupun reviewer yang keluarannya sudah mendarat.
      - `TUNTAS` — keduanya ada: Rantai tuntas. Laporkan apa adanya tanpa mendispatch siapa pun dan tanpa menulis ulang artefak yang sudah terbit.
 
 ### Fase 2 — Presentasi Rencana Kerja & Penguncian Konfigurasi
@@ -126,7 +126,7 @@ Sajikan laporan deterministik kepada main loop:
 
 - **STRICT NON-AUTHORING**: Dilarang keras membuat, mengedit, atau menghapus berkas kode di `src/` langsung dari main loop architect.
 - **SEKUENSIAL MUTLAK**: Dilarang mendispatch implementor paralel; subagent berikutnya berangkat hanya setelah subagent sebelumnya tuntas dan commit mendarat.
-- **SATU KALI REVIEW DI AKHIR**: Reviewer didispatch tepat sekali di akhir rantai.
+- **SATU REVIEW PER PUTARAN**: Reviewer didispatch tepat sekali di akhir tiap putaran rantai. `REVIEW.md` yang dinyatakan basi oleh check 3 menandai putaran baru (brief/kode mendarat sesudahnya), dan tepat satu review baru wajib berangkat sesudah verifikasi penutup hijau.
 - **TEST DI PENUTUP, KOMPILASI PER BRIEF**: Test suite dijalankan tepat sekali di Fase 4 butir 1. Kompilasi berjalan sesudah tiap brief pada stack yang `typecheck-per-brief`-nya `ya` (Fase 3 butir 3b) — lantai "titik hijau mandiri" menuntutnya, dan pada stack inkremental biayanya mendekati nol. Stack yang kompilasinya build penuh menundanya ke penutup, dan konsekuensinya diterima apa adanya: brief yang memecahkan kompilasi di sana baru ketahuan di Fase 4, dengan diagnosis lewat `git log` Failure path butir 4.
 - **COMMIT MILIK PENULISNYA**: Skill ini tidak meng-commit `src/**`, `{taskdir}/REVIEW.md`, `backenddev/issues/README.md`, maupun `{taskdir}/REPORT.md`. Jalankan commit susulan hanya saat commit hilir terbukti gagal, dengan staging path eksplisit tanpa wildcard (`git add .`/`-A` dilarang keras).
 - **LARANGAN GIT MUTASI REMOTE**: Dilarang `git push`, `git merge`, `git rebase`, atau `gh pr create` tanpa instruksi eksplisit user.

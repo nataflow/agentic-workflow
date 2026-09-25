@@ -2,7 +2,7 @@
 
 Gunakan template ini saat `architect` mendispatch subagent penilai diff (`code-reviewer`) secara langsung.
 
-**Tujuan:** Menilai seluruh diff branch satu taskdir terhadap kontrak gabungan briefnya, tepat satu kali di akhir rantai, dan mengunci hasilnya sebagai `{taskdir}/REVIEW.md`.
+**Tujuan:** Menilai seluruh diff branch satu taskdir terhadap kontrak gabungan briefnya, tepat satu kali di akhir tiap putaran rantai, dan mengunci hasilnya sebagai `{taskdir}/REVIEW.md`.
 
 **Dispatch setelah:** Fase 4 butir 1 hijau — build dan test penutup lulus dan tiap brief taskdir sudah tertutup — `DONE` dengan commitnya mendarat, atau `SUPERSEDED` bertaut ke penggantinya.
 
@@ -35,7 +35,7 @@ Review seluruh branch pekerjaan untuk satu direktori tugas.
 
 ### Aturan untuk Pendispatch
 
-- **Tepat satu kali di akhir rantai**: reviewer berangkat sekali atas seluruh diff branch gabungan, sesudah brief terakhir `DONE`. Dilarang mendispatch per brief maupun mengulang review untuk temuan yang sama.
+- **Tepat satu kali di akhir tiap putaran**: reviewer berangkat sekali atas seluruh diff branch gabungan, sesudah brief terakhir `DONE`. Dilarang mendispatch per brief. Review ulang sah tepat sekali per putaran, yaitu saat check 3 skrip prasyarat menyatakan `REVIEW.md` basi.
 - **Sesudah verifikasi penutup hijau**: build dan test Fase 4 butir 1 lulus lebih dulu. Mendispatch reviewer di atas branch yang buildnya merah menghasilkan temuan yang tak dapat dipisahkan dari kegagalan build.
 - **Dilarang menyalin isi berkas**: jangan salin isi brief, diff, atau `.claude/profile/backenddev/` ke dalam prompt. Sebutkan path-nya; subagent membacanya sendiri secara terisolasi.
 - **Audit hidrasi sebelum berangkat**: batalkan dispatch bila prompt masih memuat slot kurung kurawal `{...}` mentah atau placeholder `TBD`/`TODO`.

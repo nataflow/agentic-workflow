@@ -24,7 +24,7 @@ from precondition_lib import (  # noqa: E402
     foreign_owner,
     legacy_suffix,
 )
-from brief_status import BRIEF_STATUSES, CLOSED, scan_briefs, validate_links  # noqa: E402
+from brief_status import BRIEF_STATUSES, CLOSED, review_freshness, scan_briefs, validate_links  # noqa: E402
 
 
 def _strip_explore_scratch(status_out: str) -> str:
@@ -267,14 +267,22 @@ class PreconditionChecker:
         if not (td / "REVIEW.md").exists():
             return self._add(cid, name, "PASS", f"Seluruh brief tertutup ({closed}), REVIEW.md belum ada",
                              "Jalankan Fase 4 (verifikasi penutup lalu review).", entry="FASE_4")
+        # REVIEW.md yang ada belum tentu menutup HEAD: brief perbaikan (P1, BLOCKED,
+        # HALT) yang mendarat sesudahnya membuka putaran baru yang wajib diverifikasi
+        # dan direview ulang, bukan dilompati ke Fase 5.
+        fresh, why = review_freshness(self.root, self._get_rel_taskdir_str())
+        if not fresh:
+            return self._add(cid, name, "PASS", f"Seluruh brief tertutup ({closed}); REVIEW.md basi — {why}",
+                             "Jalankan Fase 4 ulang: verifikasi penutup lalu SATU review baru; dilarang lompat ke Fase 5.",
+                             entry="FASE_4")
         if (td / "REPORT.md").exists():
             return self._add(cid, name, "PASS",
-                             f"Seluruh brief tertutup ({closed}); REVIEW.md dan REPORT.md sudah terbit (rantai tuntas)",
+                             f"Seluruh brief tertutup ({closed}); {why}; REPORT.md sudah terbit (rantai tuntas)",
                              entry="TUNTAS")
         # Rantai tuntas menuntut DUA artefak penutup. REVIEW.md yang berdiri sendiri
         # berarti `report` gagal commit atau tak pernah berangkat di sesi sebelumnya;
         # Fase 1 menjemputnya di Fase 5, bukan memvonis rantai selesai.
-        self._add(cid, name, "PASS", f"Seluruh brief tertutup ({closed}) dan REVIEW.md terbit, REPORT.md belum ada",
+        self._add(cid, name, "PASS", f"Seluruh brief tertutup ({closed}); {why}, REPORT.md belum ada",
                   "Lompat ke Fase 5 untuk memanen laporan rantai lewat `backenddev:report`; "
                   "dilarang mendispatch ulang implementor atau reviewer.", entry="FASE_5")
 
@@ -463,8 +471,8 @@ class PreconditionChecker:
         ]
         for r in self.results:
             lines.append(f"[{r['id']}] {r['name']:<32} : {r['status']} ({r['summary']})")
-            if r["status"] == "FAIL" and r["action"]:
-                lines.append(f"    * Tindakan: {r['action']}")
+            if r["action"]:
+                lines.append(f"    * {'Tindakan' if r['status'] == 'FAIL' else 'Titik masuk'}: {r['action']}")
 
         return "\n".join(lines)
 

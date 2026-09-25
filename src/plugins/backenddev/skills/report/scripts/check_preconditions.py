@@ -24,7 +24,7 @@ from precondition_lib import (  # noqa: E402
     foreign_owner,
     legacy_suffix,
 )
-from brief_status import CLOSED, scan_briefs, validate_links  # noqa: E402
+from brief_status import CLOSED, review_freshness, scan_briefs, validate_links  # noqa: E402
 
 
 def _strip_explore_scratch(status_out: str) -> str:
@@ -225,11 +225,22 @@ class PreconditionChecker:
             })
             return
 
+        fresh, why = review_freshness(self.root, self._get_rel_taskdir_str())
+        if not fresh:
+            self.results.append({
+                "id": check_id,
+                "name": name,
+                "status": "FAIL",
+                "summary": f"REVIEW.md basi — {why}",
+                "action": "Kembalikan ke `backenddev:architect` Fase 4 (review ulang); REPORT.md atas review basi dilarang.",
+            })
+            return
+
         self.results.append({
             "id": check_id,
             "name": name,
             "status": "PASS",
-            "summary": "REVIEW.md terverifikasi di taskdir",
+            "summary": f"REVIEW.md terverifikasi di taskdir ({why})",
             "action": "",
         })
 
