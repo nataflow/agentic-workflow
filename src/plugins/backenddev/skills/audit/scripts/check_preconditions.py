@@ -4,16 +4,14 @@
 Automates verification of repository preconditions before audit sweep execution.
 Runs checks 1 through 6 in a single pass and produces a compact, actionable report.
 Zero external dependencies (Python Standard Library only). Satu impor intra-plugin:
-`skills/_common/precondition_lib.py` untuk uji izin tulis, di-bootstrap relatif
-terhadap berkas ini.
+`skills/_common/precondition_lib.py` (parser frontmatter, taskdir, chain, profil,
+berkas plugin, keluaran), di-bootstrap relatif terhadap berkas ini.
 """
 
 import argparse
-import json
 import os
 from pathlib import Path
 import re
-import subprocess
 import sys
 from typing import Any, Dict, List, Optional
 
@@ -23,11 +21,13 @@ from typing import Any, Dict, List, Optional
 # ini, bukan terhadap cwd — skrip dipanggil dengan path absolut dari mana saja.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
-    resolve_profile_dir,
-    foreign_owner,
+    find_repo_root,
+    format_text,
     legacy_suffix,
-    nearest_existing_ancestor as _nearest_existing_ancestor,
+    load_profile_index,
+    plugin_file,
     probe_writable as _probe_writable,
+    to_json,
 )
 
 
@@ -38,24 +38,11 @@ class PreconditionChecker:
         dimensions: Optional[str] = None,
         target_root: Optional[Path] = None,
     ):
-        self.root = (target_root or self._find_repo_root()).resolve()
+        self.root = (target_root or find_repo_root()).resolve()
         self.target_scope_arg = target_scope
         self.dimensions_arg = dimensions
         self.results: List[Dict[str, Any]] = []
 
-    def _find_repo_root(self) -> Path:
-        """Find the git repository root or fallback to cwd."""
-        try:
-            out = subprocess.check_output(
-                ["git", "rev-parse", "--show-toplevel"],
-                stderr=subprocess.DEVNULL,
-                universal_newlines=True,
-            ).strip()
-            if out and os.path.isdir(out):
-                return Path(out)
-        except Exception:
-            pass
-        return Path.cwd()
 
     def run_all(self) -> bool:
         """Run checks 1 through 6."""
@@ -70,18 +57,8 @@ class PreconditionChecker:
     def _check_1_source_root(self):
         check_id = 1
         name = "Source Root Read Access"
-        profile_dir = resolve_profile_dir(self.root)[0]
-        index_file = profile_dir / "index.json"
-
-        src_rel = "src"
-        if index_file.exists():
-            try:
-                with open(index_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    if data.get("source_root"):
-                        src_rel = data["source_root"]
-            except Exception:
-                pass
+        data = load_profile_index(self.root, required=("source_root",)).data
+        src_rel = data["source_root"] if data else "src"
 
         src_dir = self.root / src_rel
         if not src_dir.exists() and not (self.root / "src").exists():
@@ -116,51 +93,17 @@ class PreconditionChecker:
     def _check_2_profile_config(self):
         check_id = 2
         name = "Profile Configuration"
-        profile_dir, legacy_note = resolve_profile_dir(self.root)
-        index_file = profile_dir / "index.json"
-
-        if not index_file.exists():
+        prof = load_profile_index(self.root)
+        if not prof.ok:
             self.results.append({
                 "id": check_id,
                 "name": name,
                 "status": "FAIL",
-                "summary": "Berkas .claude/profile/backenddev/index.json tidak ditemukan",
-                "action": "Jalankan skill `backenddev:profile` untuk membuat profil repositori.",
+                "summary": prof.error,
+                "action": prof.action,
             })
             return
-
-        owner = foreign_owner(profile_dir)
-        if owner:
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "FAIL",
-                "summary": f"Profil di {profile_dir.relative_to(self.root).as_posix()}/ milik `{owner}`; bukan profil backenddev",
-                "action": "Jangan membaca atau menimpa profil plugin lain; jalankan `backenddev:profile` (ditulis ke `.claude/profile/backenddev/`).",
-            })
-            return
-
-        try:
-            with open(index_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            if not data.get("stack"):
-                self.results.append({
-                    "id": check_id,
-                    "name": name,
-                    "status": "FAIL",
-                    "summary": "Field 'stack' tidak ditemukan pada index.json",
-                    "action": "Jalankan `backenddev:profile` untuk memperbarui field stack.",
-                })
-                return
-        except Exception as e:
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "FAIL",
-                "summary": f"Format JSON corrupt pada index.json: {e}",
-                "action": "Perbaiki berkas index.json.",
-            })
-            return
+        data, legacy_note, profile_dir = prof.data, prof.note, prof.dir
 
         required_docs = ["module-structure.md", "anti-patterns.md", "invariants.md"]
         missing_docs = [doc for doc in required_docs if not (profile_dir / doc).exists()]
@@ -185,26 +128,10 @@ class PreconditionChecker:
     def _check_3_stack_adapter(self):
         check_id = 3
         name = "Stack Adapter Resolution"
-        profile_dir = resolve_profile_dir(self.root)[0]
-        index_file = profile_dir / "index.json"
-        stack_id = "unknown"
+        data = load_profile_index(self.root, required=("stack",)).data
+        stack_id = data["stack"] if data else "unknown"
 
-        if index_file.exists():
-            try:
-                with open(index_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    stack_id = data.get("stack", "unknown")
-            except Exception:
-                pass
-
-        candidate_paths = [
-            self.root / "src" / "plugins" / "backenddev" / "skills" / "profile" / "stacks" / f"{stack_id}.md",
-            Path.home() / ".gemini" / "config" / "plugins" / "backenddev" / "skills" / "profile" / "stacks" / f"{stack_id}.md",
-            Path.home() / ".claude" / "plugins" / "backenddev" / "skills" / "profile" / "stacks" / f"{stack_id}.md",
-            Path(__file__).resolve().parent.parent.parent / "profile" / "stacks" / f"{stack_id}.md",
-        ]
-
-        found = any(p.exists() for p in candidate_paths)
+        found = plugin_file("skills", "profile", "stacks", f"{stack_id}.md")
         if not found:
             self.results.append({
                 "id": check_id,
@@ -329,31 +256,10 @@ class PreconditionChecker:
         })
 
     def format_text(self) -> str:
-        all_passed = all(r["status"] == "PASS" for r in self.results)
-        passed_count = sum(1 for r in self.results if r["status"] == "PASS")
-        total = len(self.results)
-        status_label = "PASS" if all_passed else "FAIL"
-
-        lines = [
-            f"PRECONDITION CHECK: audit [{status_label}] ({passed_count}/{total} passed)",
-        ]
-        for r in self.results:
-            lines.append(f"[{r['id']}] {r['name']:<32} : {r['status']} ({r['summary']})")
-            if r["status"] == "FAIL" and r["action"]:
-                lines.append(f"    * Tindakan: {r['action']}")
-
-        return "\n".join(lines)
+        return format_text("audit", self.results)
 
     def to_json(self) -> str:
-        all_passed = all(r["status"] == "PASS" for r in self.results)
-        return json.dumps({
-            "status": "PASS" if all_passed else "FAIL",
-            "passed_count": sum(1 for r in self.results if r["status"] == "PASS"),
-            "total_count": len(self.results),
-            "root": str(self.root),
-            "target_scope": self.target_scope_arg,
-            "checks": self.results,
-        }, indent=2)
+        return to_json(self.root, self.results, target_scope=self.target_scope_arg)
 
 
 def main():

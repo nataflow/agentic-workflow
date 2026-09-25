@@ -11,10 +11,7 @@ Zero external dependencies (Python Standard Library only). Satu impor intra-plug
 """
 
 import argparse
-import json
-import os
 from pathlib import Path
-import re
 import subprocess
 import sys
 from typing import Any, Dict, List, Optional
@@ -28,9 +25,11 @@ from precondition_lib import (  # noqa: E402
     PLUGIN,
     PROFILE_DIR_REL,
     _detect,
+    find_repo_root,
     foreign_owner,
-    nearest_existing_ancestor as _nearest_existing_ancestor,
+    format_text,
     probe_writable as _probe_writable,
+    to_json,
 )
 
 
@@ -42,26 +41,13 @@ class PreconditionChecker:
         profile_dir: Optional[str] = None,
         target_root: Optional[Path] = None,
     ):
-        self.root = (target_root or self._find_repo_root()).resolve()
+        self.root = (target_root or find_repo_root()).resolve()
         self.mode_arg = mode
         self.stack_arg = stack
         self.profile_dir_arg = profile_dir or PROFILE_DIR_REL
         self.results: List[Dict[str, Any]] = []
         self.mode: str = ""
 
-    def _find_repo_root(self) -> Path:
-        """Find the git repository root or fallback to cwd."""
-        try:
-            out = subprocess.check_output(
-                ["git", "rev-parse", "--show-toplevel"],
-                stderr=subprocess.DEVNULL,
-                universal_newlines=True,
-            ).strip()
-            if out and os.path.isdir(out):
-                return Path(out)
-        except Exception:
-            pass
-        return Path.cwd()
 
     def run_all(self) -> bool:
         """Run checks 1 through 6."""
@@ -285,32 +271,11 @@ class PreconditionChecker:
         })
 
     def format_text(self) -> str:
-        all_passed = all(r["status"] == "PASS" for r in self.results)
-        passed_count = sum(1 for r in self.results if r["status"] == "PASS")
-        total = len(self.results)
-        status_label = "PASS" if all_passed else "FAIL"
-
-        lines = [
-            f"PRECONDITION CHECK: profile [{status_label}] ({passed_count}/{total} passed)",
-        ]
-        for r in self.results:
-            lines.append(f"[{r['id']}] {r['name']:<32} : {r['status']} ({r['summary']})")
-            if r["status"] == "FAIL" and r["action"]:
-                lines.append(f"    * Tindakan: {r['action']}")
-        lines.append(f"Terselesaikan: mode `{self.mode or 'tidak terselesaikan'}`")
-        return "\n".join(lines)
+        return format_text("profile", self.results,
+                           footer=[f"Terselesaikan: mode `{self.mode or 'tidak terselesaikan'}`"])
 
     def to_json(self) -> str:
-        all_passed = all(r["status"] == "PASS" for r in self.results)
-        return json.dumps({
-            "status": "PASS" if all_passed else "FAIL",
-            "passed_count": sum(1 for r in self.results if r["status"] == "PASS"),
-            "total_count": len(self.results),
-            "root": str(self.root),
-            "profile_dir": self.profile_dir_arg,
-            "mode": self.mode,
-            "checks": self.results,
-        }, indent=2)
+        return to_json(self.root, self.results, profile_dir=self.profile_dir_arg, mode=self.mode)
 
 
 def main():

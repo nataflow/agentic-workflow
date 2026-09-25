@@ -4,15 +4,13 @@
 Automates verification of repository preconditions before API documentation extraction.
 Runs checks 1 through 5 in a single pass and produces a compact, actionable report.
 Zero external dependencies (Python Standard Library only). Satu impor intra-plugin:
-`skills/_common/precondition_lib.py` untuk uji izin tulis, di-bootstrap relatif
-terhadap berkas ini.
+`skills/_common/precondition_lib.py` (parser frontmatter, taskdir, chain, profil,
+berkas plugin, keluaran), di-bootstrap relatif terhadap berkas ini.
 """
 
 import argparse
-import json
 import os
 from pathlib import Path
-import re
 import subprocess
 import sys
 from typing import Any, Dict, List, Optional
@@ -23,9 +21,12 @@ from typing import Any, Dict, List, Optional
 # ini, bukan terhadap cwd — skrip dipanggil dengan path absolut dari mana saja.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
-    resolve_profile_dir,
-    nearest_existing_ancestor as _nearest_existing_ancestor,
+    find_repo_root,
+    format_text,
+    load_profile_index,
+    plugin_file,
     probe_writable as _probe_writable,
+    to_json,
 )
 
 
@@ -37,25 +38,12 @@ class PreconditionChecker:
         stack: Optional[str] = None,
         target_root: Optional[Path] = None,
     ):
-        self.root = (target_root or self._find_repo_root()).resolve()
+        self.root = (target_root or find_repo_root()).resolve()
         self.domain_arg = domain
         self.base_branch_arg = base_branch
         self.stack_arg = stack
         self.results: List[Dict[str, Any]] = []
 
-    def _find_repo_root(self) -> Path:
-        """Find the git repository root or fallback to cwd."""
-        try:
-            out = subprocess.check_output(
-                ["git", "rev-parse", "--show-toplevel"],
-                stderr=subprocess.DEVNULL,
-                universal_newlines=True,
-            ).strip()
-            if out and os.path.isdir(out):
-                return Path(out)
-        except Exception:
-            pass
-        return Path.cwd()
 
     def run_all(self) -> bool:
         """Run checks 1 through 5."""
@@ -69,18 +57,8 @@ class PreconditionChecker:
     def _check_1_source_root(self):
         check_id = 1
         name = "Source Root & Code Access"
-        profile_dir = resolve_profile_dir(self.root)[0]
-        index_file = profile_dir / "index.json"
-
-        src_rel = "src"
-        if index_file.exists():
-            try:
-                with open(index_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    if data.get("source_root"):
-                        src_rel = data["source_root"]
-            except Exception:
-                pass
+        data = load_profile_index(self.root, required=("source_root",)).data
+        src_rel = data["source_root"] if data else "src"
 
         src_dir = self.root / src_rel
         target_check = src_dir if src_dir.exists() else (self.root / "src")
@@ -106,36 +84,23 @@ class PreconditionChecker:
     def _check_2_profile_and_stack(self):
         check_id = 2
         name = "Profile & Stack Adapter"
-        profile_dir = resolve_profile_dir(self.root)[0]
-        index_file = profile_dir / "index.json"
-
-        stack_id = self.stack_arg
-        if not stack_id and index_file.exists():
-            try:
-                with open(index_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    stack_id = data.get("stack")
-            except Exception:
-                pass
-
+        # `--stack` eksplisit membebaskan skill ini dari profil; tanpanya profil
+        # ditagih utuh (tujuh kunci) seperti skrip prasyarat lain.
+        stack_id = (self.stack_arg or "").strip()
         if not stack_id:
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "FAIL",
-                "summary": "Stack tidak terdeteksi dari profil index.json maupun argumen CLI",
-                "action": "Jalankan `backenddev:profile` atau tentukan parameter --stack secara eksplisit.",
-            })
-            return
+            prof = load_profile_index(self.root)
+            if not prof.ok:
+                self.results.append({
+                    "id": check_id,
+                    "name": name,
+                    "status": "FAIL",
+                    "summary": f"Stack tidak terbaca dari profil ({prof.error}) dan --stack kosong",
+                    "action": "Jalankan `backenddev:profile` atau tentukan parameter --stack secara eksplisit.",
+                })
+                return
+            stack_id = prof.data["stack"]
 
-        candidate_paths = [
-            self.root / "src" / "plugins" / "backenddev" / "skills" / "profile" / "stacks" / f"{stack_id}.md",
-            Path.home() / ".gemini" / "config" / "plugins" / "backenddev" / "skills" / "profile" / "stacks" / f"{stack_id}.md",
-            Path.home() / ".claude" / "plugins" / "backenddev" / "skills" / "profile" / "stacks" / f"{stack_id}.md",
-            Path(__file__).resolve().parent.parent.parent / "profile" / "stacks" / f"{stack_id}.md",
-        ]
-
-        if not any(p.exists() for p in candidate_paths):
+        if not plugin_file("skills", "profile", "stacks", f"{stack_id}.md"):
             self.results.append({
                 "id": check_id,
                 "name": name,
@@ -239,31 +204,10 @@ class PreconditionChecker:
             })
 
     def format_text(self) -> str:
-        all_passed = all(r["status"] == "PASS" for r in self.results)
-        passed_count = sum(1 for r in self.results if r["status"] == "PASS")
-        total = len(self.results)
-        status_label = "PASS" if all_passed else "FAIL"
-
-        lines = [
-            f"PRECONDITION CHECK: document-api [{status_label}] ({passed_count}/{total} passed)",
-        ]
-        for r in self.results:
-            lines.append(f"[{r['id']}] {r['name']:<32} : {r['status']} ({r['summary']})")
-            if r["status"] == "FAIL" and r["action"]:
-                lines.append(f"    * Tindakan: {r['action']}")
-
-        return "\n".join(lines)
+        return format_text("document-api", self.results)
 
     def to_json(self) -> str:
-        all_passed = all(r["status"] == "PASS" for r in self.results)
-        return json.dumps({
-            "status": "PASS" if all_passed else "FAIL",
-            "passed_count": sum(1 for r in self.results if r["status"] == "PASS"),
-            "total_count": len(self.results),
-            "root": str(self.root),
-            "domain": self.domain_arg,
-            "checks": self.results,
-        }, indent=2)
+        return to_json(self.root, self.results, domain=self.domain_arg)
 
 
 def main():
