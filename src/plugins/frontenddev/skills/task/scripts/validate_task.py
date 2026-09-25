@@ -30,6 +30,7 @@ from precondition_lib import (  # noqa: E402
     parse_sections,
     read_chain,
     report_json,
+    find_placeholders,
 )
 
 HEADINGS = ("## Description", "## Success Criteria", "## Out of Scope", "## Chain")
@@ -38,8 +39,6 @@ MEASURE = re.compile(r"— verifikasi:\s*(test|diff|typecheck|lint|build|qa\s+ma
 FORBIDDEN_MEASURE = re.compile(r"review manual|dinilai layak|terlihat bagus", re.IGNORECASE)
 DOWNSTREAM_DOCS = re.compile(r"\b(FLOW|UI|CONTRACT)\.md\b")
 FILE_REF = re.compile(r"`([\w@./+-]+\.[A-Za-z0-9]+):(\d+)(?:-\d+)?`")
-INLINE_CODE = re.compile(r"`[^`\n]*`")
-PLACEHOLDER = re.compile(r"\bTBD\b|\bTODO\b|diisi nanti|<[^<>\n]+>")
 OOS_LINE = re.compile(r"^- .+ — .+$")
 
 
@@ -159,8 +158,8 @@ class TaskValidator:
 
     def _check_7_placeholder_findings(self, text: str) -> None:
         errors = []
-        stripped = INLINE_CODE.sub("", text.split("\n## Chain", 1)[0])
-        hits = sorted(set(PLACEHOLDER.findall(stripped)))
+        head = text.split("\n## Chain", 1)[0]
+        hits = sorted({h for line in head.splitlines() for h in find_placeholders(line)})
         if hits:
             errors.append("placeholder: " + ", ".join(hits[:5]))
         source = self.fm.get("finding_source")

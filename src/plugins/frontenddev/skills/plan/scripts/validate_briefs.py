@@ -42,6 +42,8 @@ from precondition_lib import (  # noqa: E402
     split_frontmatter,
     sc_ids,
     success_criteria,
+    find_placeholders,
+    PLACEHOLDER_ACTION,
 )
 BRIEF_PATTERN = re.compile(r"^brief-(\d{2})-[a-z0-9-]+\.md$")
 
@@ -94,46 +96,6 @@ TERMINAL_HINT = re.compile(
     re.IGNORECASE,
 )
 CLOSING_MARK = "(verifikasi penutup)"
-
-# Check B — placeholder yang tidak boleh lolos ke implementor.
-PLACEHOLDER = re.compile(r"\b(TBD|TODO|FIXME|diisi nanti|isi nanti)\b", re.IGNORECASE)
-
-# Slot `<...>` yang tersisa dari template dibedakan dari generik TypeScript dan
-# tag JSX, yang sah muncul di prosa brief frontend. Dua penanda placeholder:
-# memuat spasi (`<Nama Unit Fungsional>`), atau satu kata dari kosakata slot
-# template (`<slug>`, `<NN>`). `<void>`, `<string>`, `<OrderRow>`, dan
-# `<script>` tidak memenuhi keduanya.
-ANGLE_SPAN = re.compile(r"<([^<>\n]{1,80})>")
-ANGLE_SLOT = re.compile(
-    r"^(?:slug|stack|stack-id|stack_id|feat|feature|taskdir|unit|nn|mm|n"
-    r"|entitas|layar|nama|perintah|path|berkas|file|sha|commit|tanggal|versi"
-    r"|command|deskripsi|judul|angka|nilai|id)$",
-    re.IGNORECASE,
-)
-# Sintaks tipe TypeScript yang tidak pernah muncul di slot template berbahasa
-# Indonesia: literal objek, anotasi, union, dan panah fungsi.
-TS_TYPE_SYNTAX = re.compile(r"[{}:;=]")
-
-
-def angle_placeholder(line: str) -> bool:
-    """True bila baris menyisakan slot template `<...>` yang belum diisi.
-
-    Dibedakan dari generik TypeScript dan tag JSX yang sah muncul di prosa brief
-    frontend. Sebuah span `<...>` dinilai placeholder bila namanya ada di
-    kosakata slot template, atau isinya berupa frasa multi-kata. Daftar argumen
-    generik (`Record<string, string>`) bukan frasa multi-kata: spasi sesudah
-    koma dinormalkan lebih dulu, dan span bersintaks tipe dilewati.
-    """
-    for m in ANGLE_SPAN.finditer(line):
-        content = m.group(1).strip()
-        if ANGLE_SLOT.match(content):
-            return True
-        if TS_TYPE_SYNTAX.search(content):
-            continue
-        probe = re.sub(r",\s+", ",", content)
-        if " " in probe and re.search(r"[a-z]", probe, re.IGNORECASE):
-            return True
-    return False
 
 # Check T — layer yang wajib punya test pendamping.
 TEST_REQUIRED_DIRS = ("services/", "view-model/", "hooks/api/", "controllers/")
@@ -509,15 +471,15 @@ class BriefValidator:
             for heading in REQUIRED_SECTIONS[1:]:
                 body = strip_code_fences(read_section(b["body"], heading))
                 for line in body.splitlines():
-                    if PLACEHOLDER.search(line) or angle_placeholder(line):
+                    if find_placeholders(line):
                         problems.append(
                             f"{b['name']} `{heading[:6].strip()}`: placeholder tersisa → "
                             f"{line.strip()[:90]}"
                         )
         if problems:
             self._add(cid, name, "FAIL", f"{len(problems)} placeholder",
-                      "Ganti seluruh `TBD`/`TODO`/`<...>` di seksi 2–5 dengan nilai nyata; "
-                      "implementor membaca brief apa adanya.", problems)
+                      "Seksi 2–5: " + PLACEHOLDER_ACTION + " Implementor membaca brief apa adanya.",
+                      problems)
         else:
             self._add(cid, name, "PASS", "seksi 2–5 bebas placeholder")
 

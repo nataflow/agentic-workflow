@@ -41,16 +41,11 @@ from precondition_lib import (  # noqa: E402
     split_frontmatter,
     success_criteria,
     task_lane_sections,
+    find_placeholders,
+    PLACEHOLDER_ACTION,
 )
 
 SHA_DATE = re.compile(r"^[0-9a-f]{7,40} \(\d{4}-\d{2}-\d{2}\)$")
-PLACEHOLDER = re.compile(r"\b(TBD|TODO|FIXME|diisi nanti|isi nanti)\b", re.IGNORECASE)
-ANGLE = re.compile(r"<([^<>\n]{1,80})>")
-TS_SYNTAX = re.compile(r"[{}:;=|]")
-SLOT_WORD = re.compile(
-    r"^(?:slug|stack|stack-id|feat|feature|taskdir|unit|unit-slug|nn|n|nama|path|berkas|layer|layar"
-    r"|perintah|sha|tanggal|judul|nilai|id|elemen|field|skenario|langkah|alasan|keputusan|platform|rute)$",
-    re.IGNORECASE)
 
 SPECS: Dict[str, Dict[str, Any]] = {
     "flow": {
@@ -232,21 +227,10 @@ class DocValidator:
     def _check_placeholders(self) -> None:
         problems = []
         for line in outside_fences(self.body.splitlines()):
-            if PLACEHOLDER.search(line):
+            if find_placeholders(line):
                 problems.append(line.strip()[:90])
-                continue
-            for m in ANGLE.finditer(line):
-                content = m.group(1).strip()
-                if SLOT_WORD.match(content):
-                    problems.append(line.strip()[:90])
-                    break
-                if TS_SYNTAX.search(content):
-                    continue
-                if " " in re.sub(r",\s+", ",", content):
-                    problems.append(line.strip()[:90])
-                    break
         self._add("B", "Placeholder", problems, "nol placeholder",
-                  "Ganti tiap `TBD`/`TODO`/`<...>` dengan isi nyata dari bukti repo atau keputusan user.")
+                  PLACEHOLDER_ACTION + " Isi dari bukti repo atau keputusan user.")
 
     def _check_ids(self, prefix: str, ids: List[str]) -> None:
         problems = []

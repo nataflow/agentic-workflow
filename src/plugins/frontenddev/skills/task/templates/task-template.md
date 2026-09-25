@@ -68,7 +68,7 @@ Dijalankan `task` atas `TASK.md` yang baru ditulis, sebelum commit Phase 4 beran
 4. **Bukti berpaut kode**: `## Description` memuat minimal satu `file:baris`, dan tiap rujukan menunjuk berkas yang ada dengan nomor baris dalam rentang berkasnya.
 5. **Ambang terukur**: tiap butir menyebut nama layar, rute, komponen, state, teks, atau angka spesifik. Kata sifat tanpa ambang ("lebih rapi", "lebih cepat", "intuitif") adalah kegagalan.
 6. **Batas kerja bersuara**: `## Out of Scope` memuat minimal satu butir berformat `- <yang tidak dikerjakan> — <alasan>`.
-7. **Nol placeholder & temuan terpikul**: tidak ada `TBD`, `TODO`, `diisi nanti`, atau sisa penanda `<...>`. Bila `finding_source` terisi, tiap ID di `findings` disebut **tepat satu** butir `SC-{n}`, dan butir itu memuat `> Status: FIXED`.
+7. **Nol placeholder & temuan terpikul**: tidak ada `TBD`, `TODO`, `FIXME`, `diisi nanti`, atau sisa slot `<...>` (termasuk slot template seperti `<slug>` di dalam backtick). JSX (`<Skeleton />`), generik TS, dan operator perbandingan (`< 300 ms`) bukan placeholder. Bila `finding_source` terisi, tiap ID di `findings` disebut **tepat satu** butir `SC-{n}`, dan butir itu memuat `> Status: FIXED`.
 8. **Kecukupan akar**: tiap `SC-{n}` menamai permukaan yang disebut `request` atau terbukti di `evidence`. Butir yang memperkenalkan permukaan di luar keduanya dihapus, dilarang dicarikan akar susulan.
 9. **Ledger `## Chain`**: baris hop persis `expected_rows(sections)` dan seluruhnya `[ ]` — ditulis `chain.py init`, bukan diketik.
 

@@ -187,3 +187,80 @@ def test_validate_task_alat_ukur_manual_sah(make_repo, measure):
     root = make_repo({f"{PROMO_TD}/TASK.md": PROMO_TASK.format(measure=measure)})
     c3 = validate_task(root)[3]
     assert c3["status"] == "PASS", c3
+
+
+# --- L5.6 satu pendeteksi placeholder untuk tiga validator ----------------------------------
+
+PLACEHOLDER_ROWS = [
+    ("sah", "Saat memuat tampilkan `<Spinner />` di tengah kartu."),
+    ("sah", "Saat memuat tampilkan <Skeleton /> tiga baris."),
+    ("sah", "Fitur todo list menampilkan butir yang belum selesai."),
+    ("sah", "- [ ] **SC-1**: waktu muat < 300 ms dan jumlah item > 0 — verifikasi: test"),
+    ("sah", "Props `Record<string, string>` diteruskan ke <OrderRow>."),
+    ("slot", "Nama layar: <Nama Layar Utama>"),
+    ("slot", "Berkas `src/features/<slug>/api.ts` dibuat."),
+    ("slot", "Keputusan: TBD"),
+    ("slot", "Alasan diisi nanti."),
+]
+
+
+def doc_verdict(line: str) -> str:
+    vdoc = load_fe("_common/validate_doc.py", "fe_validate_doc_l56")
+    v = vdoc.DocValidator.__new__(vdoc.DocValidator)
+    v.body, v.results = line, []
+    v._check_placeholders()
+    return v.results[0]["status"]
+
+
+def brief_verdict(line: str) -> str:
+    vbr = load_fe("plan/scripts/validate_briefs.py", "fe_validate_briefs_l56")
+    body = "".join(f"{h}\n{line if h.startswith('## 2') else 'isi'}\n\n" for h in vbr.REQUIRED_SECTIONS)
+    v = vbr.BriefValidator.__new__(vbr.BriefValidator)
+    v.results = []
+    v.active = lambda: [{"name": "brief-01-x.md", "body": body}]
+    v._check_b_placeholder()
+    return v.results[0]["status"]
+
+
+@pytest.mark.parametrize("want,line", PLACEHOLDER_ROWS)
+def test_find_placeholders(want, line):
+    assert bool(FE_LIB.find_placeholders(line)) is (want == "slot")
+
+
+@pytest.mark.parametrize("want,line", PLACEHOLDER_ROWS)
+def test_validate_doc_dan_briefs_sama_dengan_pendeteksi(want, line):
+    expected = "FAIL" if want == "slot" else "PASS"
+    assert doc_verdict(line) == expected
+    assert brief_verdict(line) == expected
+
+
+@pytest.mark.parametrize("line", ['Tombol <Button variant="primary"> di kanan.',
+                                  'Tampilkan <Spinner size="sm" /> saat memuat.'])
+def test_jsx_berattribut(line):
+    assert FE_LIB.find_placeholders(line) == []
+
+
+def test_todo_huruf_besar_tetap_ditolak():
+    assert FE_LIB.find_placeholders("TODO: pastikan label benar") == ["TODO"]
+
+
+def test_slot_dalam_backtick_hanya_kosakata():
+    assert FE_LIB.find_placeholders("Render `<Nama Komponen>` di header.") == []
+    assert FE_LIB.find_placeholders("Berkas `brief-<NN>-x.md`.") == ["<NN>"]
+
+
+def promo_task_check7(root, description_extra: str = "", sc: str = "banner tampil di beranda"):
+    text = PROMO_TASK.format(measure="test `promo.test.tsx` hijau").replace("banner tampil di beranda", sc)
+    write_files(root, {f"{PROMO_TD}/TASK.md": text.replace("Perbaiki banner.",
+                                                            "Perbaiki banner. " + description_extra)})
+    return validate_task(root)[7]
+
+
+def test_validate_task_sc_perbandingan_bukan_placeholder(make_repo):
+    c7 = promo_task_check7(make_repo(), sc="waktu muat < 300 ms dan jumlah item > 0, tampil <OrderRow>")
+    assert c7["status"] == "PASS", c7
+
+
+def test_validate_task_slug_dalam_backtick_ditolak(make_repo):
+    c7 = promo_task_check7(make_repo(), description_extra="Berkas `src/features/<slug>/api.ts` dibuat.")
+    assert c7["status"] == "FAIL" and "<slug>" in c7["summary"], c7

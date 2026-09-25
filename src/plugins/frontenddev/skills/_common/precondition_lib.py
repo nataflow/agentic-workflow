@@ -443,6 +443,58 @@ def is_manual_cell(how: str) -> bool:
     return bool(_MANUAL.match(how.strip()))
 
 
+INLINE_CODE = re.compile(r"`[^`\n]*`")
+# TODO/TBD/FIXME hanya huruf besar (penanda penulis di template); frasa Indonesia tak peka huruf.
+# Fitur bernama "todo list" bukan placeholder.
+WORD_PLACEHOLDER = re.compile(r"\b(?:TBD|TODO|FIXME)\b|(?i:\b(?:diisi nanti|isi nanti)\b)")
+# Slot `<...>`: dibuka huruf/underscore tepat sesudah `<`, ditutup non-spasi non-`/` tepat
+# sebelum `>`. Operator perbandingan (`< 300 ms dan item > 0`) dan JSX swa-tutup
+# (`<Spinner />`) gugur di sini.
+PLACEHOLDER_ANGLE = re.compile(r"<(?=[A-Za-z_])([^<>\n]{1,80}?)(?<=[^\s/])>")
+# Sintaks tipe/atribut (literal objek, anotasi, union, atribut JSX) tidak pernah muncul
+# di slot template berbahasa Indonesia.
+_TS_SYNTAX = re.compile(r"[{}:;=|]")
+SLOT_WORDS = frozenset("""
+slug stack stack-id stack_id feat feature taskdir unit unit-slug nn mm n nama path berkas file
+layer layar perintah command sha commit tanggal versi judul deskripsi angka nilai id elemen field
+skenario langkah alasan keputusan platform rute entitas
+""".split())
+
+
+def _is_slot(content: str) -> bool:
+    """Isi `<...>` di prosa: kosakata slot template, atau frasa multi-kata tanpa sintaks tipe."""
+    content = content.strip()
+    if content.lower() in SLOT_WORDS:
+        return True
+    if _TS_SYNTAX.search(content):
+        return False
+    return " " in re.sub(r",\s+", ",", content)
+
+
+def find_placeholders(line: str) -> List[str]:
+    """Token placeholder yang tersisa di satu baris (kosong bila bersih) — satu aturan tiga validator.
+
+    Di dalam inline code hanya slot berkosakata (`` `src/features/<slug>/api.ts` ``) yang
+    ditolak; backtick lazim membungkus JSX dan generik (`` `<Nama Komponen>` `` lolos).
+    Di prosa: `TBD`/`TODO`/`FIXME`/`diisi nanti`, dan `<...>` yang `_is_slot`. Tag JSX
+    (`<OrderRow>`, `<Skeleton />`), generik TS (`Record<string, string>`), dan operator
+    perbandingan bukan placeholder.
+    """
+    hits: List[str] = []
+    for m in INLINE_CODE.finditer(line):
+        for a in PLACEHOLDER_ANGLE.finditer(m.group(0)):
+            if a.group(1).strip().lower() in SLOT_WORDS:
+                hits.append(a.group(0))
+    prose = INLINE_CODE.sub(" ", line)
+    hits += [m.group(0) for m in WORD_PLACEHOLDER.finditer(prose)]
+    hits += [m.group(0) for m in PLACEHOLDER_ANGLE.finditer(prose) if _is_slot(m.group(1))]
+    return hits
+
+
+PLACEHOLDER_ACTION = ("Ganti `TBD`/`TODO`/`FIXME`/`diisi nanti`/slot `<…>` dengan isi nyata. JSX (`<X />`), "
+                      "generik TS, dan operator perbandingan bukan placeholder.")
+
+
 # ================================================================ 3. lane & sections
 
 ROOTED_LANES = ("FULL_PIPELINE", "FAST_FORWARD", "REFACTOR_ARCH", "HOTFIX_MINOR")
