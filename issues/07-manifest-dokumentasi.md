@@ -44,11 +44,24 @@ Manifest menjadi satu sumber kebenaran (versi, deskripsi, penulis) yang divonis 
 4. **L7.4:** sembunyikan 15 skill internal dari menu `/` atau tidak.
 5. **L7.5:** pertahankan `metadata.mode` (dengan dokumentasi) atau hapus.
 
+## Catatan implementasi (2026-09-25)
+
+Keputusan: versi hanya di `plugin.json`; email `fakhrulnugroho15@gmail.com`; perintah instalasi dengan placeholder `<owner>/<repo>`; artefak quickdev di-commit; `LICENSE` MIT ditambahkan; ke-15 skill disembunyikan; `metadata` dihapus.
+
+- **L7.1**: `version` dibuang dari keempat entri marketplace dan deskripsi frontenddev disamakan (diff Opsi A). Email frontenddev diganti. Versi keempat plugin belum pernah naik sejak `init`, jadi semuanya dinaikkan satu minor: analyst 0.3.0, backenddev 0.6.0, frontenddev 0.5.0, quickdev 0.2.0.
+- **L7.2**: `src/plugins/frontenddev/plugin.json` dihapus.
+- **L7.4**: check F3 sudah ada di lint sebagai WARN; kini dinaikkan menjadi FAIL.
+- **L7.5**: `__pycache__` di `src/` dibersihkan. Poin 3 rencana keliru menganggap `conftest.py` sudah memasang `PYTHONDONTWRITEBYTECODE`: sesudah suite dijalankan, 17 `.pyc` muncul lagi. Sekarang `conftest.py` memasang `sys.dont_write_bytecode` dan `PYTHONDONTWRITEBYTECODE=1`, dan `find src -name '*.pyc'` kosong sesudah `pytest`.
+- **L7.3**: isi README mengikuti kode sesudah L1.1–L1.4, bukan kerangka di atas yang ditulis sebelumnya. Artinya profil per plugin, penanda `.claude/workflow`, `detect.py` Python, hook PreToolUse `guard_bash.py`, baseline quickdev yang meminta izin, dan skill quickdev yang ber-`disable-model-invocation`. Seksi "Keterbatasan" backenddev dan quickdev memuat item 08b/08d yang masih terbuka (D1, D2, D7, B4–B6, B13).
+- CI dan `tests/test_lint_plugins.py`: `LINT_IGNORE`/`deferred` tinggal `R2` (X1).
+- Verifikasi: `pytest` 862 passed + 2 xfail; `lint_plugins.py --base HEAD` 0 FAIL selain R2; `claude plugin validate .` lolos.
+- **Belum diverifikasi manual**: tampilan `/plugin` Installed/Discover (frontenddev 0.5.0 + deskripsi baru), menu `/` tanpa ke-15 skill internal, dan satu alur fixture per plugin yang memanggil skill tersembunyi lewat tool Skill. Ketiganya butuh sesi Claude Code interaktif. Perintah instalasi juga belum diuji pada marketplace hasil publikasi.
+
 ---
 
 ## L7.1 [Rendah] Versi, deskripsi, dan email frontenddev tidak sinkron
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** keempat plugin (frontenddev paling parah) · **Estimasi:** 30 menit · **Bergantung pada:** keputusan user (sumber versi, email) · **Memblokir:** L6.3 check M3/M4
 
@@ -194,7 +207,7 @@ Pengecualian yang relevan untuk pengembangan lokal: versi tidak mengunci plugin 
 
 ## L7.2 [Rendah] `plugin.json` liar di root frontenddev
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 5 menit · **Bergantung pada:** — · **Memblokir:** L6.3 check M5
 
@@ -239,7 +252,7 @@ Tidak ada risiko fungsional yang teridentifikasi.
 
 ## L7.3 [Rendah] README
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev, quickdev, frontenddev, analyst, root repo · **Estimasi:** 1–1,5 hari · **Bergantung pada:** L1.1, L1.3 (isi seksi profil dan koeksistensi), L7.1 (kebijakan versi), keputusan lokasi publikasi · **Memblokir:** —
 
@@ -320,7 +333,7 @@ Pengguna memasang keempat plugin dari satu marketplace, user-wide. Tanpa README,
 
 ## L7.4 [Rendah] Skill internal tidak ditandai
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** analyst, backenddev, frontenddev · **Estimasi:** 1 jam + uji manual · **Bergantung pada:** keputusan user · **Memblokir:** L6.3 check F3 (opsional)
 
@@ -400,7 +413,7 @@ Alternatif: tandai hanya skill yang tidak pernah berguna dipanggil manual (`busi
 
 ## L7.5 [Rendah] Field tidak dikenal dan sisa cache lokal
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** keempat plugin · **Estimasi:** 15 menit · **Bergantung pada:** keputusan user (nasib `metadata`) · **Memblokir:** L6.3 check G1
 
