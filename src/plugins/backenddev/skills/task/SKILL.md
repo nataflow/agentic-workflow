@@ -61,7 +61,7 @@ Susun 1–7 butir berformat `- [ ] **SC-{n}**: <hasil terukur> — verifikasi: <
 
 1. Pasangkan tiap butir dengan alat ukur sah pada tabel; buang atau pecah butir tanpa alat ukur pasti. Dilarang alat ukur subjektif seperti "review manual".
 2. **Sumber kriteria tidak pernah dokumen yang belum terbit.** Turunkan tiap butir dari permukaan yang terbukti di `evidence` beserta perubahan perilaku yang diminta `request`, lalu namai permukaannya (endpoint, transisi status, aturan) di butirnya. Butir yang hanya menyebut nama dokumen ("seluruh AC PRD tertutup") dihapus, bukan dicarikan permukaan susulan.
-   > Mengapa: pada lane `PRD_CONVERSION`, `BRD.md` dan `PRD.md` belum ada saat skill ini berjalan — keduanya hop hilir dari akar ini. Butir yang mengukur keberadaan dokumen adalah tautologi, dan seluruh keterlacakan hilir (`Akar` PRD, `Fulfills:` brief) kehilangan isinya di atasnya.
+   > Rasional: `references/rationale.md` R1.
 3. Gabungkan kriteria tumpang tindih pada `EXEC_BRIEF` jadi satu butir; hitung dari capaian fungsional, bukan jumlah brief.
 4. Cantumkan nama entitas, threshold numerik, atau status spesifik. Tolak kata sifat tanpa ambang ukur ("lebih cepat", "optimal").
 5. **Uji kecukupan.** Tiap butir berakar pada permukaan yang disebut `request` atau terbukti di `evidence`; yang memperkenalkan permukaan di luar keduanya dihapus, bukan dicarikan akar susulan. Berhenti begitu tiap permukaan yang diminta punya satu butir pemikul — angka 7 adalah plafon, bukan target.

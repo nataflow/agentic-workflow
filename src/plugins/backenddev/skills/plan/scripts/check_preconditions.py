@@ -348,6 +348,7 @@ class PreconditionChecker:
             "references/entry-rules.md",
             "references/slicing-and-scan.md",
             "references/review-and-commit.md",
+            "references/check-catalog.md",
             # Kedua skrip di bawah menegakkan Fase 3 dan Fase 4. Ketiadaannya
             # diperiksa di sini supaya rantai berhenti sebelum brief ditulis,
             # bukan di tengah batch saat gerbang per-brief hendak dipanggil.

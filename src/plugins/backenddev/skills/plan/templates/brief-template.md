@@ -140,30 +140,24 @@ ______________________________________________________________________
    - Setiap langkah kode wajib berupa snippet lengkap dan valid (bukan potongan elipsis `...`).
    - Setiap langkah wajib membawa **titik sisip/anchor konkret** (nama class, method, atau field beserta posisi relatifnya).
    - Langkah yang mengubah nilai wajib mendokumentasikan nilai `sebelum:` dan `sesudah:`.
-   - **Nol verifikasi di dalam brief**: dilarang menempel baris `— verifikasi:` atau perintah perintah build/test di seksi mana pun, dan dilarang menghidupkan kembali seksi `## Verification`. Eksekutor brief menulis kode tanpa menjalankan build/test; kompilasi dan test suite dijalankan sekali di penutup taskdir sesudah brief terakhir mendarat. Ini **rumah kanonik** aturan tersebut.
+   - **Nol verifikasi di dalam brief** *(Check F)*: dilarang baris `— verifikasi:`, perintah build/test, maupun seksi `## Verification` di seksi mana pun — build dan test dijalankan sekali di penutup taskdir. Ini **rumah kanonik** aturan tersebut.
 
-6. **Baris `Covers:` — Pendaratan Acceptance Criteria**:
+6. **Baris `Covers:` — Pendaratan Acceptance Criteria** *(Check H, Check I)*: rumah kanonik aturan ini; rasional dan remediasinya di `../references/check-catalog.md`.
 
-   - Baris `Covers:` berdiri tepat di bawah paragraf `## Objective`, berformat `Covers: AC-1, AC-3` — nomor `AC-{n}` disalin apa adanya dari `## Acceptance criteria` PRD, dipisah koma. Ini **rumah kanonik** aturan tersebut; `plan` dan `brief-reviewer` membacanya mekanis, bukan menafsirkan isi `## Steps`.
-   - Gabungan baris `Covers:` seluruh brief satu taskdir wajib menutup **setiap** `AC-{n}` PRD. AC yang tak terpetakan berarti fiturnya ter-implement separuh tanpa terdeteksi gerbang.
-   - Dilarang menyebut `AC-{n}` yang tidak ada di PRD, dan dilarang menghilangkan barisnya. Brief yang sah tidak memikul AC (mis. jalur `LANGSUNG` atau `RCA` tanpa PRD) menulis `Covers: — (<alasan>)`.
-   - **AC bertanda `test otomatis` wajib punya pemikul test yang tertulis.** Minimal satu baris berkas test di `## File scope` brief pengklaim menyebut `AC-{n}` itu — di kolom `Anchor` atau di kolom "Apa yang berubah", seperti contoh bagian 1. Menuntut sekadar "ada berkas test di brief pengklaim" tidak cukup: beberapa brief dapat menyentuh berkas test yang sama karena alasan yang berbeda-beda, dan bertiga lolos mengklaim satu AC yang tidak satu pun di antaranya benar-benar menguji. Penamaan membuat pemikul assertion-nya tertulis, bukan tersirat. `plan` menagihnya lewat Check I di `../references/review-and-commit.md` bagian 4.
-   - AC yang kolom "Cara verifikasi"-nya bernilai `QA manual:` diklaim di `Covers:` persis seperti AC lain, dan **langkah manualnya turun ke `## Risk & rollback`** brief pengklaim sebagai kalimat operasional yang menyebut nomor AC-nya. Ia dilarang mendarat di `## Analysis trace`: seksi itu dinyatakan bukan pekerjaan eksekutor, sehingga satu-satunya bentuk verifikasi AC tersebut jadi tak terlihat justru di titik ia harus dijalankan. `plan` menagihnya lewat Check I di `../references/review-and-commit.md` bagian 4.
-   - Baris ini bukan seksi baru: sepuluh seksi wajib brief tidak bertambah karenanya.
-   - `Covers:` mengangkut **hanya** `AC-{n}`. Token sumbu lain dilarang menumpang di baris ini; keterlacakan ke akar `TASK.md` punya barisnya sendiri di butir 7.
+   - Berdiri tepat di bawah paragraf `## Objective`, berformat `Covers: AC-1, AC-3` — nomor disalin apa adanya dari `## Acceptance criteria` PRD, dipisah koma, dan **hanya** `AC-{n}` (sumbu akar punya barisnya sendiri di butir 7). Bukan seksi baru.
+   - Gabungan `Covers:` seluruh brief taskdir menutup **setiap** `AC-{n}` PRD; `AC-{n}` yang tidak ada di PRD dan baris yang hilang dilarang. Brief sah tanpa AC (jalur `LANGSUNG`/`RCA` tanpa PRD) menulis `Covers: — (<alasan>)`.
+   - AC `test otomatis`: minimal satu baris berkas test di `## File scope` brief pengklaim menyebut `AC-{n}` itu di kolom `Anchor` atau "Apa yang berubah" — penamaan, bukan sekadar ada berkas test.
+   - AC `QA manual:`: diklaim di `Covers:` seperti AC lain, dan langkah manualnya turun ke `## Risk & rollback` brief pengklaim sebagai kalimat operasional bernomor AC — dilarang di `## Analysis trace`.
 
-7. **Baris `Fulfills:` — Pendaratan Success Criteria Akar, hanya pada rantai tanpa PRD**:
+7. **Baris `Fulfills:` — Pendaratan Success Criteria Akar, hanya pada rantai tanpa PRD** *(Check G, Check S)*: rumah kanonik aturan ini; rasional di `../references/check-catalog.md` Check G.
 
-   - **Rantai ber-PRD tidak menulis baris ini sama sekali.** Keterlacakan `SC-{n}` sudah diangkut kolom `Akar` tabel `## Acceptance criteria` PRD, dan rantainya tergerbangi di tiap sambungan: `SC-{n}` → `Akar` (predikat G2 `analyst`), lalu `AC-{n}` → `Covers:` (Check H dan predikat G). Baris `Fulfills:` di atasnya memvonis ulang kesimpulan yang sama dari ujung yang berbeda, dan `SC-{n}` pada rantai itu memang parafrase `AC-{n}`-nya. `scaffold_brief.py` tidak menuliskannya, dan Check S menolak brief yang memuatnya.
-   - **Rantai tanpa PRD** — `chain: BRIEF` dan jalur `RCA` — memakainya sebagai satu-satunya rute ke akar, dan gerbangnya berlaku penuh: baris `Fulfills:` berdiri tepat di bawah baris `Covers:`, berformat `Fulfills: SC-2, SC-4`, nomor `SC-{n}` disalin apa adanya dari `## Success Criteria` `TASK.md`, dipisah koma. Ini **rumah kanonik** aturan tersebut; `plan` (Check G) dan `brief-reviewer` membacanya mekanis.
-   - Gabungan baris `Fulfills:` seluruh brief satu taskdir wajib menutup **setiap** `SC-{n}` `TASK.md`. `SC-{n}` tanpa brief pengklaim berarti kriteria akar dikerjakan separuh tanpa terdeteksi gerbang.
-   - Dilarang menyebut `SC-{n}` yang tidak ada di `TASK.md`, dan dilarang menghilangkan barisnya. Brief pada taskdir tanpa `TASK.md` menulis `Fulfills: — (akar absen)`.
-   - **Nomor, bukan prosa.** Prosa butir Success Criteria dilarang disalin ke brief seksi mana pun — butir itu memuat literal `— verifikasi:` yang ditolak Check F dan butir 5 di atas. Baris `Fulfills:` ada justru supaya penyalinan itu tidak pernah diperlukan.
-   - Baris ini bukan seksi baru: sepuluh seksi wajib brief tidak bertambah karenanya.
+   - **Rantai ber-PRD tidak menulis baris ini sama sekali** — keterlacakan `SC-{n}` diangkut kolom `Akar` PRD (predikat G2 `analyst`, lalu Check H). `scaffold_brief.py` tidak menuliskannya, dan Check S menolak brief yang memuatnya.
+   - **Rantai tanpa PRD** (`chain: BRIEF`, jalur `RCA`): baris `Fulfills: SC-2, SC-4` tepat di bawah `Covers:`, nomor disalin apa adanya dari `## Success Criteria` `TASK.md`. Gabungannya menutup **setiap** `SC-{n}`; nomor hantu dan baris hilang dilarang; taskdir tanpa `TASK.md` menulis `Fulfills: — (akar absen)`. Bukan seksi baru.
+   - **Nomor, bukan prosa**: prosa butir SC dilarang disalin ke seksi mana pun — ia memuat `— verifikasi:` yang ditolak Check F.
 
 8. **Satu baris `Consumes` = satu brief sumber (`## Interfaces`)**: brief yang mengonsumsi dari dua pendahulu menulis **dua baris `Consumes`**, masing-masing menyebut satu `brief-NN`, seperti contoh bagian 1. Ini **rumah kanonik** aturan tersebut; `plan` menagihnya lewat Check C.
 
-   Alasannya bukan kerapian. Satu baris yang menyebut dua sumber membuat pasangan simbol-ke-sumbernya tidak dapat dipetakan, dan pemeriksaan mana pun terpaksa menyandingkan simbol pertama baris itu dengan **tiap** brief yang disebut — lalu melaporkan kegagalan hantu atas simbol yang memang milik brief yang lain. Baris `Produces` tidak memikul aturan ini: ia tidak menunjuk sumber, sehingga banyak signature sah berdiri di satu baris dipisah titik koma.
+   Baris `Produces` tidak memikul aturan ini: banyak signature sah berdiri di satu baris dipisah titik koma. Rasionalnya di `../references/check-catalog.md` Check C.
 
 9. **Integritas Batas Cakupan (`## File scope` & `## Out of scope`)**:
 
@@ -171,17 +165,14 @@ ______________________________________________________________________
    - Seluruh file yang disentuh wajib terdaftar. Implementor dilarang menyentuh file di luar tabel ini, **maupun simbol di luar kolom `Anchor` baris berkas itu**. Simbol tambahan yang ternyata harus ikut berubah dilaporkan implementor, bukan disunting diam-diam; `architect` membandingkan peta simbol commit (`architect/scripts/symbol_map.py`) terhadap kolom ini.
    - Tidak ada seksi yang dibiarkan kosong tanpa penjelasan; jika nihil, tulis "tidak ada" beserta alasannya.
 
-10. **Pendaratan Migrasi (`## Migration` & `## Risk & rollback`)**: berlaku pada dua pemicu — `## Migration requirements` PRD yang bukan "tidak perlu" (jalur `PRD`), **dan** berkas migrasi baru yang ditetapkan scan Fase 2 butir 5 pada jalur tanpa PRD. Pemicu kedua ada karena urutan deploy dan rollback plan tidak pernah divonis hulu di jalur itu; tanpa aturan ini keduanya jatuh ke orang yang menjalankan deploy.
+10. **Pendaratan Migrasi (`## Migration` & `## Risk & rollback`)** *(Check J)*: rumah kanonik aturan ini. Berlaku pada `## Migration requirements` PRD yang bukan "tidak perlu", **dan** pada berkas migrasi baru yang ditetapkan scan Fase 2 butir 5 di jalur tanpa PRD; rasional dan kasus ORM lengkapnya di `../references/check-catalog.md` Check J.
 
-   - Isi DDL — nama berkas migrasi beserta pernyataan `CREATE`/`ALTER`-nya — ditulis utuh di `## Migration`, bukan dirujuk sebagai "sesuai PRD".
-   - **Skema dibentuk ORM tanpa berkas migrasi**: repo yang profilnya (`.claude/profile/backenddev/invariants.md` atau `commands.md`) menyatakan skema dibentuk ORM saat startup — mis. Hibernate `ddl-auto`, `hbm2ddl`, TypeORM `synchronize: true`, GORM `AutoMigrate` — dan yang PRD-nya memutuskan tanpa berkas migrasi, menulis baris `Berkas migrasi: tidak ada — skema dibentuk ORM (<setelan>)` di `## Migration`. Baris itu hanya membebaskan kewajiban berkas migrasi di `## File scope`; DDL setara yang dibangkitkan ORM, urutan deploy bernomor, dan rollback plan tetap wajib. Token yang tidak ditopang pernyataan profil adalah cacat.
-   - **Urutan deploy** yang dikunci PRD (mis. pola Expand-Contract: kolom baru nullable → backfill → pembacaan pindah → kolom lama dibuang) turun jadi langkah bernomor di `## Migration`, satu fase satu langkah, dengan penanda tegas fase mana yang dieksekusi brief ini dan fase mana yang milik brief berikutnya.
-   - **Rollback plan** migrasi — cara mengembalikan skema bila migrasi gagal di tengah deployment beserta tanda kegagalannya — turun ke `## Risk & rollback` sebagai kalimat operasional, bukan frasa kosong "rollback migrasi bila gagal".
-   - Brief ber-`## Migration` terisi yang `## Risk & rollback`-nya tidak menyebut pengembalian skema adalah cacat, begitu pula sebaliknya. Ini **rumah kanonik** aturan tersebut; `plan` menagihnya lewat Check J di `../references/review-and-commit.md` bagian 4.
-   - **Urutan deploy pada jalur tanpa PRD** diturunkan `plan` sendiri dari sifat migrasinya: migrasi tidak backward-compatible mengikuti pola Expand-Contract menurut `## Failure signatures` adapter stack, satu fase satu langkah bernomor. Rollback plan-nya tetap wajib.
-   - PRD menulis "tidak perlu" pada `## Migration requirements`, atau batch tanpa PRD nol berkas migrasi → tiap brief tetap menulis "tidak perlu" beserta alasannya di `## Migration`, dan Check J dilewati.
+   - `## Migration` memuat DDL utuh (nama berkas + `CREATE`/`ALTER`), bukan "sesuai PRD", dan urutan deploy sebagai langkah bernomor — satu fase satu langkah (mis. Expand-Contract), dengan penanda fase milik brief ini vs brief berikutnya. Jalur tanpa PRD menurunkan urutannya sendiri: migrasi tidak backward-compatible mengikuti Expand-Contract menurut `## Failure signatures` adapter.
+   - `## Risk & rollback` memuat rollback plan operasional: cara mengembalikan skema beserta tanda kegagalannya. Satu sisi terisi tanpa pasangannya adalah cacat.
+   - **Skema dibentuk ORM**: baris `Berkas migrasi: tidak ada — skema dibentuk ORM (<setelan>)` membebaskan kewajiban berkas migrasi di `## File scope` hanya bila `invariants.md`/`commands.md` profil menyatakannya (`ddl-auto`, `hbm2ddl`, `synchronize: true`, `AutoMigrate`); DDL setara, urutan deploy, dan rollback plan tetap wajib.
+   - Tanpa pemicu → tiap brief menulis "tidak perlu" beserta alasannya di `## Migration`, dan Check J dilewati.
 
-11. **Derivasi `risk:` (Frontmatter)**: Nilainya **dinilai per unit kerja** atas isi `## File scope` dan `## Steps` brief itu sendiri, bukan disalin dari dokumen hulu. Ini **rumah kanonik** aturan tersebut; `plan` menagihnya lewat Check K di `../references/review-and-commit.md` bagian 4.
+11. **Derivasi `risk:` (Frontmatter)**: Nilainya **dinilai per unit kerja** atas isi `## File scope` dan `## Steps` brief itu sendiri, bukan disalin dari dokumen hulu. Ini **rumah kanonik** aturan tersebut; `plan` menagihnya lewat Check K di `../references/check-catalog.md`.
 
     > **Salinan tersinkron.** Tabel predikat di bawah disalin verbatim ke `agents/brief-reviewer.md` fokus #3, karena subagent itu tidak dapat membaca berkas plugin ini. Menyunting salah satu tanpa yang lain membuat `plan` dan reviewernya memvonis `risk:` dengan aturan berbeda. Sunting keduanya dalam satu perubahan.
 

@@ -356,24 +356,25 @@ class PreconditionChecker:
     def _check_8_explorer_dispatcher(self):
         """Dispatcher explorer wajib ada sebelum Fase 1 boleh memetakan as-is.
 
-        `system-analysis` mendispatch `code-explorer` langsung lewat
-        `dispatcher/explorer.md`, tanpa skill pembungkus.
-        Template itu memuat dua profil yang keduanya wajib: Profil S menutup empat
-        permukaan wajib Fase 1, Profil B menutup lima dimensi rawan bocor sebelum
-        Fase 4. Tanpanya, predikat dispatch bagian A protokol tidak punya jalur sah.
+        `system-analysis` mendispatch `code-explorer` langsung, tanpa skill pembungkus,
+        lewat dua template: `dispatcher/explorer-surface.md` (Profil S, empat permukaan
+        wajib Fase 1) dan `dispatcher/explorer-blast.md` (Profil B, lima dimensi rawan
+        bocor sebelum Fase 4). Tanpa keduanya, predikat dispatch bagian A protokol tidak
+        punya jalur sah.
         """
         check_id = 8
         name = "Explorer Dispatcher & Agent"
         skill_dir = Path(__file__).resolve().parent.parent
-        dispatcher_file = skill_dir / "dispatcher" / "explorer.md"
+        templates = (("explorer-surface.md", "## Profil S"), ("explorer-blast.md", "## Profil B"))
 
-        if not dispatcher_file.exists():
+        missing = [f"dispatcher/{f}" for f, _ in templates if not (skill_dir / "dispatcher" / f).exists()]
+        if missing:
             self.results.append({
                 "id": check_id,
                 "name": name,
                 "status": "FAIL",
-                "summary": "Berkas dispatcher/explorer.md tidak ditemukan di skill system-analysis",
-                "action": "Pastikan template dispatcher/explorer.md tersedia untuk dispatch langsung code-explorer."
+                "summary": f"Template dispatch tidak ditemukan di skill system-analysis: {', '.join(missing)}",
+                "action": "Pastikan kedua template dispatcher explorer tersedia untuk dispatch langsung code-explorer."
             })
             return
 
@@ -387,25 +388,27 @@ class PreconditionChecker:
             })
             return
 
-        try:
-            body = dispatcher_file.read_text(encoding="utf-8")
-        except Exception as e:
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "FAIL",
-                "summary": f"dispatcher/explorer.md tidak terbaca: {e}",
-                "action": "Periksa izin baca berkas template dispatcher."
-            })
-            return
-
-        missing_profiles = [p for p in ("Profil S", "Profil B") if p not in body]
+        missing_profiles = []
+        for fname, heading in templates:
+            try:
+                body = (skill_dir / "dispatcher" / fname).read_text(encoding="utf-8")
+            except Exception as e:
+                self.results.append({
+                    "id": check_id,
+                    "name": name,
+                    "status": "FAIL",
+                    "summary": f"dispatcher/{fname} tidak terbaca: {e}",
+                    "action": "Periksa izin baca berkas template dispatcher."
+                })
+                return
+            if heading not in body:
+                missing_profiles.append(f"{heading[3:]} ({fname})")
         if missing_profiles:
             self.results.append({
                 "id": check_id,
                 "name": name,
                 "status": "FAIL",
-                "summary": f"Profil dispatch hilang di dispatcher/explorer.md: {', '.join(missing_profiles)}",
+                "summary": f"Profil dispatch hilang: {', '.join(missing_profiles)}",
                 "action": "Pulihkan kedua profil; Profil S menutup permukaan Fase 1, Profil B menutup blast-sweep pra-Fase 4."
             })
             return
@@ -414,7 +417,7 @@ class PreconditionChecker:
             "id": check_id,
             "name": name,
             "status": "PASS",
-            "summary": "Template dispatcher/explorer.md (Profil S + B) dan agent code-explorer.md terverifikasi",
+            "summary": "Template explorer-surface.md (Profil S), explorer-blast.md (Profil B), dan agent code-explorer.md terverifikasi",
             "action": ""
         })
 

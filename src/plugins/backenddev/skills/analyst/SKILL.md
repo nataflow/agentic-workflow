@@ -137,7 +137,7 @@ Ini satu-satunya titik yang memeriksa rantai sebagai satu kesatuan. Tiap skill h
    | L | Nol brief melanggar `## Out of Scope` `TASK.md`; `risk:` tiap brief ≤ `risk:` `TASK.md` |
    | M | Tiap asumsi aktif `sementara dipakai:` yang membentuk `## Steps` mendarat di `## Objective` brief pelaksananya, bukan di `## Analysis trace` |
 
-   > Mengapa E menerima `DONE`: predikat ini dijalankan ulang pada tiap re-entry Fase 3 butir 0, dan brief yang sudah dieksekusi tidak pernah kembali ke `READY`; menuntut `READY` mutlak gagal permanen di taskdir yang pernah dieksekusi. Mengapa F hanya `chain: BRIEF`: brief pada rantai ber-PRD tidak menulis `Fulfills:` sama sekali.
+   > Rasional: `references/rationale.md` R1.
 
    Predikat F–M diperiksa ulang di sini sekalipun sudah ditagih hulu: penagihan hulu berlaku per dokumen dan per batch, sedangkan rantai bisa putus di sambungannya — misalnya brief yang menutup seluruh AC PRD sementara satu `SC-{n}` akar tak pernah dipetakan ke AC mana pun. G2 dan H2 hadir karena alasan yang sama persis dengan H: `SC-{n}` dan `EC-{n}` diangkut kolom PRD yang sama dengan `BR-{n}`, dan sumbu yang diperiksa hanya di hulu putus tanpa suara di sini.
 
