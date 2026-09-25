@@ -8,7 +8,7 @@ metadata:
 
 ## THE IRON LAW
 
-DILARANG MEMBUAT ASUMSI STACK ATAU PERINTAH BASELINE TANPA BUKTI KONFIGURASI NYATA DI FILESYSTEM. SETIAP PERINTAH VERIFIKASI (TYPECHECK, LINT, TEST) WAJIB DIUJI EKSEKUSI MINIMAL SATU KALI UNTUK MEMASTIKAN VALIDITAS RUNTIME, KECUALI `skip_baseline_exec` BERNILAI `true` DAN STATUSNYA DICATAT `SKIPPED`. BERKAS PROFIL YANG DIHASILKAN WAJIB MENGANDUNG SELURUH SECTION HEADER STANDAR DAN PANJANG KESELURUHAN DILARANG MELEBIHI 10.000 KARAKTER. DILARANG MELAKUKAN PERUBAHAN ATAU MEMBUAT BERKAS KODE SUMBER FITUR PADA SKILL INI.
+DILARANG MEMBUAT ASUMSI STACK ATAU PERINTAH BASELINE TANPA BUKTI KONFIGURASI NYATA DI FILESYSTEM. SETIAP PERINTAH VERIFIKASI (TYPECHECK, LINT, TEST, BUILD) WAJIB DIUJI EKSEKUSI MINIMAL SATU KALI SESUDAH USER MENYETUJUI DAFTAR PERINTAH BESERTA RISIKONYA LEWAT `AskUserQuestion`; PERINTAH YANG DITOLAK, ATAU SEMUANYA BILA `skip_baseline_exec` BERNILAI `true`, DICATAT `SKIPPED`. DILARANG MENJALANKAN PERINTAH MIGRASI ATAU PERINTAH APA PUN YANG MENGUBAH SKEMA ATAU DATA. BERKAS PROFIL YANG DIHASILKAN WAJIB MENGANDUNG SELURUH SECTION HEADER STANDAR DAN PANJANG KESELURUHAN DILARANG MELEBIHI 10.000 KARAKTER. DILARANG MELAKUKAN PERUBAHAN ATAU MEMBUAT BERKAS KODE SUMBER FITUR PADA SKILL INI.
 
 ## Precondition [REQUIRED]
 
@@ -81,10 +81,14 @@ DILARANG MEMBUAT ASUMSI STACK ATAU PERINTAH BASELINE TANPA BUKTI KONFIGURASI NYA
    - Perintah Linter: `pnpm lint`, `npm run lint`, `eslint .`, `ruff check .`, atau `golangci-lint run`.
    - Perintah Unit & Integration Test: `pnpm test`, `npm test`, `vitest run`, `jest`, `pytest`, atau `go test ./...`.
    - Perintah Build / Bundle Check: `pnpm build`, `npm run build`, `vite build`, atau `go build ./...`.
-2. Jalankan setiap perintah verifikasi tersebut minimal 1 kali secara nyata via terminal runner (kecuali `skip_baseline_exec: true`):
-   - Catat status eksekusi (`PASSED` atau `FAILED`; `SKIPPED` bila `skip_baseline_exec: true`) beserta durasi waktu running.
+2. Sebelum eksekusi (kecuali `skip_baseline_exec: true`):
+   - Catat `git status --porcelain` sebagai keadaan awal.
+   - Sajikan satu `AskUserQuestion`: daftar perintah beserta risikonya — test yang tampak integrasi (membaca `.env`, docker-compose, Testcontainers, `DATABASE_URL`) ditandai "menyentuh DB/jaringan"; build ditandai "dapat menulis artefak". Opsi: `jalankan semua` · `lewati yang menyentuh DB/jaringan` · `lewati semua (SKIPPED)`.
+3. Jalankan perintah yang disetujui satu per satu dengan `timeout` tool Bash 300000 ms:
+   - Catat status (`PASSED`, `FAILED`, `TIMEOUT`, `SKIPPED`) beserta durasi waktu running.
    - Tangkap baseline issues eksisting: jika terdapat error atau peringatan bawaan (misal: 2 lint warnings atau 1 skipped test), dokumentasikan secara transparan pada profil agar tidak menjadi false positive saat regresi di gate implementasi.
-3. Dilarang mencatat perintah verifikasi rekaan yang tidak dapat dieksekusi di runtime aktual repositori.
+4. Bandingkan `git status --porcelain` dengan keadaan awal. Berkas baru yang tidak di-ignore dicatat di profil sebagai "artefak build perlu di-ignore" dan dilaporkan ke user; dilarang menghapusnya sendiri.
+5. Dilarang mencatat perintah verifikasi rekaan yang tidak dapat dieksekusi di runtime aktual repositori.
 
 ### Fase 3 — Penyusunan Dokumen Profil Repositori
 
@@ -113,7 +117,8 @@ DILARANG MEMBUAT ASUMSI STACK ATAU PERINTAH BASELINE TANPA BUKTI KONFIGURASI NYA
 ## Guardrails
 
 - MUST NOT mengasumsikan framework, arsitektur, atau perintah test tanpa bukti file konfigurasi nyata di repositori.
-- MUST NOT mengabaikan eksekusi baseline verifikasi saat membuat atau memperbarui profil (kecuali eksplisit di-skip).
+- MUST NOT mengabaikan eksekusi baseline verifikasi saat membuat atau memperbarui profil (kecuali eksplisit di-skip atau ditolak user).
+- MUST NOT mengeksekusi perintah baseline tanpa izin `AskUserQuestion`, tanpa timeout, atau perintah migrasi/pengubah data apa pun.
 - MUST NOT membiarkan ukuran berkas profil melebihi 10.000 karakter (`wc -m`).
 - MUST NOT menghapus atau mengubah section header wajib yang telah distandardisasi dalam template acuan.
 - MUST NOT melakukan modifikasi atau penambahan pada kode sumber fungsional repositori dalam skill ini.
@@ -139,7 +144,7 @@ Skill ini menghasilkan berkas profil repositori terstruktur dan laporan terminal
    UKURAN: <n> karakter (batas 10.000)
    HANDOFF: explore
    ```
-   Nilai `<status>`: `PASSED`, `FAILED`, `SKIPPED` (via `skip_baseline_exec`), atau `UNVERIFIED_ENV_NOT_READY`.
+   Nilai `<status>`: `PASSED`, `FAILED`, `TIMEOUT`, `SKIPPED` (ditolak user atau `skip_baseline_exec`), atau `UNVERIFIED_ENV_NOT_READY`.
 
 ## Failure path
 

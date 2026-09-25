@@ -33,7 +33,8 @@ Hierarki layer backend dan pemisahan tanggung jawab kode:
 - **Database Engine**: `<misal: PostgreSQL 16 / MySQL 8 / MongoDB 7 / Redis 7>`
 - **ORM / Query Builder**: `<misal: Prisma / TypeORM / Drizzle / SQLAlchemy / GORM>`
 - **Migration Path & Tool**: `<misal: prisma/migrations, alembic/versions, migrations/>`
-- **Migration Command**: `<misal: pnpm prisma migrate dev / alembic upgrade head>`
+- **Migration Status Command**: `<misal: pnpm prisma migrate status / alembic current>` — read-only
+- **Migration Apply Command**: `<misal: pnpm prisma migrate deploy / alembic upgrade head>` — dicatat, tidak pernah dijalankan skill
 - **Seeding Command**: `<misal: pnpm prisma db seed / python scripts/seed.py>`
 
 ## 4. API Contracts & Routing Conventions
