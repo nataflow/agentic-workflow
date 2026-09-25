@@ -30,7 +30,7 @@ Ditagih `validate_report.py`; `FAIL` menahan commit:
 
 - **H1** — salin H1 `TASK.md` apa adanya, lalu tambahkan ` — Report`. Dilarang diturunkan dari slug.
 - **Ringkasan** — tepat satu kalimat hasil aktual, minimal 5 kata (kode inline dihitung satu kata); `Selesai.`/`Done.`/`Beres.` ditolak.
-- **Perubahan** — 1–7 butir, masing-masing menyebut perubahan perilaku (minimal 3 kata) dan ditutup kurung berisi berkas atau direktori modul yang muncul di berkas rantai (`SKILL.md` Phase 2); direktori tingkat atas tanpa `/` (mis. `src`) terlalu lebar dan ditolak. Tiap berkas rantai wajib tercakup satu butir, langsung atau lewat direktori induknya. Rujukan di dalam kurung dipisah koma.
+- **Perubahan** — 1–7 butir, masing-masing menyebut perubahan perilaku (minimal 3 kata) dan ditutup kurung berisi berkas atau direktori modul yang muncul di berkas rantai (`SKILL.md` Phase 2); direktori tingkat atas tanpa `/` (mis. `src`) terlalu lebar dan ditolak. Tiap berkas rantai wajib tercakup satu butir, langsung atau lewat direktori induknya. Rujukan di dalam kurung dipisah koma; kurung penutup yang dibaca adalah kurung seimbang terakhir di ujung baris, sehingga route group (`app/(tabs)/index.tsx`, `src/routes/(app)/+page.svelte`) dan nama berkas non-ASCII ditulis apa adanya.
 - **Catatan** — hanya dari tiga sumber: tiap `SC-{n}` yang `REVIEW.md` vonis `PERLU VERIFIKASI MANUAL` (wajib hadir, ditagih skrip), temuan `REVIEW.md` yang belum dituntaskan (tiap `### [Px-n]` ber-`> Status: PLANNED|DEFERRED` wajib disebut ID-nya, ditagih skrip), dan penyimpangan di `## Triase` `report-<NN>.md`. Ketiganya kosong → hapus heading beserta isinya; dilarang diisi `-`, `N/A`, atau kalimat penyangkalan.
 - **Nol placeholder** — tidak ada `<...>`, `{{`, atau komentar HTML tersisa.
 

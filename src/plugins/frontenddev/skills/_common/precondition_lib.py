@@ -1048,11 +1048,13 @@ def chain_commits(root: Path, taskdir_rel: str, since: str) -> List[str]:
 
 
 def chain_files_since(root: Path, taskdir_rel: str, since: str) -> List[str]:
+    """Path apa adanya (`core.quotePath=false`, `-z`): nama non-ASCII atau berspasi tidak dikutip git."""
     files: List[str] = []
     for sha in chain_commits(root, taskdir_rel, since):
-        out = git(root, "show", "--name-only", "--format=", sha, "--", ".",
-                  ":(exclude)frontenddev/docs", ":(exclude)frontenddev/reviews", ":(exclude).claude")
-        files += [l.strip() for l in out.splitlines() if l.strip()]
+        out = git(root, "-c", "core.quotePath=false", "show", "-z", "--name-only", "--format=", sha,
+                  "--", ".", ":(exclude)frontenddev/docs", ":(exclude)frontenddev/reviews",
+                  ":(exclude).claude")
+        files += [f.strip("\n") for f in out.split("\0") if f.strip()]
     return files
 
 

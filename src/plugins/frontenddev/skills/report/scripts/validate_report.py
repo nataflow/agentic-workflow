@@ -19,7 +19,7 @@ import argparse
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
@@ -37,13 +37,33 @@ REVIEW_SC_ROW = re.compile(r"^\|\s*`?(SC-\d+)`?\s*\|\s*([^|]+?)\s*\|")
 SC_LINE = re.compile(r"^- \[[ xX]\] \*\*(SC-\d+)\*\*:(.*)$")
 INLINE_CODE = re.compile(r"`[^`\n]*`")
 SENTENCE_END = re.compile(r"[.!?](?=\s|$)")
-BULLET = re.compile(r"^- (.+) \(([^()]+)\)\s*$")
 PLACEHOLDER = re.compile(r"\{\{|<!--|<[^<>\n]+>")
 EMPTY_NOTE = re.compile(r"^(-|n/?a|tidak ada|nihil)\.?$", re.IGNORECASE)
 TRIVIAL = re.compile(r"^(selesai|done|beres|ok|oke|sudah|tuntas)\.?$", re.IGNORECASE)
 OPEN_FINDING = re.compile(r"^### \[(P[123]-\d+)\]")
 MIN_SUMMARY_WORDS = 5
 MIN_BULLET_WORDS = 3
+
+
+def parse_bullet(line: str) -> Optional[Tuple[str, str]]:
+    """`- <teks> (<anotasi>)` → (teks, anotasi); anotasi = kurung seimbang TERAKHIR di ujung baris.
+
+    Kurung di dalam anotasi sah, sehingga route group (`app/(tabs)/…` Expo Router,
+    `src/routes/(app)/…` SvelteKit) dapat disebut apa adanya.
+    """
+    s = line.rstrip()
+    if not s.startswith("- ") or not s.endswith(")"):
+        return None
+    depth = 0
+    for i in range(len(s) - 1, 1, -1):
+        if s[i] == ")":
+            depth += 1
+        elif s[i] == "(":
+            depth -= 1
+            if depth == 0:
+                text, inner = s[2:i].rstrip(), s[i + 1:-1].strip()
+                return (text, inner) if text and inner else None
+    return None
 
 
 class ReportValidator:
@@ -114,19 +134,19 @@ class ReportValidator:
 
     def _check_4_changes(self) -> None:
         lines = [l.strip() for l in self.sec.get("## Perubahan", []) if l.strip()]
-        bullets = [BULLET.match(l) for l in lines]
+        bullets = [parse_bullet(l) for l in lines]
         errors = []
         if not 1 <= len(lines) <= 7:
             errors.append(f"{len(lines)} butir, sah 1–7")
         if any(b is None for b in bullets):
             errors.append("butir tanpa `(<berkas atau direktori>)` di ujungnya")
-        refs = [r.strip().strip("`").rstrip("/") for b in bullets if b for r in b.group(2).split(",")]
+        refs = [r.strip().strip("`").rstrip("/") for b in bullets if b for r in b[1].split(",")]
         files = chain_files(self.root, self.taskdir_rel)
 
         def covers(ref: str, f: str) -> bool:
             return f == ref or f.startswith(ref + "/")
 
-        vague = [b.group(1) for b in bullets if b and len(b.group(1).split()) < MIN_BULLET_WORDS]
+        vague = [b[0] for b in bullets if b and len(b[0].split()) < MIN_BULLET_WORDS]
         if vague:
             errors.append(f"butir tanpa perubahan perilaku (< {MIN_BULLET_WORDS} kata): " + ", ".join(vague[:3]))
         broad = [r for r in refs if "/" not in r and r not in files]
