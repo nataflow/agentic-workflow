@@ -102,7 +102,7 @@ Design, `sections` non-kosong Gate Contract, dan Gate Breakdown selalu. Lane `HO
 |---|---|---|
 | `init` | `task` | baris ledger persis jadwal `sections` |
 | `approve --row R --answer "<jawaban>"` | gate pemilik hop | hop hulu sah; dokumen `DRAFT` ter-commit; validator `PASS`; untuk CONTRACT/BRIEF ronde reviewer terakhir `PASS` atas konten final **tanpa `reopen` sesudah ronde itu** (BRIEF di hop `[~]` tanpa brief `READY` baru sah tanpa ronde baru). Menulis `APPROVED` + centang dalam satu commit yang memateraikan jawaban user, sha konten, dan `Hop: <R>` |
-| `reopen --row R --reason` | `lead` | kaskade: R dan seluruh hop tercentang di bawahnya jadi `[~]`, dokumen FLOW/UI/CONTRACT-nya kembali `DRAFT`; plafon 3 per hop, 6 per taskdir |
+| `reopen --row R --reason` | `lead` | kaskade: R dan seluruh hop tercentang di bawahnya jadi `[~]`, dokumen FLOW/UI/CONTRACT-nya kembali `DRAFT`; seluruh kaskade divalidasi sebelum ada yang ditulis; plafon 3 per hop (dihitung saat hop itu target), 6 per taskdir |
 | `escalate --lane L --sections S` | `lead` | lane hanya naik, sections hanya bertambah, hop tercentang di bawah hop baru wajib di-`reopen` dulu; plafon 2 |
 | `abandon --reason` | `lead` | `TASK.md` `status: ABANDONED` atas keputusan user; taskdir keluar dari pemindaian (`DITUTUP`) |
 | `files` | `code-reviewer`, `report` | berkas rantai: commit bersubjek `<type>(<slug>):` sejak akar |

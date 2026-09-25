@@ -46,6 +46,7 @@ from precondition_lib import (  # noqa: E402
     BRIEF_GLOB,
     CHAIN_BY_ROW,
     DOC_ROWS,
+    FrontmatterError,
     ROOTED_LANES,
     MINOR_LANE,
     chain_files,
@@ -305,27 +306,50 @@ class Chain:
         if used >= MAX_REOPEN:
             raise ChainError(f"plafon re-entry taskdir ({MAX_REOPEN}) habis — cacatnya satu lapis di atas "
                              "hop ini; klarifikasi lingkup dengan user, atau tutup taskdir (`abandon`).")
-        n = count_subjects(self.root, rf"{pattern}[A-Z ]*\b{row}\b", self.task_rel) + 1
+        # kuota per hop: hanya reopen yang menargetkan hop ini (token pertama subjek);
+        # kaskade tidak memakan kuota hop di bawahnya — plafon taskdir tetap membatasi total
+        n = count_subjects(self.root, rf"{pattern}{row}\b", self.task_rel) + 1
         if n > MAX_REOPEN_ROW:
             raise ChainError(f"plafon re-entry hop `{row}` ({MAX_REOPEN_ROW}) habis — klarifikasi lingkup dengan user.")
         entries = self.entries()
         idx = [e["row"] for e in entries].index(row)
         cascade = [e for e in entries[idx:] if e["mark"] == "x"]
-        paths = [self.task_rel]
-        originals = self.snapshot(self.task_rel, *[f"{self.taskdir_rel}/{CHAIN_BY_ROW[e['row']][2]}"
-                                                   for e in cascade if e["row"] in DOC_ROWS])
+        docs = {f"{self.taskdir_rel}/{CHAIN_BY_ROW[e['row']][2]}": e["sha"] for e in cascade if e["row"] in DOC_ROWS}
+        originals = self.snapshot(self.task_rel, *docs)
+        staged: Dict[str, str] = {}
+        for rel, sha in docs.items():                 # 1) validasi seluruh kaskade — belum ada yang ditulis
+            if rel not in originals:
+                raise ChainError(f"`{rel}` hilang dari disk padahal hop-nya tercentang @ {sha} — "
+                                 f"pulihkan dengan `git checkout {sha} -- {rel}`, lalu ulangi reopen. "
+                                 "Tidak ada berkas yang diubah.")
+            try:
+                staged[rel] = set_frontmatter_field(originals[rel], "status", "DRAFT")
+            except FrontmatterError as exc:
+                raise ChainError(f"`{rel}`: {exc} — pulihkan frontmatter dari commit tercentang "
+                                 f"(`git show {sha}:{rel}`), lalu ulangi reopen. Tidak ada berkas yang diubah.")
         text = self.text()
         for e in cascade:
             r = e["row"]
+            # label informasional: target = hitungan target, kaskade = total pembukaan hop itu
             k = n if r == row else count_subjects(self.root, rf"{pattern}[A-Z ]*\b{r}\b", self.task_rel) + 1
             text = replace_chain_row(text, r, chain_line(r, "~", f"re-entry {k} (was {e['sha']})"))
-            if r in DOC_ROWS:
-                rel = f"{self.taskdir_rel}/{CHAIN_BY_ROW[r][2]}"
-                p = self.root / rel
-                p.write_text(set_frontmatter_field(p.read_text(encoding="utf-8"), "status", "DRAFT"),
-                             encoding="utf-8")
-                paths.append(rel)
-        self.write_task(text)
+        try:                                          # 2) tulis semuanya; gagal di tengah → pulihkan
+            for rel, new_text in staged.items():
+                (self.root / rel).write_text(new_text, encoding="utf-8")
+            self.write_task(text)
+        except OSError as exc:
+            stuck = []
+            for rel, old in originals.items():
+                try:
+                    if (self.root / rel).read_text(encoding="utf-8") != old:
+                        (self.root / rel).write_text(old, encoding="utf-8")
+                except OSError:
+                    stuck.append(rel)
+            if stuck:
+                raise ChainError(f"gagal menulis kaskade ({exc}); {', '.join(stuck)} tidak dapat dipulihkan — "
+                                 f"`git checkout -- {' '.join(stuck)}` lalu ulangi reopen.")
+            raise ChainError(f"gagal menulis kaskade ({exc}) — berkas dipulihkan ke keadaan semula.")
+        paths = [self.task_rel, *staged]
         rows = " ".join(e["row"] for e in cascade)
         new = self.commit(paths, f"docs({self.slug}): reopen {rows} — {reason.strip()[:72]}",
                           "", originals)
@@ -434,7 +458,7 @@ def main() -> None:
             print(f"CHAIN REVISIONS: {args.row} {n}/{MAX_REVISIONS}"
                   + (" — plafon habis; penolakan berikutnya dihentikan ke `frontenddev:lead` Phase 7" if left <= 0 else f" — sisa {left}"))
             sys.exit(1 if left <= 0 else 0)
-    except ChainError as exc:
+    except (ChainError, FrontmatterError, ValueError, KeyError) as exc:
         print(f"CHAIN {args.cmd.upper()}: [FAIL] {exc}")
         sys.exit(1)
 

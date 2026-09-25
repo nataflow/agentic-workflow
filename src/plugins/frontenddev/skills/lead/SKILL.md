@@ -10,7 +10,7 @@ metadata:
 - Dilarang membuat, mengedit, atau menghapus berkas di `src/` dari gate ini — dan dari main loop mana pun sebelum lane, slug, taskdir, dan akar `TASK.md` sah.
 - Sapuan lokasi berhenti pada nama path (`Glob`) dan pelokalan simbol (`Grep`); isi komponen tidak dibuka. Penelusuran lintas-layer didelegasikan ke `code-explorer` lewat `dispatcher/explorer.md`.
 - Keadaan taskdir dibaca dari `scripts/taskdir_state.py`, bukan dari ingatan sesi atau pembacaan frontmatter satu per satu.
-- Lane dan `sections` hanya bergeser lewat `chain.py escalate` (plafon 2 per taskdir); hop yang sudah disetujui hanya dibuka lewat `chain.py reopen` (kaskade ke seluruh hop tercentang di bawahnya; plafon 3 per hop, 6 per taskdir) — keduanya atas konfirmasi user.
+- Lane dan `sections` hanya bergeser lewat `chain.py escalate` (plafon 2 per taskdir); hop yang sudah disetujui hanya dibuka lewat `chain.py reopen` (kaskade ke seluruh hop tercentang di bawahnya; plafon 3 per hop — dihitung saat hop itu target `reopen`, kaskade tidak memakan kuota hop di bawahnya — dan 6 per taskdir untuk semua reopen) — keduanya atas konfirmasi user.
 - Tiap gate adalah persetujuan independen yang dimateraikan `chain.py approve` oleh gate pemiliknya — materainya (`Konten disetujui: <sha>` + `Hop: <ROW>`) sah hanya bila lebih baru daripada reopen terakhir hop itu; lead tidak pernah mencentang ledger.
 
 ## Precondition [REQUIRED]
@@ -123,7 +123,7 @@ Dijalankan ketika gate hilir mengembalikan kendali dengan temuan yang menggeser 
 | Temuan asal ditunda atau dibatalkan user | tulis `> Status: DEFERRED <tanggal> — <alasan>` / `DROPPED` di bawah temuan pada berkas `finding_source`, commit terpisah |
 | Plafon habis, atau user memutuskan berhenti | `chain.py abandon --taskdir <taskdir> --reason <keputusan user>` → `DITUTUP` |
 
-Plafon ditegakkan skrip: eskalasi 2 per taskdir; re-entry 3 per hop dan 6 per taskdir. Plafon habis → cacatnya di lingkup, bukan di dokumen: klarifikasi lingkup bersama user di Phase 8 ini — amandemen akar (baris `SC-{n}` berubah), atau tutup taskdir lewat `chain.py abandon`.
+Plafon ditegakkan skrip: eskalasi 2 per taskdir; re-entry 3 per hop (dihitung saat hop itu target `reopen`; kaskade tidak memakan kuota hop di bawahnya) dan 6 per taskdir (semua reopen). Plafon habis → cacatnya di lingkup, bukan di dokumen: klarifikasi lingkup bersama user di Phase 8 ini — amandemen akar (baris `SC-{n}` berubah), atau tutup taskdir lewat `chain.py abandon`.
 
 ## Guardrails
 

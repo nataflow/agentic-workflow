@@ -100,7 +100,7 @@ Loop yang berujung ke skill yang sama dapat berputar tanpa henti; plafonnya nume
 | Ronde `doc-reviewer` (Plan Review) | 2 per putaran, 8 per taskdir | `review_round.py --gate plan` | Hentikan, rutekan BLOCKER ke gate pemilik |
 | Revisi user per gate (FLOW, UI, CONTRACT, breakdown) | 2 berturut sejak draft/reopen | `chain.py revisions` · prasyarat `plan` mode REVISE | Hentikan gate, sajikan poin penolakan, serahkan ke lead Phase 8 (klarifikasi lingkup: amandemen akar, atau `chain.py abandon`) |
 | Brief remedi per unit asal | 2 | `validate_briefs.py` Check M | `reopen CONTRACT` — cacatnya di kontrak (MINOR: reopen BRIEF → escalate) |
-| Re-entry | 3 per hop, 6 per taskdir | `chain.py reopen` | Klarifikasi lingkup bersama user, atau `abandon` |
+| Re-entry | 3 per hop (dihitung saat hop itu target; kaskade tidak memakan kuota hop di bawahnya), 6 per taskdir (semua reopen) | `chain.py reopen` | Klarifikasi lingkup bersama user, atau `abandon` |
 | Eskalasi lane per taskdir | 2 | `chain.py escalate` | Klarifikasi lingkup bersama user |
 
 ---

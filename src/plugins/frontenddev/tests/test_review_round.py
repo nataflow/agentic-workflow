@@ -2,7 +2,7 @@
 commit bertrailer, dan bukti balikan contract (L4.3)."""
 import json
 
-from conftest import FE_TD, fe_brief, fe_commit, fe_run, git, write_files
+from conftest import FE_TD, fe_brief, fe_commit, fe_evidence as evidence, fe_round as round_, fe_run, git, write_files
 
 CONTRACT = f"{FE_TD}/CONTRACT.md"
 REVIEW_PLAN = f"{FE_TD}/REVIEW-PLAN.md"
@@ -24,26 +24,6 @@ def approve(repo, row="CONTRACT"):
 def edit(repo, rel=CONTRACT, old="Tambah tombol.", new="Tambah tombol Lacak di header."):
     p = repo / rel
     p.write_text(p.read_text(encoding="utf-8").replace(old, new), encoding="utf-8")
-
-
-def evidence(repo, n, verdict="PASS", mechanical=0, semantic=0):
-    rel = f"{FE_TD}/.explore/contract-review-r{n}.md"
-    write_files(repo, {rel: f"## Contract Review\n- Verdict: {verdict}\n- Ronde: {n}\n"
-                            f"- BLOCKER: {mechanical} [MEKANIS] · {semantic} [SEMANTIK]\n"})
-    return rel
-
-
-def round_(repo, verdict="PASS", gate="contract", mechanical=0, semantic=0):
-    opened = rr(repo, "open", gate=gate)
-    assert opened.returncode == 0, opened.out
-    n = opened.out.split("ronde ")[1].split("/")[0]
-    extra = ["--mechanical", str(mechanical), "--semantic", str(semantic)]
-    if gate == "plan":
-        write_files(repo, {REVIEW_PLAN: f"---\nverdict: {verdict}\nround: \"{n}\"\n---\n\n# Plan Review\n"})
-    else:
-        extra += ["--evidence", evidence(repo, n, verdict, mechanical, semantic)]
-    r = rr(repo, "record", "--verdict", verdict, *extra, gate=gate)
-    assert r.returncode == 0, r.out
 
 
 # ------------------------------------------------------------------ gate contract

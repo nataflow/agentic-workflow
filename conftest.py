@@ -203,3 +203,44 @@ def fe_chain_repo(make_repo):
     write_files(root, {f"{FE_TD}/CONTRACT.md":
                        (FE_FIX / "contract_valid.md").read_text(encoding="utf-8").replace("{sha}", sha)})
     return root
+
+
+def fe_evidence(repo: Path, n, verdict: str = "PASS", mechanical: int = 0, semantic: int = 0) -> str:
+    """Balikan `contract-reviewer` ronde `n` di laci `.explore/` (bukti `record --evidence`)."""
+    rel = f"{FE_TD}/.explore/contract-review-r{n}.md"
+    write_files(repo, {rel: f"## Contract Review\n- Verdict: {verdict}\n- Ronde: {n}\n"
+                            f"- BLOCKER: {mechanical} [MEKANIS] · {semantic} [SEMANTIK]\n"})
+    return rel
+
+
+def fe_round(repo: Path, verdict: str = "PASS", gate: str = "contract", mechanical: int = 0,
+             semantic: int = 0) -> None:
+    """Satu ronde reviewer lengkap: `open` → laporan/bukti → `record`."""
+    rr = ("_common/review_round.py",)
+    opened = fe_run(repo, *rr, "open", "--taskdir", FE_TD, "--gate", gate)
+    assert opened.returncode == 0, opened.out
+    n = opened.out.split("ronde ")[1].split("/")[0]
+    extra = ["--mechanical", str(mechanical), "--semantic", str(semantic)]
+    if gate == "plan":
+        write_files(repo, {f"{FE_TD}/REVIEW-PLAN.md":
+                           f'---\nverdict: {verdict}\nround: "{n}"\n---\n\n# Plan Review\n'})
+    else:
+        extra += ["--evidence", fe_evidence(repo, n, verdict, mechanical, semantic)]
+    r = fe_run(repo, *rr, "record", "--taskdir", FE_TD, "--gate", gate, "--verdict", verdict, *extra)
+    assert r.returncode == 0, r.out
+
+
+def fe_approved_chain(repo: Path) -> None:
+    """CONTRACT dan BRIEF (brief 01) disetujui lewat jalur SKILL: ronde PASS → commit skrip → approve."""
+    def run(*args):
+        r = fe_run(repo, *args)
+        assert r.returncode == 0, r.out
+    fe_round(repo)
+    run("_common/review_round.py", "commit", "--taskdir", FE_TD, "--gate", "contract",
+        "--subject", "docs(orders-lacak): draft CONTRACT.md")
+    run("_common/chain.py", "approve", "--taskdir", FE_TD, "--row", "CONTRACT", "--answer", "Setujui")
+    fe_brief(repo, "01")
+    fe_round(repo, gate="plan")
+    run("_common/review_round.py", "commit", "--taskdir", FE_TD, "--gate", "plan",
+        "--subject", "docs(orders-lacak): draft breakdown (1 briefs)")
+    run("_common/chain.py", "approve", "--taskdir", FE_TD, "--row", "BRIEF", "--answer", "Setujui")
