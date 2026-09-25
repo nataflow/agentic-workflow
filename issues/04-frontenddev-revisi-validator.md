@@ -85,19 +85,35 @@
 - Keluaran "sesudah perbaikan" di beberapa item berasal dari prototipe tambalan di salinan scratchpad (bukan repo). Prototipe itu dipakai untuk membuktikan rancangan; kodenya dikutip di **Rencana perbaikan** masing-masing item.
 - `pytest` tidak terpasang di mesin review. Test regresi L4.1 dijalankan dengan shim kecil yang meniru fixture `tmp_path`; hasilnya dikutip di L4.1.
 
+## Catatan implementasi (2026-09-25)
+
+Keputusan user: seluruh rekomendasi K1–K8 (tercatat di `Log Keputusan` `ISSUES.md`, lokal karena berkas itu di-gitignore). Satu commit per item, kecuali L4.5 + L4.9 (satu blok `chain.py reopen`). `pytest` tidak terpasang; suite dijalankan dengan `uvx pytest` — 431 lulus. Skrip reproduksi yang dijalankan ulang terhadap kode baru: `l41-contract.sh`, `l41-plan.sh`, `l42.sh`, `l46.sh`, `l48.sh` (keluaran sesuai "sesudah perbaikan"); L4.3, L4.4, L4.5, L4.7, L4.9, L4.10 dibuktikan lewat test regresi padanannya, bukan skrip bash-nya. Verifikasi manual di sesi Claude Code nyata (L4.2 butir 3: rantai MINOR sampai architect Phase 4 dengan agent `code-reviewer` baru) **belum** dijalankan.
+
+Penyimpangan dari rencana di bawah:
+
+- **Letak test & fixture**: fixture bersama frontenddev di `conftest.py` akar (`fe_chain_repo`, `fe_minor_chain`, `fe_round`, `fe_approved_chain`, `fe_review_md`) plus `src/plugins/frontenddev/tests/fixtures/` (`task_fast_forward.md`, `contract_valid.md`, `brief_button.md`, `audit_valid.md`, `minor_chain_reviewed.sh` — setup `l46.sh`). Fixture R1–R5 L4.2 dibangun `fe_review_md(**override)`, bukan berkas `tests/fixtures/review/*.md` terpisah. Test tambahan: `test_validate_audit.py` (L4.7, termasuk `test_finding_source_bukan_berkas_rantai`, bukan `test_chain_files.py`).
+- **L4.1**: pemeriksaan kesiapan ronde tinggal di `Rounds.ready()` (`review_round.py`), bukan `precondition_lib.review_ready`; `chain.py` mengimpor `Rounds` (tidak ada impor melingkar lagi karena `content_snapshot` pindah ke `precondition_lib`).
+- **L4.3**: ditambah `review_round.py rebuild` — state hilang padahal trailer mencatat ronde kini punya jalur pulih bila `.bak` juga hilang (ronde rekonstruksi mengisi plafon taskdir, ber-epoch `-1`, tidak pernah sah untuk approve). Gate plan: `record` juga menolak bila `verdict` frontmatter `REVIEW-PLAN.md` ≠ flag. Kegagalan state di dalam `chain.py approve` dibungkus jadi `CHAIN APPROVE: [FAIL]`.
+- **L4.8**: `status --ready` tetap ditambahkan walau K2 dipilih (pesan prasyarat menyebut keduanya); Check 8 contract membaca status ronde lewat `contract_review_ready()` (impor lambat `review_round`).
+- **L4.9**: label `re-entry k` baris kaskade dibiarkan tanpa penanda `(kaskade)`.
+- **L4.5**: pemulihan sesudah gagal tulis melewati berkas yang isinya tak berubah dan melaporkan berkas yang tak dapat dipulihkan beserta perintah `git checkout`.
+- **L4.7 / K6**: frontenddev memberi `Edit` ke `code-reviewer`; backenddev (L2.6) menaruh penyuntingan `> Status: FIXED` di implementor. Penjaganya sepadan (diff `finding_source` hanya boleh menyentuh baris `> Status:`), aktornya berbeda.
+- **L4.2**: aturan 10 hanya menagih backtick — kolom pertama tabel `run_verification.py` adalah **nama** perintah, bukan perintah penuh, jadi keanggotaan di `commands.md` tidak dicek; perintah HIJAU untuk bukti SC mencakup nama dan kolom "Perintah penuh". Aturan 11: `run_verification.py closing` kini menulis `closing-verification.json` (kedua salinan, tetap identik); `architect/SKILL.md` Phase 4 butir 3 dan `dispatcher/reviewer.md` memanggil `--log`. Tanpa masa transisi: `REVIEW.md` lama yang *Violation*-nya tanpa `Dimensi <n> —` kini FAIL, sehingga fase architect kembali `PENUTUP` dan review ulang dipicu.
+- **L4.10**: resolver mengembalikan `("tidak", "adapter")` untuk adapter Svelte tanpa baris profil, dan `("tidak", "bawaan")` hanya bila adapter tidak ada.
+
 ## Definisi selesai langkah ini
 
-- [ ] Kesepuluh item tercentang, masing-masing memenuhi **Selesai bila**-nya.
-- [ ] Skrip reproduksi di berkas ini, dijalankan terhadap kode baru, menghasilkan perilaku "sesudah perbaikan" yang tertulis (approve lolos pada skenario A–D; kelima fixture L4.2 FAIL dengan pesan yang menunjuk bagian salah; dst.).
-- [ ] Test regresi baru hijau: `pytest src/plugins/frontenddev/tests -q` (minimal berkas `test_review_round.py`, `test_validate_review.py`, `test_validate_report.py`, `test_chain_reopen.py`, `test_validate_briefs_check_m.py`, `test_phase_report.py`, `test_typecheck_per_brief.py`).
-- [ ] Kata "generasi" (arti lama) tidak lagi muncul di SKILL, dispatcher, `lane-routing-matrix.md`, dan README frontenddev.
-- [ ] Contoh terisi `review-template.md` bagian 3 dan fixture positif L4.2 tetap `PASS` di validator baru.
-- [ ] Keputusan K1–K8 tercatat di `Log Keputusan` `ISSUES.md`.
+- [x] Kesepuluh item tercentang, masing-masing memenuhi **Selesai bila**-nya.
+- [x] Skrip reproduksi di berkas ini, dijalankan terhadap kode baru, menghasilkan perilaku "sesudah perbaikan" yang tertulis (approve lolos pada skenario A–D; kelima fixture L4.2 FAIL dengan pesan yang menunjuk bagian salah; dst.).
+- [x] Test regresi baru hijau: `pytest src/plugins/frontenddev/tests -q` (minimal berkas `test_review_round.py`, `test_validate_review.py`, `test_validate_report.py`, `test_chain_reopen.py`, `test_validate_briefs_check_m.py`, `test_phase_report.py`, `test_typecheck_per_brief.py`).
+- [x] Kata "generasi" (arti lama) tidak lagi muncul di SKILL, dispatcher, `lane-routing-matrix.md`, dan README frontenddev.
+- [x] Contoh terisi `review-template.md` bagian 3 dan fixture positif L4.2 tetap `PASS` di validator baru.
+- [x] Keputusan K1–K8 tercatat di `Log Keputusan` `ISSUES.md`.
 
 ---
 
 ## L4.1 [Tinggi] Revisi user tidak pernah bisa disetujui — aturan "generasi" ronde review
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 10–14 jam · **Bergantung pada:** — (test memakai struktur L6.1) · **Memblokir:** L4.3, L4.8
 
@@ -985,7 +1001,7 @@ REVIEW ROUND STATUS: contract — generasi 0/2, taskdir 2/8
 ---
 
 ## L4.2 [Tinggi] `validate_review.py` dan `validate_report.py` hanya menilai bentuk
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 14–20 jam (10–14 jam tanpa butir log mesin) · **Bergantung pada:** L3.3 (butir log mesin), L4.7 (daftar berkas rantai) · **Memblokir:** —
 
@@ -1519,7 +1535,7 @@ Fixture positif (REVIEW WARNING yang benar + REPORT dengan Catatan `P2-1`) di pr
 ---
 
 ## L4.3 [Sedang] State ronde review bisa di-reset diam-diam
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 3–4 jam (minimal) · +6 jam bila opsi K2 (subperintah `commit` + trailer) · **Bergantung pada:** L4.1 · **Memblokir:** L4.8 (bila K2 dipilih)
 
@@ -1704,7 +1720,7 @@ Lanjutan yang dicek dengan fixture L4.1 (kontrak valid): sesudah 2 ronde BLOCKED
 ---
 
 ## L4.4 [Sedang] Jalur remedi lane MINOR buntu di Check M
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 1–2 jam · **Bergantung pada:** — · **Memblokir:** —
 
@@ -1837,7 +1853,7 @@ Pencocokan bergantung pada format subjek `chain.py escalate` (`eskalasi lane X �
 ---
 
 ## L4.5 [Sedang] `chain.py reopen` bisa crash di tengah kaskade
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 2–3 jam · **Bergantung pada:** — · **Memblokir:** —
 
@@ -2010,7 +2026,7 @@ slug: orders-lacak
 ---
 
 ## L4.6 [Sedang] REPORT.md yang gagal di-commit menjadi jalan buntu; loop validasi tanpa plafon
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 5–7 jam · **Bergantung pada:** L4.7 (fixture REPORT) · **Memblokir:** —
 
@@ -2289,7 +2305,7 @@ Jalankan `l46.sh` terhadap kode baru: architect `fase=LAPORAN TERTUNDA` + Check 
 ---
 
 ## L4.7 [Sedang] `finding_source` mencemari berkas rantai; reviewer tanpa Edit
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 3–4 jam (+3 jam `validate_audit.py`) · **Bergantung pada:** keputusan K6 (selaras L2.6) · **Memblokir:** L4.6, L4.2 (fixture REPORT)
 
@@ -2401,7 +2417,7 @@ Pengecualian `frontenddev/reviews` berlaku global. Bila suatu saat rantai sah pe
 ---
 
 ## L4.8 [Sedang] Remediasi prasyarat menyuruh commit artefak yang belum direview
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 2–3 jam (0 tambahan bila ikut K2 di L4.3) · **Bergantung pada:** L4.1 (field ronde), L4.3 (bila K2) · **Memblokir:** —
 
@@ -2520,7 +2536,7 @@ Tidak ada instruksi (SKILL maupun pesan skrip) yang menyuruh commit artefak tert
 ---
 
 ## L4.9 [Rendah] Kaskade reopen memakan kuota hop di bawahnya
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 1–2 jam · **Bergantung pada:** keputusan K7 · **Memblokir:** —
 
@@ -2627,7 +2643,7 @@ Kuota per hop hanya berkurang oleh reopen yang menargetkan hop itu; plafon taskd
 ---
 
 ## L4.10 [Sedang] Sumber `typecheck-per-brief` bertentangan
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 3–4 jam · **Bergantung pada:** — · **Memblokir:** —
 
