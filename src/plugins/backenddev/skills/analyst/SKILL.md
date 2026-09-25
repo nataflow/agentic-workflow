@@ -56,14 +56,14 @@ Jalankan hop belum tercentang paling atas pada ledger `## Chain`, satu hop per g
 | `PRD` | `backenddev:system-analysis` | `PRD.md` `DRAFT` | Fase 4 |
 | `BRIEF` | `backenddev:plan` | `brief-*.md` `READY` | Fase 6 |
 
-0. **Re-entry — ledger sudah tercentang penuh.** Taskdir yang kembali dari gerbang membawa kegagalan hilir tidak punya hop belum tercentang, sehingga predikat butir 1 tidak pernah terpenuhi dan rantai berhenti tanpa jalan masuk. Bukalah hop-nya lebih dulu, jangan berimprovisasi masuk ke tengah fase. Empat pemicunya: vonis `NOT_READY_FOR_IMPLEMENTATION` yang dikembalikan gerbang, verifikasi penutup `architect` merah karena cacat perencanaan (`architect` Failure path 4b), berkas terdampak yang tak dimiliki `## File scope` brief mana pun, dan temuan `P1` `REVIEW.md` yang dikembalikan gerbang (hop pemilik: `BRIEF`, atau `PRD` bila temuan menunjuk kontrak).
+0. **Re-entry — ledger sudah tercentang penuh.** Taskdir yang kembali dari gerbang membawa kegagalan hilir tidak punya hop belum tercentang, sehingga predikat butir 1 tidak pernah terpenuhi dan rantai berhenti tanpa jalan masuk. Bukalah hop-nya lebih dulu, jangan berimprovisasi masuk ke tengah fase. Lima pemicunya: vonis `NOT_READY_FOR_IMPLEMENTATION` yang dikembalikan gerbang, verifikasi penutup `architect` merah karena cacat perencanaan (`architect` Failure path 4b), berkas terdampak yang tak dimiliki `## File scope` brief mana pun, brief `BLOCKED` di taskdir (`reentry_reason` menyebut brief-NN beserta sebab dari `report-NN.md`; hop pemilik `BRIEF`), dan temuan `P1` `REVIEW.md` yang dikembalikan gerbang (hop pemilik: `BRIEF`, atau `PRD` bila temuan menunjuk kontrak).
 
    1. Tetapkan **satu** hop pemilik kegagalannya dari laporan masuk: predikat atau berkas yang gagal menunjuk `brief-*.md` → hop `BRIEF`; menunjuk kontrak, `AC-{n}`, atau permukaan PRD → hop `PRD`; menunjuk aturan bisnis `BR-{n}` → hop `BRD`. Kegagalan yang menunjuk dua hop sekaligus dibuka pada hop **paling hulu**.
    2. Ubah centang hop itu menjadi `- [~] <HOP> — <skill> → <artefak> @ re-entry <n> (was <sha lama>)`. Hop di bawahnya yang sudah tercentang ikut dibuka menjadi `- [ ]` tanpa penanda: artefaknya tidak dibatalkan, tetapi ia wajib berangkat ulang di atas hasil hop hulu yang baru.
    3. Commit pembaruan dengan staging path eksplisit `{taskdir}/TASK.md` dan subjek `docs(<slug>): re-entry hop <HOP> ke-<n>`.
    4. Lanjutkan ke butir 1; hop `[~]` diperlakukan persis seperti hop belum tercentang, dan kembali `[x]` bersha baru saat ia tuntas.
 
-   **Artefak hop yang dibuka tidak dihapus dan tidak diturunkan statusnya.** `BRD.md`/`PRD.md` `APPROVED` bertahan `APPROVED` sampai hop itu menerbitkan revisinya, lalu gerbang dokumen Fase 4 berjalan ulang atasnya. Brief `DONE` **tidak pernah** dibuka: ia sudah dieksekusi, dan sisa pekerjaannya adalah brief tambahan pada taskdir yang sama — bukan penulisan ulang riwayat.
+   **Artefak hop yang dibuka tidak dihapus dan tidak diturunkan statusnya.** `BRD.md`/`PRD.md` `APPROVED` bertahan `APPROVED` sampai hop itu menerbitkan revisinya, lalu gerbang dokumen Fase 4 berjalan ulang atasnya. Brief `DONE` **tidak pernah** dibuka: ia sudah dieksekusi, dan sisa pekerjaannya adalah brief tambahan pada taskdir yang sama — bukan penulisan ulang riwayat. Brief `BLOCKED` juga tidak dibuka: `plan` menutupnya jadi `SUPERSEDED` lewat brief pengganti.
 
    **Plafon dua re-entry per taskdir**, dihitung terpisah dari eskalasi chain Fase 5 dan amandemen akar Fase 4a. Permintaan ketiga → `## Failure path` butir 9.
 
@@ -114,7 +114,7 @@ Ini satu-satunya titik yang memeriksa rantai sebagai satu kesatuan. Tiap skill h
    | B | Ledger `## Chain` tercentang penuh, tiap centang membawa sha |
    | C | `BRD.md` `APPROVED` bila `chain: BRD_PRD_BRIEF`, verdict `brd-reviewer` `Approved` terlampir apa adanya |
    | D | `PRD.md` `APPROVED` bila `chain` ber-PRD, verdict `prd-reviewer` `Approved` terlampir apa adanya |
-   | E | Tiap `brief-*.md` berstatus `READY` **atau** `DONE`, dan yang `READY` ter-commit satu batch; verdict `brief-reviewer` `Approved` terlampir apa adanya. `BLOCKED` tetap gagal |
+   | E | Tiap `brief-*.md` berstatus `READY`, `DONE`, atau `SUPERSEDED` bertaut (Check C `validate_briefs.py` tanpa pelanggaran tautan); yang `READY` ter-commit satu batch; verdict `brief-reviewer` `Approved` terlampir apa adanya. `BLOCKED` tetap gagal — ia wajib sudah digantikan brief ber-`supersedes` |
    | F | Tiap `SC-{n}` `TASK.md` disebut minimal satu baris `Fulfills:` — **hanya `chain: BRIEF`**; rantai ber-PRD melewatinya (jalurnya `Akar` PRD → `Covers:`, predikat G2 dan G) |
    | G | Tiap `AC-{n}` `PRD.md` disebut minimal satu baris `Covers:` (chain ber-PRD) |
    | G2 | Tiap `SC-{n}` `TASK.md` disebut minimal satu kolom `Akar` PRD (chain ber-PRD) |

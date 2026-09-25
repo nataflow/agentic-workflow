@@ -24,6 +24,7 @@ from precondition_lib import (  # noqa: E402
     foreign_owner,
     legacy_suffix,
 )
+from brief_status import CLOSED, scan_briefs, validate_links  # noqa: E402
 
 
 def _strip_explore_scratch(status_out: str) -> str:
@@ -233,15 +234,16 @@ class PreconditionChecker:
         })
 
     def _check_4_all_briefs_done(self):
+        """Seluruh brief tertutup: `DONE`, atau `SUPERSEDED` yang bertaut ke penggantinya."""
         check_id = 4
-        name = "All Briefs Status DONE"
+        name = "All Briefs Closed"
         taskdir_path = self._resolve_taskdir()
 
         if not taskdir_path or not taskdir_path.exists():
             return
 
-        brief_files = sorted(taskdir_path.glob("brief-*.md"))
-        if not brief_files:
+        briefs = scan_briefs(taskdir_path)
+        if not briefs:
             self.results.append({
                 "id": check_id,
                 "name": name,
@@ -251,24 +253,18 @@ class PreconditionChecker:
             })
             return
 
-        not_done = []
-        for bf in brief_files:
-            try:
-                content = bf.read_text(encoding="utf-8")
-                match = re.search(r"^status:\s*([A-Z_]+)", content, re.MULTILINE)
-                st = match.group(1) if match else "UNKNOWN"
-                if st != "DONE":
-                    not_done.append(f"{bf.name} ({st})")
-            except Exception:
-                not_done.append(f"{bf.name} (READ_ERROR)")
-
-        if not_done:
+        problems = [f"{b['name']} ({b['status']})" for b in briefs if b["status"] not in CLOSED]
+        problems += validate_links(briefs)
+        n_done = sum(b["status"] == "DONE" for b in briefs)
+        if not n_done:
+            problems.append("nol brief DONE")
+        if problems:
             self.results.append({
                 "id": check_id,
                 "name": name,
                 "status": "FAIL",
-                "summary": f"Terdapat brief yang belum DONE: {', '.join(not_done)}",
-                "action": "Selesaikan seluruh brief hingga berstatus DONE sebelum menerbitkan REPORT.md.",
+                "summary": f"Brief belum tertutup: {'; '.join(problems)}",
+                "action": "Selesaikan lewat `backenddev:architect`; SUPERSEDED sah hanya bila bertaut ke pengganti.",
             })
             return
 
@@ -276,7 +272,7 @@ class PreconditionChecker:
             "id": check_id,
             "name": name,
             "status": "PASS",
-            "summary": f"Seluruh {len(brief_files)} brief berstatus DONE",
+            "summary": f"{n_done} DONE · {len(briefs) - n_done} SUPERSEDED",
             "action": "",
         })
 

@@ -31,7 +31,7 @@ Direktori `backenddev/issues/` tidak diperiksa di sini: ia dibuat dan diseed sen
 ## Fase 0 — Rentang & Kontrak Acuan
 
 1. Tetapkan rentang wajib `$(git merge-base <base_branch> HEAD)..HEAD`; tolak `<base_branch>..HEAD` polos.
-2. Himpun **union** tabel `## File scope` seluruh `brief-*.md` sebagai kontrak acuan tunggal — dilarang menilai cakupan per brief.
+2. Himpun **union** tabel `## File scope` seluruh `brief-*.md` — `DONE` **dan** `SUPERSEDED`, karena commit `wip` brief yang digantikan tetap berada di rentang diff — sebagai kontrak acuan tunggal; dilarang menilai cakupan per brief.
 3. Baca `.claude/profile/backenddev/invariants.md` dan tiap baris `.claude/profile/backenddev/anti-patterns.md`. Baris diff yang cocok pola terlarang jadi temuan `P2` dimensi `architecture`, mengutip `file:line` diff dan baris profil yang dilanggar; dilarang dinaikkan ke `P1` — `P1` milik pelanggaran invariant.
 4. Baca `## Audit checklist` adapter stack sebagai sumber tunggal butir spesifik stack. Butir bertanda `hexagonal` dipakai **hanya** bila field `architecture` bernilai `hexagonal` atau `hybrid`; memakainya pada repo `layered` menghasilkan temuan palsu.
 5. Kecualikan perubahan di bawah `backenddev/` dan `.claude/` — artefak dokumen, bukan kode.
@@ -41,7 +41,7 @@ Direktori `backenddev/issues/` tidak diperiksa di sini: ia dibuat dan diseed sen
 
 1. **Scope Conformance**: Sandingkan `git diff --name-only` vs union `## File scope`. Berkas kode di luar union adalah Pelanggaran Scope (`P2`; `P1` bila menyentuh domain luar). Pastikan nol mutasi konfigurasi build global tanpa otorisasi brief dan nol berkas test dihapus demi lolos.
 2. **Cross-Brief Coherence**: Evaluasi berkas yang disentuh lebih dari satu commit brief. **Rollback terselubung** (batas transaksi atau exception handler brief awal dilonggarkan brief akhir tanpa justifikasi `## Steps`) dan **duplikasi migrasi** (dua migrasi mengubah kolom sama secara bertentangan) adalah `P1` Cacat Koherensi.
-3. **Steps Completeness**: Telusuri tiap langkah `## Steps` ke diff aktual; buktikan pada anchor simbol dan commit SHA lewat `git log -S "<simbol>"`. Langkah tak terbukti di rentang diff adalah langkah tertinggal. Validasi nilai terhitung terhadap spesifikasi sebelum/sesudah.
+3. **Steps Completeness**: Telusuri tiap langkah `## Steps` brief `DONE` ke diff aktual — brief `SUPERSEDED` tidak dinilai, cukup dicatat di *Verification notes* beserta penggantinya; buktikan pada anchor simbol dan commit SHA lewat `git log -S "<simbol>"`. Langkah tak terbukti di rentang diff adalah langkah tertinggal. Validasi nilai terhitung terhadap spesifikasi sebelum/sesudah.
 4. **Migration & Mirrored Paths**: Definisi skema persistensi berubah tanpa migrasi baru → `P1` Blocker Migrasi. Berkas `## Mirrored paths` absen dari diff padahal pasangan jalur utamanya muncul → `P1` Desinkronisasi Event/Scheduler. Pastikan penamaan migrasi urut tanpa tabrakan versi menurut pola profil.
 5. **Kualitas Kode & 6 Dimensi**: Evaluasi baris yang berubah terhadap keenam dimensi berikut. Kandidat yang cocok lebih dari satu dimensi dicatat sebagai **satu** temuan dengan dampak terburuk, prioritas menurun `security` → `transaction` → `data` → `persistence` → `concurrency` → `architecture`.
 

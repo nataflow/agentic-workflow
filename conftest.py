@@ -109,12 +109,12 @@ BE_SKILLS = PLUGINS / "backenddev" / "skills"
 TD = "backenddev/docs/2609240900-order-fix"
 
 
-def brief(repo: Path, nn: str, unit: str, status: str, **extra: str) -> Path:
+def brief(repo: Path, nn: str, unit: str, status: str, body: str = "# Brief\n", **extra: str) -> Path:
     """Tulis `{TD}/brief-<nn>-<unit>.md` berfrontmatter minimal; `extra` menambah field."""
     fm = "".join(f"{k}: {v}\n" for k, v in extra.items())
     path = repo / TD / f"brief-{nn}-{unit}.md"
     path.write_text(f"---\ntitle: {unit}\nsource: TASK.md\nrisk: MINOR\nstatus: {status}\n"
-                    f'commit_message: "fix(order): implement {unit}"\n{fm}---\n# Brief\n', encoding="utf-8")
+                    f'commit_message: "fix(order): implement {unit}"\n{fm}---\n{body}', encoding="utf-8")
     return path
 
 

@@ -11,7 +11,7 @@ Format wajib `backenddev/docs/<YYMMDDhhmm>-<slug>/` — timestamp dari `date +%y
 | Kondisi terdeteksi | Tindakan |
 | --- | --- |
 | Parameter `taskdir` diisi dan direktorinya ada di disk | Pakai ulang. Dilarang membuat timestamp baru untuk pekerjaan yang sama |
-| Taskdir memuat brief `BLOCKED` | Dahulukan brief perbaikan via `backenddev:analyst`; jangan menutupinya dengan taskdir baru |
+| Taskdir memuat brief `BLOCKED` | Lane `PLANNING` taskdir sama, `reentry_reason` = brief-NN + sebab `report-NN.md`; `plan` menerbitkan pengganti ber-`supersedes`. Jangan menutupinya dengan taskdir baru |
 | Taskdir memuat brief `READY` | Rutekan ke `backenddev:architect` |
 | Taskdir memuat `BRD.md`/`PRD.md` berstatus `DRAFT` | Rutekan ke `backenddev:analyst`; gerbang dokumennya milik skill itu (bagian 4) |
 | Seluruh brief `DONE`/`SUPERSEDED` **dan** `REPORT.md` terbit, atau permintaannya memang baru | Buat taskdir bertimestamp baru. `REVIEW.md` ber-`P1` bukan rantai selesai: perbaikannya berjalan di taskdir yang sama |

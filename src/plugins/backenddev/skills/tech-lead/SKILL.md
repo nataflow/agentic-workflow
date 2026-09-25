@@ -115,7 +115,7 @@ Jalankan untuk rute yang menghasilkan artefak rancangan atau kode; lewati pada l
 
 1. **Provisi Taskdir**: Tetapkan direktori `backenddev/docs/<YYMMDDhhmm>-<slug>/`; evaluasi `ls backenddev/docs/` sebelum membuat baru (`references/decisions.md` bagian 4).
    - Gunakan kembali direktori jika `taskdir` terisi dan ada di disk; dilarang membuat timestamp baru untuk pekerjaan sama.
-   - Dahulukan brief perbaikan via `backenddev:analyst` jika taskdir memuat brief `BLOCKED`.
+   - Berangkatkan lane `PLANNING` pada taskdir yang sama dengan `reentry_reason` terisi (brief-NN beserta sebab dari `report-NN.md`) jika taskdir memuat brief `BLOCKED`; `plan` menutupnya lewat brief pengganti ber-`supersedes`.
    - Rutekan ke `backenddev:architect` jika taskdir memuat brief `READY`.
    - Rutekan ke `backenddev:analyst` jika taskdir memuat `BRD.md`/`PRD.md` berstatus `DRAFT`; approval dokumen milik skill itu.
    - Buat taskdir bertimestamp baru untuk permintaan baru, atau jika seluruh brief berstatus `DONE`/`SUPERSEDED` **dan** `REPORT.md` sudah terbit. `REVIEW.md` ber-`P1` bukan rantai selesai — perbaikannya tetap di taskdir itu (Fase 5 butir 4).

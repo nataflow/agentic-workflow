@@ -9,22 +9,26 @@ ______________________________________________________________________
 Alur siklus hidup status brief diatur secara deterministik untuk menjamin keterlacakan eksekusi:
 
 ```
-[ brief-NN ] ──► Status: READY ──┬─► Sukses Verifikasi ──► Status: DONE ──► Lanjut ke NN+1
-                                 │
-                                 └─► Stop Condition ────► Status: BLOCKED ──► STOP Rantai
+[ brief-NN ] ─► READY ─┬─► DONE ──────────────────────────────► lanjut NN+1
+                       ├─► BLOCKED ─► (plan: pengganti) ─► SUPERSEDED ─► dilewati
+                       └─► SUPERSEDED (plan: terbit ulang hilir) ─────► dilewati
 ```
 
 ### Matriks Transisi Status Frontmatter Brief
 
-Baris `status` frontmatter ditulis **`code-implementor`**, bukan `architect`. Skill orkestrator
-membacanya untuk traversal dan memverifikasi commit-nya mendarat — tidak pernah menulisnya.
+Baris `status` frontmatter ditulis **`code-implementor`** (`DONE`/`BLOCKED`) dan skrip
+`scaffold_brief.py` milik `plan` (`SUPERSEDED`), bukan `architect`. Skill orkestrator membacanya
+untuk traversal dan memverifikasi commit-nya mendarat — tidak pernah menulisnya.
 
 | Status Awal | Kondisi Transisi                            | Status Akhir | Ditulis oleh       | Aksi Lanjutan `architect`                    |
 | ----------- | ------------------------------------------- | ------------ | ------------------ | -------------------------------------------- |
 | `READY`     | Seluruh `## Steps` tuntas + cek statis lolos | `DONE`      | `code-implementor` | Catat SHA dari amplop, lanjut ke `NN+1`      |
 | `READY`     | Kena stop condition / cacat statis di luar scope | `BLOCKED` | `code-implementor` | Jalankan matriks bukti disk bagian 3       |
 | `DONE`      | Traversal sesi baru (re-entrancy)           | `DONE`       | —                  | Lewati unit, pertahankan commit eksisting    |
-| `BLOCKED`   | Traversal sesi baru (re-entrancy)           | `BLOCKED`    | —                  | **BERHENTI SEGERA**, eskalasi ke `tech-lead` |
+| `BLOCKED`   | Traversal sesi baru, belum digantikan        | `BLOCKED`    | —                  | **BERHENTI**, eskalasi ke `tech-lead` (lane `PLANNING`, taskdir sama) |
+| `BLOCKED`   | `scaffold_brief.py --nn` baris pengganti     | `SUPERSEDED` | `plan` (skrip)     | Lewati; pengganti dieksekusi di NN-nya       |
+| `READY`     | Terbit ulang sesudah perbaikan (D2-A)        | `SUPERSEDED` | `plan` (skrip)     | Lewati                                       |
+| `SUPERSEDED`| Traversal sesi baru                          | `SUPERSEDED` | —                  | Lewati                                       |
 
 > [!NOTE] `DEFERRED` **bukan** nilai frontmatter brief maupun nilai item `## Work status`. Penundaan
 > tidak melompati brief: rantai berhenti di brief itu, statusnya tetap `READY`, dan sesi berikutnya
@@ -34,15 +38,15 @@ membacanya untuk traversal dan memverifikasi commit-nya mendarat — tidak perna
 ### Protokol Re-entrancy & Pemulihan Sesi
 
 1. **Rantai Terputus di Sesi Sebelumnya**:
-   - Pindai brief urut `NN`. Brief berstatus `DONE` dilewati tanpa re-dispatch dan tanpa duplikasi commit.
-   - Eksekusi dimulai persis pada brief pertama berstatus `READY`.
+   - Pindai brief urut `NN`. Brief berstatus `DONE` atau `SUPERSEDED` dilewati tanpa re-dispatch dan tanpa duplikasi commit.
+   - Eksekusi dimulai persis pada brief pertama berstatus `READY` (`entry` `FASE_3:<NN>` check 3 skrip prasyarat). Brief `BLOCKED` di mana pun menahan rantai, sekalipun brief `READY` menyusul sesudahnya.
 2. **Kondisi Terminal — dua artefak penutup, bukan satu**:
 
    Rantai dinyatakan tuntas hanya ketika `{taskdir}/REVIEW.md` **dan** `{taskdir}/REPORT.md` sama-sama
    ada. Memvonis tuntas atas `REVIEW.md` saja membuat `report` yang gagal commit — atau tak pernah
    berangkat karena sesi sebelumnya putus di antara Fase 4 dan Fase 5 — tidak pernah dijemput siapa pun.
 
-   | Seluruh brief `DONE` | `REVIEW.md` | `REPORT.md` | Titik masuk sesi ini |
+   | Seluruh brief tertutup (`DONE`/`SUPERSEDED`) | `REVIEW.md` | `REPORT.md` | Titik masuk sesi ini |
    | --- | --- | --- | --- |
    | ya | tidak ada | — | Fase 4 — jalankan gerbang verifikasi lalu review penutup |
    | ya | ada | tidak ada | Fase 5 — panen laporan rantai lewat `backenddev:report`; commit trail direkonstruksi dari `git log`, severity dibaca dari `REVIEW.md`, dan tidak ada satu pun subagent didispatch ulang |
@@ -103,8 +107,9 @@ bukan pula dipindahkan ke taskdir baru.
 > Taskdir baru menyembunyikan brief `BLOCKED` dari tiap gerbang yang memindainya, sekaligus memutus
 > `Consumes`/`Produces` brief sisanya dari `Produces` brief yang sudah `DONE`. Rutenya:
 > `architect` → `tech-lead` → lane `PLANNING` → `analyst` re-entry (Fase 3 butir 0) dengan
-> `reentry_reason` menyebut brief yang terblokir → brief perbaikan menyusul di `NN` berikutnya pada
-> taskdir yang sama.
+> `reentry_reason` menyebut brief yang terblokir → `plan` menerbitkan brief pengganti ber-`supersedes`
+> di `NN` berikutnya pada taskdir yang sama; `scaffold_brief.py` menandai brief `BLOCKED` (dan brief
+> `READY` hilirnya yang diterbitkan ulang) `SUPERSEDED`.
 
 ### Matriks Bukti Disk untuk Amplop `BLOCKED`
 

@@ -19,10 +19,11 @@ Dua mode:
 Seluruh kegagalan dilaporkan **sekaligus**; tidak ada penghentian di kegagalan
 pertama, sehingga satu putaran perbaikan cukup untuk menutup seluruh temuan.
 
-Brief `DONE`/`BLOCKED` dilewati predikat **rencana** dan tetap ditagih predikat
-**cakupan**: remediasi predikat rencana atasnya berarti memalsukan riwayat brief
-yang kodenya sudah mendarat, sementara `Covers:`/`Fulfills:`/`Produces`-nya masih
-menopang rantai keterlacakan. `--include-locked` menagih keduanya; ia alat audit,
+Brief `DONE`/`BLOCKED`/`SUPERSEDED` dilewati predikat **rencana**; `DONE`/`BLOCKED`
+tetap ditagih predikat **cakupan**: remediasi predikat rencana atasnya berarti
+memalsukan riwayat brief yang kodenya sudah mendarat, sementara
+`Covers:`/`Fulfills:`/`Produces`-nya masih menopang rantai keterlacakan. Klaim
+brief `SUPERSEDED` tidak dihitung — penggantinya yang memikul. `--include-locked` menagih keduanya; ia alat audit,
 bukan gerbang.
 
 State ronde self-review dimateraikan ke laci taskdir: `--open-round` sebelum
@@ -55,6 +56,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
     resolve_profile_dir,
 )
+from brief_status import LOCKED as LOCKED_STATUSES  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Konstanta kanonik
@@ -157,12 +159,14 @@ REVIEW_STATE = "brief-review-state.json"
 MAX_ROUNDS = 2
 MAX_ROUNDS_TASKDIR = 4
 
-# Brief yang sudah dieksekusi `code-implementor`. Predikat yang menilai
-# *rencana* tidak berlaku atasnya: statusnya memang bukan READY, berkas
-# `create`-nya memang sudah ada, dan anchornya menunjuk kode yang sudah
-# berpindah. Yang tetap berlaku predikat *cakupan* — `Covers:`, `Fulfills:`,
-# `Produces` — karena rantai keterlacakannya tidak gugur oleh eksekusi.
-LOCKED_STATUSES = ("DONE", "BLOCKED")
+# Brief terkunci (`LOCKED_STATUSES`, dari `_common/brief_status.py`): sudah
+# dieksekusi `code-implementor` (`DONE`/`BLOCKED`) atau digantikan
+# (`SUPERSEDED`). Predikat yang menilai *rencana* tidak berlaku atasnya:
+# statusnya memang bukan READY, berkas `create`-nya memang sudah ada, dan
+# anchornya menunjuk kode yang sudah berpindah. Yang tetap berlaku predikat
+# *cakupan* — `Covers:`, `Fulfills:`, `Produces` — karena rantai
+# keterlacakannya tidak gugur oleh eksekusi; kecuali brief `SUPERSEDED`, yang
+# klaimnya dipikul penggantinya.
 
 
 def _norm_heading(text: str) -> str:
@@ -694,7 +698,7 @@ class BriefValidator:
     def plan_briefs(self) -> List[Dict[str, Any]]:
         """Brief yang masih dinilai predikat **rencana**.
 
-        Brief `DONE`/`BLOCKED` dikeluarkan: `status:`-nya memang bukan `READY`,
+        Brief `DONE`/`BLOCKED`/`SUPERSEDED` dikeluarkan: `status:`-nya memang bukan `READY`,
         berkas beraksi `create` miliknya memang sudah ada di disk, dan anchornya
         menunjuk kode yang sudah bergeser oleh brief sesudahnya. Menagihnya
         dengan predikat rencana menuntut remediasi yang berarti **memalsukan
@@ -702,12 +706,18 @@ class BriefValidator:
         tersisa jadi mengabaikan keluaran skrip, dan gerbang yang rutin
         diabaikan berhenti menggerbangi apa pun.
 
-        Predikat **cakupan** (C, G, H, I, J) tetap menilai seluruh brief: rantai
-        `Covers:`/`Fulfills:`/`Produces` tidak gugur oleh eksekusi.
+        Predikat **cakupan** (C, G, H, I, J) tetap menilai seluruh brief yang
+        tidak digantikan (`live_briefs`): rantai `Covers:`/`Fulfills:`/`Produces`
+        tidak gugur oleh eksekusi.
         """
         if self.include_locked:
             return self.briefs
         return [b for b in self.briefs if not b["locked"]]
+
+    @property
+    def live_briefs(self) -> List[Dict[str, Any]]:
+        """Brief yang klaim cakupannya dihitung: semua kecuali `SUPERSEDED`."""
+        return [b for b in self.briefs if b["status"] != "SUPERSEDED"]
 
     def run_all(self) -> bool:
         single = self.brief_filter is not None
@@ -775,7 +785,8 @@ class BriefValidator:
             if status and status != "READY":
                 problems.append(
                     f"{b['name']}: `status: {status}` — brief terbit `READY`; "
-                    f"`DONE`/`BLOCKED` milik code-implementor, `DRAFT`/`APPROVED` bukan status brief"
+                    f"`DONE`/`BLOCKED` milik code-implementor, `SUPERSEDED` milik `scaffold_brief.py`, "
+                    f"`DRAFT`/`APPROVED` bukan status brief"
                 )
 
             commit = fm.get("commit_message") or ""
@@ -1322,6 +1333,28 @@ class BriefValidator:
                         f"`Produces` brief-{ref}"
                     )
 
+        # Tautan penggantian dua arah, dan brief READY tidak mengonsumsi brief
+        # yang sudah digantikan — kontraknya pindah ke pengganti.
+        for b in self.briefs:
+            fm = b["frontmatter"]
+            if b["status"] == "SUPERSEDED":
+                refs = re.findall(r"brief-(\d{2})", fm.get("superseded_by", ""))
+                tgt = by_nn.get(int(refs[0])) if len(refs) == 1 else None
+                if (not tgt or b["nn"] is None or tgt["nn"] <= b["nn"]
+                        or f"brief-{b['nn']:02d}" not in tgt["frontmatter"].get("supersedes", "")):
+                    problems.append(f"{b['name']}: SUPERSEDED tanpa tautan dua arah ke pengganti ber-NN lebih besar")
+            for ref in re.findall(r"brief-(\d{2})", fm.get("supersedes", "")):
+                src = by_nn.get(int(ref))
+                if not src or src["status"] != "SUPERSEDED":
+                    problems.append(f"{b['name']}: `supersedes` brief-{ref} yang tidak berstatus SUPERSEDED")
+            if b["status"] == "READY":
+                for line in b["interfaces"]["consumes"]:
+                    for ref in re.findall(r"brief-(\d{2})", line):
+                        src = by_nn.get(int(ref))
+                        if src and src["status"] == "SUPERSEDED":
+                            problems.append(f"{b['name']}: `Consumes` menunjuk brief-{ref} yang SUPERSEDED "
+                                            f"— rujuk penggantinya")
+
         self._verdict(cid, name, problems,
                       "DAG linear satu arah, signature Consumes/Produces selaras",
                       "Pecah baris `Consumes` multi-sumber jadi satu baris per brief sumber; samakan "
@@ -1346,7 +1379,7 @@ class BriefValidator:
             return
 
         if not self.task_text:
-            for b in self.briefs:
+            for b in self.live_briefs:
                 val = b["fulfills"] or ""
                 if not re.match(r"^[—-]\s*\(", val):
                     problems.append(
@@ -1358,7 +1391,7 @@ class BriefValidator:
 
         sc_ids = self._sc_ids()
         claimed: Set[str] = set()
-        for b in self.briefs:
+        for b in self.live_briefs:
             val = b["fulfills"]
             if val is None:
                 problems.append(f"{b['name']}: baris `Fulfills:` tidak ada")
@@ -1389,7 +1422,7 @@ class BriefValidator:
         problems: List[str] = []
 
         if not self.prd_text:
-            for b in self.briefs:
+            for b in self.live_briefs:
                 val = b["covers"] or ""
                 if not re.match(r"^[—-]\s*\(", val):
                     problems.append(
@@ -1401,7 +1434,7 @@ class BriefValidator:
 
         ac = self._ac_entries()
         claimed: Set[str] = set()
-        for b in self.briefs:
+        for b in self.live_briefs:
             val = b["covers"]
             if val is None:
                 problems.append(f"{b['name']}: baris `Covers:` tidak ada")
@@ -1436,7 +1469,7 @@ class BriefValidator:
         problems: List[str] = []
         ac = self._ac_entries()
         for num, kind in sorted(ac.items(), key=lambda kv: int(kv[0])):
-            claimers = [b for b in self.briefs
+            claimers = [b for b in self.live_briefs
                         if b["covers"] and f"AC-{num}" in b["covers"]]
             if not claimers:
                 continue  # sudah dilaporkan Check H
@@ -1507,11 +1540,11 @@ class BriefValidator:
         prd_trigger = bool(prd_req.strip()) and "tidak perlu" not in prd_req.lower()
 
         migration_files = [
-            (b, r) for b in self.briefs for r in b["file_rows"]
+            (b, r) for b in self.live_briefs for r in b["file_rows"]
             if _is_migration_path(r["path"])
         ]
 
-        owners = [b for b in self.briefs
+        owners = [b for b in self.live_briefs
                   if self._section_text(b, "Migration").strip()
                   and "tidak perlu" not in self._section_text(b, "Migration").lower()]
 
@@ -1678,7 +1711,7 @@ def main():
                         help="Materaikan satu ronde self-review yang baru selesai "
                              "(Approved | Issues Found)")
     parser.add_argument("--include-locked", action="store_true",
-                        help="Nilai brief DONE/BLOCKED dengan predikat rencana juga; "
+                        help="Nilai brief DONE/BLOCKED/SUPERSEDED dengan predikat rencana juga; "
                              "untuk audit, bukan untuk gerbang Fase 4")
     parser.add_argument("--root", type=str, default=None, help="Root repositori target")
     parser.add_argument("--json", action="store_true", help="Keluaran JSON")

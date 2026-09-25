@@ -15,11 +15,11 @@ Taskdir yang sudah sebagian dieksekusi memuat dua populasi brief, dan predikat d
 | Populasi | `status:` | Predikat **rencana** (S, B, F, L, N, D, K, E) | Predikat **cakupan** (C, G, H, I, J) |
 |---|---|---|---|
 | batch aktif | `READY` | ditagih penuh | ditagih penuh |
-| terkunci | `DONE` · `BLOCKED` | **dilewati** | ditagih penuh |
+| terkunci | `DONE` · `BLOCKED` · `SUPERSEDED` | **dilewati** | ditagih penuh (kecuali `SUPERSEDED`: tidak dihitung — penggantinya yang memikul) |
 
 Brief terkunci dilewati predikat rencana karena remediasinya mustahil dikerjakan tanpa memalsukan riwayat: `status:`-nya memang bukan `READY`, berkas beraksi `create` miliknya memang sudah ada di disk, dan anchornya menunjuk kode yang sudah bergeser oleh brief sesudahnya. Gerbang yang menagihnya menyisakan satu-satunya jalan keluar berupa mengabaikan keluaran skrip — dan gerbang yang rutin diabaikan berhenti menggerbangi apa pun.
 
-Predikat cakupan tetap menilai seluruh brief: `Covers:`, `Fulfills:`, dan `Produces` brief yang sudah `DONE` masih menopang rantai keterlacakan dan masih menjadi sumber `Consumes` brief penerusnya. Keduanya tidak gugur oleh eksekusi.
+Predikat cakupan tetap menilai seluruh brief yang tidak digantikan: `Covers:`, `Fulfills:`, dan `Produces` brief yang sudah `DONE` masih menopang rantai keterlacakan dan masih menjadi sumber `Consumes` brief penerusnya. Keduanya tidak gugur oleh eksekusi. Brief `SUPERSEDED` dikecualikan: klaimnya dipikul pengganti, dan Check C menolak brief `READY` yang masih mengonsumsinya.
 
 Skrip melaporkan populasi terkunci sebagai baris `LOCKED` — informasi, bukan kegagalan. `--include-locked` menagih predikat rencana atas keduanya; ia alat **audit**, dan dilarang dipakai sebagai gerbang Fase 4.
 
@@ -113,15 +113,15 @@ matriks alokasi terkunci → tiap brief lolos gerbang per-brief Fase 3
 ```
 
 1. **Satu commit untuk seluruh batch**, sekalipun batch memuat brief hasil perbaikan cacat — bukan satu commit tambahan per perbaikan.
-2. **Staging eksplisit per path**, tiap berkas brief yang baru terbit disebut satu per satu:
+2. **Staging eksplisit per path**, tiap berkas brief yang baru terbit **dan** tiap brief lama yang baru ditandai `SUPERSEDED` (baris `Stage bersama di commit agregat` keluaran `scaffold_brief.py --nn`) disebut satu per satu:
    ```
-   git add {taskdir}/brief-01-<unit>.md {taskdir}/brief-02-<unit>.md
+   git add {taskdir}/brief-02-<unit>.md {taskdir}/brief-03-<unit>.md {taskdir}/brief-04-<unit>.md {taskdir}/brief-05-<unit>.md
    git commit -m "docs(plan): add <N> briefs for <slug>"
    ```
-   `<N>` diisi jumlah brief yang benar-benar terbit pada batch ini; `<slug>` diambil dari nama direktori taskdir tanpa awalan timestamp.
+   `<N>` diisi jumlah brief yang benar-benar terbit pada batch ini (brief `SUPERSEDED` tidak dihitung); `<slug>` diambil dari nama direktori taskdir tanpa awalan timestamp.
 3. **Eksekusi seketika saat `Approved`**, tanpa menunggu persetujuan user, gerbang, maupun main loop — self-review satu-satunya prasyarat commit. Sebaliknya, tahan commit tanpa pengecualian bila status belum `Approved`.
 4. **Dilarang staging wildcard.** `git add .` dan `git add -A` berisiko menarik berkas scratch, log, atau pekerjaan user yang belum di-commit.
-5. **Batas kewenangan.** Commit ini satu-satunya mutasi git milik `plan` dan hanya memuat `brief-*.md` pada taskdir aktif; berkas lain milik skill penulisnya. `git push`, `git merge`, `git rebase`, `git branch`, dan `git checkout` terlarang tanpa kecuali.
+5. **Batas kewenangan.** Commit ini satu-satunya mutasi git milik `plan` dan hanya memuat `brief-*.md` pada taskdir aktif — brief baru dan brief yang baru ditandai `SUPERSEDED`; berkas lain milik skill penulisnya. `git push`, `git merge`, `git rebase`, `git branch`, dan `git checkout` terlarang tanpa kecuali.
 
 ### Kegagalan Commit & Mitigasi Mandiri
 

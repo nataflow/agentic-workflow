@@ -24,6 +24,7 @@ from precondition_lib import (  # noqa: E402
     foreign_owner,
     legacy_suffix,
 )
+from brief_status import BRIEF_STATUSES, CLOSED, scan_briefs, validate_links  # noqa: E402
 
 
 def _strip_explore_scratch(status_out: str) -> str:
@@ -217,100 +218,65 @@ class PreconditionChecker:
             "action": "",
         })
 
-    def _check_3_brief_readiness(self):
-        check_id = 3
-        name = "Brief Set & Readiness"
-        taskdir_path = self._resolve_taskdir()
-        if not taskdir_path or not taskdir_path.exists():
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "FAIL",
-                "summary": "Taskdir tidak ditemukan untuk pemindaian brief",
-                "action": "Selesaikan provisi taskdir terlebih dahulu.",
-            })
-            return
-
-        brief_files = sorted(taskdir_path.glob("brief-*.md"))
-        if not brief_files:
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "FAIL",
-                "summary": "Tidak ditemukan berkas brief-* di taskdir",
-                "action": "Jalankan skill `backenddev:plan` untuk merumuskan brief sebelum orkestrasi.",
-            })
-            return
-
-        ready_count = 0
-        done_count = 0
-        blocked_count = 0
-        other_count = 0
-
-        for bf in brief_files:
-            try:
-                content = bf.read_text(encoding="utf-8")
-                match = re.search(r"^status:\s*([A-Z_]+)", content, re.MULTILINE)
-                st = match.group(1) if match else "UNKNOWN"
-                if st == "READY":
-                    ready_count += 1
-                elif st == "DONE":
-                    done_count += 1
-                elif st == "BLOCKED":
-                    blocked_count += 1
-                else:
-                    other_count += 1
-            except Exception:
-                other_count += 1
-
-        review_file = taskdir_path / "REVIEW.md"
-        report_file = taskdir_path / "REPORT.md"
-        if ready_count == 0 and done_count == len(brief_files) and review_file.exists():
-            # Rantai tuntas menuntut DUA artefak penutup. REVIEW.md yang berdiri sendiri
-            # berarti `report` gagal commit atau tak pernah berangkat di sesi sebelumnya;
-            # Fase 1 menjemputnya di Fase 5, bukan memvonis rantai selesai.
-            if report_file.exists():
-                summary = f"Seluruh {done_count} brief DONE; REVIEW.md dan REPORT.md sudah terbit (rantai tuntas)"
-                action = ""
-            else:
-                summary = f"Seluruh {done_count} brief DONE dan REVIEW.md terbit, REPORT.md belum ada"
-                action = "Lompat ke Fase 5 untuk memanen laporan rantai lewat `backenddev:report`; dilarang mendispatch ulang implementor atau reviewer."
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "PASS",
-                "summary": summary,
-                "action": action,
-            })
-            return
-
-        if ready_count == 0 and done_count == len(brief_files):
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "PASS",
-                "summary": f"Seluruh {done_count} brief DONE, siap masuk gerbang penutup REVIEW.md",
-                "action": "",
-            })
-            return
-
-        if ready_count == 0:
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "FAIL",
-                "summary": f"Nol brief berstatus READY (DONE: {done_count}, BLOCKED: {blocked_count}, OTHER: {other_count})",
-                "action": "Pastikan minimal satu brief berstatus READY atau selesaikan status BLOCKED.",
-            })
-            return
-
+    def _add(self, cid: int, name: str, status: str, summary: str, action: str = "", entry: str = ""):
         self.results.append({
-            "id": check_id,
+            "id": cid,
             "name": name,
-            "status": "PASS",
-            "summary": f"{len(brief_files)} brief terdeteksi ({ready_count} READY, {done_count} DONE)",
-            "action": "",
+            "status": status,
+            "summary": summary,
+            "action": action,
+            "entry": entry,
         })
+
+    def _check_3_brief_readiness(self):
+        """Titik masuk sesi dari status brief di disk.
+
+        `entry` adalah titik masuk yang dibaca Fase 1: `FASE_3:<NN>`, `FASE_4`,
+        `FASE_5`, atau `TUNTAS`. Brief `BLOCKED` menahan rantai walau ada brief
+        `READY` sesudahnya — Fase 1 berhenti di brief pertama yang terblokir.
+        """
+        cid, name = 3, "Brief Set & Readiness"
+        td = self._resolve_taskdir()
+        if not td or not td.exists():
+            return self._add(cid, name, "FAIL", "Taskdir tidak ditemukan untuk pemindaian brief",
+                             "Selesaikan provisi taskdir terlebih dahulu.")
+        briefs = scan_briefs(td)
+        if not briefs:
+            return self._add(cid, name, "FAIL", "Tidak ditemukan berkas brief-* di taskdir",
+                             "Jalankan skill `backenddev:plan` untuk merumuskan brief sebelum orkestrasi.")
+        bad = [f"{b['name']} ({b['status']})" for b in briefs if b["status"] not in BRIEF_STATUSES]
+        bad += validate_links(briefs)
+        if bad:
+            return self._add(cid, name, "FAIL", "; ".join(bad),
+                             "Kembalikan ke `backenddev:plan`; architect dilarang menyunting frontmatter brief.")
+        blocked = [b["name"] for b in briefs if b["status"] == "BLOCKED"]
+        if blocked:
+            return self._add(cid, name, "FAIL", f"Brief BLOCKED menahan rantai: {', '.join(blocked)}",
+                             "Kembalikan ke `backenddev:tech-lead` → lane PLANNING taskdir yang sama "
+                             "(`reentry_reason` = brief + sebab `report-NN.md`); `plan` menerbitkan "
+                             "pengganti ber-`supersedes`.")
+        start = next((b for b in briefs if b["status"] not in CLOSED), None)
+        if start:
+            return self._add(cid, name, "PASS", f"Titik mulai brief-{start['nn']} ({start['name']})",
+                             entry=f"FASE_3:{start['nn']}")
+        self._all_closed(cid, name, td, briefs)
+
+    def _all_closed(self, cid: int, name: str, td: Path, briefs: List[Dict[str, Any]]):
+        done = sum(b["status"] == "DONE" for b in briefs)
+        closed = f"{done} DONE · {len(briefs) - done} SUPERSEDED"
+        if not (td / "REVIEW.md").exists():
+            return self._add(cid, name, "PASS", f"Seluruh brief tertutup ({closed}), REVIEW.md belum ada",
+                             "Jalankan Fase 4 (verifikasi penutup lalu review).", entry="FASE_4")
+        if (td / "REPORT.md").exists():
+            return self._add(cid, name, "PASS",
+                             f"Seluruh brief tertutup ({closed}); REVIEW.md dan REPORT.md sudah terbit (rantai tuntas)",
+                             entry="TUNTAS")
+        # Rantai tuntas menuntut DUA artefak penutup. REVIEW.md yang berdiri sendiri
+        # berarti `report` gagal commit atau tak pernah berangkat di sesi sebelumnya;
+        # Fase 1 menjemputnya di Fase 5, bukan memvonis rantai selesai.
+        self._add(cid, name, "PASS", f"Seluruh brief tertutup ({closed}) dan REVIEW.md terbit, REPORT.md belum ada",
+                  "Lompat ke Fase 5 untuk memanen laporan rantai lewat `backenddev:report`; "
+                  "dilarang mendispatch ulang implementor atau reviewer.", entry="FASE_5")
 
     def _check_4_git_worktree(self):
         check_id = 4

@@ -1,13 +1,13 @@
 ---
 name: report
-description: Dipanggil backenddev:architect sesudah REVIEW.md terbit dan seluruh brief DONE - perumusan REPORT.md dari diff merge-base yang dipasangkan dengan Success Criteria TASK.md, dikunci satu commit sebelum rantai dinyatakan selesai
+description: Dipanggil backenddev:architect sesudah REVIEW.md terbit dan seluruh brief tertutup - perumusan REPORT.md dari diff merge-base yang dipasangkan dengan Success Criteria TASK.md, dikunci satu commit sebelum rantai dinyatakan selesai
 metadata:
   mode: compact
 ---
 
 ## THE IRON LAW
 
-- Tulis `REPORT.md` hanya sesudah `REVIEW.md` terbit dan seluruh brief berstatus `DONE` — rantai yang belum tuntas tidak punya hasil untuk dilaporkan.
+- Tulis `REPORT.md` hanya sesudah `REVIEW.md` terbit dan seluruh brief tertutup (`DONE`, atau `SUPERSEDED` yang bertaut ke pengganti) — rantai yang belum tuntas tidak punya hasil untuk dilaporkan.
 - Setiap butir `## Perubahan` wajib berakar pada berkas yang muncul di diff merge-base; klaim tanpa berkas dibuang, bukan diloloskan.
 - Skill ini melaporkan, bukan menilai — dilarang menerbitkan severity, verdict, atau temuan baru.
 - Dilarang menyentuh `src/`, mengedit `TASK.md`, `REVIEW.md`, atau brief mana pun.
@@ -18,7 +18,7 @@ metadata:
 1. Jalankan skrip verifikasi prasyarat: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/report/scripts/check_preconditions.py --taskdir <taskdir> [--base-branch <base_branch>]`.
 2. Evaluasi output skrip secara deterministik:
    - `PASS` (7/7 checks): Lanjutkan ke perumusan laporan rantai dan commit REPORT.md.
-   - `FAIL`: Hentikan eksekusi segera dan jalankan tindakan remediasi pada butir yang gagal (taskdir hilang → verifikasi inisialisasi taskdir; `TASK.md` hilang → kembalikan ke `backenddev:tech-lead` untuk backfill akar (`gate-lifecycle.md` bagian 1a), taskdir lama tanpa akar di luar cakupan; REVIEW.md belum ada → tuntaskan review via `architect`; brief belum DONE → selesaikan brief; REPORT.md sudah ada → minta otorisasi user; working tree kotor → bersihkan sebelum melanjutkan).
+   - `FAIL`: Hentikan eksekusi segera dan jalankan tindakan remediasi pada butir yang gagal (taskdir hilang → verifikasi inisialisasi taskdir; `TASK.md` hilang → kembalikan ke `backenddev:tech-lead` untuk backfill akar (`gate-lifecycle.md` bagian 1a), taskdir lama tanpa akar di luar cakupan; REVIEW.md belum ada → tuntaskan review via `architect`; brief belum tertutup → selesaikan brief lewat `architect`; REPORT.md sudah ada → minta otorisasi user; working tree kotor → bersihkan sebelum melanjutkan).
 
 ## Parameter [REQUIRED]
 
@@ -87,7 +87,7 @@ Tutup satu baris: `kembali ke backenddev:architect | Taskdir: <path> | Laporan: 
 ## Failure path
 
 1. **REPORT.md Sudah Ada**: Hentikan tanpa membaca isinya, laporkan path terbacanya, dan serahkan keputusan penulisan ulang ke user.
-2. **REVIEW.md Absen atau Brief Belum DONE**: Hentikan eksekusi, sebut brief yang belum `DONE`, dan arahkan rantai ke `backenddev:architect`.
+2. **REVIEW.md Absen atau Brief Belum Tertutup**: Hentikan eksekusi, sebut brief yang belum tertutup (`DONE`, atau `SUPERSEDED` yang bertaut ke pengganti), dan arahkan rantai ke `backenddev:architect`.
 3. **Severity P1 di REVIEW.md**: Jalankan Fase 1 butir 4 — hentikan sebelum menulis berkas, laporkan temuan `P1`-nya, kembalikan kendali ke `backenddev:tech-lead`.
 4. **Diff Kosong**: Hentikan eksekusi jika `git merge-base` resolve tetapi diff tidak memuat satu berkas pun. Laporkan branch aktif dan `base_branch` terbaca. Dilarang mengarang butir dari isi brief.
 5. **Commit Gagal**: Tulis berkasnya tetap jika working tree kotor di luar taskdir atau `commit_convention` tak terbaca. Laporkan `Commit: GAGAL` beserta pesan git, dan nyatakan penguncian diserahkan ke gerbang.

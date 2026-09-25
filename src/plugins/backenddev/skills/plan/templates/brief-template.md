@@ -105,11 +105,14 @@ ______________________________________________________________________
 
 1. **Pesan Commit (`commit_message`)**: Ditulis `backenddev:plan` dari `commit_convention` profil, berbentuk `<type>(<domain>): implement <unit>`. Eksekutor memakainya apa adanya; varian gagal diturunkan darinya menjadi `wip(<domain>): brief-<NN>-<unit> [BLOCKED]`.
 
-2. **Status Siklus Hidup Brief (Frontmatter)**:
+2. **Status Siklus Hidup Brief (Frontmatter)** — empat nilai, tiap transisi punya satu penulis:
 
-   - `READY`: Ditulis oleh `backenddev:plan`. Seluruh brief lahir siap eksekusi tanpa fase draft (`status: READY`).
-   - `DONE`: Ditulis `code-implementor` sesudah seluruh langkah `## Steps` tuntas, tepat sebelum ia meng-commit brief itu bersama perubahan `src/**`-nya.
-   - `BLOCKED`: Ditulis `code-implementor` jika ia terhenti oleh *stop condition*. *(Dilarang memakai status `DRAFT` atau `APPROVED` pada brief; approval berhenti di BRD dan PRD).*
+   - `READY`: Ditulis `backenddev:plan` lewat `scaffold_brief.py --nn`. Seluruh brief lahir siap eksekusi tanpa fase draft.
+   - `DONE`: Ditulis `code-implementor` sesudah seluruh `## Steps` tuntas, tepat sebelum ia meng-commit brief bersama perubahan `src/**`-nya. Koreksi `READY → DONE` oleh `architect` sah hanya pada baris "commit ada, status tertinggal" matriks bukti disk (`architect/references/lifecycle-recovery.md` bagian 3).
+   - `BLOCKED`: Ditulis `code-implementor` saat terhenti oleh *stop condition*. Brief `BLOCKED` menahan rantai sampai digantikan.
+   - `SUPERSEDED`: Ditulis **hanya** oleh `scaffold_brief.py --nn <NN-pengganti>` atas brief yang disebut kolom `supersedes` baris pengganti. Asal sah: `BLOCKED`, atau `READY` hilir yang diterbitkan ulang sesudah perbaikan supaya urutan `NN` tetap urutan eksekusi. Brief lama menerima `superseded_by: brief-<NN>`, brief pengganti membawa `supersedes: brief-<NN>[, brief-<NN>]`. `SUPERSEDED` tertutup: dilewati traversal `architect`, tidak dihitung predikat cakupan `Covers:`/`Fulfills:`, dan tidak pernah kembali ke status lain.
+
+   *(Dilarang memakai `DRAFT` atau `APPROVED` pada brief — approval berhenti di BRD dan PRD — dan dilarang menulis `SUPERSEDED` dengan tangan: Check C `validate_briefs.py` menolak tautan yang tidak dua arah.)*
 
 3. **4 Nilai Status Item Kerja (`## Work status`)**:
 

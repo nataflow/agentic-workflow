@@ -18,7 +18,7 @@ metadata:
 1. Jalankan skrip verifikasi prasyarat: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/architect/scripts/check_preconditions.py --taskdir <taskdir> [--base-branch <base_branch>]`.
 2. Evaluasi output skrip secara deterministik:
    - `PASS` (6/6 checks): Lanjutkan ke evaluasi parameter dan workflow orkestrasi brief.
-   - `FAIL`: Hentikan eksekusi segera dan jalankan tindakan remediasi pada butir yang gagal (taskdir belum sah/tidak ada → minta alokasi dari `backenddev:tech-lead`; profil/invariants hilang → arahkan ke `backenddev:profile`; brief READY tidak ditemukan → jalankan `backenddev:plan`; working tree kotor → bersihkan sebelum melanjutkan).
+   - `FAIL`: Hentikan eksekusi segera dan jalankan tindakan remediasi pada butir yang gagal (taskdir belum sah/tidak ada → minta alokasi dari `backenddev:tech-lead`; profil/invariants hilang → arahkan ke `backenddev:profile`; brief READY tidak ditemukan → jalankan `backenddev:plan`; brief `BLOCKED` → `backenddev:tech-lead` (lane `PLANNING`, taskdir sama); working tree kotor → bersihkan sebelum melanjutkan).
 
 ## Parameter [REQUIRED]
 
@@ -42,15 +42,15 @@ metadata:
 Pindai direktori tugas untuk menentukan titik awal eksekusi deterministik:
 
 1. Jalankan `ls {taskdir}/`, baca frontmatter tiap `brief-<NN>-<unit>.md` urut `NN`.
-2. Evaluasi status frontmatter setiap brief:
-   - Status `DONE`: Lewati, lanjut ke `NN` berikutnya.
-   - Status `READY`: Tetapkan sebagai titik mulai rantai aktif.
-   - Status `BLOCKED`: Hentikan eksekusi segera, laporkan status terblokir ke gerbang.
-   - Nilai di luar `READY|DONE|BLOCKED`: Hentikan eksekusi segera, laporkan nilai terbaca beserta path briefnya.
-   - Seluruh brief `DONE`: Periksa `{taskdir}/REVIEW.md` lebih dulu, lalu `{taskdir}/REPORT.md`. Rantai dinyatakan tuntas hanya ketika **kedua** berkas itu ada.
-     - `REVIEW.md` belum ada: Lompat ke Fase 4 untuk review penutup.
-     - `REVIEW.md` ada, `REPORT.md` belum ada: Lompat ke Fase 5 untuk memanen laporan rantai yang belum terbit — `report` yang gagal commit atau tidak pernah berangkat di sesi sebelumnya dijemput persis di sini. Rekonstruksi tabel commit trail dari `git log` dan severity dari `REVIEW.md`; dilarang mendispatch ulang implementor maupun reviewer yang keluarannya sudah mendarat.
-     - Keduanya ada: Rantai tuntas. Laporkan apa adanya tanpa mendispatch siapa pun dan tanpa menulis ulang artefak yang sudah terbit.
+2. Tetapkan titik masuk dari field `entry` check 3 skrip prasyarat (`--json`; keluaran teks mencetaknya sebagai `Titik masuk`), lalu konfirmasi dengan frontmatter:
+   - `DONE` atau `SUPERSEDED`: Lewati, lanjut ke `NN` berikutnya. `SUPERSEDED` sah hanya bila bertaut dua arah ke pengganti ber-NN lebih besar — skrip sudah menagihnya.
+   - `READY` (`entry` `FASE_3:<NN>`): Tetapkan sebagai titik mulai rantai aktif.
+   - `BLOCKED`: Hentikan eksekusi, laporkan ke gerbang. Brief itu ditutup `plan` lewat brief pengganti, bukan oleh skill ini — skrip sudah `FAIL` di check 3 sekalipun ada brief `READY` sesudahnya.
+   - Nilai di luar `READY|DONE|BLOCKED|SUPERSEDED`: Hentikan eksekusi, laporkan nilai terbaca beserta path briefnya.
+   - Seluruh brief tertutup (`DONE`/`SUPERSEDED`): ikuti `entry` check 3. Rantai dinyatakan tuntas hanya ketika `REVIEW.md` **dan** `REPORT.md` sama-sama ada.
+     - `FASE_4` — `REVIEW.md` belum ada: Lompat ke Fase 4 untuk verifikasi penutup lalu review.
+     - `FASE_5` — `REVIEW.md` ada, `REPORT.md` belum ada: Lompat ke Fase 5 untuk memanen laporan rantai yang belum terbit — `report` yang gagal commit atau tidak pernah berangkat di sesi sebelumnya dijemput persis di sini. Rekonstruksi tabel commit trail dari `git log` dan severity dari `REVIEW.md`; dilarang mendispatch ulang implementor maupun reviewer yang keluarannya sudah mendarat.
+     - `TUNTAS` — keduanya ada: Rantai tuntas. Laporkan apa adanya tanpa mendispatch siapa pun dan tanpa menulis ulang artefak yang sudah terbit.
 
 ### Fase 2 — Presentasi Rencana Kerja & Penguncian Konfigurasi
 

@@ -4,7 +4,7 @@ Gunakan template ini saat `architect` mendispatch subagent penilai diff (`code-r
 
 **Tujuan:** Menilai seluruh diff branch satu taskdir terhadap kontrak gabungan briefnya, tepat satu kali di akhir rantai, dan mengunci hasilnya sebagai `{taskdir}/REVIEW.md`.
 
-**Dispatch setelah:** Fase 4 butir 1 hijau — build dan test penutup lulus dan tiap brief taskdir sudah `DONE` dengan commitnya mendarat.
+**Dispatch setelah:** Fase 4 butir 1 hijau — build dan test penutup lulus dan tiap brief taskdir sudah tertutup — `DONE` dengan commitnya mendarat, atau `SUPERSEDED` bertaut ke penggantinya.
 
 ```markdown
 Review seluruh branch pekerjaan untuk satu direktori tugas.
