@@ -35,3 +35,18 @@ def test_migrate_refuses_when_new_location_exists(make_repo):
     be_profile(root, "go")
     proc = run_script(SCRIPT, "--root", str(root))
     assert proc.returncode != 0
+
+
+def test_migrate_tanpa_profil_lama_json_fail(make_repo):
+    """Smoke L6.1: tanpa profil lama, `--json` tetap mencetak JSON dan pesannya tidak menuduh profil asing."""
+    root = make_repo()
+    proc = run_script(SCRIPT, "--json", "--root", str(root))
+    assert proc.returncode == 1
+    out = json.loads(proc.stdout)
+    assert out["status"] == "FAIL" and "tidak ada" in out["error"], out
+
+
+def test_migrate_index_rusak_disebut_rusak(make_repo):
+    root = make_repo({".claude/profile/index.json": "{rusak"})
+    proc = run_script(SCRIPT, "--root", str(root))
+    assert proc.returncode == 1 and "bukan JSON" in proc.stderr, proc.stderr

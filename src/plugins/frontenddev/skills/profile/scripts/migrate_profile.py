@@ -35,16 +35,23 @@ def _git_mv(root: Path, src: Path, dst: Path) -> bool:
     return proc.returncode == 0
 
 
+class MigrateError(Exception):
+    """Profil lama tidak bisa dipindah; tidak ada berkas yang disentuh."""
+
+
 def migrate(root: Path, plugin: str = PLUGIN) -> Tuple[List[str], List[str]]:
     """Pindahkan profil lama milik `plugin`. Mengembalikan (dipindah, sisa)."""
     legacy = root / _detect.PROFILE_ROOT
     target = legacy / plugin
     data, state = _detect.read_index(legacy / "index.json")
-    if state != "OK" or _detect.owner_of(data) != plugin:
-        raise SystemExit(f"MIGRATE FAIL: .claude/profile/index.json bukan milik {plugin}")
+    if state == "ABSENT":
+        raise MigrateError(".claude/profile/index.json tidak ada; tidak ada profil lama untuk dipindah")
+    if state != "OK":
+        raise MigrateError(".claude/profile/index.json bukan JSON objek yang valid")
+    if _detect.owner_of(data) != plugin:
+        raise MigrateError(f".claude/profile/index.json bukan milik {plugin}")
     if (target / "index.json").exists():
-        raise SystemExit(f"MIGRATE FAIL: .claude/profile/{plugin}/index.json sudah ada; "
-                         "lokasi baru tidak ditimpa")
+        raise MigrateError(f".claude/profile/{plugin}/index.json sudah ada; lokasi baru tidak ditimpa")
     target.mkdir(parents=True, exist_ok=True)
     moved: List[str] = []
     for name in _detect.PROFILE_FILES[plugin]:
@@ -78,7 +85,14 @@ def main() -> None:
     parser.add_argument("--json", action="store_true", help="keluaran JSON")
     args = parser.parse_args()
     root = (Path(args.root) if args.root else _find_root()).resolve()
-    moved, leftovers = migrate(root)
+    try:
+        moved, leftovers = migrate(root)
+    except MigrateError as exc:
+        if args.json:
+            print(json.dumps({"plugin": PLUGIN, "status": "FAIL", "error": str(exc)}, indent=2))
+        else:
+            print(f"MIGRATE FAIL: {exc}", file=sys.stderr)
+        sys.exit(1)
     history = "git log --oneline -- .claude/profile/index.json"
     if args.json:
         print(json.dumps({"plugin": PLUGIN, "target": f".claude/profile/{PLUGIN}",
