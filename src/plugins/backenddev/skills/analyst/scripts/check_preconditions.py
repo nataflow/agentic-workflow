@@ -3,34 +3,41 @@
 
 Automates verification of repository preconditions before analyst skill execution.
 Runs checks 1 through 7 in a single pass and produces a compact, actionable report.
-Zero external dependencies (Python Standard Library only).
+Zero external dependencies (Python Standard Library only). Satu impor intra-plugin:
+`skills/_common/precondition_lib.py` (parser frontmatter, taskdir, chain, status git,
+profil, keluaran), di-bootstrap relatif terhadap berkas ini.
 """
 
 import argparse
-import json
-import os
 from pathlib import Path
 import re
 import subprocess
 import sys
 from typing import Any, Dict, List, Optional
 
-# Resolver profil `.claude/profile/backenddev/` tinggal di
-# `skills/_common/precondition_lib.py`. Bootstrap path relatif terhadap berkas
-# ini, bukan terhadap cwd.
+# Parser bersama tinggal di `skills/_common/precondition_lib.py`. Bootstrap path
+# relatif terhadap berkas ini, bukan terhadap cwd.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
-    resolve_profile_dir,
-    foreign_owner,
+    TASKDIR_ACTION,
+    VALID_CHAINS,
+    VALID_RISKS,
+    GitError,
+    check_taskdir,
+    declared_chain,
+    dirty_paths,
+    find_repo_root,
+    format_text,
+    is_under,
     legacy_suffix,
+    load_profile_index,
+    parse_chain,
+    read_text,
+    to_json,
 )
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import chain_counters as _counters  # noqa: E402
-
-VALID_RISKS = {"BREAKING", "MAJOR", "MINOR"}
-
-VALID_CHAINS = {"BRD_PRD_BRIEF", "PRD_BRIEF", "BRIEF"}
 
 # Artefak rancangan yang wajib ada pada tiap chain.
 CHAIN_ARTIFACTS = {
@@ -57,25 +64,20 @@ class PreconditionChecker:
         chain: Optional[str] = None,
         target_root: Optional[Path] = None,
     ):
-        self.root = (target_root or self._find_repo_root()).resolve()
+        self.root = (target_root or find_repo_root()).resolve()
         self.taskdir_arg = taskdir
         self.risk_arg = (risk or "").strip().upper() if risk else None
-        self.chain_arg = (chain or "auto").strip().upper()
+        # `auto` (atau kosong) hanya sah sebagai parameter: chain diturunkan di Fase 1.
+        # Nilai lain dinormalkan parse_chain; nilai asing dilaporkan check 4, bukan KeyError.
+        raw = (chain or "").strip()
+        if raw.lower() in ("", "auto"):
+            self.chain_arg, self.chain_err = "AUTO", ""
+        else:
+            parsed, self.chain_err = parse_chain(raw)
+            self.chain_arg = parsed or raw.upper()
+        self.td = check_taskdir(self.root, taskdir)
         self.results: List[Dict[str, Any]] = []
 
-    def _find_repo_root(self) -> Path:
-        """Find the git repository root or fallback to cwd."""
-        try:
-            out = subprocess.check_output(
-                ["git", "rev-parse", "--show-toplevel"],
-                stderr=subprocess.DEVNULL,
-                universal_newlines=True,
-            ).strip()
-            if out and os.path.isdir(out):
-                return Path(out)
-        except Exception:
-            pass
-        return Path.cwd()
 
     def run_all(self) -> bool:
         """Run checks 1 through 6."""
@@ -88,133 +90,38 @@ class PreconditionChecker:
         self._check_7_resume_point()
         return all(r["status"] == "PASS" for r in self.results)
 
-    def _resolve_taskdir(self) -> Optional[Path]:
-        if not self.taskdir_arg:
-            return None
-        td = Path(self.taskdir_arg)
-        return td if td.is_absolute() else self.root / td
-
-    def _get_rel_taskdir_str(self) -> str:
-        if not self.taskdir_arg:
-            return ""
-        td_path = self._resolve_taskdir()
-        if not td_path:
-            return self.taskdir_arg
-        try:
-            return str(td_path.relative_to(self.root)).rstrip("/")
-        except ValueError:
-            return str(td_path).rstrip("/")
-
-    def _declared_chain(self) -> Optional[str]:
-        """Baca nilai `chain:` dari frontmatter TASK.md bila berkasnya sudah ada."""
-        taskdir_path = self._resolve_taskdir()
-        if not taskdir_path:
-            return None
-        task_file = taskdir_path / "TASK.md"
-        if not task_file.exists():
-            return None
-        try:
-            content = task_file.read_text(encoding="utf-8")
-        except Exception:
-            return None
-        match = re.search(r"^chain:\s*([A-Z_]+)\s*$", content, re.MULTILINE)
-        return match.group(1).upper() if match else None
+    def _declared_chain(self):
+        """(chain, galat) dari frontmatter TASK.md bila berkasnya sudah ada."""
+        return declared_chain(self.td.path) if self.td.ok else (None, "")
 
     def _check_1_taskdir(self):
         check_id = 1
         name = "Taskdir Format & Existence"
 
-        if not self.taskdir_arg:
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "FAIL",
-                "summary": "Parameter taskdir belum diberikan",
-                "action": "Minta direktori kerja sah dari gerbang `backenddev:tech-lead` (format: backenddev/docs/<YYMMDDhhmm>-<slug>/).",
-            })
-            return
-
-        taskdir_path = self._resolve_taskdir()
-        if not taskdir_path or not taskdir_path.exists():
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "FAIL",
-                "summary": f"Direktori taskdir tidak ditemukan di disk: {self.taskdir_arg}",
-                "action": "Pastikan gerbang `backenddev:tech-lead` telah memprovisi direktori taskdir sebelum memanggil skill analyst.",
-            })
-            return
-
-        rel_str = self._get_rel_taskdir_str()
-        pattern = r"^backenddev/docs/\d{10}-[a-z0-9-]+$"
-        if not re.match(pattern, rel_str):
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "FAIL",
-                "summary": f"Format taskdir '{rel_str}' tidak sesuai pola kanonik backenddev/docs/<YYMMDDhhmm>-<slug>/",
-                "action": "Gunakan format taskdir kanonik backenddev/docs/<YYMMDDhhmm>-<slug>/.",
-            })
-            return
-
         self.results.append({
             "id": check_id,
             "name": name,
-            "status": "PASS",
-            "summary": f"Taskdir terverifikasi: {rel_str}",
-            "action": "",
+            "status": "PASS" if self.td.ok else "FAIL",
+            "summary": self.td.summary,
+            "action": "" if self.td.ok else TASKDIR_ACTION,
         })
 
     def _check_2_profile(self):
         check_id = 2
         name = "Profile & Commit Convention"
-        profile_dir, legacy_note = resolve_profile_dir(self.root)
-        index_file = profile_dir / "index.json"
-
-        if not index_file.exists():
+        prof = load_profile_index(self.root)
+        if not prof.ok:
             self.results.append({
                 "id": check_id,
                 "name": name,
                 "status": "FAIL",
-                "summary": "Berkas .claude/profile/backenddev/index.json tidak ditemukan",
-                "action": "Jalankan skill `backenddev:profile` untuk membuat profil repositori.",
+                "summary": prof.error,
+                "action": prof.action,
             })
             return
+        data, legacy_note = prof.data, prof.note
 
-        owner = foreign_owner(profile_dir)
-        if owner:
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "FAIL",
-                "summary": f"Profil di {profile_dir.relative_to(self.root).as_posix()}/ milik `{owner}`; bukan profil backenddev",
-                "action": "Jangan membaca atau menimpa profil plugin lain; jalankan `backenddev:profile` (ditulis ke `.claude/profile/backenddev/`).",
-            })
-            return
-
-        try:
-            with open(index_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-
-            commit_conv = data.get("commit_convention")
-            if not commit_conv or not str(commit_conv).strip():
-                self.results.append({
-                    "id": check_id,
-                    "name": name,
-                    "status": "FAIL",
-                    "summary": "Field commit_convention kosong atau hilang di index.json",
-                    "action": "Lengkapi field commit_convention via skill `backenddev:profile`.",
-                })
-                return
-        except Exception as e:
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "FAIL",
-                "summary": f"Format JSON rusak pada index.json: {e}",
-                "action": "Perbaiki format JSON atau inisialisasi ulang via `backenddev:profile`.",
-            })
-            return
+        commit_conv = data["commit_convention"]
 
         self.results.append({
             "id": check_id,
@@ -270,12 +177,12 @@ class PreconditionChecker:
             })
             return
 
-        if self.chain_arg not in VALID_CHAINS:
+        if self.chain_err:
             self.results.append({
                 "id": check_id,
                 "name": name,
                 "status": "FAIL",
-                "summary": f"Chain '{self.chain_arg}' tidak sah (wajib BRD_PRD_BRIEF | PRD_BRIEF | BRIEF | auto)",
+                "summary": f"{self.chain_err[:-1]} | auto)",
                 "action": "Gunakan salah satu enum chain kanonik atau kosongkan agar diturunkan di Fase 1.",
             })
             return
@@ -291,7 +198,16 @@ class PreconditionChecker:
             })
             return
 
-        declared = self._declared_chain()
+        declared, declared_err = self._declared_chain()
+        if declared_err:
+            self.results.append({
+                "id": check_id,
+                "name": name,
+                "status": "FAIL",
+                "summary": f"TASK.md memuat chain asing: {declared_err}",
+                "action": "Laporkan salah rute ke gerbang `backenddev:tech-lead`; chain TASK.md hanya boleh BRD_PRD_BRIEF | PRD_BRIEF | BRIEF.",
+            })
+            return
         if declared and declared != self.chain_arg:
             self.results.append({
                 "id": check_id,
@@ -314,8 +230,7 @@ class PreconditionChecker:
         check_id = 5
         name = "Artifact vs Chain Consistency"
 
-        taskdir_path = self._resolve_taskdir()
-        if not taskdir_path or not taskdir_path.exists():
+        if not self.td.ok:
             self.results.append({
                 "id": check_id,
                 "name": name,
@@ -324,8 +239,23 @@ class PreconditionChecker:
                 "action": "Selesaikan check 1 terlebih dahulu.",
             })
             return
+        taskdir_path = self.td.path
 
-        effective_chain = self.chain_arg if self.chain_arg in VALID_CHAINS else self._declared_chain()
+        declared, declared_err = self._declared_chain()
+        if self.chain_arg in VALID_CHAINS:
+            effective_chain = self.chain_arg
+        elif self.chain_err or declared_err:
+            # CHAIN_ARTIFACTS hanya diakses sesudah nilainya tervalidasi.
+            self.results.append({
+                "id": check_id,
+                "name": name,
+                "status": "FAIL",
+                "summary": f"Chain tidak sah; konsistensi artefak tak dapat dinilai ({self.chain_err or declared_err})",
+                "action": "Laporkan salah rute ke gerbang `backenddev:tech-lead`; dilarang menghapus artefak atau menyesuaikan chain agar cocok.",
+            })
+            return
+        else:
+            effective_chain = declared
         present = {n for n in ("BRD.md", "PRD.md") if (taskdir_path / n).exists()}
 
         if not effective_chain:
@@ -388,30 +318,10 @@ class PreconditionChecker:
             return
 
         try:
-            status_output = subprocess.check_output(
-                ["git", "status", "--porcelain", "-uall"],
-                cwd=self.root,
-                stderr=subprocess.DEVNULL,
-                universal_newlines=True,
-            ).splitlines()
-
-            rel_taskdir = self._get_rel_taskdir_str().rstrip("/")
-            dirty_outside: List[str] = []
-            for line in status_output:
-                if not line.strip():
-                    continue
-                file_part = line[3:].strip().rstrip("/")
-                if " -> " in file_part:
-                    file_part = file_part.split(" -> ")[-1].strip().rstrip("/")
-
-                if rel_taskdir and (file_part == rel_taskdir or file_part.startswith(rel_taskdir + "/")):
-                    continue
-                # Laci kerja `.explore/` milik `code-explorer` bukan artefak rantai:
-                # tidak pernah di-stage maupun di-commit, jadi tidak dihitung kotor.
-                if ".explore" in file_part.rstrip("/").split("/"):
-                    continue
-                dirty_outside.append(file_part)
-
+            # Laci kerja `.explore/` milik `code-explorer` bukan artefak rantai:
+            # tidak pernah di-stage maupun di-commit, jadi dibuang dirty_paths.
+            dirty_outside = [p for p in dirty_paths(self.root)
+                             if not (self.td.rel and is_under(p, self.td.rel))]
             if dirty_outside:
                 samples = dirty_outside[:3]
                 suffix = f" (+{len(dirty_outside)-3} lainnya)" if len(dirty_outside) > 3 else ""
@@ -431,7 +341,7 @@ class PreconditionChecker:
                 "summary": "Working tree bersih di luar taskdir (siap untuk commit isolasi)",
                 "action": "",
             })
-        except Exception as e:
+        except GitError as e:
             self.results.append({
                 "id": check_id,
                 "name": name,
@@ -448,12 +358,11 @@ class PreconditionChecker:
         ledger `## Chain`, bukan ditebak model.
         """
         check_id, name = 7, "Resume Point"
-        taskdir_path = self._resolve_taskdir()
-        task = taskdir_path / "TASK.md" if taskdir_path else None
+        task = self.td.path / "TASK.md" if self.td.ok else None
         if not task or not task.exists():
             summary = "TASK.md belum ada — rantai baru (Fase 1)"
         else:
-            text = task.read_text(encoding="utf-8")
+            text = read_text(task)
             ledger = re.search(r"^## Chain\s*$(.*?)(?=^## |\Z)", text, re.M | re.S)
             hops = re.findall(r"^- \[( |x|~)\] (BRD|PRD|BRIEF)\b", ledger.group(1) if ledger else "", re.M)
             top = next((h for mark, h in hops if mark in (" ", "~")), None)
@@ -464,7 +373,7 @@ class PreconditionChecker:
             else:
                 summary = "Resume: TASK.md tanpa ledger `## Chain` — laporkan ke gerbang (lane non-planning)"
         if task and task.exists():
-            counters = _counters.parse(task.read_text(encoding="utf-8"))
+            counters = _counters.parse(read_text(task))
             summary += f" · Counters: {_counters.summary(counters)}"
         self.results.append({
             "id": check_id,
@@ -475,33 +384,10 @@ class PreconditionChecker:
         })
 
     def format_text(self) -> str:
-        all_passed = all(r["status"] == "PASS" for r in self.results)
-        passed_count = sum(1 for r in self.results if r["status"] == "PASS")
-        total = len(self.results)
-        status_label = "PASS" if all_passed else "FAIL"
-
-        lines = [
-            f"PRECONDITION CHECK: analyst [{status_label}] ({passed_count}/{total} passed)",
-        ]
-        for r in self.results:
-            lines.append(f"[{r['id']}] {r['name']:<35} : {r['status']} ({r['summary']})")
-            if r["status"] == "FAIL" and r["action"]:
-                lines.append(f"    * Tindakan: {r['action']}")
-
-        return "\n".join(lines)
+        return format_text("analyst", self.results)
 
     def to_json(self) -> str:
-        all_passed = all(r["status"] == "PASS" for r in self.results)
-        return json.dumps({
-            "status": "PASS" if all_passed else "FAIL",
-            "passed_count": sum(1 for r in self.results if r["status"] == "PASS"),
-            "total_count": len(self.results),
-            "root": str(self.root),
-            "taskdir": self.taskdir_arg,
-            "risk": self.risk_arg,
-            "chain": self.chain_arg,
-            "checks": self.results,
-        }, indent=2)
+        return to_json(self.root, self.results, taskdir=self.taskdir_arg, risk=self.risk_arg, chain=self.chain_arg)
 
 
 def main():
