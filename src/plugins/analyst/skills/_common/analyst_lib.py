@@ -96,13 +96,18 @@ def normalize_ticketdir(ticketdir: str, root: Path) -> str:
 
 # ── Frontmatter & seksi ───────────────────────────────────────────────────────
 
+BOM = chr(0xFEFF)
+
+
 def split_frontmatter(text: str) -> Tuple[Dict[str, Any], str]:
     """Parse subset YAML frontmatter → `(data, body)`.
 
     Mendukung skalar, skalar berkutip, list inline `[a, "b, c"]`, dan `[]` kosong.
     Tidak ada komentar di akhir baris: `#` adalah bagian nilai (`Tim #2 Sales`).
-    Berkas tanpa pagar `---` lengkap → `({}, text)`.
+    Berkas tanpa pagar `---` lengkap → `({}, text)`. BOM (U+FEFF) di awal berkas,
+    tulisan sebagian editor Windows, dibuang lebih dulu: pagar sesudah BOM tetap pagar.
     """
+    text = text.lstrip(BOM)
     if not text.startswith("---"):
         return {}, text
     end = text.find("\n---", 3)
@@ -143,7 +148,10 @@ def clean_value(value: str, limit: int = 200) -> str:
 
 
 def set_frontmatter_field(text: str, key: str, value: str) -> str:
-    """Ganti nilai `key` di frontmatter, atau sisipkan sebelum pagar penutup."""
+    """Ganti nilai `key` di frontmatter, atau sisipkan sebelum pagar penutup.
+
+    BOM di awal berkas ikut `head` dan tertulis kembali apa adanya.
+    """
     end = text.find("\n---", 3)
     head, rest = text[:end], text[end:]
     pattern = re.compile(rf"^{re.escape(key)}:.*$", re.MULTILINE)
