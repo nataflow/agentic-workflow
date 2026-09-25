@@ -235,7 +235,6 @@ def test_load_profile_index_legacy_note(make_repo):
     assert prof.ok and "MIGRATE" in prof.note
 
 
-@pytest.mark.xfail(strict=True, reason="L5.5: tech-lead masih memakai kandidat path ~/.gemini")
 def test_find_agent_tanpa_fallback_home(tmp_path, make_repo):
     """Reproduksi L5.5 #2: salinan `~/.gemini` tidak menutupi agent yang hilang dari plugin."""
     import shutil

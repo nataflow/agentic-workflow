@@ -59,3 +59,24 @@ def test_fullstack_both_profiles_check1_pass(make_repo):
     git(root, "add", "-A")
     git(root, "commit", "-qm", "init")
     assert _check(_run(root), 1)["status"] == "PASS"
+
+
+# -- Langkah 5 (L5.5): porcelain -z dan zona artefak per segmen ----------------------------
+
+def test_l55_reentry_berkas_unicode_di_zona_artefak(make_repo):
+    from conftest import be_profile, commit, run_script, write_files, BE_SKILLS
+    import json as _json
+    root = make_repo({"src/a.go": "package a\n"})
+    be_profile(root, "go")
+    commit(root, "init")
+    write_files(root, {"backenddev/docs/2601011200-refund/café.md": "x\n",
+                       "backenddev/docs/2601011200-refund/catatan rapat.md": "x\n"})
+    proc = run_script(BE_SKILLS / "tech-lead/scripts/check_preconditions.py", "--root", str(root),
+                      "--re-entry", "--json")
+    c = {c["id"]: c for c in _json.loads(proc.stdout)["checks"]}[3]
+    assert c["status"] == "PASS" and "2 berkas artefak" in c["summary"]
+    write_files(root, {"backenddev/docsx/a.md": "x\n"})
+    proc = run_script(BE_SKILLS / "tech-lead/scripts/check_preconditions.py", "--root", str(root),
+                      "--re-entry", "--json")
+    c = {c["id"]: c for c in _json.loads(proc.stdout)["checks"]}[3]
+    assert c["status"] == "FAIL" and "backenddev/docsx/a.md" in c["summary"]

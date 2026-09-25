@@ -9,13 +9,11 @@ detached, izin tulis, `commands.md`, dan profil yang belum ada tidak dinilai —
 ketiganya tidak relevan untuk "di mana X dipanggil?". Prasyarat penuh (tanpa
 flag) dijalankan Fase 3 butir 0 sebelum taskdir/branch diprovisi.
 Zero external dependencies (Python Standard Library only). Satu impor intra-plugin:
-`skills/_common/precondition_lib.py` untuk uji izin tulis, di-bootstrap relatif
-terhadap berkas ini.
+`skills/_common/precondition_lib.py` (parser frontmatter, taskdir, chain, profil,
+berkas plugin, keluaran), di-bootstrap relatif terhadap berkas ini.
 """
 
 import argparse
-import json
-import os
 from pathlib import Path
 import subprocess
 import sys
@@ -38,12 +36,19 @@ RE_ENTRY_ALLOWED_PREFIXES = (
 # ini, bukan terhadap cwd — skrip dipanggil dengan path absolut dari mana saja.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
-    resolve_profile_dir,
-    foreign_owner,
+    GitError,
+    dirty_paths,
+    find_agent,
+    find_repo_root,
+    format_text,
+    freshness_banner,
+    is_under,
     legacy_suffix,
-    nearest_existing_ancestor as _nearest_existing_ancestor,
+    load_profile_index,
     probe_writable as _probe_writable,
     profile_staleness as _profile_staleness,
+    resolve_profile_dir,
+    to_json,
     LEGACY_PROFILE_DIR_REL,
     PROFILE_FILES,
 )
@@ -55,7 +60,7 @@ RE_ENTRY_ALLOWED_PREFIXES += tuple(f"{LEGACY_PROFILE_DIR_REL}/{f}" for f in PROF
 
 class PreconditionChecker:
     def __init__(self, target_root: Optional[Path] = None, re_entry: bool = False, read_only: bool = False):
-        self.root = (target_root or self._find_repo_root()).resolve()
+        self.root = (target_root or find_repo_root()).resolve()
         self.re_entry = re_entry
         self.read_only = read_only
         self.results: List[Dict[str, Any]] = []
@@ -70,19 +75,6 @@ class PreconditionChecker:
             "action": "",
         })
 
-    def _find_repo_root(self) -> Path:
-        """Find the git repository root or fallback to cwd."""
-        try:
-            out = subprocess.check_output(
-                ["git", "rev-parse", "--show-toplevel"],
-                stderr=subprocess.DEVNULL,
-                universal_newlines=True
-            ).strip()
-            if out and os.path.isdir(out):
-                return Path(out)
-        except Exception:
-            pass
-        return Path.cwd()
 
     def run_all(self) -> bool:
         """Run checks 1 through 6."""
@@ -97,64 +89,25 @@ class PreconditionChecker:
     def _check_1_profile(self):
         check_id = 1
         name = "Profile Index & Invariants"
-        profile_dir, legacy_note = resolve_profile_dir(self.root)
-        index_file = profile_dir / "index.json"
-        module_file = profile_dir / "module-structure.md"
-        invariants_file = profile_dir / "invariants.md"
-
-        if not index_file.exists():
-            if self.read_only:
+        prof = load_profile_index(self.root)
+        if not prof.ok:
+            if self.read_only and prof.kind == "missing":
                 return self._soft(check_id, name, "Profil absen — jawab dari sapuan manual (TERDEGRADASI), "
                                                   "tawarkan `backenddev:profile`")
+            if self.read_only and prof.kind == "foreign":
+                return self._soft(check_id, name, f"Profil backenddev absen ({prof.error}) — "
+                                                  "jawab dari sapuan manual (TERDEGRADASI), tawarkan `backenddev:profile`")
             self.results.append({
                 "id": check_id,
                 "name": name,
                 "status": "FAIL",
-                "summary": "Missing .claude/profile/backenddev/index.json",
-                "action": "Arahkan user ke `backenddev:profile` untuk inisialisasi profil repo."
+                "summary": prof.error,
+                "action": prof.action,
             })
             return
-
-        owner = foreign_owner(profile_dir)
-        if owner and self.read_only:
-            return self._soft(check_id, name, f"Profil backenddev absen (`.claude/profile/` milik `{owner}`) — "
-                                              "jawab dari sapuan manual (TERDEGRADASI), tawarkan `backenddev:profile`")
-        if owner:
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "FAIL",
-                "summary": f"Profil di {profile_dir.relative_to(self.root).as_posix()}/ milik `{owner}`; bukan profil backenddev",
-                "action": "Jangan membaca atau menimpa profil plugin lain; jalankan `backenddev:profile` (ditulis ke `.claude/profile/backenddev/`).",
-            })
-            return
-
-        try:
-            with open(index_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            required_keys = [
-                "root_namespace", "source_root", "base_branch",
-                "branch_convention", "commit_convention", "stack", "architecture"
-            ]
-            missing_keys = [k for k in required_keys if not data.get(k)]
-            if missing_keys:
-                self.results.append({
-                    "id": check_id,
-                    "name": name,
-                    "status": "FAIL",
-                    "summary": f"Field kritis hilang/kosong di index.json: {', '.join(missing_keys)}",
-                    "action": "Jalankan `backenddev:profile` untuk memperbarui field profil."
-                })
-                return
-        except Exception as e:
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "FAIL",
-                "summary": f"Corrupt index.json: {e}",
-                "action": "Perbaiki format JSON atau inisialisasi ulang via `backenddev:profile`."
-            })
-            return
+        data, legacy_note, profile_dir = prof.data, prof.note, prof.dir
+        module_file = profile_dir / "module-structure.md"
+        invariants_file = profile_dir / "invariants.md"
 
         missing_docs = []
         if not module_file.exists():
@@ -249,53 +202,22 @@ class PreconditionChecker:
                 "action": "Pastikan HEAD terhubung ke branch aktif dan direktori memiliki .git sah."
             })
 
-    @staticmethod
-    def _porcelain_paths(status_out: str) -> List[str]:
-        """Ambil path relatif dari tiap baris `git status --porcelain` v1.
-
-        Tiap baris berbentuk `XY <path>`; rename/copy berbentuk
-        `XY <lama> -> <baru>`; path ber-spasi atau non-ASCII dibungkus kutip.
-        """
-        paths = []
-        for line in status_out.splitlines():
-            if not line.strip():
-                continue
-            path = line[3:] if len(line) > 3 else line.strip()
-            if " -> " in path:
-                path = path.split(" -> ")[-1]
-            path = path.strip()
-            if len(path) >= 2 and path.startswith('"') and path.endswith('"'):
-                path = path[1:-1]
-            if path:
-                paths.append(path)
-        return paths
-
     def _check_3_git_status(self):
         check_id = 3
         name = "Git Clean Working Tree"
         try:
-            # `-uall` mencegah git meringkas direktori untracked jadi satu baris
-            # (`docs/`), yang membuat perbandingan prefix zona artefak meleset.
-            status_out = subprocess.check_output(
-                ["git", "status", "--porcelain", "-uall"],
-                cwd=self.root,
-                stderr=subprocess.DEVNULL,
-                universal_newlines=True
-            )
+            # porcelain -z -uall: path apa adanya (tanpa kutip/escape oktal) dan direktori
+            # untracked tidak diringkas jadi satu baris, sehingga perbandingan zona
+            # artefak per segmen tidak meleset. Laci kerja `.explore/` milik
+            # `code-explorer` bukan artefak rantai, jadi dibuang dirty_paths.
+            dirty = dirty_paths(self.root)
 
-            # Laci kerja `.explore/` milik `code-explorer` bukan artefak rantai:
-            # tidak pernah di-stage maupun di-commit, jadi tidak dihitung kotor.
-            dirty_paths = [
-                p for p in self._porcelain_paths(status_out)
-                if ".explore" not in p.rstrip("/").split("/")
-            ]
+            if dirty and self.read_only:
+                return self._soft(check_id, name, f"{len(dirty)} berkas uncommitted")
 
-            if dirty_paths and self.read_only:
-                return self._soft(check_id, name, f"{len(dirty_paths)} berkas uncommitted")
-
-            if dirty_paths:
+            if dirty:
                 if self.re_entry:
-                    outside = [p for p in dirty_paths if not p.startswith(RE_ENTRY_ALLOWED_PREFIXES)]
+                    outside = [p for p in dirty if not any(is_under(p, x) for x in RE_ENTRY_ALLOWED_PREFIXES)]
 
                     if outside:
                         sample = ", ".join(outside[:3])
@@ -314,7 +236,7 @@ class PreconditionChecker:
                         "id": check_id,
                         "name": name,
                         "status": "PASS",
-                        "summary": f"Mode re-entry: {len(dirty_paths)} berkas artefak menunggu commit gerbang, nol berkas di luar zona artefak",
+                        "summary": f"Mode re-entry: {len(dirty)} berkas artefak menunggu commit gerbang, nol berkas di luar zona artefak",
                         "action": ""
                     })
                     return
@@ -323,7 +245,7 @@ class PreconditionChecker:
                     "id": check_id,
                     "name": name,
                     "status": "FAIL",
-                    "summary": f"Working tree kotor ({len(dirty_paths)} berkas uncommitted)",
+                    "summary": f"Working tree kotor ({len(dirty)} berkas uncommitted)",
                     "action": "Minta user stash atau commit perubahan sebelum membuat taskdir/branch."
                 })
                 return
@@ -335,7 +257,7 @@ class PreconditionChecker:
                 "summary": "Working tree bersih (0 perubahan uncommitted)",
                 "action": ""
             })
-        except Exception as e:
+        except GitError as e:
             self.results.append({
                 "id": check_id,
                 "name": name,
@@ -438,12 +360,6 @@ class PreconditionChecker:
         skill_dir = Path(__file__).resolve().parent.parent
         dispatcher_file = skill_dir / "dispatcher" / "explorer.md"
 
-        candidate_agents = [
-            skill_dir.parent.parent / "agents" / "code-explorer.md",
-            self.root / "src" / "plugins" / "backenddev" / "agents" / "code-explorer.md",
-            Path.home() / ".gemini" / "config" / "plugins" / "backenddev" / "agents" / "code-explorer.md",
-            Path.home() / ".claude" / "plugins" / "backenddev" / "agents" / "code-explorer.md",
-        ]
 
         if not dispatcher_file.exists():
             self.results.append({
@@ -455,7 +371,7 @@ class PreconditionChecker:
             })
             return
 
-        if not any(p.exists() for p in candidate_agents):
+        if not find_agent("code-explorer"):
             self.results.append({
                 "id": check_id,
                 "name": name,
@@ -473,40 +389,16 @@ class PreconditionChecker:
             "action": ""
         })
 
+    def _mode_label(self) -> str:
+        return (" · mode: re-entry" if self.re_entry else "") + (" · mode: read-only" if self.read_only else "")
+
     def format_text(self) -> str:
-        all_passed = all(r["status"] == "PASS" for r in self.results)
-        passed_count = sum(1 for r in self.results if r["status"] == "PASS")
-        total = len(self.results)
-        status_label = "PASS" if all_passed else "FAIL"
-
-        mode_label = " · mode: re-entry" if self.re_entry else ""
-        mode_label += " · mode: read-only" if self.read_only else ""
-        lines = [
-            f"PRECONDITION CHECK: tech-lead [{status_label}] ({passed_count}/{total} passed){mode_label}",
-        ]
-        for r in self.results:
-            lines.append(f"[{r['id']}] {r['name']:<28} : {r['status']} ({r['summary']})")
-            if r["status"] == "FAIL" and r["action"]:
-                lines.append(f"    * Tindakan: {r['action']}")
-
-        freshness = getattr(self, "profile_freshness", None)
-        if freshness and freshness[0] == "BASI":
-            lines.insert(0, f"[TERDEGRADASI] profil basi — {freshness[1]}")
-
-        return "\n".join(lines)
+        return format_text("tech-lead", self.results, header_suffix=self._mode_label(),
+                           banner=freshness_banner(getattr(self, "profile_freshness", None)))
 
     def to_json(self) -> str:
-        all_passed = all(r["status"] == "PASS" for r in self.results)
-        return json.dumps({
-            "status": "PASS" if all_passed else "FAIL",
-            "passed_count": sum(1 for r in self.results if r["status"] == "PASS"),
-            "total_count": len(self.results),
-            "root": str(self.root),
-            "re_entry": self.re_entry,
-            "read_only": self.read_only,
-            "profile_freshness": getattr(self, "profile_freshness", ("TAK_TERNILAI", "belum dinilai"))[0],
-            "checks": self.results
-        }, indent=2)
+        return to_json(self.root, self.results, re_entry=self.re_entry, read_only=self.read_only,
+                       profile_freshness=getattr(self, "profile_freshness", ("TAK_TERNILAI", "belum dinilai"))[0])
 
 
 def main():
