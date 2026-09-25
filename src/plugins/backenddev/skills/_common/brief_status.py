@@ -21,6 +21,8 @@ import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+from precondition_lib import FrontmatterError, doc_status, split_frontmatter
+
 BRIEF_STATUSES = ("READY", "DONE", "BLOCKED", "SUPERSEDED")
 CLOSED = ("DONE", "SUPERSEDED")               # tidak dieksekusi lagi, tidak menahan rantai
 LOCKED = ("DONE", "BLOCKED", "SUPERSEDED")    # alokasi tidak boleh ditulis ulang `plan`
@@ -34,20 +36,15 @@ _BRIEF_NAME = re.compile(r"^brief-(\d{2})-")
 
 
 def read_frontmatter(path: Path) -> Dict[str, str]:
-    """Field frontmatter blok `---` pertama; baris `key:` di badan tidak terbaca."""
+    """Field frontmatter blok `---` pertama; baris `key:` di badan atau blok kode tidak terbaca.
+
+    Parser bersama `precondition_lib.split_frontmatter`; frontmatter rusak (tanpa
+    pagar, kunci ganda) terbaca kosong sehingga status brief jatuh ke `UNKNOWN`.
+    """
     try:
-        text = path.read_bytes().decode("utf-8")
-    except (OSError, UnicodeDecodeError):
+        return split_frontmatter(path.read_bytes().decode("utf-8"))[0]
+    except (OSError, UnicodeDecodeError, FrontmatterError):
         return {}
-    m = _FM.match(text)
-    if not m:
-        return {}
-    out: Dict[str, str] = {}
-    for line in m.group(2).splitlines():
-        kv = re.match(r"^([A-Za-z_][A-Za-z0-9_]*):\s*(.*?)\s*$", line)
-        if kv:
-            out[kv.group(1)] = kv.group(2).strip('"').strip("'")
-    return out
 
 
 def set_frontmatter(path: Path, **fields: str) -> None:
@@ -73,18 +70,24 @@ def brief_refs(value: str) -> List[str]:
 
 
 def scan_briefs(taskdir: Path) -> List[Dict]:
-    """Brief taskdir urut NN, dibaca dari frontmatter saja."""
+    """Brief taskdir urut NN, dibaca dari frontmatter saja.
+
+    Status dibandingkan persis (huruf besar): `status: ready` atau frontmatter
+    rusak menjadi `UNKNOWN` dengan alasannya di `why`, bukan dilipat diam-diam.
+    """
     out: List[Dict] = []
     for p in sorted(taskdir.glob("brief-*.md")):
         m = _BRIEF_NAME.match(p.name)
         if not m:
             continue
         fm = read_frontmatter(p)
+        status, why = doc_status(p, BRIEF_STATUSES)
         out.append({
             "nn": m.group(1),
             "name": p.name,
             "path": p,
-            "status": (fm.get("status") or "").upper() or "UNKNOWN",
+            "status": status or "UNKNOWN",
+            "why": why,
             "superseded_by": brief_refs(fm.get("superseded_by", "")),
             "supersedes": brief_refs(fm.get("supersedes", "")),
             "repairs": brief_refs(fm.get("repairs", "")),

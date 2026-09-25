@@ -3,52 +3,36 @@
 
 Automates verification of repository preconditions before architect skill execution.
 Runs checks 1 through 7 in a single pass and produces a compact, actionable report.
-Zero external dependencies (Python Standard Library only).
+Zero external dependencies (Python Standard Library only). Impor intra-plugin:
+`skills/_common/precondition_lib.py` (parser taskdir, status git, profil, berkas
+plugin, keluaran) dan `skills/_common/brief_status.py`, di-bootstrap relatif
+terhadap berkas ini.
 """
 
 import argparse
-import json
-import os
 from pathlib import Path
-import re
 import subprocess
 import sys
 from typing import Any, Dict, List, Optional
 
-# Resolver profil `.claude/profile/backenddev/` tinggal di
-# `skills/_common/precondition_lib.py`. Bootstrap path relatif terhadap berkas
-# ini, bukan terhadap cwd.
+# Parser bersama tinggal di `skills/_common/precondition_lib.py`. Bootstrap path
+# relatif terhadap berkas ini, bukan terhadap cwd.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
-    resolve_profile_dir,
-    foreign_owner,
+    TASKDIR_ACTION,
+    check_taskdir,
+    dirty_paths,
+    find_agent,
+    find_repo_root,
+    format_text,
     legacy_suffix,
+    load_profile_index,
+    plugin_file,
+    to_json,
 )
 from brief_status import (  # noqa: E402
     BRIEF_STATUSES, CLOSED, landed_sha, read_halt, review_freshness, scan_briefs, validate_links,
 )
-
-
-def _strip_explore_scratch(status_out: str) -> str:
-    """Buang baris `git status --porcelain` yang menunjuk laci kerja `.explore/`.
-
-    `code-explorer` menulis laporannya ke `<taskdir>/.explore/<slug>.md` (dan
-    `backenddev/docs/.explore/` untuk dispatch gerbang). Laci itu zona kerja,
-    bukan artefak rantai: tidak pernah di-stage maupun di-commit, sehingga
-    kehadirannya tidak boleh dihitung sebagai working tree kotor.
-    """
-    kept = []
-    for line in status_out.splitlines():
-        if not line.strip():
-            continue
-        path = line[3:] if len(line) > 3 else line.strip()
-        if " -> " in path:
-            path = path.split(" -> ")[-1]
-        path = path.strip().strip('"')
-        if ".explore" in path.rstrip("/").split("/"):
-            continue
-        kept.append(line)
-    return "\n".join(kept)
 
 
 class PreconditionChecker:
@@ -58,24 +42,12 @@ class PreconditionChecker:
         base_branch: Optional[str] = None,
         target_root: Optional[Path] = None,
     ):
-        self.root = (target_root or self._find_repo_root()).resolve()
+        self.root = (target_root or find_repo_root()).resolve()
         self.taskdir_arg = taskdir
         self.base_branch_arg = base_branch
+        self.td = check_taskdir(self.root, taskdir)
         self.results: List[Dict[str, Any]] = []
 
-    def _find_repo_root(self) -> Path:
-        """Find the git repository root or fallback to cwd."""
-        try:
-            out = subprocess.check_output(
-                ["git", "rev-parse", "--show-toplevel"],
-                stderr=subprocess.DEVNULL,
-                universal_newlines=True,
-            ).strip()
-            if out and os.path.isdir(out):
-                return Path(out)
-        except Exception:
-            pass
-        return Path.cwd()
 
     def run_all(self) -> bool:
         """Run checks 1 through 7."""
@@ -88,118 +60,32 @@ class PreconditionChecker:
         self._check_7_halt_marker()
         return all(r["status"] == "PASS" for r in self.results)
 
-    def _resolve_taskdir(self) -> Optional[Path]:
-        if not self.taskdir_arg:
-            return None
-        td = Path(self.taskdir_arg)
-        return td if td.is_absolute() else self.root / td
-
-    def _get_rel_taskdir_str(self) -> str:
-        if not self.taskdir_arg:
-            return ""
-        td_path = self._resolve_taskdir()
-        if not td_path:
-            return self.taskdir_arg
-        try:
-            return str(td_path.relative_to(self.root)).rstrip("/")
-        except ValueError:
-            return str(td_path).rstrip("/")
-
     def _check_1_taskdir(self):
         check_id = 1
         name = "Taskdir Format & Existence"
 
-        if not self.taskdir_arg:
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "FAIL",
-                "summary": "Parameter taskdir belum diberikan",
-                "action": "Minta direktori kerja sah dari gerbang `backenddev:tech-lead` (format: backenddev/docs/<YYMMDDhhmm>-<slug>/).",
-            })
-            return
-
-        taskdir_path = self._resolve_taskdir()
-        if not taskdir_path or not taskdir_path.exists():
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "FAIL",
-                "summary": f"Direktori taskdir tidak ditemukan di disk: {self.taskdir_arg}",
-                "action": "Pastikan direktori taskdir telah diprovisi oleh gerbang `backenddev:tech-lead`.",
-            })
-            return
-
-        rel_str = self._get_rel_taskdir_str()
-        pattern = r"^backenddev/docs/\d{10}-[a-z0-9-]+$"
-        if not re.match(pattern, rel_str):
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "FAIL",
-                "summary": f"Format taskdir '{rel_str}' tidak sesuai pola kanonik backenddev/docs/<YYMMDDhhmm>-<slug>/",
-                "action": "Gunakan format taskdir kanonik backenddev/docs/<YYMMDDhhmm>-<slug>/.",
-            })
-            return
-
         self.results.append({
             "id": check_id,
             "name": name,
-            "status": "PASS",
-            "summary": f"Taskdir terverifikasi: {rel_str}",
-            "action": "",
+            "status": "PASS" if self.td.ok else "FAIL",
+            "summary": self.td.summary,
+            "action": "" if self.td.ok else TASKDIR_ACTION,
         })
 
     def _check_2_profile(self):
         check_id = 2
         name = "Profile Invariants & Commands"
-        profile_dir, legacy_note = resolve_profile_dir(self.root)
-        index_file = profile_dir / "index.json"
-
-        if not index_file.exists():
+        prof = load_profile_index(self.root)
+        if not prof.ok:
             self.results.append({
                 "id": check_id,
                 "name": name,
                 "status": "FAIL",
-                "summary": "Berkas .claude/profile/backenddev/index.json tidak ditemukan",
-                "action": "Jalankan skill `backenddev:profile` untuk membuat profil repositori.",
+                "summary": prof.error,
+                "action": prof.action,
             })
             return
-
-        owner = foreign_owner(profile_dir)
-        if owner:
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "FAIL",
-                "summary": f"Profil di {profile_dir.relative_to(self.root).as_posix()}/ milik `{owner}`; bukan profil backenddev",
-                "action": "Jangan membaca atau menimpa profil plugin lain; jalankan `backenddev:profile` (ditulis ke `.claude/profile/backenddev/`).",
-            })
-            return
-
-        try:
-            with open(index_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            required_keys = ["base_branch", "commit_convention", "source_root", "stack"]
-            missing = [k for k in required_keys if not data.get(k)]
-            if missing:
-                self.results.append({
-                    "id": check_id,
-                    "name": name,
-                    "status": "FAIL",
-                    "summary": f"Field kritis hilang di index.json: {', '.join(missing)}",
-                    "action": "Jalankan `backenddev:profile` untuk melengkapi field profil.",
-                })
-                return
-        except Exception as e:
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "FAIL",
-                "summary": f"Format JSON corrupt pada index.json: {e}",
-                "action": "Perbaiki format JSON atau inisialisasi ulang via `backenddev:profile`.",
-            })
-            return
+        data, legacy_note, profile_dir = prof.data, prof.note, prof.dir
 
         required_docs = ["commands.md", "invariants.md"]
         missing_docs = [doc for doc in required_docs if not (profile_dir / doc).exists()]
@@ -223,12 +109,8 @@ class PreconditionChecker:
 
     def _profile_base_branch(self) -> Optional[str]:
         """Field `base_branch` index.json profil; `None` bila tak terbaca (check 2 yang memvonisnya)."""
-        try:
-            profile_dir, _ = resolve_profile_dir(self.root)
-            value = json.loads((profile_dir / "index.json").read_text(encoding="utf-8")).get("base_branch")
-            return value if isinstance(value, str) and value.strip() else None
-        except (OSError, ValueError):
-            return None
+        data = load_profile_index(self.root, required=("base_branch",)).data
+        return data["base_branch"].strip() if data and isinstance(data["base_branch"], str) else None
 
     def _add(self, cid: int, name: str, status: str, summary: str, action: str = "", entry: str = ""):
         self.results.append({
@@ -249,15 +131,17 @@ class PreconditionChecker:
         `READY` sesudahnya — Fase 1 berhenti di brief pertama yang terblokir.
         """
         cid, name = 3, "Brief Set & Readiness"
-        td = self._resolve_taskdir()
-        if not td or not td.exists():
+        td = self.td.path if self.td.ok else None
+        if not td:
             return self._add(cid, name, "FAIL", "Taskdir tidak ditemukan untuk pemindaian brief",
                              "Selesaikan provisi taskdir terlebih dahulu.")
         briefs = scan_briefs(td)
         if not briefs:
             return self._add(cid, name, "FAIL", "Tidak ditemukan berkas brief-* di taskdir",
                              "Jalankan skill `backenddev:plan` untuk merumuskan brief sebelum orkestrasi.")
-        bad = [f"{b['name']} ({b['status']})" for b in briefs if b["status"] not in BRIEF_STATUSES]
+        # Status dibaca dari frontmatter saja (blok kode `status: DONE` di badan tidak
+        # terhitung) dan dibandingkan persis; yang tak terbaca disebut beserta alasannya.
+        bad = [f"{b['name']} tak terbaca ({b['why']})" for b in briefs if b["status"] not in BRIEF_STATUSES]
         bad += validate_links(briefs)
         if bad:
             return self._add(cid, name, "FAIL", "; ".join(bad),
@@ -270,7 +154,7 @@ class PreconditionChecker:
                              "pengganti ber-`supersedes`.")
         start = next((b for b in briefs if b["status"] not in CLOSED), None)
         if start:
-            rel = f"{self._get_rel_taskdir_str()}/{start['name']}"
+            rel = f"{self.td.rel}/{start['name']}"
             sha = landed_sha(self.root, rel, start["commit_message"])
             if sha:
                 return self._add(cid, name, "PASS", f"brief-{start['nn']} READY tetapi commit {sha} sudah mendarat",
@@ -289,7 +173,7 @@ class PreconditionChecker:
         # REVIEW.md yang ada belum tentu menutup HEAD: brief perbaikan (P1, BLOCKED,
         # HALT) yang mendarat sesudahnya membuka putaran baru yang wajib diverifikasi
         # dan direview ulang, bukan dilompati ke Fase 5.
-        fresh, why = review_freshness(self.root, self._get_rel_taskdir_str())
+        fresh, why = review_freshness(self.root, self.td.rel)
         if not fresh:
             return self._add(cid, name, "PASS", f"Seluruh brief tertutup ({closed}); REVIEW.md basi — {why}",
                              "Jalankan Fase 4 ulang: verifikasi penutup lalu SATU review baru; dilarang lompat ke Fase 5.",
@@ -325,13 +209,9 @@ class PreconditionChecker:
                 })
                 return
 
-            status = _strip_explore_scratch(subprocess.check_output(
-                ["git", "status", "--porcelain"],
-                cwd=self.root,
-                stderr=subprocess.DEVNULL,
-                universal_newlines=True,
-            )).strip()
-            if status:
+            # Laci kerja `.explore/` milik `code-explorer` bukan artefak rantai: tidak
+            # pernah di-stage maupun di-commit, jadi dibuang dirty_paths.
+            if dirty_paths(self.root):
                 self.results.append({
                     "id": check_id,
                     "name": name,
@@ -414,21 +294,9 @@ class PreconditionChecker:
         skill_dir = Path(__file__).resolve().parent.parent
         dispatcher_file = skill_dir / "dispatcher" / "implementor.md"
 
-        candidate_agents = [
-            skill_dir.parent.parent / "agents" / "code-implementor.md",
-            self.root / "src" / "plugins" / "backenddev" / "agents" / "code-implementor.md",
-            Path.home() / ".gemini" / "config" / "plugins" / "backenddev" / "agents" / "code-implementor.md",
-            Path.home() / ".claude" / "plugins" / "backenddev" / "agents" / "code-implementor.md",
-        ]
 
         reviewer_dispatcher = skill_dir / "dispatcher" / "reviewer.md"
 
-        candidate_reviewer_agents = [
-            skill_dir.parent.parent / "agents" / "code-reviewer.md",
-            self.root / "src" / "plugins" / "backenddev" / "agents" / "code-reviewer.md",
-            Path.home() / ".gemini" / "config" / "plugins" / "backenddev" / "agents" / "code-reviewer.md",
-            Path.home() / ".claude" / "plugins" / "backenddev" / "agents" / "code-reviewer.md",
-        ]
 
         if not dispatcher_file.exists():
             self.results.append({
@@ -440,7 +308,7 @@ class PreconditionChecker:
             })
             return
 
-        if not any(p.exists() for p in candidate_agents):
+        if not find_agent("code-implementor"):
             self.results.append({
                 "id": check_id,
                 "name": name,
@@ -460,7 +328,7 @@ class PreconditionChecker:
             })
             return
 
-        if not any(p.exists() for p in candidate_reviewer_agents):
+        if not find_agent("code-reviewer"):
             self.results.append({
                 "id": check_id,
                 "name": name,
@@ -481,12 +349,7 @@ class PreconditionChecker:
     def _check_6_lifecycle_recovery(self):
         check_id = 6
         name = "Lifecycle Recovery Reference"
-        ref_paths = [
-            self.root / "src" / "plugins" / "backenddev" / "skills" / "architect" / "references" / "lifecycle-recovery.md",
-            Path(__file__).resolve().parent.parent / "references" / "lifecycle-recovery.md",
-        ]
-        found = any(p.exists() for p in ref_paths)
-        if not found:
+        if not plugin_file("skills", "architect", "references", "lifecycle-recovery.md"):
             self.results.append({
                 "id": check_id,
                 "name": name,
@@ -512,8 +375,7 @@ class PreconditionChecker:
         `NN+1` dan melanjutkan di atas kode yang diketahui rusak.
         """
         cid, name = 7, "Halt Marker"
-        td = self._resolve_taskdir()
-        fm = read_halt(td) if td else None
+        fm = read_halt(self.td.path) if self.td.ok else None
         if fm is not None:
             return self._add(
                 cid, name, "FAIL",
@@ -524,31 +386,10 @@ class PreconditionChecker:
         self._add(cid, name, "PASS", "Tidak ada HALT.md")
 
     def format_text(self) -> str:
-        all_passed = all(r["status"] == "PASS" for r in self.results)
-        passed_count = sum(1 for r in self.results if r["status"] == "PASS")
-        total = len(self.results)
-        status_label = "PASS" if all_passed else "FAIL"
-
-        lines = [
-            f"PRECONDITION CHECK: architect [{status_label}] ({passed_count}/{total} passed)",
-        ]
-        for r in self.results:
-            lines.append(f"[{r['id']}] {r['name']:<32} : {r['status']} ({r['summary']})")
-            if r["action"]:
-                lines.append(f"    * {'Tindakan' if r['status'] == 'FAIL' else 'Titik masuk'}: {r['action']}")
-
-        return "\n".join(lines)
+        return format_text("architect", self.results, entry_label="Titik masuk")
 
     def to_json(self) -> str:
-        all_passed = all(r["status"] == "PASS" for r in self.results)
-        return json.dumps({
-            "status": "PASS" if all_passed else "FAIL",
-            "passed_count": sum(1 for r in self.results if r["status"] == "PASS"),
-            "total_count": len(self.results),
-            "root": str(self.root),
-            "taskdir": self.taskdir_arg,
-            "checks": self.results,
-        }, indent=2)
+        return to_json(self.root, self.results, taskdir=self.taskdir_arg)
 
 
 def main():
