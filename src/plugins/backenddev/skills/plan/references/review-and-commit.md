@@ -117,8 +117,9 @@ matriks alokasi terkunci → tiap brief lolos gerbang per-brief Fase 3
    ```
    git add {taskdir}/brief-02-<unit>.md {taskdir}/brief-03-<unit>.md {taskdir}/brief-04-<unit>.md {taskdir}/brief-05-<unit>.md
    git rm -q {taskdir}/HALT.md        # hanya bila keluaran --nn menyebut HALT.md dihapus (baris `repairs`)
-   git commit -m "docs(plan): add <N> briefs for <slug>"
+   git commit -m "docs(plan): add <N> briefs for <slug>" -m "Brief-Review-Rounds: gen=<generasi> rounds=<n> total=<n>"
    ```
+   Trailer `Brief-Review-Rounds:` disalin apa adanya dari baris `trailer commit agregat` keluaran `validate_briefs.py --review-state`. State ronde di laci `.explore/` tidak ter-commit; trailer inilah yang membuat plafon ronde bertahan di clone baru.
    `<N>` diisi jumlah brief yang benar-benar terbit pada batch ini (brief `SUPERSEDED` tidak dihitung); `<slug>` diambil dari nama direktori taskdir tanpa awalan timestamp.
 3. **Eksekusi seketika saat `Approved`**, tanpa menunggu persetujuan user, gerbang, maupun main loop — self-review satu-satunya prasyarat commit. Sebaliknya, tahan commit tanpa pengecualian bila status belum `Approved`.
 4. **Dilarang staging wildcard.** `git add .` dan `git add -A` berisiko menarik berkas scratch, log, atau pekerjaan user yang belum di-commit.

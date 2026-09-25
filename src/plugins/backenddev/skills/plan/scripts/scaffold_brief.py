@@ -50,7 +50,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from brief_status import (  # noqa: E402
-    HALT_FILE, LOCKED, SUPERSEDABLE, halted_nn, scan_briefs, set_frontmatter,
+    HALT_FILE, LOCKED, SUPERSEDABLE, halted_nn, read_frontmatter, scan_briefs, set_frontmatter,
 )
 
 VALID_RISKS = ["BREAKING", "MAJOR", "MINOR"]
@@ -60,6 +60,8 @@ RISK_ORDER = {"MINOR": 1, "MAJOR": 2, "BREAKING": 3}
 # rantai — tidak di-stage, tidak di-commit, tidak dihitung working tree kotor —
 # sehingga matriks yang mendarat di sini tidak pernah menghentikan `architect`
 # Fase 0 maupun gerbang penutup. Ia berbagi laci dengan laporan `code-explorer`.
+# Karena tidak ter-commit, laci bisa hilang (clone baru, mesin lain); matriks
+# lalu direkonstruksi dari brief ter-commit (`reconstruct_matrix`).
 LACI = ".explore"
 MATRIX_MD = "brief-matrix.md"
 MATRIX_JSON = "brief-matrix.json"
@@ -458,12 +460,52 @@ class MatrixTool:
 
     def load_matrix(self) -> Optional[Dict[str, Any]]:
         text = _read(self.taskdir / LACI / MATRIX_JSON)
-        if not text:
-            return None
-        try:
-            return json.loads(text)
-        except Exception:
-            return None
+        if text:
+            try:
+                return json.loads(text)
+            except Exception:
+                pass
+        return self.reconstruct_matrix()
+
+    def reconstruct_matrix(self) -> Optional[Dict[str, Any]]:
+        """Baris matriks dari brief di disk: frontmatter, baris `Covers:`/`Fulfills:`, `## Interfaces`.
+
+        Penegasan bernalar `— (<alasan>)` disalin apa adanya bila dokumen hulunya
+        ada, supaya brief lama yang sah tidak memicu "sumbu kosong".
+        """
+        rows: List[Dict[str, Any]] = []
+        for b in scan_briefs(self.taskdir):
+            text = _read(b["path"]) or ""
+            fm = read_frontmatter(b["path"])
+            iface = _doc_section(text, "Interfaces") or ""
+            row: Dict[str, Any] = {
+                "nn": b["nn"],
+                "unit": re.sub(r"^brief-\d{2}-|\.md$", "", b["name"]),
+                "title": fm.get("title", ""),
+                "risk": fm.get("risk", "MINOR"),
+                "consumes": [c.strip() for c in re.findall(r"^\s*[-*]\s*Consumes:\s*(.+)$", iface, re.M)],
+                "produces": [p.strip() for p in re.findall(r"^\s*[-*]\s*Produces:\s*(.+)$", iface, re.M)],
+                "reconstructed": True,
+            }
+            for key, label, prefix, upstream in (("covers", "Covers", "AC", self.prd_text),
+                                                 ("fulfills", "Fulfills", "SC", self.task_text)):
+                m = re.search(rf"^\s*{label}:\s*(.+)$", text, re.M)
+                val = m.group(1).strip() if m else ""
+                ids = re.findall(rf"\b{prefix}-\d+\b", val)
+                if ids:
+                    row[key] = ids
+                elif val and upstream:
+                    row[key] = [val]
+                else:
+                    row[key] = []
+                    if val:
+                        row[f"{key}_note"] = val
+            if b["supersedes"]:
+                row["supersedes"] = b["supersedes"]
+            if b["repairs"]:
+                row["repairs"] = b["repairs"][0]
+            rows.append(row)
+        return {"briefs": rows, "reconstructed_from": "brief di disk"} if rows else None
 
     # -- scaffold ----------------------------------------------------------
 
@@ -642,8 +684,9 @@ def main():
         else:
             print(f"BRIEF MATRIX: [PASS] {n} brief teralokasi; plafon risk {ceiling or '—'}")
         if args.append:
+            origin = " (direkonstruksi dari brief di disk)" if spec.get("reconstructed_from") else ""
             print(f"    dipertahankan : {len(kept_nn)} baris lama "
-                  f"({', '.join(f'brief-{n}' for n in kept_nn) or '—'})")
+                  f"({', '.join(f'brief-{n}' for n in kept_nn) or '—'}){origin}")
             print(f"    baris baru    : {n_new}")
             if locked:
                 print(f"    terkunci      : "

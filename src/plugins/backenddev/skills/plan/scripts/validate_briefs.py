@@ -30,6 +30,9 @@ State ronde self-review dimateraikan ke laci taskdir: `--open-round` sebelum
 dispatch (snapshot brief), `--record-round` sesudah balikan, `--review-state`
 untuk membacanya. Plafonnya per **generasi batch** — himpunan berkas brief yang
 ada — sehingga brief yang ditambahkan sesudah plafon habis tetap dapat direview.
+Laci itu tidak ter-commit, jadi hitungan yang sudah terkunci ikut dibaca dari
+trailer `Brief-Review-Rounds:` commit agregat `plan`; clone baru tidak mendapat
+jatah ronde gratis.
 
 Predikat semantik sengaja tidak ditangani di sini — keselarasan aturan bisnis
 `BR-{n}`, pendaratan 4 pilar kontrak PRD, dan kualitas snippet `## Steps` milik
@@ -145,6 +148,7 @@ DECLARATION_RE = re.compile(
 # Laci kerja taskdir; sudah dikecualikan tiap gerbang git di rantai.
 LACI = ".explore"
 REVIEW_STATE = "brief-review-state.json"
+TRAILER_KEY = "Brief-Review-Rounds"
 
 # Plafon ronde **per generasi batch**, bukan per taskdir. Satu generasi adalah
 # himpunan berkas brief yang ada di taskdir; ia berganti hanya saat brief
@@ -332,7 +336,26 @@ class BriefValidator:
         data.setdefault("total_rounds", 0)
         data.setdefault("generations", {})
         data.setdefault("open", None)
+        # Laci hilang (clone baru, mesin lain) tidak me-reset plafon: hitungan
+        # yang sudah terkunci di commit agregat dibaca kembali dari trailernya.
+        trailer = self._trailer_rounds()
+        data["total_rounds"] = max(int(data["total_rounds"] or 0), trailer.pop("_total", 0))
+        for gen, rounds in trailer.items():
+            bucket = data["generations"].setdefault(gen, {"rounds": 0, "history": []})
+            bucket["rounds"] = max(int(bucket.get("rounds") or 0), rounds)
         return data
+
+    def _trailer_rounds(self) -> Dict[str, int]:
+        """Ronde per generasi dan total taskdir dari trailer commit yang menyentuh taskdir."""
+        out = subprocess.run(
+            ["git", "log", f"--format=%(trailers:key={TRAILER_KEY},valueonly)", "--", str(self.taskdir)],
+            cwd=self.root, capture_output=True, text=True,
+        ).stdout
+        best: Dict[str, int] = {"_total": 0}
+        for m in re.finditer(r"gen=(\w+) rounds=(\d+) total=(\d+)", out):
+            best[m.group(1)] = max(best.get(m.group(1), 0), int(m.group(2)))
+            best["_total"] = max(best["_total"], int(m.group(3)))
+        return best
 
     def _write_state(self, data: Dict[str, Any]):
         path = self._state_path()
@@ -1772,6 +1795,7 @@ def main():
             "changed_briefs": changed,
             "history": [{k: v for k, v in h.items() if k != "snapshot"}
                         for h in state["history"]],
+            "trailer": f"{TRAILER_KEY}: gen={state['generation']} rounds={used} total={state['total_rounds']}",
         }
         if args.json:
             print(json.dumps(payload, indent=2, ensure_ascii=False))
@@ -1787,6 +1811,7 @@ def main():
                       f"tutup dengan `--record-round \"<verdict>\"`.")
             print(f"    brief berubah sejak ronde terakhir: "
                   f"{', '.join(changed) if changed else '(tidak ada)'}")
+            print(f"    trailer commit agregat: {payload['trailer']}")
             if left == 0:
                 print(f"    * {why}. Serahkan brief apa adanya dengan status self-review "
                       f"tidak tuntas; dilarang membuka ronde baru sekalipun `plan` "
