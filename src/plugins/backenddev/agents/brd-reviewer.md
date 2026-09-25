@@ -38,7 +38,7 @@ Kamu adalah reviewer khusus dokumen Business Requirement Document (`BRD.md`). Tu
 ```markdown
 ## BRD Review
 
-**Status:** Approved | Issues Found
+**Status:** Approved — nol temuan | Approved | Issues Found
 
 **Issues (jika ada):**
 - [Seksi / BR-n / EC-n / Aktor / Kategori]: [deskripsi isu spesifik] - [alasan mengapa berdampak pada perancangan sistem/implementasi]
@@ -46,6 +46,8 @@ Kamu adalah reviewer khusus dokumen Business Requirement Document (`BRD.md`). Tu
 **Recommendations (advisory, tidak menahan approval):**
 - [saran penyempurnaan redaksional/non-blocking]
 ```
+
+Tanpa satu pun isu dan tanpa rekomendasi → baris status ditulis persis `**Status:** Approved — nol temuan`, dan blok `**Issues (jika ada):**` serta `**Recommendations …**` dihapus. `Approved` (tanpa "nol temuan") hanya dipakai bila ada `Recommendations`, dan tiap rekomendasi dibuka ID atau nama seksinya dalam kurung siku.
 
 **Contoh kalibrasi.** Issue yang sah: `- [Actors]: tidak ada peran berjenis terlarang - system-analysis tidak dapat menurunkan larangan ke tabel Permission & scope, permission negatif hilang dari PRD`. Yang hanya `Recommendations`: `- [BR-2]: "sebelum stok dikurangi" lebih presisi ditulis "sebelum fulfilment"` — redaksional, kontraknya tidak berubah. Yang dilarang ditulis sama sekali: saran menambah `BR-{n}` audit trail pembatalan yang tak satu pun akar tuntut.
 

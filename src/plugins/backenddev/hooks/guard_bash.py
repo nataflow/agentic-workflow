@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Pagar mekanis `backenddev:code-implementor` (hook PreToolUse, matcher `Bash|Edit|Write`).
+"""Pagar mekanis `backenddev:code-implementor` dan `backenddev:code-explorer` (hook PreToolUse, matcher `Bash|Edit|Write`).
 
   guard_bash.py hook                   # input hook JSON dari stdin
   guard_bash.py lease --brief <path>   # ditulis architect sebelum dispatch implementor
   guard_bash.py lease --clear          # dihapus architect sesudah triase unit
 
-Hanya berlaku bila input hook membawa `agent_type == "backenddev:code-implementor"` — identitas
+Hanya berlaku bila input hook membawa `agent_type` salah satu dari kedua agent itu — identitas
 subagen plugin di input hook (docs hooks, "Common input fields"). Panggilan lain (main loop,
 agent lain, plugin lain) lolos tanpa keputusan (exit 0).
+
+`code-explorer` (tanpa Bash): Edit/Write hanya pada laporan laci `.explore/*.md` di dalam repo
+(`backenddev/docs/.explore/<slug>.md` atau `<taskdir>/.explore/<slug>.md`); selain itu ditolak.
 
 Untuk implementor: fail-closed — galat internal pun menolak (exit 2), karena exit selain 2 tidak
 memblokir (docs hooks: "Any other exit code doesn't block on its own").
@@ -34,6 +37,8 @@ except Exception as e:  # berkas plugin rusak: implementor tetap ditolak di hook
     IMPORT_ERROR = e
 
 AGENT = "backenddev:code-implementor"
+EXPLORER = "backenddev:code-explorer"
+EXPLORE_REPORT = re.compile(r"^backenddev/docs/(?:[^/]+/)?\.explore/[^/]+\.md$")
 META = re.compile(r"[;&|<>`\n\r]|\$\(|\$\{")          # rantai/pengalihan/substitusi → tolak
 READ_ONLY_GIT = {"status", "diff", "log", "show", "rev-parse", "ls-files"}
 READ_ONLY_BAD_FLAGS = {"--output", "--ext-diff"}      # satu-satunya jalan tulis/eksekusi di subperintah baca
@@ -105,7 +110,11 @@ def hook() -> int:
         data = json.load(sys.stdin)
     except ValueError:
         return 0                                   # agen tak dapat dikenali: bukan urusan pagar ini
-    if not isinstance(data, dict) or data.get("agent_type") != AGENT:
+    if not isinstance(data, dict):
+        return 0
+    if data.get("agent_type") == EXPLORER:
+        return explorer_hook(data)
+    if data.get("agent_type") != AGENT:
         return 0
     tool = data.get("tool_name")
     if tool not in ("Bash", "Edit", "Write"):
@@ -124,6 +133,25 @@ def hook() -> int:
             decide_file(ti["file_path"], root, allowed)
         return deny(reason) if reason else 0
     except Exception as e:                         # fail-closed khusus implementor
+        return deny(f"galat internal pagar: {e!r}")
+
+
+def explorer_hook(data: dict) -> int:
+    """`code-explorer` hanya menulis laporan `.explore/*.md`; fail-closed seperti implementor."""
+    if data.get("tool_name") not in ("Edit", "Write"):
+        return 0
+    try:
+        cwd = Path(data.get("cwd") or ".").resolve()
+        root = repo_root(str(cwd))
+        target = str(cwd / data["tool_input"]["file_path"])
+        try:
+            p = rel(root, target)
+        except ValueError:
+            return deny(f"`{data['tool_input']['file_path']}` di luar repo")
+        if EXPLORE_REPORT.match(p):
+            return 0
+        return deny(f"{EXPLORER} hanya boleh menulis laporan `.explore/*.md`; `{p}` ditolak")
+    except Exception as e:
         return deny(f"galat internal pagar: {e!r}")
 
 

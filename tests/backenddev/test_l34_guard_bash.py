@@ -168,3 +168,28 @@ def test_architect_uses_lease_and_verify_scope():
     impl = (PLUGINS / "backenddev/agents/code-implementor.md").read_text(encoding="utf-8")
     for word in ("--amend", "--no-verify", "git clean", "git stash", "guard_bash.py"):
         assert word in impl
+
+
+# --- B19: pagar Write `code-explorer` -----------------------------------------------------------
+EXPLORER = "backenddev:code-explorer"
+
+
+@pytest.mark.parametrize("path, code", [
+    (f"{TD}/.explore/order-lock.md", 0),
+    ("backenddev/docs/.explore/gate-order.md", 0),
+    ("src/order.go", 2),
+    (f"{TD}/TASK.md", 2),
+    (f"{TD}/.explore/sub/x.md", 2),
+    (f"{TD}/.explore/brief-spec.json", 2),
+    ("/etc/passwd", 2),
+])
+def test_b19_explorer_write_only_explore_reports(repo, path, code):
+    for tool in ("Write", "Edit"):
+        out = hook(repo, agent=EXPLORER, tool=tool, file_path=path)
+        assert out.returncode == code, (tool, path, out.stderr)
+
+
+def test_b19_explorer_read_tools_untouched(repo):
+    data = {"cwd": str(repo), "tool_name": "Read", "tool_input": {"file_path": "src/order.go"},
+            "agent_type": EXPLORER}
+    assert run_script(GUARD, "hook", stdin=json.dumps(data)).returncode == 0

@@ -13,10 +13,10 @@ description: Gunakan ketika ada stacktrace, exception, HTTP 5xx, atau test merah
 
 ## Precondition [REQUIRED]
 
-1. Jalankan skrip verifikasi prasyarat: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/debug/scripts/check_preconditions.py [--symptom <symptom>] [--taskdir <taskdir>] [--scope-hint <scope_hint>]`.
+1. Jalankan skrip verifikasi prasyarat: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/debug/scripts/check_preconditions.py --taskdir <taskdir> [--scope-hint <scope_hint>]`. **Jangan pernah menempelkan `symptom` ke baris perintah shell**: stacktrace memuat `$`, backtick, dan kurung yang diekspansi atau dieksekusi shell. Bila gejala perlu disimpan, tulis ke `{taskdir}/.explore/symptom.txt` lewat tool `Write`, bukan `echo`/heredoc.
 2. Evaluasi output skrip secara deterministik:
-   - `PASS` (6/6 checks): Lanjutkan ke evaluasi parameter dan workflow investigasi RCA.
-   - `FAIL`: Hentikan eksekusi segera dan jalankan tindakan remediasi pada butir yang gagal (profil/commands hilang → arahkan ke `backenddev:profile`; repo non-git → jalankan pada repo git aktif; adapter/template hilang → pulihkan berkas plugin; taskdir tidak dapat diakses → periksa izin direktori).
+   - `PASS` (7/7 checks): Lanjutkan ke evaluasi parameter dan workflow investigasi RCA.
+   - `FAIL`: Hentikan eksekusi segera dan jalankan tindakan remediasi pada butir yang gagal (profil/commands hilang → arahkan ke `backenddev:profile`; repo non-git → jalankan pada repo git aktif; adapter/seksi `## Failure signatures`/template hilang → pulihkan berkas plugin; taskdir tidak dapat diakses → periksa izin direktori; `scope_hint` tidak ada di repo → perbaiki atau kosongkan).
 
 ## Parameter [REQUIRED]
 
@@ -28,7 +28,7 @@ description: Gunakan ketika ada stacktrace, exception, HTTP 5xx, atau test merah
 
 ### Fase 0 — Verifikasi Prasyarat & Penerimaan Taskdir
 
-1. Jalankan skrip `check_preconditions.py` dengan parameter `symptom`, `taskdir`, dan `scope_hint`. Hentikan eksekusi segera jika skrip menghasilkan `FAIL`.
+1. Jalankan skrip `check_preconditions.py` dengan parameter `taskdir` dan `scope_hint`. Hentikan eksekusi segera jika skrip menghasilkan `FAIL`. Kelayakan `symptom` (tidak kosong, memuat gejala terukur) dinilai di butir ini secara langsung, bukan oleh skrip.
 2. Gunakan ulang direktori yang ditunjuk `taskdir`. Hentikan eksekusi jika `taskdir` kosong dan minta alokasinya dari gerbang `backenddev:tech-lead` Fase 3; hentikan juga jika `taskdir` diisi tetapi tidak ada di disk. Dilarang mengarang atau mengalokasikan direktori pengganti — akar rantai `TASK.md` lahir di gerbang, bukan di sini.
 3. Evaluasi berkas `{taskdir}/RCA.md` jika sudah ada di disk:
    - Status `ROOT_CAUSE_CONFIRMED`: Laporkan artefak eksisting dan hentikan eksekusi.
@@ -37,6 +37,7 @@ description: Gunakan ketika ada stacktrace, exception, HTTP 5xx, atau test merah
 
 ### Fase 1 — Normalisasi Gejala & Konfirmasi Reproduksi
 
+0. Baca `stack` dari `.claude/profile/backenddev/index.json`, lalu seksi `## Failure signatures` adapter `../profile/stacks/<stack>.md`: format stacktrace, frame paling informatif, dan pola akar masalah lazim di stack ini. Pakai ketiganya saat memecah gejala (butir 1) dan sebagai kandidat hipotesis Fase 3; pola yang dipakai disebut sumbernya.
 1. Pecah `symptom` menjadi empat fakta terpisah: exception class atau kode status, frame terdalam milik `root_namespace`, waktu/kondisi kemunculan, dan cakupan dampak (satu user, satu endpoint, atau seluruh instans).
 2. Tandai gejala sebagai kegagalan lapisan framework atau dependensi jika stacktrace tidak memuat satu pun frame di bawah `root_namespace`, dan jadikan itu hipotesis H1 alih-alih menelusuri kode aplikasi lebih dulu.
 3. Susun langkah reproduksi kandidat: perintah test, request HTTP dengan payload, atau kondisi data yang memicu. Sajikan ke user dan minta konfirmasi eksplisit bahwa langkah tersebut memunculkan gejala.

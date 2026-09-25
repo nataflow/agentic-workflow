@@ -10,6 +10,13 @@ from conftest import BE_SKILLS, TD, be_checks, be_run, brief, commit, git, write
 
 bs = load_module(BE_SKILLS / "_common" / "brief_status.py", "be_brief_status")
 
+def _spec_path(repo):
+    """Spec batch di laci `.explore/` taskdir — satu-satunya lokasi yang diterima scaffold (B11)."""
+    path = repo / TD / ".explore" / "brief-spec.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 ARCH = "architect/scripts/check_preconditions.py"
 REPORT = "report/scripts/check_preconditions.py"
 SCAFFOLD = "plan/scripts/scaffold_brief.py"
@@ -63,7 +70,7 @@ def _through_review(repo):
         LEDGER_DONE, "- [~] BRIEF — backenddev:plan → brief-*.md @ re-entry 1 (was 1111111)\n"))
     commit(repo, "docs(order-fix): re-entry hop BRIEF ke-1", f"{TD}/TASK.md")
     # 4 — pengganti 02 saja ditolak: 03 READY akan berjalan lebih dulu (D2-A)
-    spec = repo.parent / "spec.json"
+    spec = _spec_path(repo)
     spec.write_text(json.dumps({"briefs": [_row("04", "endpoint-fix", supersedes=["02"])]}))
     out = be_run(repo, SCAFFOLD, "--taskdir", TD, "--write-matrix", "--append", "--spec", str(spec))
     assert out.returncode == 1 and "brief READY hilir brief-03" in out.stdout

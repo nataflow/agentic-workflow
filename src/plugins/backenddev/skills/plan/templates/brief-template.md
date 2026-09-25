@@ -190,7 +190,7 @@ ______________________________________________________________________
     | `MAJOR` | penambahan aditif yang mengubah kontrak keluar tanpa membatalkan yang lama: endpoint baru, field opsional baru, nilai enum baru, tabel atau kolom nullable baru |
     | `MINOR` | perubahan internal tanpa kontrak keluar: refactor, perbaikan logika, penyesuaian test, konfigurasi, index penunjang |
 
-    - **Plafon akar**: nilai brief dilarang melampaui `risk:` frontmatter `{taskdir}/TASK.md`. Brief yang predikatnya menuntut nilai lebih tinggi adalah **pemicu eskalasi** — hentikan penulisan batch dan kembalikan klasifikasinya ke gerbang, sama seperti 5 pemicu `../references/entry-rules.md` bagian 1A. Dilarang melunakkan predikat agar muat di bawah plafon, dan dilarang menaikkan risk sendiri.
+    - **Plafon akar**: nilai brief dilarang melampaui `risk:` frontmatter `{taskdir}/TASK.md`. Brief yang predikatnya menuntut nilai lebih tinggi adalah **pemicu eskalasi** — hentikan penulisan batch dan kembalikan ke pemanggil — `backenddev:analyst` sebagai pemicu eskalasi chain nomor 2 pada lane planning; `backenddev:tech-lead` pada jalur `RCA` (`../references/entry-rules.md` bagian 1C). Dilarang melunakkan predikat agar muat di bawah plafon, dan dilarang menaikkan risk sendiri.
     - `TASK.md` absen → plafonnya diambil dari parameter `risk` yang diteruskan pemanggil. `risk:` `TASK.md` bernilai `-` (lane non-mutasi kode) → plafon brief adalah `MINOR`.
     - Nilai `-` bukan nilai sah bagi brief: brief selalu memikul salah satu dari tiga enum. Satu batch boleh memuat brief bernilai campur — itu justru bentuk normalnya, karena tiap brief menyentuh permukaan yang berbeda.
 

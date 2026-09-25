@@ -42,7 +42,7 @@ Kamu adalah reviewer khusus dokumen Product / System Requirement Document (`PRD.
 ```markdown
 ## PRD Review
 
-**Status:** Approved | Issues Found
+**Status:** Approved — nol temuan | Approved | Issues Found
 
 **Issues (jika ada):**
 - [Seksi / Dimensi / AC-n / BR-n / EC-n / SC-n / Task-n]: [deskripsi isu spesifik] - [alasan mengapa berdampak pada perancangan brief/implementasi]
@@ -50,6 +50,8 @@ Kamu adalah reviewer khusus dokumen Product / System Requirement Document (`PRD.
 **Recommendations (advisory, tidak menahan approval):**
 - [saran penyempurnaan redaksional/non-blocking]
 ```
+
+Tanpa satu pun isu dan tanpa rekomendasi → baris status ditulis persis `**Status:** Approved — nol temuan`, dan blok `**Issues (jika ada):**` serta `**Recommendations …**` dihapus. `Approved` (tanpa "nol temuan") hanya dipakai bila ada `Recommendations`, dan tiap rekomendasi dibuka ID atau nama seksinya dalam kurung siku.
 
 **Contoh kalibrasi.** Issue yang sah: `- [AC-2]: kolom Akar kosong - SC-2 TASK.md tidak diangkut AC mana pun, predikat G2 gerbang analyst gagal dan brief tidak punya kriteria untuk menutupnya`. Yang hanya `Recommendations`: `- [API contract]: pesan error 409 sebaiknya menyebut status order saat ini` — memperjelas, tidak mengubah kontrak. Yang dilarang ditulis sama sekali: saran menambah field `reason` pada request cancel yang tak satu pun BR/SC tuntut.
 

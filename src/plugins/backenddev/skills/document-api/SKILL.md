@@ -13,10 +13,10 @@ description: Gunakan ketika user eksplisit meminta dokumentasi API untuk endpoin
 
 ## Precondition [REQUIRED]
 
-1. Jalankan skrip verifikasi prasyarat: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/document-api/scripts/check_preconditions.py [--domain <domain>] [--base-branch <base_branch>] [--stack <stack>]`.
+1. Jalankan skrip verifikasi prasyarat: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/document-api/scripts/check_preconditions.py --domain "<domain>"`. Tulis `domain` tanpa backtick maupun `$` di dalam kutip ganda — keduanya diekspansi shell.
 2. Evaluasi output skrip secara deterministik:
-   - `PASS` (5/5 checks): Lanjutkan ke resolusi trigger dan ekstraksi endpoint.
-   - `FAIL`: Hentikan eksekusi segera dan jalankan tindakan remediasi pada butir yang gagal (source root tidak dapat dibaca → periksa izin direktori; profil/stack adapter tidak ada → jalankan `backenddev:profile`; direktori docs/api/ tidak dapat ditulis → periksa hak akses).
+   - `PASS` (6/6 checks): Lanjutkan ke resolusi trigger dan ekstraksi endpoint.
+   - `FAIL`: Hentikan eksekusi segera dan jalankan tindakan remediasi pada butir yang gagal (source root tidak dapat dibaca → periksa izin direktori; profil/stack adapter atau seksi `## API surface`-nya tidak ada → jalankan `backenddev:profile`; `domain` kosong → minta cakupan ke user; direktori docs/api/ tidak dapat ditulis → periksa hak akses).
 
 ## Parameter [REQUIRED]
 
@@ -27,7 +27,8 @@ description: Gunakan ketika user eksplisit meminta dokumentasi API untuk endpoin
 
 ### Fase 0 — Resolusi Trigger & Cakupan
 
-1. Jalankan skrip `check_preconditions.py` dengan parameter `domain` dan `base_branch`. Hentikan eksekusi segera jika skrip menghasilkan `FAIL`.
+1. Jalankan skrip `check_preconditions.py` dengan parameter `domain`. Hentikan eksekusi segera jika skrip menghasilkan `FAIL`. Fallback `base_branch` (profil → `main` → `master` → cakupan penuh + ASUMSI) dijalankan butir 3, bukan oleh skrip.
+1a. Baca `stack` dari `.claude/profile/backenddev/index.json`, lalu seksi `## API surface` adapter `../profile/stacks/<stack>.md`. Seluruh rujukan "`## API surface` adapter" di Fase 1 dan Fase 3 menunjuk seksi ini.
 2. Tetapkan mode cakupan yang diminta user: `ON_REQUEST` (user menyebut cakupan langsung) atau `POST_CHAIN` (user meminta cakupan dibatasi ke rantai yang baru selesai). Skill ini tidak pernah berangkat otomatis; kedua mode berawal dari permintaan eksplisit user.
 3. Jalankan `git diff --name-only $(git merge-base HEAD <base_branch>)..HEAD` pada mode `POST_CHAIN` dan saring berkas endpoint serta tipe muatannya yang tersentuh. Jadikan daftar hasil saring sebagai himpunan kandidat awal.
 4. Pecah `domain` menjadi kata kunci pencarian pada mode `ON_REQUEST` (kata benda domain, sinonim Inggris-Indonesia, bentuk tunggal dan jamak). Contoh `management product` menghasilkan `product`, `products`, `produk`, `catalog`, `item`.

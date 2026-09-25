@@ -2,7 +2,7 @@
 """Debug Precondition Validator.
 
 Automates verification of repository preconditions before debug RCA execution.
-Runs checks 1 through 6 in a single pass and produces a compact, actionable report.
+Runs checks 1 through 7 in a single pass and produces a compact, actionable report.
 Zero external dependencies (Python Standard Library only). Satu impor intra-plugin:
 `skills/_common/precondition_lib.py` (parser frontmatter, taskdir, chain, profil,
 berkas plugin, keluaran), di-bootstrap relatif terhadap berkas ini.
@@ -27,8 +27,8 @@ from precondition_lib import (  # noqa: E402
     format_text,
     legacy_suffix,
     load_profile_index,
-    plugin_file,
     probe_writable as _probe_writable,
+    stack_adapter_section,
     to_json,
 )
 
@@ -36,13 +36,11 @@ from precondition_lib import (  # noqa: E402
 class PreconditionChecker:
     def __init__(
         self,
-        symptom: Optional[str] = None,
         taskdir: Optional[str] = None,
         scope_hint: Optional[str] = None,
         target_root: Optional[Path] = None,
     ):
         self.root = (target_root or find_repo_root()).resolve()
-        self.symptom_arg = symptom
         self.taskdir_arg = taskdir
         self.td = check_taskdir(self.root, taskdir)
         self.scope_hint_arg = scope_hint
@@ -50,13 +48,14 @@ class PreconditionChecker:
 
 
     def run_all(self) -> bool:
-        """Run checks 1 through 6."""
+        """Run checks 1 through 7."""
         self._check_1_profile()
         self._check_2_git_worktree()
         self._check_3_stack_adapter()
         self._check_4_templates_and_dispatcher()
         self._check_5_taskdir_or_docs_root()
         self._check_6_source_read_access()
+        self._check_7_scope_hint()
         return all(r["status"] == "PASS" for r in self.results)
 
     def _check_1_profile(self):
@@ -135,14 +134,15 @@ class PreconditionChecker:
         data = load_profile_index(self.root, required=("stack",)).data
         stack_id = data["stack"] if data else "unknown"
 
-        found = plugin_file("skills", "profile", "stacks", f"{stack_id}.md")
+        found, error = stack_adapter_section(stack_id, "## Failure signatures")
         if not found:
             self.results.append({
                 "id": check_id,
                 "name": name,
                 "status": "FAIL",
-                "summary": f"Berkas adapter stacks/{stack_id}.md tidak ditemukan",
-                "action": f"Pastikan plugin backenddev memuat adapter untuk stack '{stack_id}'.",
+                "summary": error,
+                "action": f"Pulihkan adapter stack '{stack_id}' sesuai `stacks/_CONTRACT.md` bagian 7 "
+                          "(seksi `## Failure signatures` dibaca Fase 1).",
             })
             return
 
@@ -150,7 +150,7 @@ class PreconditionChecker:
             "id": check_id,
             "name": name,
             "status": "PASS",
-            "summary": f"Adapter stack '{stack_id}' memuat seksi failure signatures",
+            "summary": f"Adapter stack '{stack_id}' memuat seksi `## Failure signatures`",
             "action": "",
         })
 
@@ -286,6 +286,28 @@ class PreconditionChecker:
             "action": "",
         })
 
+    def _check_7_scope_hint(self):
+        """`scope_hint` kosong/`-`, atau path yang ada di dalam root repo."""
+        check_id = 7
+        name = "Scope Hint"
+        hint = (self.scope_hint_arg or "").strip()
+        if hint in ("", "-"):
+            self.results.append({"id": check_id, "name": name, "status": "PASS",
+                                 "summary": "scope_hint tidak diisi; permukaan awal dari frame terdalam",
+                                 "action": ""})
+            return
+        target = (self.root / hint).resolve()
+        if not target.is_relative_to(self.root) or not target.exists():
+            self.results.append({
+                "id": check_id, "name": name, "status": "FAIL",
+                "summary": f"scope_hint '{hint}' tidak ada di dalam repo",
+                "action": "Perbaiki path scope_hint (relatif root repo) atau kosongkan (`-`).",
+            })
+            return
+        self.results.append({"id": check_id, "name": name, "status": "PASS",
+                             "summary": f"scope_hint terverifikasi: {target.relative_to(self.root).as_posix() or '.'}",
+                             "action": ""})
+
     def format_text(self) -> str:
         return format_text("debug", self.results)
 
@@ -295,7 +317,6 @@ class PreconditionChecker:
 
 def main():
     parser = argparse.ArgumentParser(description="Debug RCA Preconditions Checker")
-    parser.add_argument("--symptom", type=str, default=None, help="Raw symptom or error message")
     parser.add_argument("--taskdir", type=str, default=None, help="Task directory path")
     parser.add_argument("--scope-hint", type=str, default=None, help="Suspected scope path")
     parser.add_argument("--root", type=str, default=None, help="Target repo root directory")
@@ -304,7 +325,6 @@ def main():
 
     target_root = Path(args.root) if args.root else None
     checker = PreconditionChecker(
-        symptom=args.symptom,
         taskdir=args.taskdir,
         scope_hint=args.scope_hint,
         target_root=target_root,

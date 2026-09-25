@@ -14,15 +14,14 @@ description: Gunakan ketika repo backend belum punya .claude/profile/backenddev/
 
 ## Precondition [REQUIRED]
 
-1. Jalankan skrip verifikasi prasyarat: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/profile/scripts/check_preconditions.py [--mode <mode>] [--stack <stack>] [--profile-dir <profile_dir>]`.
-2. `PASS` (6/6 checks): lanjut ke Workflow; baris `Terselesaikan: mode <GENERATE | REFRESH | MIGRATE>` adalah mode Fase 1. `FAIL`: hentikan dan remediasi butir yang gagal — nol penanda framework server backend → repo bukan target backenddev, jangan buat profil; `--profile-dir` selain `.claude/profile/backenddev` → jalankan ulang tanpa parameter itu; `.claude/profile/backenddev/index.json` milik plugin lain → laporkan ke user, jangan ditimpa; adapter stack hilang → pulihkan berkas plugin; direktori profil tidak dapat ditulis → periksa izin; bukan repo git → inisialisasi git.
+1. Jalankan skrip verifikasi prasyarat: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/profile/scripts/check_preconditions.py [--mode <mode>] [--stack <stack>]`.
+2. `PASS` (6/6 checks): lanjut ke Workflow; baris `Terselesaikan: mode <GENERATE | REFRESH | MIGRATE>` adalah mode Fase 1. `FAIL`: hentikan dan remediasi butir yang gagal — nol penanda framework server backend → repo bukan target backenddev, jangan buat profil; `mode` atau `stack` di luar nilai sah → jalankan ulang dengan nilai sah atau tanpa parameter itu; `.claude/profile/backenddev/index.json` milik plugin lain → laporkan ke user, jangan ditimpa; adapter stack hilang → pulihkan berkas plugin; direktori profil tidak dapat ditulis → periksa izin. Repo non-git lolos check 4 dengan catatan; Fase 5 butir 1 menulis field konvensi git `tidak terdeteksi`.
 
 ## Parameter [REQUIRED]
 
 - `mode` — string — default `"auto"` — `"auto"` | `"generate"` | `"refresh"` | `"migrate"`. Keadaan disk yang dilaporkan skrip prasyarat selalu menang.
 - `stack` — string — default `"auto"` — paksa `<stack-id>` bila deteksi Fase 0 ambigu; nilai sah = daftar di `stacks/_CONTRACT.md`.
 - `force` — boolean — default `false` — bila `true`, Fase 1 melewati konfirmasi REFRESH dan langsung menulis ulang. `force` tidak pernah berlaku atas profil milik plugin lain atau lokasi lama `.claude/profile/`; keduanya ditolak prasyarat atau dialihkan ke MIGRATE.
-- `profile_dir` — string — default `".claude/profile/backenddev"` — target tulis Fase 6; nilai lain ditolak.
 - `interview` — boolean — default `true` — bila `false`, Fase 3 dilewati; `code-conventions.md` dan `anti-patterns.md` diisi hasil scan saja, ditandai belum tervalidasi user.
 - `reported_anti_patterns` — list — default `[]` — Preseden menyesatkan yang ditemukan **eksekusi**, diteruskan gerbang dari slot `Umpan balik profil` laporan `backenddev:architect`: tiap entri berisi `file:baris` beserta polanya. Sapuan statis tidak menemukan pola ini — ia baru terbukti saat brief menyalinnya sebagai preseden lalu `code-implementor` terhenti. Fase 3 menyajikannya ke user untuk konfirmasi; yang disetujui masuk `anti-patterns.md` sebagai baris ber-`deteksi` dan sejak itu ditegakkan Check P `plan`. Yang ditolak dibuang, tidak disimpan sebagai catatan.
 
@@ -32,7 +31,7 @@ Pemindaian profil codebase dieksekusi sekuensial melalui 8 fase:
 
 ### Fase 0 — Deteksi Stack & Resolusi Adapter
 
-1. Jalankan `check_preconditions.py` dengan parameter `mode`, `stack`, dan `profile_dir`. Hentikan bila hasilnya `FAIL`.
+1. Jalankan `check_preconditions.py` dengan parameter `mode` dan `stack`. Target tulis Fase 6 selalu `.claude/profile/backenddev/`. Hentikan bila hasilnya `FAIL`.
 2. Check 1 skrip prasyarat memanggil `hooks/detect.py` (fungsi yang sama dengan hook SessionStart) atas root, workspace terdeklarasi (`workspaces`, `pnpm-workspace.yaml`, `go.work`, Cargo `members`), `apps/*`, `packages/*`, `services/*`, dan anak langsung root. Penanda framework server yang dicocokkan:
    - `pom.xml` (`groupId` `org.springframework.boot`) atau `build.gradle(.kts)`/`gradle/libs.versions.toml` memuat `org.springframework.boot` di luar komentar → `java-spring`
    - `go.mod` `require` (tanpa `// indirect`) memuat `github.com/gin-gonic/gin`, `github.com/gofiber/fiber`, `github.com/labstack/echo`, `github.com/go-chi/chi`, `github.com/gorilla/mux`, atau `google.golang.org/grpc` (termasuk sufiks `/vN`) → `go`

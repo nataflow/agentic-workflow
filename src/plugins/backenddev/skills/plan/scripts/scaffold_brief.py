@@ -626,7 +626,17 @@ def main():
         if not args.spec:
             print("SCAFFOLD: [FAIL] `--write-matrix` menuntut `--spec <json|->`")
             sys.exit(1)
-        raw = sys.stdin.read() if args.spec == "-" else (_read(Path(args.spec)) or "")
+        if args.spec != "-":
+            # Spec hanya boleh tinggal di laci `.explore/` taskdir (di-gitignore): berkas liar di
+            # taskdir membuat working tree kotor dan prasyarat `architect` check 4 FAIL.
+            spec_path = Path(args.spec)
+            spec_path = (spec_path if spec_path.is_absolute() else tool.root / spec_path).resolve()
+            laci = (tool.taskdir / LACI).resolve()
+            if laci not in spec_path.parents:
+                print(f"SCAFFOLD: [FAIL] spec wajib di {tool.taskdir / LACI}/ (mis. brief-spec.json) "
+                      f"atau stdin (`-`): {args.spec}")
+                sys.exit(1)
+        raw = sys.stdin.read() if args.spec == "-" else (_read(spec_path) or "")
         try:
             spec = json.loads(raw)
         except Exception as exc:

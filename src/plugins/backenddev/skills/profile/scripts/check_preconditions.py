@@ -38,13 +38,11 @@ class PreconditionChecker:
         self,
         mode: Optional[str] = None,
         stack: Optional[str] = None,
-        profile_dir: Optional[str] = None,
         target_root: Optional[Path] = None,
     ):
         self.root = (target_root or find_repo_root()).resolve()
         self.mode_arg = mode
         self.stack_arg = stack
-        self.profile_dir_arg = profile_dir or PROFILE_DIR_REL
         self.results: List[Dict[str, Any]] = []
         self.mode: str = ""
 
@@ -104,29 +102,32 @@ class PreconditionChecker:
             })
             return
 
+        # `--stack` ∈ {auto} ∪ stack-id yang adapternya terpasang (`stacks/<id>.md`).
+        known = sorted(p.stem for p in (skill_dir / "stacks").glob("*.md") if not p.name.startswith("_"))
+        asked = (self.stack_arg or "auto").strip()
+        if asked != "auto" and asked not in known:
+            self.results.append({
+                "id": check_id,
+                "name": name,
+                "status": "FAIL",
+                "summary": f"Parameter stack '{asked}' tidak dikenal; nilai sah: auto, {', '.join(known)}",
+                "action": "Jalankan ulang dengan `--stack` bernilai salah satu stack-id di atas, atau tanpa `--stack`.",
+            })
+            return
+
         self.results.append({
             "id": check_id,
             "name": name,
             "status": "PASS",
-            "summary": "Koleksi adapter stack dan kontrak stacks/_CONTRACT.md tersedia",
+            "summary": "Koleksi adapter stack dan kontrak stacks/_CONTRACT.md tersedia"
+                       + (f"; stack dipaksa `{asked}`" if asked != "auto" else ""),
             "action": "",
         })
 
     def _check_3_profile_dir_writable(self):
         check_id = 3
         name = "Profile Directory Write Access"
-        if self.profile_dir_arg.strip("/") != PROFILE_DIR_REL:
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "FAIL",
-                "summary": f"`--profile-dir {self.profile_dir_arg}` ditolak; profil {PLUGIN} hanya sah di `{PROFILE_DIR_REL}/`",
-                "action": "Jalankan ulang tanpa `--profile-dir`.",
-            })
-            return
-        target_dir = Path(self.profile_dir_arg)
-        if not target_dir.is_absolute():
-            target_dir = self.root / target_dir
+        target_dir = self.root / PROFILE_DIR_REL
 
         # Direktori profil dibuat saat profil ditulis, bukan oleh skrip check.
         ok, detail = _probe_writable(target_dir)
@@ -144,45 +145,32 @@ class PreconditionChecker:
             "id": check_id,
             "name": name,
             "status": "PASS",
-            "summary": f"Direktori {self.profile_dir_arg} siap ditulis",
+            "summary": f"Direktori {PROFILE_DIR_REL} siap ditulis",
             "action": "",
         })
 
     def _check_4_git_worktree(self):
+        """Repo non-git lolos dengan catatan: Fase 5 menulis field konvensi git `tidak terdeteksi`.
+
+        Profil boleh ada di repo non-git; rantai eksekusi tetap ditolak gerbang (`base_branch`).
+        """
         check_id = 4
         name = "Git Inspection Access"
         try:
-            inside = subprocess.check_output(
-                ["git", "rev-parse", "--is-inside-work-tree"],
-                cwd=self.root,
-                stderr=subprocess.DEVNULL,
-                universal_newlines=True,
-            ).strip()
-            if inside != "true":
-                self.results.append({
-                    "id": check_id,
-                    "name": name,
-                    "status": "FAIL",
-                    "summary": "Bukan repositori git yang valid",
-                    "action": "Inisialisasi repositori git agar riwayat commit dan branch convention dapat dipindai.",
-                })
-                return
-
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "PASS",
-                "summary": "Repositori git valid untuk pemindaian commit & branch conventions",
-                "action": "",
-            })
-        except Exception as e:
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "FAIL",
-                "summary": f"Gagal membaca status git: {e}",
-                "action": "Pastikan git CLI tersedia.",
-            })
+            r = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], cwd=self.root,
+                               capture_output=True, text=True)
+            inside = r.returncode == 0 and r.stdout.strip() == "true"
+        except FileNotFoundError:
+            inside = False
+        self.results.append({
+            "id": check_id,
+            "name": name,
+            "status": "PASS",
+            "summary": "Repositori git valid untuk pemindaian commit & branch conventions" if inside else
+                       "Bukan repositori git — Fase 5 menulis commit_convention/base_branch/branch_convention "
+                       "`tidak terdeteksi`",
+            "action": "",
+        })
 
     def _check_5_references(self):
         check_id = 5
@@ -258,7 +246,16 @@ class PreconditionChecker:
                         f"profil {PLUGIN} ditulis ke `{PROFILE_DIR_REL}/`")
             else:
                 actual, note = "GENERATE", "index.json belum ada"
-        asked = (self.mode_arg or "auto").lower()
+        asked = (self.mode_arg or "auto").strip().lower()
+        if asked not in ("auto", "generate", "refresh", "migrate"):
+            self.results.append({
+                "id": check_id,
+                "name": name,
+                "status": "FAIL",
+                "summary": f"Parameter mode '{self.mode_arg}' tidak dikenal (auto | generate | refresh | migrate)",
+                "action": "Jalankan ulang dengan `--mode` sah, atau tanpa `--mode` (auto).",
+            })
+            return
         self.mode = actual
         if asked in ("generate", "refresh", "migrate") and asked.upper() != actual:
             note += f"; parameter `mode` = `{asked.upper()}` diabaikan, keadaan disk menang"
@@ -275,14 +272,13 @@ class PreconditionChecker:
                            footer=[f"Terselesaikan: mode `{self.mode or 'tidak terselesaikan'}`"])
 
     def to_json(self) -> str:
-        return to_json(self.root, self.results, profile_dir=self.profile_dir_arg, mode=self.mode)
+        return to_json(self.root, self.results, profile_dir=PROFILE_DIR_REL, mode=self.mode)
 
 
 def main():
     parser = argparse.ArgumentParser(description="Profile Preconditions Checker")
     parser.add_argument("--mode", type=str, default=None, help="Execution mode (auto, generate, refresh, migrate)")
     parser.add_argument("--stack", type=str, default=None, help="Stack identifier override")
-    parser.add_argument("--profile-dir", type=str, default=None, help=f"Target profile directory; hanya {PROFILE_DIR_REL} yang diterima")
     parser.add_argument("--root", type=str, default=None, help="Target repo root directory")
     parser.add_argument("--json", action="store_true", help="Output JSON format")
     args = parser.parse_args()
@@ -291,7 +287,6 @@ def main():
     checker = PreconditionChecker(
         mode=args.mode,
         stack=args.stack,
-        profile_dir=args.profile_dir,
         target_root=target_root,
     )
     passed = checker.run_all()

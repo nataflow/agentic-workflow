@@ -3,6 +3,13 @@ import json
 
 from conftest import TD, be_checks, be_run, brief, commit, write_files
 
+def _spec_path(repo):
+    """Spec batch di laci `.explore/` taskdir — satu-satunya lokasi yang diterima scaffold (B11)."""
+    path = repo / TD / ".explore" / "brief-spec.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 ARCH = "architect/scripts/check_preconditions.py"
 SCAFFOLD = "plan/scripts/scaffold_brief.py"
 HALT = ("---\nbrief: brief-02-endpoint.md\nverdict: COMPILE\nsha: abc1234\nbaseline: 1111111 · hijau\n---\n"
@@ -24,7 +31,7 @@ def _halted(repo):
 
 
 def _append(repo, *rows):
-    spec = repo.parent / "spec.json"
+    spec = _spec_path(repo)
     spec.write_text(json.dumps({"briefs": list(rows)}), encoding="utf-8")
     return be_run(repo, SCAFFOLD, "--taskdir", TD, "--write-matrix", "--append", "--spec", str(spec))
 

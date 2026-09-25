@@ -508,6 +508,21 @@ def find_agent(name: str) -> Optional[Path]:
     return plugin_file("agents", f"{name}.md")
 
 
+def stack_adapter_section(stack_id: str, heading: str, base: Optional[Path] = None) -> Tuple[Optional[Path], str]:
+    """Adapter `skills/profile/stacks/<stack_id>.md` yang memuat seksi `heading` (mis. `## Failure signatures`).
+
+    Kembalikan (path, "") bila berkas ada dan heading-nya hadir persis (di luar blok kode),
+    selain itu (None, alasan). `base` hanya untuk test (menggantikan `PLUGIN_ROOT`).
+    """
+    rel = f"stacks/{stack_id}.md"
+    path = (base or PLUGIN_ROOT) / "skills" / "profile" / "stacks" / f"{stack_id}.md"
+    if not stack_id or not path.is_file():
+        return None, f"Berkas adapter {rel} tidak ditemukan"
+    if not has_heading(read_text(path), heading):
+        return None, f"Adapter {rel} tanpa seksi `{heading}`"
+    return path, ""
+
+
 # ============================================================ keluaran
 
 def format_text(skill: str, results: List[Dict[str, Any]], width: int = 32,

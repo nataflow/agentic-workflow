@@ -107,3 +107,21 @@ def test_php_build_keeps_dev(tmp_path, adapter):
     subprocess.run(_php_build_cmd(adapter) + " -q", shell=True, cwd=app, env=env, check=True)
     out = subprocess.run(["vendor/bin/phpunit"], cwd=app, env=env, capture_output=True, text=True)
     assert out.returncode == 0 and "fake phpunit OK" in out.stdout
+
+
+def _contract_keys() -> list:
+    """Kunci yang dideklarasikan `_CONTRACT.md` bagian 2 (kalimat pembuka `Sembilan baris perintah: …`)."""
+    sec = (STACKS / "_CONTRACT.md").read_text(encoding="utf-8").split("### 2. `## Commands`", 1)[1]
+    head = sec.split("baris perintah:", 1)[1].split(". Tulis", 1)[0]
+    return re.findall(r"`([a-z-]+)`", head)
+
+
+def test_b17_contract_lists_nine_keys():
+    assert _contract_keys() == ["build", "test", "test-single", "lint", "typecheck", "typecheck-scoped",
+                                "typecheck-per-brief", "migration-status", "migration-apply"]
+
+
+@pytest.mark.parametrize("adapter", ADAPTERS, ids=lambda p: p.stem)
+def test_b17_adapter_commands_match_contract(adapter):
+    keys = [k for k in rows(adapter.read_text(encoding="utf-8")) if k != "Perintah"]
+    assert sorted(keys) == sorted(_contract_keys()), f"{adapter.name}: {keys}"

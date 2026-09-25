@@ -68,7 +68,8 @@ tabel versi atau berkas migrasi). `migration-apply` dicatat untuk manusia dan **
 dieksekusi** skill atau agent mana pun. `profile` mengeksekusi perintah lain — kecuali
 `typecheck-scoped` dan `typecheck-per-brief` yang disalin apa adanya — minimal sekali sebelum
 menuliskannya ke profil; perintah yang menyentuh DB, jaringan, atau docker (`migration-status`, test
-integrasi) hanya sesudah izin user. `architect` memakainya di gerbang verifikasi penutup taskdir.
+integrasi) hanya sesudah izin user. `architect` memakai `build`/`test` di gerbang verifikasi penutup
+taskdir, serta `typecheck-per-brief`/`typecheck-scoped`/`typecheck` di gerbang kompilasi per-brief.
 
 ### 3. `## Layer taxonomy` — konsumen: `agents/code-implementor.md` (lewat slot `{adapter_path}`), `backenddev:plan`, `backenddev:audit`
 
@@ -124,7 +125,7 @@ Adapter baru boleh dipakai hanya bila seluruhnya benar:
 
 1. Tujuh seksi hadir, judul persis, berurutan, tanpa seksi tambahan.
 2. `## Audit checklist` memenuhi ambang ≥12 butir / ≥4 dimensi.
-3. Seluruh perintah di `## Commands` kecuali `migration-apply` sudah dieksekusi minimal sekali di repo nyata stack itu; `migration-apply` hanya diuji penulis adapter terhadap DB sekali pakai.
+3. Seluruh perintah di `## Commands` kecuali `migration-apply`, `typecheck-scoped`, dan `typecheck-per-brief` (keduanya menjawab cara pemakaian, bukan perintah jalan) sudah dieksekusi minimal sekali di repo nyata stack itu; `migration-apply` hanya diuji penulis adapter terhadap DB sekali pakai.
 4. Tidak ada butir yang identik dengan butir di adapter lain.
 5. `<stack-id>` terdaftar di `## Detection` milik `backenddev:profile`.
 6. Jika adapter mendeklarasikan penanda `hexagonal`: `## Layer taxonomy` memuat sub-bagian per

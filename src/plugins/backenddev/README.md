@@ -62,7 +62,7 @@ pun. Untuk memulai, melanjutkan, atau memulihkan rantai, panggil `/backenddev:te
 
 | Agent | Tools | Peran |
 |---|---|---|
-| `code-explorer` | Read, Grep, Glob, Write | penelusur bukti `file:line`; menulis hanya ke laci `.explore/` |
+| `code-explorer` | Read, Grep, Glob, Write | penelusur bukti `file:line`; menulis hanya ke laci `.explore/`, dipagari hook `guard_bash.py` |
 | `code-implementor` | Read, Grep, Glob, Edit, Write, Bash | menerapkan satu brief READY, dipagari hook `guard_bash.py` |
 | `code-reviewer` | Read, Grep, Glob, Bash, Write | menilai diff merge-base terhadap kontrak gabungan brief; menulis `REVIEW.md` |
 | `brd-reviewer` | Read, Grep, Glob | vonis BRD `Approved`/`Issues Found` |
@@ -186,14 +186,15 @@ oleh skrip prasyarat, sehingga vonis hook sama dengan vonis skrip.
   kerja selesai, dan alur `/analyst:*` atau `/quickdev:*` yang dipanggil atau dilanjutkan secara eksplisit.
 - **Opt-out `.claude/workflow`**: lihat Hidup Berdampingan.
 
-**PreToolUse** (`python3 hooks/guard_bash.py hook`, matcher `Bash|Edit|Write`, timeout 10 detik) hanya
-berlaku untuk subagent `backenddev:code-implementor`, dan menolak bila ragu (fail-closed). Implementor hanya
+**PreToolUse** (`python3 hooks/guard_bash.py hook`, matcher `Bash|Edit|Write`, timeout 10 detik) berlaku
+untuk subagent `backenddev:code-implementor` dan `backenddev:code-explorer`, dan menolak bila ragu (fail-closed). Implementor hanya
 boleh menjalankan git read-only (`status`, `diff`, `log`, `show`, `rev-parse`, `ls-files`),
 `git add <path>` eksplisit di dalam lease, dan `git commit -m`. Rantai perintah, pipe, pengalihan, dan
 substitusi ditolak. Edit/Write hanya boleh ke path lease. Lease ditulis `architect` sebelum dispatch
 (`guard_bash.py lease --brief <path>`) ke `<git-dir>/agentic-workflow/lease-backenddev.json`, di luar
 working tree. Isinya `## File scope` brief, berkas brief, `report-NN.md`, dan `finding_source`. Tanpa lease,
-semua Bash/Edit/Write implementor ditolak.
+semua Bash/Edit/Write implementor ditolak. Untuk `backenddev:code-explorer`, hook yang sama hanya
+mengizinkan Edit/Write ke laporan `backenddev/docs/[<taskdir>/].explore/*.md`.
 
 ## Penegakan Mekanis
 

@@ -3,6 +3,13 @@ import json
 
 from conftest import TD, be_checks, be_run, brief, commit, write_files
 
+def _spec_path(repo):
+    """Spec batch di laci `.explore/` taskdir — satu-satunya lokasi yang diterima scaffold (B11)."""
+    path = repo / TD / ".explore" / "brief-spec.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 ARCH = "architect/scripts/check_preconditions.py"
 REPORT = "report/scripts/check_preconditions.py"
 SCAFFOLD = "plan/scripts/scaffold_brief.py"
@@ -24,7 +31,7 @@ def _blocked_taskdir(repo):
 
 
 def _spec(repo, *rows):
-    path = repo.parent / "spec.json"
+    path = _spec_path(repo)
     path.write_text(json.dumps({"briefs": list(rows)}), encoding="utf-8")
     return str(path)
 

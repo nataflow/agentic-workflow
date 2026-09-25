@@ -2,7 +2,7 @@
 """Document-API Precondition Validator.
 
 Automates verification of repository preconditions before API documentation extraction.
-Runs checks 1 through 5 in a single pass and produces a compact, actionable report.
+Runs checks 1 through 6 in a single pass and produces a compact, actionable report.
 Zero external dependencies (Python Standard Library only). Satu impor intra-plugin:
 `skills/_common/precondition_lib.py` (parser frontmatter, taskdir, chain, profil,
 berkas plugin, keluaran), di-bootstrap relatif terhadap berkas ini.
@@ -24,8 +24,8 @@ from precondition_lib import (  # noqa: E402
     find_repo_root,
     format_text,
     load_profile_index,
-    plugin_file,
     probe_writable as _probe_writable,
+    stack_adapter_section,
     to_json,
 )
 
@@ -34,24 +34,21 @@ class PreconditionChecker:
     def __init__(
         self,
         domain: Optional[str] = None,
-        base_branch: Optional[str] = None,
-        stack: Optional[str] = None,
         target_root: Optional[Path] = None,
     ):
         self.root = (target_root or find_repo_root()).resolve()
         self.domain_arg = domain
-        self.base_branch_arg = base_branch
-        self.stack_arg = stack
         self.results: List[Dict[str, Any]] = []
 
 
     def run_all(self) -> bool:
-        """Run checks 1 through 5."""
+        """Run checks 1 through 6."""
         self._check_1_source_root()
         self._check_2_profile_and_stack()
         self._check_3_docs_api_directory()
         self._check_4_template_reference()
         self._check_5_git_cli()
+        self._check_6_domain()
         return all(r["status"] == "PASS" for r in self.results)
 
     def _check_1_source_root(self):
@@ -84,29 +81,29 @@ class PreconditionChecker:
     def _check_2_profile_and_stack(self):
         check_id = 2
         name = "Profile & Stack Adapter"
-        # `--stack` eksplisit membebaskan skill ini dari profil; tanpanya profil
-        # ditagih utuh (tujuh kunci) seperti skrip prasyarat lain.
-        stack_id = (self.stack_arg or "").strip()
-        if not stack_id:
-            prof = load_profile_index(self.root)
-            if not prof.ok:
-                self.results.append({
-                    "id": check_id,
-                    "name": name,
-                    "status": "FAIL",
-                    "summary": f"Stack tidak terbaca dari profil ({prof.error}) dan --stack kosong",
-                    "action": "Jalankan `backenddev:profile` atau tentukan parameter --stack secara eksplisit.",
-                })
-                return
-            stack_id = prof.data["stack"]
-
-        if not plugin_file("skills", "profile", "stacks", f"{stack_id}.md"):
+        # Stack hanya dari profil (tujuh kunci ditagih seperti skrip prasyarat lain): `base_branch`
+        # default Fase 0 dan rujukan `## API surface` adapter tidak punya sumber lain.
+        prof = load_profile_index(self.root)
+        if not prof.ok:
             self.results.append({
                 "id": check_id,
                 "name": name,
                 "status": "FAIL",
-                "summary": f"Adapter stacks/{stack_id}.md tidak ditemukan",
-                "action": f"Pastikan plugin backenddev mendukung stack '{stack_id}' dengan seksi ## API surface.",
+                "summary": f"Profil backenddev tidak terbaca: {prof.error}",
+                "action": prof.action or "Jalankan `backenddev:profile`.",
+            })
+            return
+        stack_id = prof.data["stack"]
+
+        found, error = stack_adapter_section(stack_id, "## API surface")
+        if not found:
+            self.results.append({
+                "id": check_id,
+                "name": name,
+                "status": "FAIL",
+                "summary": error,
+                "action": f"Pulihkan adapter stack '{stack_id}' beserta seksi `## API surface`, "
+                          "atau jalankan `backenddev:profile` bila stack profil salah.",
             })
             return
 
@@ -114,7 +111,7 @@ class PreconditionChecker:
             "id": check_id,
             "name": name,
             "status": "PASS",
-            "summary": f"Stack '{stack_id}' terverifikasi dengan adapter API surface sah",
+            "summary": f"Stack '{stack_id}' terverifikasi; adapter memuat seksi `## API surface`",
             "action": "",
         })
 
@@ -203,6 +200,20 @@ class PreconditionChecker:
                 "action": "Pastikan git CLI tersedia di environment kerja.",
             })
 
+    def _check_6_domain(self):
+        check_id = 6
+        name = "Domain Scope"
+        domain = (self.domain_arg or "").strip()
+        if not domain:
+            self.results.append({
+                "id": check_id, "name": name, "status": "FAIL",
+                "summary": "Parameter domain kosong",
+                "action": "Minta cakupan API konkret dari user; dilarang berasumsi \"seluruh API\".",
+            })
+            return
+        self.results.append({"id": check_id, "name": name, "status": "PASS",
+                             "summary": f"Cakupan domain: {domain}", "action": ""})
+
     def format_text(self) -> str:
         return format_text("document-api", self.results)
 
@@ -213,8 +224,6 @@ class PreconditionChecker:
 def main():
     parser = argparse.ArgumentParser(description="Document-API Preconditions Checker")
     parser.add_argument("--domain", type=str, default=None, help="Domain API scope name")
-    parser.add_argument("--base-branch", type=str, default=None, help="Base branch comparison")
-    parser.add_argument("--stack", type=str, default=None, help="Stack identifier override")
     parser.add_argument("--root", type=str, default=None, help="Target repo root directory")
     parser.add_argument("--json", action="store_true", help="Output JSON format")
     args = parser.parse_args()
@@ -222,8 +231,6 @@ def main():
     target_root = Path(args.root) if args.root else None
     checker = PreconditionChecker(
         domain=args.domain,
-        base_branch=args.base_branch,
-        stack=args.stack,
         target_root=target_root,
     )
     passed = checker.run_all()

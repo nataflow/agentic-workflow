@@ -4,12 +4,19 @@ import shutil
 
 from conftest import TD, be_run, brief, commit, git
 
+def _spec_path(repo):
+    """Spec batch di laci `.explore/` taskdir — satu-satunya lokasi yang diterima scaffold (B11)."""
+    path = repo / TD / ".explore" / "brief-spec.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 SCAFFOLD = "plan/scripts/scaffold_brief.py"
 VALIDATE = "plan/scripts/validate_briefs.py"
 
 
 def _spec(repo, rows):
-    path = repo.parent / "spec.json"
+    path = _spec_path(repo)
     path.write_text(json.dumps({"briefs": rows}), encoding="utf-8")
     return str(path)
 
@@ -62,3 +69,21 @@ def test_trailer_parse_ignores_other_trailers(chain_repo):
         "Co-Authored-By: x <x@x>\nBrief-Review-Rounds: gen=abc123 rounds=1 total=3\nReviewed-by: y")
     state = be_run(chain_repo, VALIDATE, "--taskdir", TD, "--review-state").stdout
     assert "taskdir 3/4" in state
+
+
+def test_b11_spec_di_luar_laci_ditolak(chain_repo):
+    loose = chain_repo / TD / "spec.json"
+    loose.write_text(json.dumps({"briefs": [_row("01", "lock", ["SC-1"])]}), encoding="utf-8")
+    out = be_run(chain_repo, SCAFFOLD, "--taskdir", TD, "--write-matrix", "--spec", str(loose))
+    assert out.returncode == 1 and "spec wajib di" in out.stdout
+    rel = be_run(chain_repo, SCAFFOLD, "--taskdir", TD, "--write-matrix", "--spec", f"{TD}/spec.json")
+    assert rel.returncode == 1 and "spec wajib di" in rel.stdout
+    sneaky = f"{TD}/.explore/../spec.json"
+    assert "spec wajib di" in be_run(chain_repo, SCAFFOLD, "--taskdir", TD, "--write-matrix", "--spec", sneaky).stdout
+
+
+def test_b11_spec_di_laci_tidak_mengotori_worktree(chain_repo):
+    out = be_run(chain_repo, SCAFFOLD, "--taskdir", TD, "--write-matrix",
+                 "--spec", _spec(chain_repo, [_row("01", "lock", ["SC-1"]), _row("02", "endpoint", ["SC-2"])]))
+    assert out.returncode == 0, out.stdout
+    assert git(chain_repo, "status", "--porcelain") == ""

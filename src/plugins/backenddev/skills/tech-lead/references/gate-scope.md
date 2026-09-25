@@ -50,6 +50,7 @@ Setiap artefak ditutup dengan `git commit` di titik ia menjadi keputusan final:
 | `.claude/profile/backenddev/` | Selesai ditulis / di-refresh | `tech-lead` | `docs: init/refresh backend profile` |
 | `.claude/profile/backenddev/` + penghapusan `.claude/profile/<berkas>` yang dipindah `migrate_profile.py` | Selesai MIGRATE | `tech-lead` | `docs: migrate backend profile` |
 | `backenddev/docs/<taskdir>/TASK.md` | Uji akar 9/9 lolos | **`task`** | `docs(<slug>): kunci TASK sebagai akar rantai` |
+| `backenddev/docs/<taskdir>/TASK.md` saat amandemen gerbang | Amandemen akar disetujui user (`gate-lifecycle.md` bagian 1a) | `tech-lead` | `docs(<slug>): amandemen akar TASK (<pemicu>)` |
 | `backenddev/docs/<taskdir>/TASK.md` saat eskalasi chain | Transisi chain dieksekusi | **`analyst`** | `docs(<slug>): eskalasi chain <asal> ke <hasil>` |
 | `backenddev/docs/<taskdir>/TASK.md` saat ledger ditutup | Hop `BRIEF` dicentang di Fase 6 langkah 0 | **`analyst`** | `docs(<slug>): tutup ledger chain <enum>` |
 | `backenddev/docs/<taskdir>/BRD.md` draft | Self-review `brd-reviewer` BRD lolos | **`business-analysis`** | `docs(spec): draft BRD <slug>` |
@@ -73,7 +74,7 @@ Setiap artefak ditutup dengan `git commit` di titik ia menjadi keputusan final:
 
 *Di luar matriks*: temuan `code-explorer` dikembalikan ke context pendispatch **dan** ditulis ke laci kerja `.explore/` — `backenddev/docs/.explore/<slug>.md` untuk dispatch gerbang, `<taskdir>/.explore/<slug>.md` untuk skill hilir. Laporan gerbang disalin ke laci taskdir sebagai `gate-<slug>.md` di Fase 3 (`gate-lifecycle.md` bagian 1). Isinya catatan penelusuran, bukan keputusan, sehingga tidak pernah di-stage maupun di-commit siapa pun, dan tidak pernah dihitung sebagai working tree kotor oleh gerbang git mana pun.
 
-*Larangan*: `audit` dan `debug` dilarang menjalankan git commit — serahkan artefak ke gerbang untuk dikunci. `code-explorer` terkunci struktural karena tidak memegang `Bash`; `Write`-nya dibatasi pada satu path laporan `.explore/` yang ditentukan pendispatch. Seluruh pemilik commit dilarang staging wildcard (`git add .` / `-A`), `git push`, `git merge`, `git rebase`, maupun perpindahan branch.
+*Larangan*: `audit` dan `debug` dilarang menjalankan git commit — serahkan artefak ke gerbang untuk dikunci. `code-explorer` tidak memegang `Bash`, sehingga tidak dapat menjalankan git. `Write`-nya dibatasi pada satu path laporan `.explore/` yang ditentukan pendispatch: prompt (`agents/code-explorer.md`) mengunci path persisnya, dan hook PreToolUse `hooks/guard_bash.py` menolak mekanis tiap `Write`/`Edit` explorer di luar `backenddev/docs/[<taskdir>/].explore/*.md`. Seluruh pemilik commit dilarang staging wildcard (`git add .` / `-A`), `git push`, `git merge`, `git rebase`, maupun perpindahan branch.
 
 ______________________________________________________________________
 

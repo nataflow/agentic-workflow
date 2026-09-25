@@ -26,7 +26,7 @@ Sesudah jalur tetap, kunci daftar item masukan yang dipetakan ke rangkaian brief
 
 ### 1A. 5 Pemicu Eskalasi — `LANGSUNG`
 
-Kena salah satu → BERHENTI SEGERA, batalkan rute MINOR beserta penulisan brief, eskalasi ke `system-analysis`:
+Kena salah satu → BERHENTI SEGERA, batalkan rute MINOR beserta penulisan brief, dan kembalikan ke pemanggil menurut **Jalan keluar eskalasi** di bawah (jalur `RCA`: bagian 1C):
 
 1. **Kontrak API belum pasti**: endpoint baru dengan bentuk request/response belum ditetapkan, field response yang dipakai konsumen eksternal bertambah/hilang, atau HTTP status berubah.
 2. **Transisi status / lifecycle berubah**: nilai enum status baru, transisi baru antar status eksisting, atau perubahan pihak yang berhak memicu transisi.
@@ -61,7 +61,7 @@ Temuan yang gugur di salah satu dari keduanya melepaskan `SC-{n}` pemikulnya, da
 
 **Gerbang masuk**: kembalikan ke `tech-lead` bila `status: INCONCLUSIVE` — rantai kausalnya belum utuh sehingga `## File scope` di atasnya adalah tebakan. Kembalikan ke `debug` bila `## Arah perbaikan` kosong padahal statusnya `ROOT_CAUSE_CONFIRMED`, atau bila scan Fase 2 menemukan bukti yang membantah rantai kausalnya — brief bukan tempat merevisi diagnosis.
 
-**Batas kewenangan**: dilarang mengubah `## Rantai kausal` atau menambah root cause di brief. Terapkan 5 pemicu bagian 1A bila perbaikan menuntut DTO, endpoint, atau kolom baru.
+**Batas kewenangan**: dilarang mengubah `## Rantai kausal` atau menambah root cause di brief. Bila perbaikan menyentuh salah satu dari 5 pemicu bagian 1A (DTO, endpoint, kolom baru, transisi status, permission), BERHENTI dan kembalikan ke `backenddev:tech-lead` — bukan ke `analyst`: taskdir `DEFECT_RCA` tidak memikul `chain` yang dapat dinaikkan. Gerbang memutuskan ulang lane-nya (`../../tech-lead/references/gate-lifecycle.md` bagian 1a).
 
 ### 1D. Pemanenan `PRD.md` — `PRD`
 

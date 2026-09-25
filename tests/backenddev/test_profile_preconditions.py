@@ -1,6 +1,8 @@
 """Prasyarat `backenddev:profile`: deteksi via `detect.py`, kepemilikan, mode MIGRATE (L1.1)."""
 import json
 
+import pytest
+
 from conftest import PLUGINS, be_profile, fe_profile, run_script
 
 SCRIPT = PLUGINS / "backenddev/skills/profile/scripts/check_preconditions.py"
@@ -57,12 +59,31 @@ def test_foreign_profile_in_own_dir_fails(make_repo):
     assert _check(out, 6)["status"] == "FAIL"
 
 
-def test_profile_dir_other_value_rejected(make_repo):
-    """B3: `--profile-dir` selain `.claude/profile/backenddev` ditolak."""
+def test_b3_profile_dir_dihapus(make_repo):
+    """B3: `--profile-dir` dihapus; target tulis selalu `.claude/profile/backenddev`."""
     root = make_repo({"go.mod": GIN})
-    proc, out = _run(root, "--profile-dir", "docs/elsewhere")
-    assert proc.returncode == 1
-    assert _check(out, 3)["status"] == "FAIL"
+    proc = run_script(SCRIPT, "--json", "--root", str(root), "--profile-dir", "docs/elsewhere")
+    assert proc.returncode == 2 and "unrecognized arguments" in proc.stderr
+    _proc, out = _run(root)
+    assert ".claude/profile/backenddev" in _check(out, 3)["summary"]
+
+
+@pytest.mark.parametrize("args, cid, status", [
+    (("--mode", "foo"), 6, "FAIL"), (("--mode", "refresh"), 6, "PASS"), (("--mode", "AUTO"), 6, "PASS"),
+    (("--stack", "cobol"), 2, "FAIL"), (("--stack", "go"), 2, "PASS"), (("--stack", "auto"), 2, "PASS"),
+])
+def test_b3_mode_dan_stack_divalidasi(make_repo, args, cid, status):
+    root = make_repo({"go.mod": GIN})
+    _proc, out = _run(root, *args)
+    assert _check(out, cid)["status"] == status
+
+
+def test_b7_repo_non_git_lolos_dengan_catatan(make_repo):
+    root = make_repo({"go.mod": GIN}, git_init=False)
+    proc, out = _run(root)
+    c = _check(out, 4)
+    assert c["status"] == "PASS" and "tidak terdeteksi" in c["summary"]
+    assert proc.returncode == 0, out
 
 
 def test_text_output_prints_resolved_mode(make_repo):

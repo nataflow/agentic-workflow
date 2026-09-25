@@ -96,7 +96,10 @@ Artefak `{taskdir}/BRD.md` (DRAFT) mengikuti `templates/brd-template.md`. Verdic
 - **Self-review**: Issues Found (<n> isu terbuka) | tidak tuntas (<alasan>)
 - **Open Qs** : <n> tersisa — <pertanyaan yang menahan>
 - **Aturan**  : <n> BR (BR-1..BR-N) · pensiun <BR-lama -> BR-baru> | —
+- **Explorasi**: <n> dispatch · <kendala dispatch/confidence low> | —
 ```
+
+Ada kendala eksplorasi pada bentuk satu baris → tambahkan ` · Explorasi: <kendala>` di ujung baris.
 
 Kedua bentuk melampirkan blok `## BRD Review` `brd-reviewer` apa adanya tepat di bawahnya — predikat C `analyst` menuntutnya utuh, dilarang diparafrase maupun diringkas. Aktor, masalah, dan tiap `BM-{n}` hidup di `BRD.md` yang gerbang dokumen baca sendiri; dilarang menyalinnya ke laporan.
 

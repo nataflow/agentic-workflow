@@ -105,7 +105,10 @@ Artefak `{taskdir}/PRD.md` (DRAFT) mengikuti `templates/prd-template.md`. Self-r
 - **Self-review**: tidak tuntas (<alasan>)
 - **Open Qs** : <n> tersisa — <pertanyaan yang menahan>
 - **BR Disanggah**: <BR-{n} yang ditulis sebagai entri `BR-DISANGGAH:` di `## Open questions`> | —
+- **Explorasi**: Profil S <n> · Profil B <n> · <permukaan tak tertutup> | —
 ```
+
+Ada penyimpangan eksplorasi pada bentuk satu baris → tambahkan ` · Explorasi: <penyimpangan>` di ujung baris.
 
 Kedua bentuk melampirkan blok `## PRD Review` `prd-reviewer` apa adanya tepat di bawahnya — predikat D `analyst` menuntutnya utuh, dilarang diparafrase. `BR Disanggah` bertahan sekalipun PRD bersih: sanggahan atas `BR-{n}` yang sudah `APPROVED` diputuskan user di gerbang dokumen, bukan di sini. Kontrak endpoint, lifecycle status, permission boundary, migrasi, dan impact map hidup di `PRD.md`.
 
