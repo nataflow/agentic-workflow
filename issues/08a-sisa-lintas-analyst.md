@@ -75,6 +75,22 @@ Versi detail seksi **8.0 Lintas plugin** dan **8.A analyst** dari `ISSUES.md`. I
 | A3 | Blok review disimpan ke `<ticketdir>/review.md` (klaim "TICKET.md satu-satunya berkas" berubah), atau tanpa persistensi (dispatch ulang tiap sesi) | `review.md`. |
 | A9 | Check `domain_terms` berjejak: FAIL atau WARN | FAIL, hanya saat `elicitation: CLOSED`. |
 
+## Catatan implementasi (2026-09-25)
+
+Keputusan user: **A1-c** varian minimal dulu, varian penuh sesudah L1.3 (A1-a/A1-b belum diputuskan, ikut versi penuh) · **A3** `review.md` · **A9** FAIL, hanya saat `elicitation: CLOSED`. Ketiganya tercatat di Log Keputusan `ISSUES.md`.
+
+Selesai: X1, X2, A2–A12, dan A1 varian minimal. **A1 tetap terbuka** untuk varian penuh (`ticket_source`). Hasil: `pytest` 885 lulus, 1 gagal. Yang gagal, `test_profile_paths[backenddev]`, sudah gagal sebelum langkah ini dan di luar cakupan 08a. `lint_plugins.py` tanpa `--ignore` → 0 FAIL. Test regresi baru di `tests/analyst/test_ticket_8a.py` (24 kasus): 22 merah pada kode sebelum patch. Dua sisanya memang hijau di kode lama karena bukan regresi: sanity fixture dan `test_a9_open_dengan_asumsi_lolos`.
+
+Penyimpangan dari rencana di bawah:
+
+- **Fixture/helper test.** Memakai `make_repo`/`run_script`/`load_module` dari `tests/conftest.py`, bukan `git_repo`/`plain_dir`/`skill_script` (lihat catatan 06). F0 disimpan di `tests/analyst/fixtures/ticket_valid.md`, bukan `tests/fixtures/analyst/`. Dua test xfail A5/A6 di `tests/analyst/test_ticket.py` dihapus, digantikan test 8a.
+- **A3.** `review_report` hanya dikeluarkan (dan `review.md` hanya ikut di-commit `approve`) bila kepala `review.md` mencatat ronde **dan** vonis yang sama dengan frontmatter. Blok ronde lama yang tertinggal (ronde sesudahnya dicatat tanpa `--report`) menghasilkan `review_report=-`. Tanpa pencocokan ronde, blok ronde 1 lolos sebagai blok ronde 2 bila vonis dan sidiknya sama.
+- **A11/A12.** Exit 3 dan pesan `COMMIT GAGAL` dipakai bersama `approve` dan `ref` (`_commit_failed`). `ref` meng-commit dengan subjek `docs(ticket): ref TICKET <slug>` dan menerima `--no-commit`.
+- **A9.** Rujukan butir yang ikut dinomori ulang: `elicit/SKILL.md` Phase 2 butir 4 (butir 10 → 12) dan contoh gugur di `elicit-template.md` bagian 3 (butir 9 → 11).
+- **X1.** Nomor baris bergeser dari tabel. Ada tiga kemunculan baru di `frontenddev/skills/architect/references/execution-protocol.md` (`check_preconditions.py`, `verify_scope.py`, `run_verification.py`), sehingga peta Skrip `architect/SKILL.md` juga mendapat `verify_scope.py`, `run_verification.py`, dan `adapter`. Notasi `«nama»` dijelaskan satu kali di tiap peta Skrip, dan di atas tiap blok bash dispatcher. `test_matrix_uses_verify_scope` (L3.4) disesuaikan ke notasi itu.
+- **Lint.** R3 (agent) naik dari WARN ke FAIL (X2). Check baru **R4** menolak `${CLAUDE_PLUGIN_ROOT}` di skrip `.py`, menggantikan test mandiri yang diusulkan di X1. `deferred` di `test_lint_plugins.py` dan `LINT_IGNORE` CI sekarang kosong.
+- **X2.** Slot `{adapter_path}` (backenddev dan frontenddev) serta `{chain_py}` (frontenddev) ditambahkan ke prompt dan tabel Slot Hidrasi dispatcher reviewer architect, dan ke daftar hidrasi di `architect/SKILL.md`. Gerbang masuk tiap agent menolak slot yang masih memuat `${`.
+
 ## Fixture bersama F0 (untuk semua reproduksi A2–A12)
 
 Salin-tempel sekali per shell (bash atau zsh). Isi heredoc ini juga menjadi berkas `tests/fixtures/analyst/ticket_valid.md` untuk test. Kartu dan catatan lolos kedua validator: `validate ticket` 9/9, `validate elicit` 8/8, `check --gate spec` 4/4.
@@ -258,7 +274,7 @@ Hasil nyata terhadap salinan ber-patch vs kode sekarang (`AW_REPO=<salinan> pyth
 ---
 
 ## X1 [Sedang] `${CLAUDE_PLUGIN_ROOT}` literal di berkas yang dibaca lewat Read
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev (utama), backenddev · **Estimasi:** 3–4 jam · **Bergantung pada:** — · **Memblokir:** L6.3 check R2 hijau
 
@@ -364,7 +380,7 @@ python3 /skills/_common/review_round.py
 ---
 
 ## X2 [Rendah] `${CLAUDE_PLUGIN_ROOT}` di badan agent
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev, frontenddev · **Estimasi:** 1–2 jam · **Bergantung pada:** X1 (pola peta Skrip) · **Memblokir:** L6.3 R2 tanpa pengecualian agent
 
@@ -400,6 +416,7 @@ Nol `${CLAUDE_PLUGIN_ROOT}` di `src/plugins/*/agents/*.md`, dan ketiga dispatche
 
 ## A1 [Tinggi] Serah-terima ke hilir tidak dikenali
 - [ ] Selesai
+- [x] Varian minimal (2026-09-25) — varian penuh menunggu L1.3 dan keputusan A1-a/A1-b
 
 **Plugin:** analyst, backenddev, frontenddev · **Estimasi:** minimal 30 menit · penuh 1,5–2 hari · **Bergantung pada:** keputusan A1-a/b/c; L1.3 (untuk versi penuh) · **Memblokir:** —
 
@@ -593,7 +610,7 @@ Hasilnya chain `BRD_PRD_BRIEF`, dan `business-analysis` Fase 2 "Elisitasi Kebutu
 ---
 
 ## A2 [Tinggi] `approve` meloloskan catatan elisitasi yang rusak
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** analyst · **Estimasi:** 30 menit · **Bergantung pada:** — · **Memblokir:** —
 
@@ -707,7 +724,7 @@ Skenario Reproduksi berakhir dengan `REVIEW FAIL: validate_doc.py --kind elicit 
 ---
 
 ## A3 [Sedang] Blok `## Ticket Review` tidak pernah disimpan
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** analyst · **Estimasi:** 2–3 jam · **Bergantung pada:** A4 (`parse_review`), keputusan A3 · **Memblokir:** —
 
@@ -819,7 +836,7 @@ def test_a3_blok_review_tersimpan_dan_verdict_dicocokkan(repo, tk):
 ---
 
 ## A4 [Sedang] Ronde review tidak di-reset saat elisitasi berubah
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** analyst · **Estimasi:** 1,5 jam · **Bergantung pada:** A7 (`int_field`) · **Memblokir:** A3
 
@@ -933,7 +950,7 @@ Reset otomatis tidak bisa dipakai untuk mengakali plafon: elisitasi hanya beruba
 ---
 
 ## A5 [Sedang] `cancel` merusak berkas tanpa frontmatter
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** analyst · **Estimasi:** 45 menit · **Bergantung pada:** — · **Memblokir:** —
 
@@ -1047,7 +1064,7 @@ Berkas ber-BOM (L5.9) juga tidak diawali `---` dan kini masuk jalur `ValueError`
 ---
 
 ## A6 [Sedang] Path root-relatif patah bila cwd di subdirektori
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** analyst · **Estimasi:** 1 jam · **Bergantung pada:** — · **Memblokir:** —
 
@@ -1124,7 +1141,7 @@ Tidak ada. Menambah field keluaran tidak mengubah parser siapa pun (`--json` sud
 ---
 
 ## A7 [Rendah] Nilai frontmatter kosong diparse jadi `[]`
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** analyst · **Estimasi:** 45 menit · **Bergantung pada:** — · **Memblokir:** A4 (`int_field`)
 
@@ -1225,7 +1242,7 @@ def test_a7_review_round_rusak_fail_rapi(repo, tk, value):
 ---
 
 ## A8 [Rendah] Nomor baris temuan kebocoran relatif terhadap body
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** analyst · **Estimasi:** 30 menit · **Bergantung pada:** — · **Memblokir:** —
 
@@ -1286,7 +1303,7 @@ Nomor baris temuan kebocoran = nomor baris berkas; test hijau.
 ---
 
 ## A9 [Rendah] Cek mekanis yang dijanjikan README belum ada
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** analyst · **Estimasi:** 1 jam · **Bergantung pada:** keputusan A9 · **Memblokir:** —
 
@@ -1374,7 +1391,7 @@ Tiket lama yang CLOSED dengan `domain_terms` tanpa jejak akan FAIL di `check --g
 ---
 
 ## A10 [Rendah] Kasus tepi `state`/`cancel`
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** analyst · **Estimasi:** 1 jam · **Bergantung pada:** — · **Memblokir:** —
 
@@ -1472,7 +1489,7 @@ Keadaan `NAMA_TIDAK_SAH` beserta rutenya ada; `new` tidak diblokir direktori ber
 ---
 
 ## A11 [Rendah] Pesan gagal commit tidak informatif
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** analyst · **Estimasi:** 30 menit · **Bergantung pada:** — · **Memblokir:** —
 
@@ -1552,7 +1569,7 @@ Pesan memuat penyebab (`The following paths are ignored …: analyst`), exit 3, 
 ---
 
 ## A12 [Rendah] Inkonsistensi instruksi
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** analyst · **Estimasi:** 1,5 jam · **Bergantung pada:** A4 (butir 5), A9 (penomoran butir 1) · **Memblokir:** A1 penuh (subjek commit `ref`)
 
