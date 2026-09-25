@@ -147,5 +147,7 @@ def chain_repo(make_repo):
     })
     git(root, "checkout", "-q", "-b", "main")
     be_profile(root, "go")
+    write_files(root, {".claude/profile/backenddev/commands.md":
+                       "## Commands\n- build: go build ./...\n- test: go test ./...\n"})
     commit(root, "init")
     return root
