@@ -7,7 +7,7 @@
 Scope sah = path `files_touched` frontmatter (frontenddev) atau baris `modify|create` tabel
 **File** `## File scope` (backenddev), ditambah berkas brief itu sendiri dan `report-NN.md` di
 direktori yang sama. Berkas `finding_source` frontmatter sah hanya bila diff-nya semata menambah
-baris `> Status: FIXED`. Laci `.explore/` diabaikan.
+baris `> Status: FIXED`. Laci `.explore/` diabaikan, hanya di `<plugin>/docs/[<taskdir>/].explore/`.
 
 PASS (exit 0): tiap berkas ada di scope. FAIL (exit 1): daftar berkas liar. Exit 2: argumen,
 brief, atau git salah. Pemeriksaan simbol (Anchor) tetap milik `symbol_map.py`.
@@ -82,6 +82,15 @@ def scope_of(brief_text: str) -> Tuple[List[str], Optional[str]]:
     return paths, fs
 
 
+def is_scratch(path: str) -> bool:
+    """Laci code-explorer: `<plugin>/docs/.explore/**` atau `<plugin>/docs/<taskdir>/.explore/**`.
+
+    Segmen `.explore` di tempat lain (mis. `internal/.explore/q.go`) adalah kode biasa.
+    """
+    seg = path.strip("/").split("/")
+    return seg[:1] in (["backenddev"], ["frontenddev"]) and seg[1:2] == ["docs"] and ".explore" in seg[2:4]
+
+
 def git(root: Path, *args: str) -> str:
     out = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True)
     if out.returncode != 0:
@@ -142,7 +151,7 @@ def main() -> int:
         touched = changed(root, a.commit)
         stray = []
         for p in touched:
-            if p in allowed or ".explore" in p.split("/"):
+            if p in allowed or is_scratch(p):
                 continue
             if fs and p == fs and only_fixed_marker(root, p, a.commit):
                 continue

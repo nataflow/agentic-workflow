@@ -21,7 +21,9 @@ from precondition_lib import (  # noqa: E402
     TASKDIR_ACTION,
     count_h1,
     check_taskdir,
+    check_base_branch,
     dirty_paths,
+    git_operation_in_progress,
     find_repo_root,
     format_text,
     has_heading,
@@ -48,7 +50,7 @@ class PreconditionChecker:
 
 
     def run_all(self) -> bool:
-        """Run checks 1 through 7."""
+        """Run checks 1 through 8."""
         self._check_1_taskdir()
         self._check_2_root_task()
         self._check_3_review_report()
@@ -56,6 +58,7 @@ class PreconditionChecker:
         self._check_5_profile_config()
         self._check_6_report_absence()
         self._check_7_git_clean()
+        self._check_8_base_branch()
         return all(r["status"] == "PASS" for r in self.results)
 
     def _check_1_taskdir(self):
@@ -263,13 +266,19 @@ class PreconditionChecker:
         try:
             # Laci kerja `.explore/` milik `code-explorer` bukan artefak rantai: tidak
             # pernah di-stage maupun di-commit, jadi dibuang dirty_paths.
-            if dirty_paths(self.root):
+            dirty = dirty_paths(self.root)
+            ops = git_operation_in_progress(self.root)
+            if dirty or ops:
+                why = "; ".join(filter(None, [
+                    f"berkas kotor: {', '.join(dirty[:3])}" if dirty else "",
+                    f"operasi git belum selesai: {', '.join(ops)}" if ops else "",
+                ]))
                 self.results.append({
                     "id": check_id,
                     "name": name,
                     "status": "FAIL",
-                    "summary": "Working tree git kotor sebelum penulisan REPORT.md",
-                    "action": "Bersihkan atau commit perubahan git sebelum merumuskan REPORT.md.",
+                    "summary": f"Working tree git tidak siap sebelum penulisan REPORT.md ({why})",
+                    "action": "Bersihkan/commit perubahan dan selesaikan operasi git yang menggantung sebelum merumuskan REPORT.md.",
                 })
                 return
 
@@ -288,6 +297,27 @@ class PreconditionChecker:
                 "summary": f"Gagal membaca status git: {e}",
                 "action": "Pastikan git repo valid.",
             })
+
+    def _check_8_base_branch(self):
+        """`base_branch` resolve, HEAD di branch kerja, dan ada commit di atas merge-base.
+
+        REPORT.md merangkum diff merge-base; diff kosong baru ketahuan di Fase 2 tanpa check ini.
+        """
+        check_id = 8
+        name = "Base Branch & Merge-Base Diff"
+        base = self.base_branch_arg
+        if not base:
+            data = load_profile_index(self.root, required=("base_branch",)).data
+            base = data["base_branch"] if data else None
+        ok, detail = check_base_branch(self.root, base, require_diff=True)
+        self.results.append({
+            "id": check_id,
+            "name": name,
+            "status": "PASS" if ok else "FAIL",
+            "summary": detail,
+            "action": "" if ok else "REPORT.md menuntut diff merge-base yang nyata di branch kerja; perbaiki "
+                                    "`base_branch` atau jalankan dari branch taskdir.",
+        })
 
     def format_text(self) -> str:
         return format_text("report", self.results)

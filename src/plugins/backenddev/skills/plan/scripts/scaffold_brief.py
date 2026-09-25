@@ -600,6 +600,33 @@ class MatrixTool:
         return f"{path}\n{note}"
 
 
+SPEC_LIST_FIELDS = ("covers", "fulfills", "consumes", "produces")
+SPEC_STR_FIELDS = ("nn", "unit", "title", "risk", "explore", "commit_type", "domain", "ticket", "repairs")
+
+
+def spec_shape_problems(spec: Any) -> List[str]:
+    """Tolak bentuk spec yang akan membuat skrip crash, sebelum validasi isi."""
+    if not isinstance(spec, dict):
+        return [f"akar spec wajib objek JSON `{{\"briefs\": [...]}}`, bukan {type(spec).__name__}"]
+    briefs = spec.get("briefs")
+    if not isinstance(briefs, list):
+        return ["`briefs` wajib berupa list objek"]
+    problems: List[str] = []
+    for i, b in enumerate(briefs, start=1):
+        if not isinstance(b, dict):
+            problems.append(f"entri ke-{i} wajib objek, bukan {type(b).__name__}")
+            continue
+        for f in SPEC_LIST_FIELDS:
+            if f in b and not (isinstance(b[f], list) and all(isinstance(x, str) for x in b[f])):
+                problems.append(f"entri ke-{i}: `{f}` wajib list string")
+        for f in SPEC_STR_FIELDS:
+            if f in b and not isinstance(b[f], (str, int)):
+                problems.append(f"entri ke-{i}: `{f}` wajib string")
+        if "supersedes" in b and not isinstance(b["supersedes"], (str, list)):
+            problems.append(f"entri ke-{i}: `supersedes` wajib string atau list string")
+    return problems
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Brief Matrix & Scaffold Writer — alokasi dikunci sebelum penulisan"
@@ -641,6 +668,12 @@ def main():
             spec = json.loads(raw)
         except Exception as exc:
             print(f"SCAFFOLD: [FAIL] spec bukan JSON sah: {exc}")
+            sys.exit(1)
+        shape = spec_shape_problems(spec)
+        if shape:
+            print(f"SCAFFOLD: [FAIL] bentuk spec tidak sah ({len(shape)} pelanggaran)")
+            for problem in shape:
+                print(f"    - {problem}")
             sys.exit(1)
 
         locked = tool.locked_briefs()

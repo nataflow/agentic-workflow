@@ -213,8 +213,9 @@ def is_scratch(path: str) -> bool:
 def dirty_paths(root: Path, exclude_scratch: bool = True) -> List[str]:
     """Path kotor relatif root dari `git status --porcelain -z -uall`.
 
-    Tanpa kutip, tanpa escape oktal, rename/copy diwakili path tujuannya.
-    Laci kerja (`is_scratch`) dibuang bila `exclude_scratch`. Raise `GitError` bila git gagal.
+    Tanpa kutip, tanpa escape oktal. Rename/copy menyumbang **kedua** path-nya (tujuan lalu
+    asal): memindahkan berkas ter-track ke laci `.explore/` tetap terhitung kotor lewat path
+    asalnya. Laci kerja (`is_scratch`) dibuang bila `exclude_scratch`. Raise `GitError` bila git gagal.
     """
     try:
         proc = subprocess.run(["git", "-C", str(root), "status", "--porcelain", "-z", "-uall"],
@@ -232,12 +233,76 @@ def dirty_paths(root: Path, exclude_scratch: bool = True) -> List[str]:
         if len(entry) < 4:
             continue
         xy, path = entry[:2], entry[3:]
-        if "R" in xy or "C" in xy:
-            i += 1                      # entri berikutnya = path asal rename/copy
-        if exclude_scratch and is_scratch(path):
-            continue
-        out.append(path)
+        paths = [path]
+        if "R" in xy or "C" in xy:      # format -z: "XY <tujuan>\0<asal>\0"
+            if i < len(entries) and entries[i]:
+                paths.append(entries[i])
+            i += 1
+        out.extend(p for p in paths if not (exclude_scratch and is_scratch(p)))
     return out
+
+
+# Penanda operasi git yang belum selesai. Dicari lewat `git rev-parse --git-path`
+# supaya benar juga di worktree tambahan, tempat `.git` berupa berkas.
+GIT_OPERATION_MARKERS = (
+    ("MERGE_HEAD", "merge"),
+    ("CHERRY_PICK_HEAD", "cherry-pick"),
+    ("REVERT_HEAD", "revert"),
+    ("rebase-merge", "rebase"),
+    ("rebase-apply", "rebase/am"),
+    ("sequencer", "sequencer (cherry-pick/revert beruntun)"),
+    ("BISECT_LOG", "bisect"),
+)
+
+
+def _git_out(root: Path, *args: str) -> Tuple[int, str]:
+    try:
+        r = subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, timeout=15)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return 255, str(exc)
+    return r.returncode, r.stdout.strip()
+
+
+def git_operation_in_progress(root: Path) -> List[str]:
+    """Label operasi git yang masih menggantung (kosong = tidak ada)."""
+    found: List[str] = []
+    for marker, label in GIT_OPERATION_MARKERS:
+        rc, out = _git_out(root, "rev-parse", "--git-path", marker)
+        if rc != 0 or not out:
+            continue
+        p = Path(out)
+        if not p.is_absolute():
+            p = root / p
+        if p.exists() and label not in found:
+            found.append(label)
+    return found
+
+
+def check_base_branch(root: Path, base: Optional[str], require_diff: bool = False) -> Tuple[bool, str]:
+    """Validasi `base_branch` dan posisi HEAD untuk skill yang menilai diff merge-base.
+
+    Mengembalikan (ok, keterangan). Urutan: base resolve → HEAD ter-attach →
+    HEAD bukan base → merge-base ada → (opsional) ada commit di atas base.
+    """
+    base = (base or "").strip()
+    if not base or base == "tidak terdeteksi":
+        return False, "base_branch kosong di parameter maupun index.json"
+    rc, _ = _git_out(root, "rev-parse", "--verify", "--quiet", f"{base}^{{commit}}")
+    if rc != 0:
+        return False, f"base_branch '{base}' tidak resolve ke commit"
+    rc, head = _git_out(root, "symbolic-ref", "-q", "--short", "HEAD")
+    if rc != 0 or not head:
+        return False, "Detached HEAD — rantai wajib berjalan di branch kerja"
+    if head == base:
+        return False, f"HEAD berada di base branch `{base}` — rantai wajib berjalan di branch kerja"
+    rc, mb = _git_out(root, "merge-base", base, "HEAD")
+    if rc != 0 or not mb:
+        return False, f"tidak ada merge-base antara '{base}' dan HEAD"
+    if require_diff:
+        _, head_sha = _git_out(root, "rev-parse", "HEAD")
+        if mb == head_sha:
+            return False, f"nol commit di atas '{base}' (merge-base = HEAD)"
+    return True, f"branch '{head}' · merge-base {mb[:7]} terhadap '{base}'"
 
 
 def is_under(path: str, prefix: str) -> bool:
@@ -492,6 +557,26 @@ def load_profile_index(root: Path, required: Sequence[str] = REQUIRED_INDEX_KEYS
                             "Jalankan `backenddev:profile` untuk melengkapi field profil.",
                             profile_dir, note, "incomplete")
     return ProfileIndex(data, "", "", profile_dir, note)
+
+
+# commands.md ditulis `backenddev:profile` sebagai baris `kunci: nilai [status]` yang dipisah
+# ` · ` (profile/templates/profile-template.md bagian 9), bukan tabel. Butir list `- kunci: nilai`
+# juga diterima.
+_CMD_SEGMENT = re.compile(r"^\s*(?:[-*]\s+)?([a-z][a-z-]*)\s*:\s*(.*?)\s*$")
+NOT_APPLICABLE = re.compile(r"^`?tidak berlaku\b", re.IGNORECASE)
+
+
+def parse_commands(text: str) -> Dict[str, str]:
+    """Peta `kunci -> nilai` dari commands.md (di luar code fence, tanpa heading); kunci pertama menang."""
+    cmds: Dict[str, str] = {}
+    for _, line in iter_outside_fences(normalize_text(text)):
+        if line.lstrip().startswith("#"):
+            continue
+        for seg in line.split("·"):
+            m = _CMD_SEGMENT.match(seg)
+            if m and m.group(2):
+                cmds.setdefault(m.group(1), m.group(2))
+    return cmds
 
 
 def plugin_file(*parts: str) -> Optional[Path]:

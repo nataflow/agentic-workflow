@@ -16,7 +16,7 @@ description: Gunakan ketika direktori taskdir berisi brief READY siap dieksekusi
 1. Jalankan skrip verifikasi prasyarat: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/architect/scripts/check_preconditions.py --taskdir <taskdir> [--base-branch <base_branch>]`.
 2. Evaluasi output skrip secara deterministik:
    - `PASS` (7/7 checks): Lanjutkan ke evaluasi parameter dan workflow orkestrasi brief.
-   - `FAIL`: Hentikan eksekusi segera dan jalankan tindakan remediasi pada butir yang gagal (taskdir belum sah/tidak ada → minta alokasi dari `backenddev:tech-lead`; profil/invariants hilang → arahkan ke `backenddev:profile`; brief READY tidak ditemukan → jalankan `backenddev:plan`; brief `BLOCKED` → `backenddev:tech-lead` (lane `PLANNING`, taskdir sama); `HALT.md` ada → `backenddev:tech-lead` (check 7 menyebut brief dan verdict-nya); working tree kotor → bersihkan sebelum melanjutkan).
+   - `FAIL`: Hentikan eksekusi segera dan jalankan tindakan remediasi pada butir yang gagal (taskdir belum sah/tidak ada → minta alokasi dari `backenddev:tech-lead`; profil/invariants hilang → arahkan ke `backenddev:profile`; brief READY tidak ditemukan → jalankan `backenddev:plan`; brief `BLOCKED` → `backenddev:tech-lead` (lane `PLANNING`, taskdir sama); `HALT.md` ada → `backenddev:tech-lead` (check 7 menyebut brief dan verdict-nya); working tree kotor atau operasi git (merge/cherry-pick/revert/rebase) menggantung → bersihkan/selesaikan sebelum melanjutkan; HEAD detached/di base branch atau `base_branch` tak resolve → kembali ke gerbang `backenddev:tech-lead`).
 
 ## Parameter [REQUIRED]
 

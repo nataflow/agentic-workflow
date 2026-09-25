@@ -152,12 +152,32 @@ def test_dirty_paths_unicode_dan_spasi(make_repo):
     assert sorted(lib.dirty_paths(root)) == [f"{TD}/café.md", f"{TD}/catatan rapat.md"]
 
 
-def test_dirty_paths_rename_mengambil_tujuan(make_repo):
+def test_dirty_paths_rename_mengambil_kedua_path(make_repo):
+    """B6: rename menyumbang path tujuan dan asal."""
     root = make_repo({"a": "isi\n"})
     git(root, "add", "-A")
     git(root, "commit", "-qm", "init")
     git(root, "mv", "a", "b")
-    assert lib.dirty_paths(root) == ["b"]
+    assert lib.dirty_paths(root) == ["b", "a"]
+
+
+def test_b6_rename_ke_laci_tetap_kotor(make_repo):
+    td = "backenddev/docs/2609240900-order-fix"
+    root = make_repo({"internal/order/service.go": "package order\n", f"{td}/.explore/.keep": ""})
+    git(root, "add", "-A")
+    git(root, "commit", "-qm", "init")
+    git(root, "mv", "internal/order/service.go", f"{td}/.explore/service.go")
+    assert lib.dirty_paths(root) == ["internal/order/service.go"]
+
+
+def test_b6_explore_di_luar_laci_tetap_kotor(make_repo):
+    root = make_repo({"internal/.explore/q.go": "package q\n"})
+    git(root, "add", "-A")
+    git(root, "commit", "-qm", "init")
+    write_files(root, {"internal/.explore/q.go": "package q\n// ubah\n",
+                       "backenddev/docs/.explore/gate.md": "x\n",
+                       "backenddev/docs/2609240900-x/.explore/a.md": "x\n"})
+    assert lib.dirty_paths(root) == ["internal/.explore/q.go"]
 
 
 def test_dirty_paths_nama_berpanah(make_repo):

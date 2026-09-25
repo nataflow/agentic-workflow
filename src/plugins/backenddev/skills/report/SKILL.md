@@ -16,8 +16,8 @@ user-invocable: false
 
 1. Jalankan skrip verifikasi prasyarat: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/report/scripts/check_preconditions.py --taskdir <taskdir> [--base-branch <base_branch>]`.
 2. Evaluasi output skrip secara deterministik:
-   - `PASS` (7/7 checks): Lanjutkan ke perumusan laporan rantai dan commit REPORT.md.
-   - `FAIL`: Hentikan eksekusi segera dan jalankan tindakan remediasi pada butir yang gagal (taskdir hilang → verifikasi inisialisasi taskdir; `TASK.md` hilang → kembalikan ke `backenddev:tech-lead` untuk backfill akar (`gate-lifecycle.md` bagian 1a), taskdir lama tanpa akar di luar cakupan; REVIEW.md belum ada → tuntaskan review via `architect`; brief belum tertutup → selesaikan brief lewat `architect`; REPORT.md sudah ada → minta otorisasi user; working tree kotor → bersihkan sebelum melanjutkan).
+   - `PASS` (8/8 checks): Lanjutkan ke perumusan laporan rantai dan commit REPORT.md.
+   - `FAIL`: Hentikan eksekusi segera dan jalankan tindakan remediasi pada butir yang gagal (taskdir hilang → verifikasi inisialisasi taskdir; `TASK.md` hilang → kembalikan ke `backenddev:tech-lead` untuk backfill akar (`gate-lifecycle.md` bagian 1a), taskdir lama tanpa akar di luar cakupan; REVIEW.md belum ada → tuntaskan review via `architect`; brief belum tertutup → selesaikan brief lewat `architect`; REPORT.md sudah ada → minta otorisasi user; working tree kotor atau operasi git (merge/cherry-pick/revert/rebase) menggantung → bersihkan/selesaikan sebelum melanjutkan; `base_branch` tak resolve, HEAD detached/di base, atau nol commit di atas merge-base → kembali ke `backenddev:tech-lead`).
 
 ## Parameter [REQUIRED]
 

@@ -68,3 +68,36 @@ def test_chain_dan_risk_huruf_kecil_dari_task(repo):
 def test_templat_dan_agent_plugin_tersedia(repo):
     checks = plan(repo, "--entry-mode", "LANGSUNG", "--chain", "BRIEF")
     assert checks[5]["status"] == "PASS" and checks[7]["status"] == "PASS"
+
+
+# --- B10: jalur RCA menagih risk dan file_scope ------------------------------------------------
+RCA_MD = "---\nstatus: ROOT_CAUSE_CONFIRMED\n---\n\n# RCA\n\n## Arah perbaikan\n\n| src/a.go | modify |\n"
+
+
+@pytest.fixture
+def rca_repo(make_repo):
+    def _make(task_risk=True):
+        fm = "lane: DEFECT_RCA\n" + ("risk: MINOR\n" if task_risk else "")
+        root = make_repo({f"{TD}/TASK.md": f"---\n{fm}---\n# T\n", f"{TD}/RCA.md": RCA_MD,
+                          "src/a.go": "package a\n"})
+        be_profile(root, "go")
+        commit(root, "init")
+        return root
+    return _make
+
+
+def test_b10_rca_tanpa_file_scope_fail(rca_repo):
+    c = plan(rca_repo(), "--entry-mode", "RCA")[8]
+    assert c["status"] == "FAIL" and "file_scope kosong pada jalur RCA" in c["summary"]
+
+
+def test_b10_rca_tanpa_risk_fail(rca_repo):
+    c = plan(rca_repo(task_risk=False), "--entry-mode", "RCA", "--file-scope", "src/")[8]
+    assert c["status"] == "FAIL" and "Risk tidak sah pada jalur RCA" in c["summary"]
+
+
+def test_b10_rca_lengkap_pass(rca_repo):
+    root = rca_repo()
+    c = plan(root, "--entry-mode", "RCA", "--file-scope", "src/")[8]
+    assert c["status"] == "PASS" and "risk MINOR" in c["summary"]
+    assert plan(root, "--entry-mode", "RCA", "--risk", "MAJOR", "--file-scope", "src/")[8]["status"] == "PASS"

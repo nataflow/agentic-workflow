@@ -38,13 +38,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
     GitError,
     dirty_paths,
-    find_agent,
     find_repo_root,
     format_text,
     freshness_banner,
     is_under,
     legacy_suffix,
     load_profile_index,
+    NOT_APPLICABLE,
+    parse_commands,
     probe_writable as _probe_writable,
     profile_staleness as _profile_staleness,
     resolve_profile_dir,
@@ -83,7 +84,7 @@ class PreconditionChecker:
         self._check_3_git_status()
         self._check_4_write_access()
         self._check_5_commands()
-        self._check_6_explorer_dispatcher()
+        self._check_6_branch_resolution()
         return all(r["status"] == "PASS" for r in self.results)
 
     def _check_1_profile(self):
@@ -317,27 +318,7 @@ class PreconditionChecker:
             return
 
         try:
-            content = commands_file.read_text(encoding="utf-8").lower()
-            has_build = "build" in content or "compile" in content
-            has_test = "test" in content
-
-            if not (has_build and has_test):
-                self.results.append({
-                    "id": check_id,
-                    "name": name,
-                    "status": "FAIL",
-                    "summary": "Perintah build atau test belum didefinisikan di commands.md",
-                    "action": "Lengkapi seksi ## Commands dengan instruksi build dan test yang sah."
-                })
-                return
-
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "PASS",
-                "summary": "Perintah build dan test terdefinisi di commands.md",
-                "action": ""
-            })
+            cmds = parse_commands(commands_file.read_text(encoding="utf-8"))
         except Exception as e:
             self.results.append({
                 "id": check_id,
@@ -346,38 +327,25 @@ class PreconditionChecker:
                 "summary": f"Gagal membaca commands.md: {e}",
                 "action": "Periksa permissions berkas .claude/profile/backenddev/commands.md."
             })
-
-    def _check_6_explorer_dispatcher(self):
-        """Template dispatch code-explorer milik gerbang beserta definisi agentnya.
-
-        Gerbang mendispatch `code-explorer` langsung lewat `dispatcher/explorer.md`,
-        tanpa skill pembungkus. Template itu satu-satunya prompt dispatch yang sah di
-        Fase 1 butir 2; tanpanya pemicu dispatch wajib bagian 4E tidak punya jalur
-        berangkat dan gerbang diam-diam jatuh ke sapuan manual berkuota.
-        """
-        check_id = 6
-        name = "Explorer Dispatcher & Agent"
-        skill_dir = Path(__file__).resolve().parent.parent
-        dispatcher_file = skill_dir / "dispatcher" / "explorer.md"
-
-
-        if not dispatcher_file.exists():
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "FAIL",
-                "summary": "Berkas dispatcher/explorer.md tidak ditemukan di skill tech-lead",
-                "action": "Pastikan template dispatcher/explorer.md tersedia untuk dispatch langsung code-explorer."
-            })
             return
 
-        if not find_agent("code-explorer"):
+        # `build: tidak berlaku` sah (stack yang dijalankan langsung dari sumber); `test: tidak berlaku`
+        # tidak: verifikasi penutup architect Fase 4 tidak punya alat ukur tanpanya.
+        problems = []
+        if "build" not in cmds:
+            problems.append("baris `build:` tidak ada")
+        test = cmds.get("test")
+        if test is None:
+            problems.append("baris `test:` tidak ada")
+        elif NOT_APPLICABLE.match(test):
+            problems.append("`test: tidak berlaku` — verifikasi penutup architect tidak punya alat ukur")
+        if problems:
             self.results.append({
                 "id": check_id,
                 "name": name,
                 "status": "FAIL",
-                "summary": "Definisi subagent agents/code-explorer.md tidak ditemukan",
-                "action": "Pastikan berkas agents/code-explorer.md tersedia di plugin backenddev."
+                "summary": f"commands.md tidak memenuhi kontrak: {'; '.join(problems)}",
+                "action": "Jalankan `backenddev:profile` (mode refresh) agar baris `build:`/`test:` tertulis dari eksekusi nyata."
             })
             return
 
@@ -385,8 +353,42 @@ class PreconditionChecker:
             "id": check_id,
             "name": name,
             "status": "PASS",
-            "summary": "Template dispatcher/explorer.md dan agent code-explorer.md terverifikasi",
+            "summary": f"build: {cmds['build']} · test: {test}",
             "action": ""
+        })
+
+    def _check_6_branch_resolution(self):
+        """Bahan Fase 3 (isolasi branch): `base_branch` resolve dan `branch_convention` berslot `<slug>`.
+
+        Integritas berkas plugin (dispatcher/agent) bukan keadaan repo user; lint plugin
+        (`scripts/lint_plugins.py`) yang menjaganya.
+        """
+        check_id = 6
+        name = "Base Branch & Branch Convention"
+        if self.read_only:
+            return self._soft(check_id, name, "base_branch dan branch_convention profil")
+        prof = load_profile_index(self.root, required=())
+        data = prof.data or {}
+        base = str(data.get("base_branch") or "").strip()
+        conv = str(data.get("branch_convention") or "").strip()
+        problems = []
+        if base in ("", "tidak terdeteksi"):
+            problems.append("base_branch kosong/tidak terdeteksi")
+        elif subprocess.run(["git", "rev-parse", "--verify", "--quiet", f"{base}^{{commit}}"],
+                            cwd=self.root, capture_output=True).returncode != 0:
+            problems.append(f"base_branch '{base}' tidak resolve ke commit")
+        if "<slug>" not in conv:
+            problems.append(f"branch_convention '{conv or '(kosong)'}' tanpa placeholder <slug>")
+        if problems:
+            self.results.append({
+                "id": check_id, "name": name, "status": "FAIL",
+                "summary": "; ".join(problems),
+                "action": "Perbaiki index.json lewat `backenddev:profile`; gerbang tidak menebak branch acuan (`## Failure path` butir 1)."
+            })
+            return
+        self.results.append({
+            "id": check_id, "name": name, "status": "PASS",
+            "summary": f"base '{base}' resolve · pola branch '{conv}'", "action": ""
         })
 
     def _mode_label(self) -> str:

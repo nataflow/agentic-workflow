@@ -21,7 +21,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
     TASKDIR_ACTION,
     check_taskdir,
+    check_base_branch,
     dirty_paths,
+    git_operation_in_progress,
     find_agent,
     find_repo_root,
     format_text,
@@ -211,57 +213,42 @@ class PreconditionChecker:
 
             # Laci kerja `.explore/` milik `code-explorer` bukan artefak rantai: tidak
             # pernah di-stage maupun di-commit, jadi dibuang dirty_paths.
-            if dirty_paths(self.root):
+            dirty = dirty_paths(self.root)
+            if dirty:
+                sample = ", ".join(dirty[:3]) + (f", +{len(dirty) - 3} lainnya" if len(dirty) > 3 else "")
                 self.results.append({
                     "id": check_id,
                     "name": name,
                     "status": "FAIL",
-                    "summary": "Working tree git kotor sebelum rantai orkestrasi dimulai",
+                    "summary": f"Working tree git kotor sebelum rantai orkestrasi dimulai ({sample})",
                     "action": "Bersihkan atau simpan perubahan uncommitted sebelum memulai orkestrasi architect.",
                 })
                 return
 
-            # Check rebase in progress
-            git_dir = Path(subprocess.check_output(
-                ["git", "rev-parse", "--git-dir"],
-                cwd=self.root,
-                stderr=subprocess.DEVNULL,
-                universal_newlines=True,
-            ).strip())
-            if not git_dir.is_absolute():
-                git_dir = self.root / git_dir
-            if (git_dir / "rebase-apply").exists() or (git_dir / "rebase-merge").exists():
+            ops = git_operation_in_progress(self.root)
+            if ops:
                 self.results.append({
                     "id": check_id,
                     "name": name,
                     "status": "FAIL",
-                    "summary": "Operasi git rebase sedang berlangsung",
-                    "action": "Selesaikan atau batalkan git rebase sebelum melanjutkan.",
+                    "summary": f"Operasi git belum selesai: {', '.join(ops)}",
+                    "action": "Selesaikan atau batalkan operasi itu (`--continue`/`--abort`) sebelum melanjutkan.",
                 })
                 return
 
             # Commit brief dan REVIEW.md wajib mendarat di branch kerja: detached HEAD
             # membuatnya hilang saat user kembali ke branch, dan HEAD = base branch
             # membuat rentang merge-base..HEAD kosong sementara commit langsung ke base.
-            branch = subprocess.run(["git", "symbolic-ref", "-q", "--short", "HEAD"], cwd=self.root,
-                                    capture_output=True, text=True).stdout.strip()
-            if not branch:
+            # `base_branch` yang tidak resolve membuat reviewer menilai acuan tebakan.
+            ok, detail = check_base_branch(self.root, self.base_branch_arg or self._profile_base_branch())
+            if not ok:
                 self.results.append({
                     "id": check_id,
                     "name": name,
                     "status": "FAIL",
-                    "summary": "Detached HEAD",
-                    "action": "Checkout branch kerja taskdir sebelum orkestrasi.",
-                })
-                return
-            base = self.base_branch_arg or self._profile_base_branch()
-            if base and branch == base:
-                self.results.append({
-                    "id": check_id,
-                    "name": name,
-                    "status": "FAIL",
-                    "summary": f"HEAD berada di base branch `{base}`",
-                    "action": "Buat/checkout branch kerja taskdir; rentang review kosong di base branch.",
+                    "summary": detail,
+                    "action": "Checkout branch kerja taskdir (gerbang `backenddev:tech-lead` Fase 3) atau perbaiki "
+                              "`base_branch`; dilarang menebak acuan diff.",
                 })
                 return
 
@@ -269,7 +256,7 @@ class PreconditionChecker:
                 "id": check_id,
                 "name": name,
                 "status": "PASS",
-                "summary": "Working tree bersih dan siap dieksekusi",
+                "summary": f"Working tree bersih dan siap dieksekusi · {detail}",
                 "action": "",
             })
         except Exception as e:

@@ -333,7 +333,8 @@ def main():
     parser = argparse.ArgumentParser(description="Task Preconditions Checker")
     parser.add_argument("--taskdir", type=str, required=False, help="Task directory path")
     parser.add_argument("--lane", type=str, required=False, help="Terminal lane enum")
-    parser.add_argument("--chain", type=str, required=False, help="Chain enum (BRD_PRD_BRIEF | PRD_BRIEF | BRIEF)")
+    parser.add_argument("--chain", type=str, nargs="?", const="", default=None,
+                        help="Chain enum (BRD_PRD_BRIEF | PRD_BRIEF | BRIEF); kosong/tanpa nilai pada lane non-planning")
     parser.add_argument("--root", type=str, default=None, help="Root path of target repository")
     parser.add_argument("--json", action="store_true", help="Output JSON format")
     args = parser.parse_args()

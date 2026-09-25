@@ -193,3 +193,13 @@ def test_b19_explorer_read_tools_untouched(repo):
     data = {"cwd": str(repo), "tool_name": "Read", "tool_input": {"file_path": "src/order.go"},
             "agent_type": EXPLORER}
     assert run_script(GUARD, "hook", stdin=json.dumps(data)).returncode == 0
+
+
+def test_b6_verify_scope_explore_di_luar_laci_liar(repo):
+    write_files(repo, {"src/order.go": "package order\n// ok\n", "internal/.explore/q.go": "package q\n",
+                       f"{TD}/.explore/order-lock.md": "laporan\n"})
+    git(repo, "add", "-f", "src/order.go", "internal/.explore/q.go", f"{TD}/.explore/order-lock.md")
+    git(repo, "commit", "-qm", "fix(order): implement lock")
+    out = run_script(SCOPE, "--brief", BRIEF, "--commit", "HEAD", cwd=repo)
+    assert out.returncode == 1 and "internal/.explore/q.go" in out.stdout
+    assert f"{TD}/.explore/order-lock.md" not in out.stdout

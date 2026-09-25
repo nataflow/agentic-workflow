@@ -499,12 +499,28 @@ class PreconditionChecker:
             )
             return
 
-        # Jalur RCA dirutekan gerbang langsung, bukan lane planning:
-        # ia tidak memikul chain dan tidak diperiksa di sini.
+        # Jalur RCA dirutekan gerbang langsung, bukan lane planning: ia tidak
+        # memikul chain, tetapi Check K dan Check E tetap butuh `risk` dan
+        # `file_scope` — keduanya wajib dari slot rute gerbang.
         if self.entry_mode_arg == "RCA" and not chain:
+            risk, risk_err = self._risk()
+            if risk_err or not risk:
+                fail(
+                    f"Risk tidak sah pada jalur RCA: {risk_err or '(kosong)'} (wajib BREAKING | MAJOR | MINOR)",
+                    "Minta gerbang `backenddev:tech-lead` meneruskan `--risk` dari Keputusan 2, "
+                    "atau pastikan `risk:` TASK.md DEFECT_RCA terisi.",
+                )
+                return
+            if not self.file_scope_arg:
+                fail(
+                    "file_scope kosong pada jalur RCA — Check E akan berjalan terdegradasi",
+                    "Minta gerbang `backenddev:tech-lead` meneruskan slot `File Scope` laporan rutenya "
+                    "sebagai `--file-scope`; `## Arah perbaikan` RCA.md bukan pengganti batas yang diizinkan.",
+                )
+                return
             self.results.append({
                 "id": check_id, "name": name, "status": "PASS",
-                "summary": f"Jalur {self.entry_mode_arg} dirutekan gerbang; parameter chain tidak berlaku",
+                "summary": f"Jalur RCA dirutekan gerbang · risk {risk} · file_scope terisi; parameter chain tidak berlaku",
                 "action": "",
             })
             return

@@ -14,7 +14,7 @@ description: Gunakan ketika ada permintaan kerja baru atau susulan di repo backe
 ## Precondition [REQUIRED]
 
 1. Fase 0 (tiap permintaan): `python3 ${CLAUDE_PLUGIN_ROOT}/skills/tech-lead/scripts/check_preconditions.py --read-only`. `FAIL` di mode ini berarti repo tak terbaca (bukan git, `index.json` rusak) → hentikan dan laporkan.
-2. Fase 3 butir 0 (hanya lane yang memprovisi taskdir/branch: `PLANNING`, `DEFECT_RCA`, `EXEC_BRIEF`, `AUDIT_SWEEP`, `API_DOCS`): skrip yang sama tanpa `--read-only`, ditambah `--re-entry` bila masuk lewat Fase 5. `PASS` (6/6) → lanjut. `FAIL` → remediasi: profil/`commands.md` bermasalah → rute `PROFILE`; tree kotor di luar zona artefak → minta user stash/commit; HEAD detached → minta checkout ke `base_branch`.
+2. Fase 3 butir 0 (hanya lane yang memprovisi taskdir/branch: `PLANNING`, `DEFECT_RCA`, `EXEC_BRIEF`, `AUDIT_SWEEP`, `API_DOCS`): skrip yang sama tanpa `--read-only`, ditambah `--re-entry` bila masuk lewat Fase 5. `PASS` (6/6) → lanjut. `FAIL` → remediasi: profil (`commands.md`, `base_branch`) bermasalah → rute `PROFILE`; tree kotor di luar zona artefak → minta user stash/commit; HEAD detached → minta checkout ke `base_branch`.
 
 ## Parameter [REQUIRED]
 

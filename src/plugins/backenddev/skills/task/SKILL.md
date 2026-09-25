@@ -15,7 +15,7 @@ user-invocable: false
 
 ## Precondition [REQUIRED]
 
-1. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/task/scripts/check_preconditions.py --taskdir <taskdir> --lane <lane> --chain <chain>`.
+1. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/task/scripts/check_preconditions.py --taskdir <taskdir> --lane <lane> [--chain <chain>]`. Hilangkan `--chain` pada lane `DEFECT_RCA`/`EXEC_BRIEF`.
 2. `PASS` (6/6 checks) → lanjut ke Workflow. `FAIL` → hentikan dan remediasi butir gagal: taskdir belum sah → minta alokasi ke `backenddev:tech-lead`; profil atau commit convention belum lengkap → `backenddev:profile`; `TASK.md` sudah ada → serahkan ke gerbang; `chain` di luar enum atau tak selaras dengan `lane` → kembalikan ke `backenddev:analyst`; working tree kotor → bersihkan dulu.
 
 ## Parameter [REQUIRED]

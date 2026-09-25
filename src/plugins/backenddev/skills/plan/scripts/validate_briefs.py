@@ -265,7 +265,7 @@ class BriefValidator:
         self.root = (target_root or find_repo_root()).resolve()
         self.taskdir_arg = taskdir
         self.taskdir = resolve_taskdir(self.root, taskdir)
-        self.brief_filter = (brief or "").strip().lstrip("#") or None
+        self.brief_filter = self._normalize_nn(brief)
         _risk = (risk_ceiling or "").strip().upper()
         self.risk_ceiling_arg = None if _risk in ("", "—", "-") else _risk
         self.file_scope_arg = (file_scope or "").strip() or None
@@ -470,6 +470,18 @@ class BriefValidator:
 
     # -- pemuatan ----------------------------------------------------------
 
+    @staticmethod
+    def _normalize_nn(raw: Optional[str]) -> Optional[str]:
+        """`--brief` → `NN` dua digit; `None` = seluruh batch; `"INVALID"` = tolak."""
+        val = (raw or "").strip().lstrip("#")
+        if val.lower().startswith("brief-"):
+            val = val[6:].split("-", 1)[0]
+        if not val:
+            return None
+        if not val.isdigit() or not 1 <= int(val) <= 99:
+            return "INVALID"
+        return f"{int(val):02d}"
+
     def load(self) -> Optional[str]:
         """Muat brief, dokumen hulu, laci `.explore`, dan resep penamaan test.
 
@@ -478,9 +490,11 @@ class BriefValidator:
         if not self.taskdir.is_dir():
             return f"Taskdir tidak ditemukan: {self.taskdir}"
 
+        if self.brief_filter == "INVALID":
+            return "Nomor brief wajib 1..99 (mis. `3` atau `03`); `0`, `00`, dan nilai non-angka ditolak"
         paths = sorted(self.taskdir.glob("brief-*.md"))
         if self.brief_filter:
-            paths = [p for p in paths if p.name.startswith(f"brief-{self.brief_filter}")]
+            paths = [p for p in paths if p.name.startswith(f"brief-{self.brief_filter}-")]
             if not paths:
                 return f"Brief dengan nomor '{self.brief_filter}' tidak ditemukan di {self.taskdir}"
         if not paths:

@@ -31,6 +31,18 @@ from precondition_lib import (  # noqa: E402
 )
 
 
+VALID_DIMENSIONS = ("security", "transaction", "data", "persistence", "concurrency", "architecture")
+
+# Bentuk target yang menunjuk diff/PR, dicocokkan terhadap SELURUH string dan hanya
+# bila string itu bukan path yang ada. `a..b`/`a...b` wajib punya ruas kiri bukan
+# titik/garis miring, sehingga `../x` dan `internal/expr/` tidak ikut tertangkap.
+DIFF_TARGET = re.compile(
+    r"^(?:[^\s./][^\s]*?\.\.\.?[^\s/][^\s]*"      # main..HEAD, a...b
+    r"|origin/\S+|refs/pull/\d+(?:/\w+)?|pr/\d+|#\d+|diff:.*)$",
+    re.IGNORECASE,
+)
+
+
 class PreconditionChecker:
     def __init__(
         self,
@@ -60,7 +72,17 @@ class PreconditionChecker:
         data = load_profile_index(self.root, required=("source_root",)).data
         src_rel = data["source_root"] if data else "src"
 
-        src_dir = self.root / src_rel
+        src_dir = (self.root / src_rel).resolve()
+        if not src_dir.is_relative_to(self.root):
+            self.results.append({
+                "id": check_id,
+                "name": name,
+                "status": "FAIL",
+                "summary": f"source_root '{src_rel}' berada di luar root repositori {self.root}",
+                "action": "Perbaiki `source_root` di index.json menjadi path relatif di dalam repo lewat `backenddev:profile`.",
+            })
+            return
+
         if not src_dir.exists() and not (self.root / "src").exists():
             self.results.append({
                 "id": check_id,
@@ -214,47 +236,48 @@ class PreconditionChecker:
         check_id = 6
         name = "Target Scope Validation"
 
-        if not self.target_scope_arg:
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "PASS",
-                "summary": "Parameter target_scope kosong, evaluasi cakupan default di Fase 0",
-                "action": "",
-            })
+        def fail(summary: str, action: str):
+            self.results.append({"id": check_id, "name": name, "status": "FAIL",
+                                 "summary": summary, "action": action})
+
+        scope_str = (self.target_scope_arg or "").strip()
+        if not scope_str:
+            fail("Parameter target_scope kosong (REQUIRED)",
+                 "Minta path modul/package/folder yang disapu; audit tidak menebak cakupan.")
             return
 
-        # Check if target scope looks like a diff or PR
-        scope_str = self.target_scope_arg.strip()
-        if re.search(r"(\.\.|origin/|refs/pull|pr/)", scope_str):
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "FAIL",
-                "summary": f"target_scope '{scope_str}' menunjuk diff branch/PR, bukan kode mendarat",
-                "action": "Gunakan subagent `code-reviewer` untuk penilaian diff, audit hanya menyapu path direktori/modul nyata.",
-            })
+        dims = [d.strip().lower() for d in (self.dimensions_arg or "all").split(",") if d.strip()]
+        unknown = [d for d in dims if d != "all" and d not in VALID_DIMENSIONS]
+        if unknown:
+            fail(f"Dimensi tidak dikenal: {', '.join(unknown)}",
+                 f"Gunakan `all` atau subset dari: {', '.join(VALID_DIMENSIONS)}.")
             return
 
         scope_path = Path(scope_str)
         if not scope_path.is_absolute():
             scope_path = self.root / scope_path
+        scope_path = scope_path.resolve()
+
+        if not scope_path.exists() and DIFF_TARGET.match(scope_str):
+            fail(f"target_scope '{scope_str}' menunjuk diff branch/PR, bukan kode mendarat",
+                 "Gunakan subagent `code-reviewer` untuk penilaian diff, audit hanya menyapu path direktori/modul nyata.")
+            return
+
+        if not scope_path.is_relative_to(self.root):
+            fail(f"target_scope '{scope_str}' berada di luar root repositori",
+                 "Tentukan path modul/package di dalam repositori target.")
+            return
 
         if not scope_path.exists():
-            self.results.append({
-                "id": check_id,
-                "name": name,
-                "status": "FAIL",
-                "summary": f"Path target_scope '{scope_str}' tidak ditemukan di disk",
-                "action": "Tentukan path modul/package yang valid di repositori.",
-            })
+            fail(f"Path target_scope '{scope_str}' tidak ditemukan di disk",
+                 "Tentukan path modul/package yang valid di repositori.")
             return
 
         self.results.append({
             "id": check_id,
             "name": name,
             "status": "PASS",
-            "summary": f"Target scope terverifikasi: {scope_str}",
+            "summary": f"Target scope terverifikasi: {scope_path.relative_to(self.root).as_posix() or '.'} · dimensi {', '.join(dims)}",
             "action": "",
         })
 

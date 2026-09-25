@@ -13,10 +13,10 @@ description: Gunakan ketika kode backend perlu disapu terhadap 6 konvensi arsite
 
 ## Precondition [REQUIRED]
 
-1. Jalankan skrip verifikasi prasyarat: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/audit/scripts/check_preconditions.py [--target-scope <target_scope>] [--dimensions <dimensions>]`.
+1. Jalankan skrip verifikasi prasyarat: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/audit/scripts/check_preconditions.py --target-scope <target_scope> [--dimensions <dimensions>]` (`dimensions` dipisah koma, mis. `security,data`).
 2. Evaluasi output skrip secara deterministik:
    - `PASS` (6/6 checks): Lanjutkan ke evaluasi parameter dan alur audit kode.
-   - `FAIL`: Hentikan eksekusi segera dan jalankan tindakan remediasi pada butir yang gagal (source root hilang/tidak terbaca → periksa izin direktori; profil/adapter hilang → arahkan ke `backenddev:profile`; direktori issues tidak dapat ditulis → periksa izin tulis `backenddev/issues/`; target scope menunjuk diff/PR → gunakan subagent `code-reviewer` lewat `backenddev:architect`).
+   - `FAIL`: Hentikan eksekusi segera dan jalankan tindakan remediasi pada butir yang gagal (source root hilang/tidak terbaca → periksa izin direktori; profil/adapter hilang → arahkan ke `backenddev:profile`; direktori issues tidak dapat ditulis → periksa izin tulis `backenddev/issues/`; target scope menunjuk diff/PR → gunakan subagent `code-reviewer` lewat `backenddev:architect`; target scope kosong, di luar repo, atau tidak ada → minta path modul di dalam repo; dimensi asing → pakai `all` atau token dimensi yang sah; `source_root` profil di luar repo → perbaiki lewat `backenddev:profile`).
 
 ## Parameter [REQUIRED]
 
