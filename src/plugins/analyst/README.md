@@ -10,6 +10,15 @@ Tiga aturan menyetir bentuknya: **tiket menyebut apa dan kenapa, tidak pernah ba
 dari peminta, bukan dari tebakan analis**; dan **yang dapat divonis mesin divonis skrip** — struktur,
 penomoran, keterpikulan aturan oleh acceptance criteria, kebocoran istilah teknis, dan materai persetujuan.
 
+## Instalasi
+
+```
+/plugin marketplace add <owner>/<repo>          # atau path lokal: ./path/ke/agentic-workflow
+/plugin install analyst@fakhrulnugroho
+```
+
+Prasyarat: `python3` ≥ 3.9. `git` opsional (lihat seksi Git). Lihat juga `README.md` di root repo.
+
 ## Tiga Skill, Satu Subagent
 
 | Skill | Peran | Menulis | Dikunci oleh |
@@ -17,6 +26,10 @@ penomoran, keterpikulan aturan oleh acceptance criteria, kebocoran istilah tekni
 | `analyst:intake` | gerbang: wilayah, tipe, ukuran, duplikat, pemulihan ticketdir | — | — |
 | `analyst:elicit` | tanya-jawab dengan peminta, direkam tiap giliran | `TICKET.md` — frontmatter + `## Catatan Elisitasi` | `elicitation: CLOSED` + `validate_doc.py --kind elicit` |
 | `analyst:spec` | penyusunan kartu, review independen, persetujuan user | `TICKET.md` — kartu di atas catatan | `ticket.py approve` → `READY` |
+
+Hanya `intake` yang muncul di menu `/`. `elicit` dan `spec` ber-`user-invocable: false`: model memanggilnya
+lewat tool Skill sesuai keadaan ticketdir, dan pemulihan tiket (melanjutkan elisitasi, merevisi, membuka ulang)
+selalu dimulai dari `/analyst:intake`.
 
 `ticket-reviewer` (`agents/ticket-reviewer.md`) adalah pembaca independen read-only yang memvonis draft
 kartu `PASS`/`BLOCKED` terhadap catatan elisitasi di berkas yang sama sebelum diajukan ke user; ia didispatch langsung lewat
@@ -101,8 +114,8 @@ dan istilah yang memang kosakata produk (mis. produk API untuk mitra, aplikasi `
 
 Sidik review dihitung per bagian — kartu (beserta `type`, `priority`) dan catatan elisitasi (beserta `type`,
 `domain_terms`) — sehingga suntingan di bagian mana pun membuat vonis basi. `approve` memateraikan sidik berkas
-utuh. Tiket `READY` yang disunting sesudah disetujui terbaca `DRIFT`: sidiknya tidak lagi sama dengan `approved_hash`. Perubahan resmi lewat
-`analyst:spec` (reopen), yang mengulang review dan persetujuan.
+utuh. Tiket `READY` yang disunting sesudah disetujui terbaca `DRIFT`: sidiknya tidak lagi sama dengan `approved_hash`. Perubahan resmi dimulai
+dari `/analyst:intake`, yang merutekan ke `analyst:spec` (reopen) untuk mengulang review dan persetujuan.
 
 ## Git
 
@@ -130,7 +143,7 @@ Untuk repo yang hanya memakai analyst, tulis `.claude/workflow` tanpa nama plugi
 | Menulis tiket dari permintaan pengguna/stakeholder | `analyst` |
 | Kontrak teknis, BRD/PRD berjangkar kode, brief implementasi | `backenddev` |
 | Alur layar, bentuk layar, kontrak layer frontend | `frontenddev` |
-| Perubahan kecil satu berkas tanpa taskdir | `quickdev` |
+| Perubahan kecil–menengah dengan satu berkas rencana (`plan/<task>.md`), tanpa taskdir | `quickdev` |
 | Refaktor, upgrade pustaka, stacktrace dari developer | gerbang engineer, bukan `analyst` |
 
 ## Sengaja Belum Ada

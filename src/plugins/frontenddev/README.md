@@ -26,6 +26,11 @@ spesifik-stack hidup di satu adapter `skills/profile/stacks/<stack-id>.md` yang 
 | `frontenddev:report` | laporan penutup | `REPORT.md` | commit — penanda tuntas |
 | `frontenddev:review` | review ad-hoc di luar rantai aktif | chat, atau `frontenddev/reviews/<berkas>.md` | commit bila `--write` |
 
+Hanya `lead`, `profile`, dan `review` yang muncul di menu `/`. Tujuh lainnya ber-`user-invocable: false`:
+model tetap memanggilnya lewat tool Skill, tetapi mengetik `/frontenddev:plan` tidak menjalankan apa pun.
+Untuk memulai, melanjutkan, atau memulihkan rantai, termasuk yang terputus di tengah eksekusi, panggil
+`/frontenddev:lead`, yang merutekan ke gate pemiliknya.
+
 Kesepuluhnya jalan **di main loop**. Penelusuran, penilaian dokumen, penulisan kode, dan penilaian diff
 duduk di `agents/*.md` — tiap subagent mandiri, didispatch langsung lewat template prompt di
 `skills/<skill>/dispatcher/`, tanpa skill pembungkus.
@@ -117,7 +122,7 @@ approval tanpa jawaban ditolak dan jawabannya dimateraikan di badan commit.
 
 ## Mechanical Enforcement
 
-Tiap skill kecuali `lead` punya `scripts/check_preconditions.py` yang dijalankan sebelum Phase 0 (`lead` memakai `scripts/taskdir_state.py`); primitif bersamanya
+Tiap skill kecuali `lead` punya `skills/<skill>/scripts/check_preconditions.py` yang dijalankan sebelum Phase 0 (`lead` memakai `skills/lead/scripts/taskdir_state.py`); primitif bersamanya
 di `skills/_common/precondition_lib.py`, supaya satu artefak tidak pernah divonis berbeda oleh dua gate.
 Di atasnya lima validator:
 
@@ -272,11 +277,14 @@ kali.
 ## Per-Repo Setup
 
 ```
-/plugin marketplace add fakhrulnugroho/frontenddev
-/plugin install frontenddev
+/plugin marketplace add <owner>/<repo>          # atau path lokal: ./path/ke/agentic-workflow
+/plugin install frontenddev@fakhrulnugroho
 ```
 
-Lalu di tiap repo frontend, sekali: `setup frontenddev`. Skill `profile` mendeteksi stack, memindai repo
+Marketplace `fakhrulnugroho` memuat keempat plugin repo ini; lihat `README.md` di root repo.
+
+Lalu di tiap repo frontend, sekali: `/frontenddev:profile`, atau cukup ajukan permintaan kerja pertama.
+`lead` merutekan lane `PROFILE` lebih dulu bila profil belum ada. Skill `profile` mendeteksi stack, memindai repo
 dengan resep adapter, dan menulis `.claude/profile/frontenddev/` — `index.json` plus sembilan berkas `.md`, modular
 supaya tiap konsumen membuka hanya yang rutenya butuh. `manual-notes.md` satu-satunya yang selamat dari
 tulis ulang penuh saat `REFRESH`. Jalankan ulang saat repo bergeser jauh: dependency baru, folder fitur
@@ -295,9 +303,11 @@ milik `backenddev` dan dipakai juga oleh skrip prasyarat, sehingga vonis hook = 
 ada di `hooks/gate_text.py`.
 
 - **Kapan menyuntik**: profil `.claude/profile/frontenddev/` ada, atau manifest (root git, workspace
-  terdeklarasi, `apps/*`, `packages/*`, `services/*`, anak langsung root) memuat penanda stack yang
-  didukung — React/Svelte wajib bersama Vite; Next.js, CRA, dan Rollup di luar cakupan. Di tempat
-  lain hook diam.
+  terdeklarasi, `apps/*`, `packages/*`, `services/*`, anak langsung root; maksimal 200 kandidat) memuat
+  penanda stack yang didukung (tabel Stack Adapters). React dan Svelte non-Kit wajib bersama Vite;
+  `react-native`/`expo` dan `@sveltejs/kit` tidak. Next.js, CRA (`react-scripts`), serta React/Svelte
+  tanpa Vite di luar cakupan. Di tempat lain hook diam. Di repo fullstack, hook `backenddev` menyala
+  juga dengan deteksinya sendiri; keduanya menyuntik bloknya masing-masing.
 - **Profil milik plugin lain** (`.claude/profile/index.json` lama milik `backenddev`) tidak pernah
   dibaca atau ditimpa. Profil frontenddev di lokasi lama memicu lane `PROFILE` mode MIGRATE.
 - **Profil hilang, tidak sah, atau tidak lengkap**: permintaan kerja tetap lewat `frontenddev:lead`,
@@ -307,8 +317,8 @@ ada di `hooks/gate_text.py`.
 - **Opt-out mekanis `.claude/workflow`**: berkas teks berisi nama plugin yang boleh menggerbangi repo,
   dipisah spasi atau baris. Isi `quickdev` → hook `frontenddev` dan `backenddev` diam; isi
   `frontenddev quickdev` → hanya hook `frontenddev` yang menyala. Berkas tidak ada → perilaku normal.
-- **Prasyarat**: `python3` (≥ 3.8; `tomllib` dipakai bila ≥ 3.11) di `PATH`. Di Windows yang hanya
-  punya `py`/`python`, hook tidak jalan — sama seperti hook `.sh` sebelumnya.
+- **Prasyarat**: `python3` ≥ 3.9 di `PATH` (`tomllib` dipakai bila ≥ 3.11). Di Windows yang hanya
+  punya `py`/`python`, hook tidak jalan.
 
 ## Boundaries With Other Skills
 
