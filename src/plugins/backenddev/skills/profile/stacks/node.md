@@ -4,13 +4,15 @@ Node.js/TypeScript dengan framework HTTP. Ditulis mengikuti `_CONTRACT.md`; tuju
 
 ## Detection
 
-Manifest: `package.json` di root atau satu tingkat workspace.
+Manifest: `package.json` di root, workspace terdeklarasi, `apps/*`, `packages/*`, `services/*`, atau
+anak langsung root (sama dengan `hooks/detect.py`).
 
-- **Penanda wajib**: minimal satu framework server di `dependencies` —
-  `@nestjs/core`, `express`, `fastify`, `koa`, `@hapi/hapi`. Paket dengan `react`/`vue`/`next` tanpa
-  satu pun penanda ini adalah frontend, bukan stack backend ini.
-- **Pemutus terhadap `bun`**: bila `bun.lockb` atau `bunfig.toml` hadir bersama `hono`/`elysiajs`,
-  stack-nya `bun`, bukan `node`.
+- **Penanda wajib**: minimal satu framework server di `dependencies` (bukan `devDependencies`,
+  `overrides`, atau `keywords`) — `@nestjs/core`, `express`, `fastify`, `koa`, `@hapi/hapi`, `hono`.
+  Paket dengan `react`/`vue`/`next` tanpa satu pun penanda ini adalah frontend, bukan stack backend ini.
+- **Pemutus terhadap `bun`**: `elysia` di `dependencies`, atau `hono` bersama lockfile Bun
+  (`bun.lockb`/`bun.lock`) atau `bunfig.toml`, dan tanpa `@nestjs/core`/`express` → stack-nya `bun`,
+  bukan `node`. `hono` di atas Node (tanpa penanda Bun) tetap `node`.
 - **Nama project**: field `name` pada `package.json`; pada workspace, `name` paket yang memuat entrypoint server.
 - **Versi runtime**: `engines.node`, `.nvmrc`, atau `volta.node`.
 - **Package manager aktif**: ditentukan lockfile yang ada — `pnpm-lock.yaml`, `yarn.lock`,

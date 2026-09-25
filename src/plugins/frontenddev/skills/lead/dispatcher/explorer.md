@@ -75,7 +75,7 @@ Tulis Bentuk B lebih dulu ke laci kerja — `{laci}<slug>.md` bila baris Laci te
 
 - **Dispatch langsung tanpa skill pembungkus**: seluruh doktrin penelusuran — gerbang masuk, dua fase eksplorasi, formula offset, dan kerangka Bentuk B — duduk di `agents/code-explorer.md`. Dilarang memanggil skill perantara atau menyalin potongan doktrin itu ke dalam prompt.
 - **Satu pertanyaan per dispatch**: dua pertanyaan terpisah didispatch bergantian agar ringkasan tetap padat.
-- **Dilarang menyalin isi berkas**: jangan salin isi berkas `.claude/profile/`, adapter, atau kode ke dalam prompt. Sebutkan path-nya; subagent membacanya sendiri secara terisolasi.
+- **Dilarang menyalin isi berkas**: jangan salin isi berkas `.claude/profile/frontenddev/`, adapter, atau kode ke dalam prompt. Sebutkan path-nya; subagent membacanya sendiri secara terisolasi.
 - **Read-only mutlak**: dilarang menyuruh subagent mengubah kode, menetapkan lane, atau mengambil keputusan rute arsitektur.
 - **Ambiguitas monorepo diselesaikan di hulu**: bila target app (`apps/web` vs `apps/mobile`) belum pasti, tetapkan lebih dulu di `{batas_cakupan}`. Subagent dilarang bertanya balik.
 - **Periksa `.frontenddev/` terabaikan git**: sebelum dispatch pertama di sebuah repo, periksa `.gitignore` memuat baris `.frontenddev/` dan `.explore/`. **WHEN** belum ada: hentikan dispatch dan rutekan ke `frontenddev:profile` mode REFRESH — gate itu pemilik tunggal baris tersebut dan meng-commitnya bersama profil. Dilarang menuliskannya sendiri: `.gitignore` yang berubah tanpa pemilik commit menggantung sepanjang taskdir dan merusak gerbang "tree bersih" milik `code-implementor`.

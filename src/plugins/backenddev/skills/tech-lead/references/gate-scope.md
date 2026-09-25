@@ -46,7 +46,8 @@ Setiap artefak ditutup dengan `git commit` di titik ia menjadi keputusan final:
 
 | Artefak | Titik Terjadinya Commit | Pemilik Commit | Format Pesan Commit |
 | --- | --- | --- | --- |
-| `.claude/profile/` | Selesai ditulis / di-refresh | `tech-lead` | `docs: init/refresh backend profile` |
+| `.claude/profile/backenddev/` | Selesai ditulis / di-refresh | `tech-lead` | `docs: init/refresh backend profile` |
+| `.claude/profile/backenddev/` + penghapusan `.claude/profile/<berkas>` yang dipindah `migrate_profile.py` | Selesai MIGRATE | `tech-lead` | `docs: migrate backend profile` |
 | `backenddev/docs/<taskdir>/TASK.md` | Uji akar 9/9 lolos | **`task`** | `docs(<slug>): kunci TASK sebagai akar rantai` |
 | `backenddev/docs/<taskdir>/TASK.md` saat eskalasi chain | Transisi chain dieksekusi | **`analyst`** | `docs(<slug>): eskalasi chain <asal> ke <hasil>` |
 | `backenddev/docs/<taskdir>/TASK.md` saat ledger ditutup | Hop `BRIEF` dicentang di Fase 6 langkah 0 | **`analyst`** | `docs(<slug>): tutup ledger chain <enum>` |
@@ -117,7 +118,7 @@ Framing untuk `business-analysis`, `system-analysis`, `task`, dan `plan` tidak d
 | Simbol yang user sebut tak muncul di `Glob` #1 | nama kelas atau method dari prompt tidak menghasilkan satu pun kandidat berkas |
 | Kuota sapuan main loop habis | panggilan `Glob`+`Grep` ke-4, pembacaan berkas penuh pertama, atau query database pertama |
 
-**Yang tidak dihitung kuota**: pembacaan `.claude/profile/` (Fase 0), `ls backenddev/docs/` (Fase 3), serta perintah `git status`/`git branch` pada gerbang git.
+**Yang tidak dihitung kuota**: pembacaan `.claude/profile/backenddev/` (Fase 0), `ls backenddev/docs/` (Fase 3), serta perintah `git status`/`git branch` pada gerbang git.
 
 **Sesudah laporan diterima**: gunakan pointer `file:line` di laporan sebagai bukti Keputusan 1. Dilarang membaca ulang berkas yang sudah diringkas explorer hanya untuk memastikan.
 

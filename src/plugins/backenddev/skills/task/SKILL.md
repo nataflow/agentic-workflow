@@ -35,7 +35,7 @@ metadata:
 ### Fase 1 — Penyerapan Framing Gerbang
 
 1. Serap enam slot handoff gerbang: Target Skill, Taskdir, File Scope, Risk Level, Acceptance Criteria, Stop Conditions.
-2. Baca `commit_convention` dan `base_branch` dari `.claude/profile/index.json` untuk Fase 5.
+2. Baca `commit_convention` dan `base_branch` dari `.claude/profile/backenddev/index.json` untuk Fase 5.
 3. Petakan tiap `evidence` ke simbol yang disebutnya; buang rujukan yang tidak mengarah ke berkas nyata dan hentikan bila tak ada sisa.
 4. Turunkan judul H1 berformat `<Domain> — <jenis kerja>` dari slug taskdir (maksimal 8 kata, tanpa path).
 

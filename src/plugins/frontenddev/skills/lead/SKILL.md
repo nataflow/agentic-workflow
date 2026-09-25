@@ -16,7 +16,7 @@ metadata:
 ## Precondition [REQUIRED]
 
 1. Repositori target adalah proyek frontend dari stack adapter `skills/profile/stacks/<stack-id>.md`: React + Vite SPA, React Native/Expo, SvelteKit, atau Svelte + Vite. Next.js tidak dilayani.
-2. Profil `.claude/profile/` ada dan `index.json`-nya ber-field `stack`; tidak ada → Failure path 1.
+2. Profil `.claude/profile/frontenddev/` ada dan `index.json`-nya ber-field `stack`; tidak ada → Failure path 1.
 3. Git repo lokal, working tree bersih di luar laci `.explore/`/`.frontenddev/`.
 4. `python3` tersedia. Skrip: `taskdir_state.py` = `${CLAUDE_PLUGIN_ROOT}/skills/lead/scripts/taskdir_state.py`; `chain.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py`.
 
@@ -34,7 +34,7 @@ metadata:
 
 - Glob nama path dari kata kunci prompt (maks 2 pola; feature root dari `structure.md` profil): `src/features/*<kw>*/**`, `src/lib/features/*<kw>*/**`, `apps/*/src/features/*<kw>*/**`.
 - Tepat satu cocok → slug dari nama folder aktual. Lebih dari satu (monorepo) → pakai `target_app`, atau tanyakan lewat `AskUserQuestion`. Nol → fitur baru, slug kebab-case baru.
-- **Kuota sapuan main loop** per pemicu: maksimal 3 panggilan `Glob`+`Grep`, nol berkas dibaca isinya, nol `Bash` penelusuran (tidak dihitung: berkas `.claude/profile/` dan skrip Phase 2).
+- **Kuota sapuan main loop** per pemicu: maksimal 3 panggilan `Glob`+`Grep`, nol berkas dibaca isinya, nol `Bash` penelusuran (tidak dihitung: berkas `.claude/profile/frontenddev/` dan skrip Phase 2).
 - **Pemicu dispatch wajib** — satu cukup: objek kerja melintasi lebih dari satu layer; yang dicari relasi (pemanggil Controller, konsumen DTO, pemilik query key); simbol dari prompt tak muncul di Glob #1; kuota habis. Hidrasi `dispatcher/explorer.md` (`{laci}` kosong — taskdir belum ada) dan dispatch `code-explorer` (`subagent_type`: `frontenddev:code-explorer`). `confidence: low` → pertajam objective, ulangi sekali.
 
 ### Phase 2 — Pemulihan Taskdir

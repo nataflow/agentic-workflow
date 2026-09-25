@@ -1,7 +1,7 @@
-# `.claude/profile/` Template
+# `.claude/profile/backenddev/` Template
 
-Dokumen ini mendefinisikan struktur artefak modular `.claude/profile/` yang ditulis oleh `backenddev:profile` pada Fase 6.
-Profil codebase disimpan dalam direktori `.claude/profile/` yang terdiri atas `index.json` (metadata terstruktur) dan 8 berkas markdown seksi arsitektur.
+Dokumen ini mendefinisikan struktur artefak modular `.claude/profile/backenddev/` yang ditulis oleh `backenddev:profile` pada Fase 6.
+Profil codebase disimpan dalam direktori `.claude/profile/backenddev/` yang terdiri atas `index.json` (metadata terstruktur) dan 8 berkas markdown seksi arsitektur.
 
 **Field `stack` pada `index.json` adalah kunci pemuatan adapter.** Tanpa nilai yang sah, tiap skill hilir tidak tahu berkas `stacks/<stack-id>.md` mana yang harus dibaca dan akan berhenti di Fase 0-nya.
 
@@ -26,12 +26,13 @@ Profil hidup jauh lebih lama daripada nomor baris. Setiap bukti karena itu ditul
 
 ---
 
-## 1. `.claude/profile/index.json`
+## 1. `.claude/profile/backenddev/index.json`
 
 Metadata konfigurasi dan identitas repositori dalam format JSON valid:
 
 ```json
 {
+  "plugin": "backenddev",
   "project": "<nama-repo>",
   "stack": "<java-spring | go | node | bun | rust | php | php-codeigniter>",
   "architecture": "<layered | hexagonal | hybrid | tidak terdeteksi>",
@@ -43,9 +44,11 @@ Metadata konfigurasi dan identitas repositori dalam format JSON valid:
 }
 ```
 
+`plugin` selalu `"backenddev"`: penanda kepemilikan. Profil ber-`plugin` lain tidak pernah dibaca atau ditimpa skill backenddev, dan skrip prasyarat memvonisnya FAIL.
+
 ---
 
-## 2. `.claude/profile/stack.md`
+## 2. `.claude/profile/backenddev/stack.md`
 
 Ringkasan blueprint stack, versi runtime, package manager, dan dependensi penanda:
 
@@ -57,7 +60,7 @@ Ringkasan blueprint stack, versi runtime, package manager, dan dependensi penand
 
 ---
 
-## 3. `.claude/profile/module-structure.md`
+## 3. `.claude/profile/backenddev/module-structure.md`
 
 Pola pengelompokan modul, gaya arsitektur, anatomi layer, dan tipe data batas:
 
@@ -73,7 +76,7 @@ Shared: <folder util bersama bila ada>
 
 ---
 
-## 4. `.claude/profile/domain-map.md`
+## 4. `.claude/profile/backenddev/domain-map.md`
 
 Peta modul bisnis nyata beserta path, permukaan aktif, dan titik entri daftarnya (maksimal 12 baris):
 
@@ -85,7 +88,7 @@ Peta modul bisnis nyata beserta path, permukaan aktif, dan titik entri daftarnya
 
 ---
 
-## 5. `.claude/profile/surface-map.md`
+## 5. `.claude/profile/backenddev/surface-map.md`
 
 Peta permukaan runtime aktif yang benar-benar ada di kode (maksimal 15 baris). Permukaan yang tidak ada dihapus:
 
@@ -97,7 +100,7 @@ Peta permukaan runtime aktif yang benar-benar ada di kode (maksimal 15 baris). P
 
 ---
 
-## 6. `.claude/profile/code-conventions.md`
+## 6. `.claude/profile/backenddev/code-conventions.md`
 
 Keputusan gaya nyata yang dianut repo per aspek kanonik (maksimal 10 baris). Setiap baris wajib bercontoh anchor:
 
@@ -109,7 +112,7 @@ Keputusan gaya nyata yang dianut repo per aspek kanonik (maksimal 10 baris). Set
 
 ---
 
-## 7. `.claude/profile/anti-patterns.md`
+## 7. `.claude/profile/backenddev/anti-patterns.md`
 
 Pola minoritas atau warisan yang dilarang ditiru beserta pola pengganti mayoritas, resep pengenalnya, dan buktinya (maksimal 8 baris). Baris bersumber repo wajib ber-`deteksi`; baris bersumber konfirmasi user dilarang punya `deteksi` karena polanya memang tak berjejak di kode:
 
@@ -124,7 +127,7 @@ Pola minoritas atau warisan yang dilarang ditiru beserta pola pengganti mayorita
 
 ---
 
-## 8. `.claude/profile/invariants.md`
+## 8. `.claude/profile/backenddev/invariants.md`
 
 Aturan keras runtime yang bila dilanggar membuat sistem rusak (blocker, bukan sekadar gaya kode):
 
@@ -139,7 +142,7 @@ Aturan keras runtime yang bila dilanggar membuat sistem rusak (blocker, bukan se
 
 ---
 
-## 9. `.claude/profile/commands.md`
+## 9. `.claude/profile/backenddev/commands.md`
 
 Blueprint perintah build, verifikasi, dan manajemen migrasi:
 
@@ -156,7 +159,7 @@ migration: <command> · folder <path> · pola <format nama berkas>
 
 ## Filled Example — `orders-api` (Go Stack)
 
-### `.claude/profile/index.json`
+### `.claude/profile/backenddev/index.json`
 ```json
 {
   "project": "orders-api",
@@ -170,14 +173,14 @@ migration: <command> · folder <path> · pola <format nama berkas>
 }
 ```
 
-### `.claude/profile/stack.md`
+### `.claude/profile/backenddev/stack.md`
 ```markdown
 # Stack
 
 Echo v4.11 / Go 1.22 · go modules (go.sum) · PostgreSQL + golang-migrate · NATS JetStream · Redis · sqlc untuk codegen query
 ```
 
-### `.claude/profile/module-structure.md`
+### `.claude/profile/backenddev/module-structure.md`
 ```markdown
 # Module Structure
 
@@ -188,7 +191,7 @@ Tipe batas: internal/<domain>/dto.go — struct request/response terpisah dari s
 Shared: internal/platform/ (config, logger, httpx, txmanager)
 ```
 
-### `.claude/profile/domain-map.md`
+### `.claude/profile/backenddev/domain-map.md`
 ```markdown
 # Domain Map
 
@@ -197,7 +200,7 @@ catalog: internal/catalog · http · entry cmd/api/routes.go#registerCatalogRout
 billing: internal/billing · http+scheduler · entry cmd/api/routes.go#registerBillingRoutes
 ```
 
-### `.claude/profile/surface-map.md`
+### `.claude/profile/backenddev/surface-map.md`
 ```markdown
 # Surface Map
 
@@ -213,7 +216,7 @@ error: internal/platform/httpx/error.go · HTTPErrorHandler terpusat · bentuk A
 config: internal/platform/config · envconfig struct · .env.example sebagai daftar wajib
 ```
 
-### `.claude/profile/code-conventions.md`
+### `.claude/profile/backenddev/code-conventions.md`
 ```markdown
 # Code Conventions
 
@@ -227,7 +230,7 @@ envelope: seluruh response dibungkus httpx.APIResponse{data,error} · contoh int
 test: <nama>_test.go bersebelahan dengan berkas ujinya, table-driven · contoh internal/order/service_test.go#TestOrderService_Create
 ```
 
-### `.claude/profile/anti-patterns.md`
+### `.claude/profile/backenddev/anti-patterns.md`
 ```markdown
 # Anti-patterns
 
@@ -237,7 +240,7 @@ test: <nama>_test.go bersebelahan dengan berkas ujinya, table-driven · contoh i
 - Menambah kolom lewat sqlc tanpa migrasi baru → satu migrasi baru per perubahan skema · bukti user
 ```
 
-### `.claude/profile/invariants.md`
+### `.claude/profile/backenddev/invariants.md`
 ```markdown
 # Invariants (violation = blocker, not style)
 
@@ -249,7 +252,7 @@ test: <nama>_test.go bersebelahan dengan berkas ujinya, table-driven · contoh i
 - TZ=UTC diset di Dockerfile#ENV TZ → seluruh time.Time lahir dalam UTC; konversi lokal wajib eksplisit
 ```
 
-### `.claude/profile/commands.md`
+### `.claude/profile/backenddev/commands.md`
 ```markdown
 # Commands
 

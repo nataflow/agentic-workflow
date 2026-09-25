@@ -20,7 +20,7 @@ Diterima dari pendispatch, tanpa dialog:
 1. `taskdir` [REQUIRED] — path `frontenddev/docs/<YYMMDDhhmm>-<slug>` berisi brief `READY`.
 1a. `round` [REQUIRED] — nomor ronde dari `review_round.py`; disalin ke frontmatter laporan.
 2. `sections` [REQUIRED] — cakupan dokumen hulu: `architecture`, `flow`, `ui`, atau gabungannya.
-3. `profile_path` [OPTIONAL] — default `.claude/profile/`.
+3. `profile_path` [OPTIONAL] — default `.claude/profile/frontenddev/`.
 3a. `brief_berubah` [OPTIONAL] — ronde 2 saja (`-` pada ronde 1): brief yang berubah sejak ronde lalu; nilai ulang brief itu beserta dependen dan konsumennya, bukan seluruh batch.
 3b. `previous_report` [OPTIONAL] — ronde 2 saja (`-` pada ronde 1): path `REVIEW-PLAN.md` ronde lalu; baca untuk memastikan temuannya tertutup. Laporan baru menimpanya utuh.
 4. Blok `Format artefak` dan `Format balikan` [REQUIRED] — kerangka laporan dan payload milik pendispatch. Berkas ini tidak menyediakan kerangka cadangan: prompt tanpa kedua blok itu dihentikan sebagai kegagalan dispatch.

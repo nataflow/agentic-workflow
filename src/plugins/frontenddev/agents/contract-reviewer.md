@@ -13,7 +13,7 @@ Kamu adalah reviewer khusus `CONTRACT.md` frontend. Tugasmu memvonis apakah kont
 
 ## Masukan
 
-Slot prompt: `taskdir`, `sections`, `stack`, `adapter_path`, `round`, dan — pada ronde 2 — `previous_verdict` beserta `changed_sections`. Baca sendiri: `{taskdir}/CONTRACT.md`, `TASK.md`, `FLOW.md`/`UI.md` sesuai `sections`, `.claude/profile/layer-adoption.md`, `invariants.md`, `surface-map.md`, dan `## Layer taxonomy` di `{adapter_path}`. Aturan semantik kanonik: bagian 2 butir 7–13 `${CLAUDE_PLUGIN_ROOT}/skills/contract/templates/contract-template.md`.
+Slot prompt: `taskdir`, `sections`, `stack`, `adapter_path`, `round`, dan — pada ronde 2 — `previous_verdict` beserta `changed_sections`. Baca sendiri: `{taskdir}/CONTRACT.md`, `TASK.md`, `FLOW.md`/`UI.md` sesuai `sections`, `.claude/profile/frontenddev/layer-adoption.md`, `invariants.md`, `surface-map.md`, dan `## Layer taxonomy` di `{adapter_path}`. Aturan semantik kanonik: bagian 2 butir 7–13 `${CLAUDE_PLUGIN_ROOT}/skills/contract/templates/contract-template.md`.
 
 ## Fokus Pemeriksaan
 

@@ -6,7 +6,7 @@ Penyerapan profil repositori, aturan jalur masuk Fase 1, dan kontrak panen artef
 
 Dijalankan sesudah skrip prasyarat lulus dan sebelum jalur masuk ditetapkan.
 
-1. Baca `../profile/stacks/<stack>.md` dengan `<stack>` dari field `stack` di `.claude/profile/index.json`. Seksi `## Layer taxonomy` di sana adalah sumber tunggal pola spesifik stack — dilarang memakai pola stack lain atau mengarangnya sendiri. Pilih sub-bagian sesuai field `architecture`; nilai `hybrid` atau `tidak terdeteksi` → ikuti struktur nyata modul target dan tulis bukti `file:line`-nya di brief. Berkas adapter tidak ada → hentikan eksekusi, rutekan ke `backenddev:profile`.
+1. Baca `../profile/stacks/<stack>.md` dengan `<stack>` dari field `stack` di `.claude/profile/backenddev/index.json`. Seksi `## Layer taxonomy` di sana adalah sumber tunggal pola spesifik stack — dilarang memakai pola stack lain atau mengarangnya sendiri. Pilih sub-bagian sesuai field `architecture`; nilai `hybrid` atau `tidak terdeteksi` → ikuti struktur nyata modul target dan tulis bukti `file:line`-nya di brief. Berkas adapter tidak ada → hentikan eksekusi, rutekan ke `backenddev:profile`.
 2. Serap `root_namespace` dan `source_root` dari `index.json`, pola penamaan modul dari `module-structure.md`, konvensi tipe batas, perintah test dan konfigurasi migrasi modul target dari `commands.md`, lalu `code-conventions.md`, `anti-patterns.md`, dan `invariants.md` (setelan skema penyimpanan, tenant scoping, zona waktu).
 3. Identifikasi struktur modul target agar slicing Fase 3 tetap berada di dalam batasnya.
 

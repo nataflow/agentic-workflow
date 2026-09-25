@@ -48,7 +48,7 @@ Evaluasi setiap pesan user, termasuk susulan di tengah sesi:
 ### Fase 0 — Verifikasi Prasyarat Profil Repositori
 
 1. Jalankan skrip `check_preconditions.py`. Hentikan eksekusi segera jika skrip menghasilkan `FAIL`.
-2. Baca `.claude/profile/index.json` dan `.claude/profile/invariants.md`.
+2. Baca `.claude/profile/backenddev/index.json` dan `.claude/profile/backenddev/invariants.md`.
 3. Hentikan gerbang dan arahkan ke `backenddev:profile` jika profil hilang atau field kritisnya corrupt.
 4. Catat invariant zona waktu, response wrapper, dan exception pattern sebagai baseline batas modul, lalu ke Fase 1.
 
@@ -77,7 +77,7 @@ Pilih satu dari tujuh jalur kanonik berdasar fakta kode terverifikasi:
 
 | Jalur (Lane) | Kondisi Masuk | Rute Awal | Artefak |
 |---|---|---|---|
-| **PROFILE** | Profil tidak ada, atau 1 field wajibnya hilang | `profile` | `.claude/profile/` |
+| **PROFILE** | Profil tidak ada, atau 1 field wajibnya hilang | `profile` | `.claude/profile/backenddev/` |
 | **EXPLORE_FACT** | Pertanyaan faktual letak simbol/alur, tanpa mutasi | Selesai di Fase 1 | Jawaban di chat |
 | **PLANNING** | Permintaan mengubah perilaku sistem dan brief `READY`-nya belum terbit | `analyst` | `TASK.md` → `BRD.md`/`PRD.md` → `brief-<NN>-<unit>.md` |
 | **DEFECT_RCA** | Ada error/stacktrace/test merah, penyebab belum terbukti | `debug` | `RCA.md` |
@@ -138,7 +138,7 @@ Jalankan untuk rute yang menghasilkan artefak rancangan atau kode; lewati pada l
 
 Jalankan tiap kali skill hilir menutup dengan instruksi `kembali ke backenddev:tech-lead`:
 
-1. Jalankan skrip prasyarat dengan `--re-entry`; berkas kotor di zona artefak (`.claude/profile/`, `backenddev/docs/`, `backenddev/issues/`, `docs/api/`) memang menunggu commit butir 2. Identifikasi pengirim balik, baca laporan penutupnya, dan periksa status artefaknya.
+1. Jalankan skrip prasyarat dengan `--re-entry`; berkas kotor di zona artefak (`.claude/profile/backenddev/`, `backenddev/docs/`, `backenddev/issues/`, `docs/api/`, dan — hanya selama masa transisi MIGRATE — penghapusan berkas profil backenddev di lokasi lama `.claude/profile/<berkas>`) memang menunggu commit butir 2. Berkas di `.claude/profile/frontenddev/` atau sisa milik plugin lain di `.claude/profile/` bukan artefak gerbang ini dan tidak ikut di-stage. Identifikasi pengirim balik, baca laporan penutupnya, dan periksa status artefaknya.
 2. Commit artefak yang masih menunggu: profil dari `backenddev:profile`, laporan dan indeks `backenddev/issues/` dari `audit`, serta `RCA.md` dari `debug`. Gunakan staging path eksplisit; dilarang `git add .` atau `-A` (`references/gate-scope.md` bagian 3). Stage **tiap path** yang disebut slot `Menunggu commit` laporan pengirim — pada `profile` itu termasuk `.gitignore`, yang memikul baris ignore laci `.explore/` dan `.backenddev/`. Berkas itu tertinggal di luar commit berarti ia tiba di `architect` sebagai working tree kotor, lalu berakhir jadi commit susulan tanpa brief pengklaim yang dihukum `code-reviewer` di penutup taskdir.
 3. Tentukan langkah lanjut berdasarkan pengirim balik:
    - Pengirim `backenddev:profile`: Ulangi Fase 0 dan lanjutkan rute tertunda.

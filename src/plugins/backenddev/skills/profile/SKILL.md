@@ -1,6 +1,6 @@
 ---
 name: profile
-description: Gunakan ketika repo backend belum punya .claude/profile/ atau konfigurasi berubah - deteksi stack, pemindaian arsitektur, sebelum mengedit kode atau menjalankan task tanpa profile
+description: Gunakan ketika repo backend belum punya .claude/profile/backenddev/ atau konfigurasi berubah - deteksi stack, pemindaian arsitektur, sebelum mengedit kode atau menjalankan task tanpa profile
 metadata:
   mode: standard
 ---
@@ -11,19 +11,19 @@ metadata:
 - Baris konvensi wajib bercontoh anchor `<file>#<simbol>`, baris anti-pattern bersumber repo wajib ber-`deteksi` yang berhit dan baris bersumber user wajib bertanda `bukti user`; yang tidak terbukti dihapus, bukan ditebak dari kelaziman stack.
 - Setiap perintah di `commands.md` wajib dieksekusi minimal sekali sebelum ditulis ke profil.
 - Profiling read-only mutlak: dilarang mengubah, membuat, atau memperbaiki kode di source root.
-- Profil hanya sah ditulis ke `.claude/profile/` (`index.json` + 8 berkas `.md`), wajib memuat field `stack`, dan pada mode refresh ditulis ulang penuh tanpa merge parsial.
+- Profil hanya sah ditulis ke `.claude/profile/backenddev/` (`index.json` + 8 berkas `.md`), wajib memuat field `stack`, dan pada mode refresh ditulis ulang penuh tanpa merge parsial.
 
 ## Precondition [REQUIRED]
 
 1. Jalankan skrip verifikasi prasyarat: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/profile/scripts/check_preconditions.py [--mode <mode>] [--stack <stack>] [--profile-dir <profile_dir>]`.
-2. `PASS` (5/5 checks): lanjut ke Workflow. `FAIL`: hentikan dan remediasi butir yang gagal — manifest backend tidak terdeteksi → pastikan target repo backend valid; adapter stack hilang → pulihkan berkas plugin; direktori profil tidak dapat ditulis → periksa izin; bukan repo git → inisialisasi git.
+2. `PASS` (6/6 checks): lanjut ke Workflow; baris `Terselesaikan: mode <GENERATE | REFRESH | MIGRATE>` adalah mode Fase 1. `FAIL`: hentikan dan remediasi butir yang gagal — nol penanda framework server backend → repo bukan target backenddev, jangan buat profil; `--profile-dir` selain `.claude/profile/backenddev` → jalankan ulang tanpa parameter itu; `.claude/profile/backenddev/index.json` milik plugin lain → laporkan ke user, jangan ditimpa; adapter stack hilang → pulihkan berkas plugin; direktori profil tidak dapat ditulis → periksa izin; bukan repo git → inisialisasi git.
 
 ## Parameter [REQUIRED]
 
-- `mode` — string — default `"auto"` — `"auto"` | `"generate"` | `"refresh"`.
+- `mode` — string — default `"auto"` — `"auto"` | `"generate"` | `"refresh"` | `"migrate"`. Keadaan disk yang dilaporkan skrip prasyarat selalu menang.
 - `stack` — string — default `"auto"` — paksa `<stack-id>` bila deteksi Fase 0 ambigu; nilai sah = daftar di `stacks/_CONTRACT.md`.
-- `force` — boolean — default `false` — bila `true`, Fase 1 melewati konfirmasi REFRESH dan langsung menulis ulang.
-- `profile_dir` — string — default `".claude/profile"` — target tulis Fase 6; nilai lain ditolak.
+- `force` — boolean — default `false` — bila `true`, Fase 1 melewati konfirmasi REFRESH dan langsung menulis ulang. `force` tidak pernah berlaku atas profil milik plugin lain atau lokasi lama `.claude/profile/`; keduanya ditolak prasyarat atau dialihkan ke MIGRATE.
+- `profile_dir` — string — default `".claude/profile/backenddev"` — target tulis Fase 6; nilai lain ditolak.
 - `interview` — boolean — default `true` — bila `false`, Fase 3 dilewati; `code-conventions.md` dan `anti-patterns.md` diisi hasil scan saja, ditandai belum tervalidasi user.
 - `reported_anti_patterns` — list — default `[]` — Preseden menyesatkan yang ditemukan **eksekusi**, diteruskan gerbang dari slot `Umpan balik profil` laporan `backenddev:architect`: tiap entri berisi `file:baris` beserta polanya. Sapuan statis tidak menemukan pola ini — ia baru terbukti saat brief menyalinnya sebagai preseden lalu `code-implementor` terhenti. Fase 3 menyajikannya ke user untuk konfirmasi; yang disetujui masuk `anti-patterns.md` sebagai baris ber-`deteksi` dan sejak itu ditegakkan Check P `plan`. Yang ditolak dibuang, tidak disimpan sebagai catatan.
 
@@ -34,12 +34,12 @@ Pemindaian profil codebase dieksekusi sekuensial melalui 8 fase:
 ### Fase 0 — Deteksi Stack & Resolusi Adapter
 
 1. Jalankan `check_preconditions.py` dengan parameter `mode`, `stack`, dan `profile_dir`. Hentikan bila hasilnya `FAIL`.
-2. Pindai manifest di root dan satu tingkat submodule, cocokkan dependensi penanda framework server:
-   - `pom.xml`/`build.gradle(.kts)` + `org.springframework.boot` → `java-spring`
-   - `go.mod` + `gin`/`fiber`/`echo`/`chi`/`gorilla/mux`/`grpc-go` → `go`
-   - `package.json` + `hono`/`elysiajs` bersama `bun.lockb`/`bunfig.toml` → `bun`; selain itu `@nestjs/core`/`express`/`fastify`/`koa`/`@hapi/hapi` → `node`
-   - `Cargo.toml` + `axum`/`actix-web`/`rocket`/`warp`/`poem` → `rust`
-   - `composer.json` + `codeigniter4/framework` bersama `spark` → `php-codeigniter`; selain itu `laravel/framework`/`symfony/framework-bundle`/`slim/slim`/`yiisoft/yii2` → `php`
+2. Check 1 skrip prasyarat memanggil `hooks/detect.py` (fungsi yang sama dengan hook SessionStart) atas root, workspace terdeklarasi (`workspaces`, `pnpm-workspace.yaml`, `go.work`, Cargo `members`), `apps/*`, `packages/*`, `services/*`, dan anak langsung root. Penanda framework server yang dicocokkan:
+   - `pom.xml` (`groupId` `org.springframework.boot`) atau `build.gradle(.kts)`/`gradle/libs.versions.toml` memuat `org.springframework.boot` di luar komentar → `java-spring`
+   - `go.mod` `require` (tanpa `// indirect`) memuat `github.com/gin-gonic/gin`, `github.com/gofiber/fiber`, `github.com/labstack/echo`, `github.com/go-chi/chi`, `github.com/gorilla/mux`, atau `google.golang.org/grpc` (termasuk sufiks `/vN`) → `go`
+   - `package.json` — hanya dari `dependencies`, bukan `devDependencies`/`overrides`/`keywords`: `elysia`, atau `hono` bersama `bun.lockb`/`bun.lock`/`bunfig.toml` (dan tanpa `@nestjs/core`/`express`) → `bun`; selain itu `@nestjs/core`/`express`/`fastify`/`koa`/`@hapi/hapi`/`hono` → `node`
+   - `Cargo.toml` `[dependencies]` + `axum`/`actix-web`/`rocket`/`warp`/`poem`/`salvo` → `rust`
+   - `composer.json` `require` + `codeigniter4/framework` → `php-codeigniter`; selain itu `laravel/framework`/`symfony/framework-bundle`/`slim/slim`/`laminas/laminas-mvc`/`yiisoft/yii2` → `php`
 3. Evaluasi hasil deteksi:
    - Pakai nilai eksplisit parameter `stack` bila disetel; catat penanda pendukung maupun yang bertentangan.
    - Nol stack: hentikan, sebutkan manifest yang diperiksa. Dilarang membuat profil palsu pada repo non-backend.
@@ -48,9 +48,10 @@ Pemindaian profil codebase dieksekusi sekuensial melalui 8 fase:
 
 ### Fase 1 — Deteksi Mode Operasi & Konfirmasi Pengguna
 
-1. Periksa `.claude/profile/index.json`:
-   - Belum ada: mode `GENERATE`, lanjut ke Fase 2 tanpa konfirmasi.
-   - Sudah ada: mode `REFRESH`, tampilkan ringkasan profil saat ini, lalu minta konfirmasi "Lakukan REFRESH (tulis ulang penuh) atau BATAL?". Hentikan menunggu respons bila `force: false`.
+1. Ambil mode dari baris `Terselesaikan:` skrip prasyarat (check 6 "Mode & kepemilikan profil"):
+   - `GENERATE` (`.claude/profile/backenddev/index.json` belum ada): lanjut ke Fase 2 tanpa konfirmasi. Bila check 6 menyebut profil lama milik plugin lain di `.claude/profile/`, biarkan berkas itu; jangan dibaca sebagai profil backenddev, jangan ditimpa.
+   - `REFRESH` (`.claude/profile/backenddev/index.json` ada dan milik backenddev): tampilkan ringkasan profil saat ini, lalu minta konfirmasi "Lakukan REFRESH (tulis ulang penuh) atau BATAL?". Hentikan menunggu respons bila `force: false`.
+   - `MIGRATE` (profil backenddev masih di lokasi lama `.claude/profile/index.json`): jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/profile/scripts/migrate_profile.py`, laporkan berkas sisa di `.claude/profile/` sebagai **bukan milik plugin ini — tidak disentuh**, lalu lanjut ke Fase 7 tanpa pemindaian ulang. Sebut juga di laporan: profil backenddev yang pernah tertimpa plugin lain dapat dipulihkan dari riwayat `git log --oneline -- .claude/profile/index.json`. Commit pemindahan (termasuk penghapusan di lokasi lama) dikunci gerbang `backenddev:tech-lead` di Fase 5-nya.
 2. Abaikan seluruh isi profil lama saat memindai bila REFRESH disetujui; tulis hasil scan baru utuh tanpa merge parsial.
 3. Laporkan perubahan stack sebagai temuan tersendiri sebelum menulis ulang bila profil lama memuat `stack` berbeda dari hasil Fase 0.
 
@@ -83,7 +84,7 @@ Uji enam perintah hasil Fase 2 titik 7 sebelum ditulis ke `commands.md`:
 
 ### Fase 5 — Verifikasi State Git & Pemasangan Gitignore
 
-Satu-satunya berkas di luar `.claude/profile/` yang boleh disentuh adalah `.gitignore`:
+Satu-satunya berkas di luar `.claude/profile/backenddev/` yang boleh disentuh adalah `.gitignore`:
 
 1. `git rev-parse --git-dir`. Bila gagal, catat status non-git dan tulis `commit_convention`, `base_branch`, serta `branch_convention` sebagai `tidak terdeteksi`.
 2. `git check-ignore -q backenddev`. Bila exit code 0, peringatkan bahwa artefak `backenddev/` berstatus lokal dan tidak di-track git.
@@ -92,11 +93,11 @@ Satu-satunya berkas di luar `.claude/profile/` yang boleh disentuh adalah `.giti
 
    Laci `.explore/` adalah zona kerja `code-explorer` beserta berkas kerja `plan` (`brief-matrix.*`, `brief-review-state.json`). Ia hidup **di dalam taskdir** supaya laporannya ko-lokasi dengan artefak yang lahir darinya — `plan` Fase 3 langkah 3 memanennya ulang tepat sebelum mengisi `## File scope`. Konsekuensinya ia berkas untracked di dalam direktori yang ter-track, dan tanpa baris ignore ini ia muncul di tiap `git status --porcelain`: `architect` menolak start karena working tree kotor, dan siapa pun yang menambal baris ignore itu belakangan menghasilkan commit tanpa brief pengklaim yang dihukum `code-reviewer` sebagai temuan. Satu baris berpemilik di sini menutup ketiganya. Pola tanpa awalan path sekaligus mencakup laci gerbang di `backenddev/docs/.explore/`.
 
-5. **Laporkan `.gitignore` sebagai artefak yang menunggu commit.** Skill ini menulis barisnya tetapi tidak meng-commit-nya sendiri — penguncian artefak profil milik gerbang `backenddev:tech-lead` di Fase 5-nya. Sebut path `.gitignore` eksplisit di slot `Artefak` laporan penutup, sejajar dengan berkas `.claude/profile/`, supaya gerbang menariknya ke dalam commit yang sama. Baris yang ditulis lalu tidak ikut ter-commit tiba di `architect` sebagai working tree kotor — persis keadaan yang ia ada untuk mencegahnya.
+5. **Laporkan `.gitignore` sebagai artefak yang menunggu commit.** Skill ini menulis barisnya tetapi tidak meng-commit-nya sendiri — penguncian artefak profil milik gerbang `backenddev:tech-lead` di Fase 5-nya. Sebut path `.gitignore` eksplisit di slot `Artefak` laporan penutup, sejajar dengan berkas `.claude/profile/backenddev/`, supaya gerbang menariknya ke dalam commit yang sama. Baris yang ditulis lalu tidak ikut ter-commit tiba di `architect` sebagai working tree kotor — persis keadaan yang ia ada untuk mencegahnya.
 
 ### Fase 6 — Penyusunan & Penulisan Dokumen Profil Modular
 
-Tulis `<repo>/.claude/profile/` persis mengikuti skema, format, dan batas baris di `templates/profile-template.md`:
+Tulis `<repo>/.claude/profile/backenddev/` persis mengikuti skema, format, dan batas baris di `templates/profile-template.md`:
 
 | Berkas | Isi |
 |---|---|
@@ -112,7 +113,7 @@ Tulis `<repo>/.claude/profile/` persis mengikuti skema, format, dan batas baris 
 
 ### Fase 7 — Laporan Penutupan & Audit Missing Fields
 
-1. Konfirmasikan `Ditulis: .claude/profile/ (index.json + 8 berkas .md)`.
+1. Konfirmasikan `Ditulis: .claude/profile/backenddev/ (index.json + 8 berkas .md)`.
 2. Rinci seluruh field atau seksi berstatus `tidak terdeteksi` beserta dampaknya pada skill hilir.
 3. Sebutkan jumlah baris `domain-map.md`, `code-conventions.md`, `anti-patterns.md`, jumlah baris anti-pattern bertanda `[PUNAH]` beserta keputusan user atasnya, dan ringkasan resolusi inkonsistensi yang dikonfirmasi user.
 4. Rekomendasikan gerbang berikutnya: `backenddev:tech-lead`.
@@ -121,7 +122,7 @@ Tulis `<repo>/.claude/profile/` persis mengikuti skema, format, dan batas baris 
 
 - **READ-ONLY KODE SUMBER**: dilarang membuat, mengedit, memformat, atau menghapus berkas kode sumber selama profiling.
 - **BUKTI KONFIGURASI AKTUAL**: dilarang mencatat dependensi, versi runtime, atau invariant dari tebakan tanpa bukti manifest atau konfigurasi nyata.
-- **OUTPUT MODULAR TUNGGAL**: profil HANYA ditulis ke `.claude/profile/`; satu-satunya tulisan lain yang sah adalah baris `.backenddev/` dan `.explore/` pada `.gitignore` (Fase 5), dan keduanya dilaporkan ke gerbang sebagai artefak yang menunggu commit. Skill ini **pemilik tunggal** mutasi `.gitignore` di seluruh rantai: skrip `plan`, `architect`, dan gerbang dilarang menambahkan barisnya sendiri, karena baris tak berpemilik tiba di hilir sebagai working tree kotor lalu berakhir jadi commit tanpa brief pengklaim.
+- **OUTPUT MODULAR TUNGGAL**: profil HANYA ditulis ke `.claude/profile/backenddev/`; satu-satunya tulisan lain yang sah adalah baris `.backenddev/` dan `.explore/` pada `.gitignore` (Fase 5), dan keduanya dilaporkan ke gerbang sebagai artefak yang menunggu commit. Skill ini **pemilik tunggal** mutasi `.gitignore` di seluruh rantai: skrip `plan`, `architect`, dan gerbang dilarang menambahkan barisnya sendiri, karena baris tak berpemilik tiba di hilir sebagai working tree kotor lalu berakhir jadi commit tanpa brief pengklaim.
 - **FIELD STACK WAJIB**: profil tanpa `stack` valid di `index.json` membuat skill hilir gagal memuat adapter; dilarang serah terima dalam keadaan itu.
 - **REWRITE PENUH PADA REFRESH**: tulis ulang 100% dokumen dari pemindaian segar; dilarang merge parsial.
 - **INKONSISTENSI WAJIB DIKLARIFIKASI**: dilarang memilih sepihak saat pola terbelah Gaya A vs Gaya B; keputusan user diambil di Fase 3.
@@ -131,19 +132,19 @@ Tulis `<repo>/.claude/profile/` persis mengikuti skema, format, dan batas baris 
 
 ## Output [REQUIRED]
 
-Artefak `.claude/profile/` mengikuti `templates/profile-template.md`. Profil utuh dan baseline terverifikasi → tutup dua baris tanpa blok: judul `### BACKEND PROFILE GENERATION REPORT — <GENERATE | REFRESH> · stack <stack-id> · <framework> <version> · index.json + 8 berkas .md` plus slot `Menunggu commit`. Selain itu, sajikan:
+Artefak `.claude/profile/backenddev/` mengikuti `templates/profile-template.md`. Profil utuh dan baseline terverifikasi → tutup dua baris tanpa blok: judul `### BACKEND PROFILE GENERATION REPORT — <GENERATE | REFRESH | MIGRATE> · stack <stack-id> · <framework> <version> · index.json + 8 berkas .md` plus slot `Menunggu commit`. Selain itu, sajikan:
 
 ```markdown
-### BACKEND PROFILE GENERATION REPORT — <GENERATE | REFRESH> TIDAK UTUH
-- **Profil**  : .claude/profile/ (<n> berkas ditulis) · stack <stack-id | tidak terdeteksi>
+### BACKEND PROFILE GENERATION REPORT — <GENERATE | REFRESH | MIGRATE> TIDAK UTUH
+- **Profil**  : .claude/profile/backenddev/ (<n> berkas ditulis) · stack <stack-id | tidak terdeteksi>
 - **Baseline**: <perintah yang FAIL | UNVERIFIED_ENV_NOT_READY> — <pesan galat>
 - **Gap**     : inkonsistensi <daftar> · field tak terdeteksi <daftar>
-- **Menunggu commit**: `.claude/profile/` (<n> berkas) · `.gitignore` (<baris `.backenddev/` dan/atau `.explore/` ditambahkan | tidak disentuh>)
+- **Menunggu commit**: `.claude/profile/backenddev/` (<n> berkas) · `.gitignore` (<baris `.backenddev/` dan/atau `.explore/` ditambahkan | tidak disentuh>)
 ```
 
 `Menunggu commit` wajib di kedua bentuk: gerbang meng-stage **persis** path yang disebutnya, dan `.gitignore` yang tertinggal di luar commit profil tiba di `architect` sebagai working tree kotor. Isi profil — arsitektur, konvensi, invariant, blueprint — sengaja tidak disalin ke laporan: skill yang membutuhkannya membaca berkasnya sendiri saat rutenya jalan, supaya yang terbaca selalu versi terakhir.
 
-**Serah-terima.** `Profil codebase selesai ditulis di .claude/profile/` — kembali ke `backenddev:tech-lead` di main loop. Profil belum di-commit; gerbang yang menutupnya.
+**Serah-terima.** `Profil codebase selesai ditulis di .claude/profile/backenddev/` — kembali ke `backenddev:tech-lead` di main loop. Profil belum di-commit; gerbang yang menutupnya.
 
 ## Failure path
 
@@ -156,7 +157,7 @@ Artefak `.claude/profile/` mengikuti `templates/profile-template.md`. Profil utu
 | Konfirmasi REFRESH ditolak | Batalkan tanpa mengubah profil eksisting. |
 | Baseline tidak dapat dieksekusi | Catat `UNVERIFIED_ENV_NOT_READY`, instruksikan pemasangan dependensi, tetap tulis profil dengan status itu terpampang. |
 | Repositori non-git | Lanjutkan dengan field konvensi git `tidak terdeteksi` dan peringatan kebutuhan input manual. |
-| Izin tulis gagal | Laporkan kendala izin pada `.claude/profile/` sebelum mencoba kembali. |
+| Izin tulis gagal | Laporkan kendala izin pada `.claude/profile/backenddev/` sebelum mencoba kembali. |
 
 ## STYLE
 

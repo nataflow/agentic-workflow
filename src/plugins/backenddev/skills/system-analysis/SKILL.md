@@ -12,7 +12,7 @@ Kebutuhan BRD dibaca dari `chain`, bukan dari `risk_level`: `chain: BRD_PRD_BRIE
 ## Precondition [REQUIRED]
 
 1. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/system-analysis/scripts/check_preconditions.py --taskdir <taskdir> --risk-level <risk_level> --chain <chain>`.
-2. `PASS` (8/8): lanjut. `FAIL`: hentikan dan rutekan butir gagal — BRD absen/belum `APPROVED` pada `chain: BRD_PRD_BRIEF` ke `backenddev:analyst`; `chain` tak terbaca ke `backenddev:analyst`; taskdir tidak sah ke `tech-lead`; `.claude/profile/index.json` absen ke `backenddev:profile`.
+2. `PASS` (8/8): lanjut. `FAIL`: hentikan dan rutekan butir gagal — BRD absen/belum `APPROVED` pada `chain: BRD_PRD_BRIEF` ke `backenddev:analyst`; `chain` tak terbaca ke `backenddev:analyst`; taskdir tidak sah ke `tech-lead`; `.claude/profile/backenddev/index.json` absen ke `backenddev:profile`.
 
 ## Parameter [REQUIRED]
 

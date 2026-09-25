@@ -29,7 +29,7 @@ metadata:
 
 ### Phase 0 — Serap Profil & Baseline
 
-1. Serap `stack` dari `.claude/profile/index.json`, perintah dari `commands.md`, dan baris `typecheck-per-brief` `## Commands` adapter `${CLAUDE_PLUGIN_ROOT}/skills/profile/stacks/<stack>.md`.
+1. Serap `stack` dari `.claude/profile/frontenddev/index.json`, perintah dari `commands.md`, dan baris `typecheck-per-brief` `## Commands` adapter `${CLAUDE_PLUGIN_ROOT}/skills/profile/stacks/<stack>.md`.
 2. `typecheck-per-brief: ya` → jalankan `typecheck` sekali sekarang dan simpan jumlah galatnya sebagai baseline gerbang kompilasi. Merah di sini bukan alasan berhenti — ia yang membuat gerbang dapat memvonis galat **baru**.
 3. Sajikan rantai sebelum implementor pertama berangkat: tabel `NN`, unit, status, `files_touched`, `depends_on`. Dilarang menahan rantai untuk meminta otorisasi commit — persetujuan breakdown sudah dimateraikan di ledger.
 

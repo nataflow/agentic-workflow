@@ -1,4 +1,4 @@
-# `.claude/profile/` Template
+# `.claude/profile/frontenddev/` Template
 
 Profil kode acuan arsitektur untuk seluruh skill dan subagent plugin `frontenddev`. Nilai contoh di bawah bercampur antar stack sebagai ilustrasi; profil nyata hanya memuat idiom satu `<stack-id>`.
 
@@ -21,7 +21,7 @@ Berlaku untuk seluruh kolom `Bukti` dan seluruh baris berbukti di seluruh berkas
 
 | Berkas | Isi | Konsumen utama |
 |---|---|---|
-| `index.json` | `project`, `stack`, `platform`, `framework`, `source_root`, `workspace`, `commit_convention` | `hooks/lead-gate.sh`, seluruh skill (resolusi adapter) |
+| `index.json` | `project`, `stack`, `platform`, `framework`, `source_root`, `workspace`, `commit_convention` | `hooks/detect.py`, seluruh skill (resolusi adapter) |
 | `stack.md` | framework & versi, bahasa & compiler flags, package manager, router, state, query, styling, UI library | `contract`, `ui-design`, `ux-design`, `code-reviewer`, `review` |
 | `structure.md` | source root, path fitur, anatomi layer per direktori, shared components, definisi rute | `contract`, `plan`, `code-explorer` |
 | `surface-map.md` | permukaan runtime: path kanonik · penanda pengenal kode · bukti | `code-explorer`, `plan`, `contract`, `code-implementor` |
@@ -36,12 +36,13 @@ Berkas yang datanya nihil tetap ditulis, berisi satu baris `tidak terdeteksi`. B
 
 ---
 
-## 1. `.claude/profile/index.json`
+## 1. `.claude/profile/frontenddev/index.json`
 
-Satu-satunya berkas mesin di profil. `hooks/lead-gate.sh` dan skrip prasyarat tiap skill (`skills/*/scripts/check_preconditions.py`) membaca field `stack` dari sini untuk memuat adapter; field yang hilang atau kosong mengunci gate.
+Satu-satunya berkas mesin di profil. `hooks/detect.py` dan skrip prasyarat tiap skill (`skills/*/scripts/check_preconditions.py`) membaca field `stack` dari sini untuk memuat adapter; field yang hilang atau kosong mengunci gate.
 
 ```json
 {
+  "plugin": "frontenddev",
   "project": "<nama repo>",
   "stack": "<react-vite | react-native | sveltekit | svelte-vite>",
   "platform": "<React SPA (Vite) | React Native (Expo / Bare) | SvelteKit | Svelte SPA (Vite)>",
@@ -53,11 +54,11 @@ Satu-satunya berkas mesin di profil. `hooks/lead-gate.sh` dan skrip prasyarat ti
 }
 ```
 
-`stack` wajib salah satu dari empat nilai sah — ia yang menentukan `stacks/<stack-id>.md` mana yang dimuat seluruh skill hilir. `commit_convention` diturunkan dari `git log -n 20 --oneline` nyata, bukan dari asumsi Conventional Commits; repo non-git menulis `UNINITIALIZED (default conventional commits)`.
+`plugin` selalu `"frontenddev"`: penanda kepemilikan — profil ber-`plugin` lain tidak pernah dibaca atau ditimpa skill frontenddev, juga dengan `force: true`. `stack` wajib salah satu dari empat nilai sah — ia yang menentukan `stacks/<stack-id>.md` mana yang dimuat seluruh skill hilir. `commit_convention` diturunkan dari `git log -n 20 --oneline` nyata, bukan dari asumsi Conventional Commits; repo non-git menulis `UNINITIALIZED (default conventional commits)`.
 
 ---
 
-## 2. `.claude/profile/stack.md`
+## 2. `.claude/profile/frontenddev/stack.md`
 
 - **Platform**: `<React SPA (Vite) | React Native (Expo / Bare) | SvelteKit | Svelte SPA (Vite)>`
 - **Framework Version**: React `<18.x | 19.x>` / Svelte `<4.x | 5.x>`, Vite `<5 | 6>`, Expo SDK `<51 | 52>`, SvelteKit `<2.x>`
@@ -72,7 +73,7 @@ Satu-satunya berkas mesin di profil. `hooks/lead-gate.sh` dan skrip prasyarat ti
 
 ---
 
-## 3. `.claude/profile/structure.md`
+## 3. `.claude/profile/frontenddev/structure.md`
 
 - **Source Root**: `src/` (atau `apps/web/src/`, `apps/mobile/src/`, `src/lib/` di SvelteKit)
 - **Workspace**: `<Single App | Monorepo — daftar package aktif dan aplikasi utama>`
@@ -89,7 +90,7 @@ Satu-satunya berkas mesin di profil. `hooks/lead-gate.sh` dan skrip prasyarat ti
 
 ---
 
-## 4. `.claude/profile/surface-map.md`
+## 4. `.claude/profile/frontenddev/surface-map.md`
 
 Kolom **Penanda Pengenal Kode** diisi dari `## Navigation recipes` adapter yang benar-benar berhit di repo; `code-explorer` menyisir dari kolom ini, bukan dari adapter.
 
@@ -107,7 +108,7 @@ Kolom **Penanda Pengenal Kode** diisi dari `## Navigation recipes` adapter yang 
 
 ---
 
-## 5. `.claude/profile/invariants.md`
+## 5. `.claude/profile/frontenddev/invariants.md`
 
 Pelanggaran = blocker, bukan gaya.
 
@@ -122,7 +123,7 @@ Invariant yang repo-nya belum patuhi tetap ditulis sebagai invariant; ketidakpat
 
 ---
 
-## 6. `.claude/profile/commands.md`
+## 6. `.claude/profile/frontenddev/commands.md`
 
 | Perintah Terminal | Status Baseline Aktual | Error Pre-existing / Catatan | Cakupan yang TIDAK Diperiksa |
 |---|---|---|---|
@@ -142,7 +143,7 @@ Status sah: `OK (...)`, `FAIL (<n> errors)`, `UNVERIFIED_ENV_NOT_READY`, `TIMEOU
 
 ---
 
-## 7. `.claude/profile/layer-adoption.md`
+## 7. `.claude/profile/frontenddev/layer-adoption.md`
 
 ```
 [ Presentation ] ──► [ Controller ]
@@ -167,7 +168,7 @@ Aspek yang terbelah tanpa mayoritas dicatat di sini hanya sesudah user memilih g
 
 ---
 
-## 8. `.claude/profile/visual.md`
+## 8. `.claude/profile/frontenddev/visual.md`
 
 - **Color Palette Tokens**: Primary `primary-500` (`#2563EB`), Secondary `secondary-500` (`#4F46E5`), Background `bg-background` (`#FFFFFF`), Surface `bg-card` (`#F8FAFC`), Semantic (`success`, `danger`, `warning`, `info`), Text `text-foreground` (`#0F172A`), `text-muted` (`#64748B`).
 - **Typography**: Heading `Inter`, Body `Inter`, Monospace `JetBrains Mono`.
@@ -178,7 +179,7 @@ Nilai disalin **persis** dari konfigurasi tema, bukan dari ingatan atau dari tam
 
 ---
 
-## 9. `.claude/profile/drift.md`
+## 9. `.claude/profile/frontenddev/drift.md`
 
 Format baris wajib: `- <pola warisan> (<sebaran>) → <pola modern> · deteksi \`<pola grep> @ <glob>\` · bukti <file#simbol>`. Resep `deteksi` ditulis dalam **satu** span backtick yang memuat pola dan glob dipisah ` @ `; memecahnya jadi dua span membuat `validate_briefs.py` Check P tidak mengenalinya dan baris itu diam-diam tidak pernah ditegakkan. Resep `deteksi` wajib berhit minimal sekali saat baris ditulis; nol hit berarti pola sudah punah dan barisnya batal. Pada REFRESH tiap resep dijalankan ulang dan vonisnya `[MASIH HIDUP — n hit]` atau `[PUNAH — 0 hit]`; baris `PUNAH` dicabut hanya atas persetujuan user, bukan diam-diam oleh pemindaian.
 
@@ -191,7 +192,7 @@ Gaya yang kalah dalam wawancara pola terbelah (Phase 3) masuk ke sini dengan `bu
 
 ---
 
-## 10. `.claude/profile/manual-notes.md`
+## 10. `.claude/profile/frontenddev/manual-notes.md`
 
 Catatan manual user. Berkas ini **satu-satunya** bagian profil yang dipertahankan apa adanya saat mode `REFRESH` menulis ulang profil; sembilan berkas lain lahir kembali dari pemindaian segar. Isi dengan satu baris `—` bila belum ada catatan.
 

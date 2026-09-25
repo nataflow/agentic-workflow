@@ -31,13 +31,13 @@ Review seluruh branch pekerjaan untuk satu direktori tugas.
 | Slot | Sumber Pengisian | Keterangan & Batasan Kritis |
 | --- | --- | --- |
 | `{taskdir}` | Parameter `taskdir` architect | **[REQUIRED]** Direktori tugas yang dinilai — misal `backenddev/docs/2608181430-order-split`. Dilarang dikosongkan atau diganti path induknya; reviewer menurunkan kontrak penilaiannya dari brief di direktori ini |
-| `{base_branch}` | Field `base_branch` di `.claude/profile/index.json` | **[REQUIRED]** Titik cabang dasar — misal `main` atau `dev`. Batalkan dispatch bila profil tidak terbaca; menebak `main` pada repo ber-`base_branch` lain menghasilkan rentang diff yang salah dan review yang menilai pekerjaan orang lain |
+| `{base_branch}` | Field `base_branch` di `.claude/profile/backenddev/index.json` | **[REQUIRED]** Titik cabang dasar — misal `main` atau `dev`. Batalkan dispatch bila profil tidak terbaca; menebak `main` pada repo ber-`base_branch` lain menghasilkan rentang diff yang salah dan review yang menilai pekerjaan orang lain |
 
 ### Aturan untuk Pendispatch
 
 - **Tepat satu kali di akhir rantai**: reviewer berangkat sekali atas seluruh diff branch gabungan, sesudah brief terakhir `DONE`. Dilarang mendispatch per brief maupun mengulang review untuk temuan yang sama.
 - **Sesudah verifikasi penutup hijau**: build dan test Fase 4 butir 1 lulus lebih dulu. Mendispatch reviewer di atas branch yang buildnya merah menghasilkan temuan yang tak dapat dipisahkan dari kegagalan build.
-- **Dilarang menyalin isi berkas**: jangan salin isi brief, diff, atau `.claude/profile/` ke dalam prompt. Sebutkan path-nya; subagent membacanya sendiri secara terisolasi.
+- **Dilarang menyalin isi berkas**: jangan salin isi brief, diff, atau `.claude/profile/backenddev/` ke dalam prompt. Sebutkan path-nya; subagent membacanya sendiri secara terisolasi.
 - **Audit hidrasi sebelum berangkat**: batalkan dispatch bila prompt masih memuat slot kurung kurawal `{...}` mentah atau placeholder `TBD`/`TODO`.
 - **Read-only terhadap `src/`**: reviewer tidak pernah memperbaiki kode atau menjalankan build/test; ia hanya menulis dan meng-commit laporannya sendiri.
 - **Dispatch langsung tanpa skill pembungkus**: seluruh doktrin review — gerbang masuk, lima pemeriksaan, kontrak `REVIEW.md`, dan amplop balikan — duduk di `agents/code-reviewer.md`. Dilarang memanggil skill perantara atau menyalin potongan doktrin itu ke dalam prompt.

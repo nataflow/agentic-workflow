@@ -125,7 +125,7 @@ laporan.
 | `{taskdir}` | Parameter `taskdir` plan | **[REQUIRED]** Path taskdir aktif apa adanya, mis. `frontenddev/docs/2608251430-order-export-csv`. Tanpa slot ini subagent tidak punya muara tulis dan menghentikan dispatch |
 | `{sections}` | Frontmatter `sections` `TASK.md` (baris `Terselesaikan:` prasyarat plan) | **[REQUIRED]** Satu atau gabungan dari `architecture`, `flow`, `ui`. Nilai kosong berarti lane `HOTFIX_MINOR` — gerbang ini dilewati, bukan didispatch dengan slot kosong |
 | `{round}` | Keluaran `review_round.py open --gate plan` | **[REQUIRED]** `1` atau `2`; subagent menyalinnya ke frontmatter `round` |
-| `{profile_path}` | Parameter pendispatch | **[OPTIONAL]** Default `.claude/profile/`. Isi slotnya dengan path default itu, bukan dibiarkan kosong |
+| `{profile_path}` | Parameter pendispatch | **[OPTIONAL]** Default `.claude/profile/frontenddev/`. Isi slotnya dengan path default itu, bukan dibiarkan kosong |
 | `{brief_berubah}` | Daftar berkas yang direvisi sejak ronde sebelumnya | **[OPTIONAL]** Ronde 2 saja; `-` pada ronde 1. Ronde 2 tanpa slot ini mengulang seluruh dimensi dengan biaya penuh |
 | `{previous_report}` | `<taskdir>/REVIEW-PLAN.md` ronde sebelumnya | **[OPTIONAL]** Ronde 2 saja, sebagai path — bukan isinya disalin; `-` pada ronde 1 |
 

@@ -23,7 +23,7 @@ metadata:
 ## Parameter [REQUIRED]
 
 - `taskdir` — string — `[REQUIRED]` — Path taskdir aktif berpola `backenddev/docs/<YYMMDDhhmm>-<slug>/`; path tak ditemukan ditolak.
-- `base_branch` — string — default dari `.claude/profile/index.json` — Branch pembanding merge-base; nilai yang tidak resolve ke ref git ditolak.
+- `base_branch` — string — default dari `.claude/profile/backenddev/index.json` — Branch pembanding merge-base; nilai yang tidak resolve ke ref git ditolak.
 
 ## Workflow
 

@@ -1,6 +1,6 @@
 # Scan Guide — `profile`
 
-Titik pemindaian **1–14** untuk mengisi `.claude/profile/`; titik 15–17 ada di `convention-scan.md`. Jalankan setiap item, simpan bukti sebagai anchor `<file>#<simbol>` — bukan nomor baris — dan catat `tidak terdeteksi` bila fakta tidak ada di kode aktual.
+Titik pemindaian **1–14** untuk mengisi `.claude/profile/backenddev/`; titik 15–17 ada di `convention-scan.md`. Jalankan setiap item, simpan bukti sebagai anchor `<file>#<simbol>` — bukan nomor baris — dan catat `tidak terdeteksi` bila fakta tidak ada di kode aktual.
 
 **Anchor dicatat sejak dipindai.** Bentuk lengkapnya ada di `../templates/profile-template.md` § Tata cara anchor bukti. Catat simbolnya saat berkasnya dibuka; nomor baris yang terlanjur dicatat di fase pemindaian tidak bisa dipulihkan lagi jadi simbol saat profil ditulis.
 

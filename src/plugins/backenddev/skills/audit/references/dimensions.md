@@ -2,7 +2,7 @@
 
 Rumah tunggal **definisi** dimensi untuk `backenddev:audit`. Butir checklist
 konkretnya tidak tinggal di sini: ia milik `## Audit checklist` pada `../../profile/stacks/<stack-id>.md`,
-dibaca dari field `stack` di `.claude/profile/index.json`. Jangan menyalin butir adapter ke skill
+dibaca dari field `stack` di `.claude/profile/backenddev/index.json`. Jangan menyalin butir adapter ke skill
 mana pun — dua salinan melahirkan dua definisi `P1`.
 
 Subagent `code-reviewer` memegang kembaran **diff-scoped** dari definisi keenam dimensi ini di
@@ -52,7 +52,7 @@ waktu dan retry, pewarisan konteks, serta keselarasan mirrored path terhadap `##
 
 Penyimpangan struktural dan pelanggaran boundary layer. Yang dinilai: penempatan logika, arah
 dependensi, kebocoran tipe antar-layer, state bersama yang bisa berubah, dan penyimpangan dari
-anatomi module yang tercatat di `.claude/profile/module-structure.md`.
+anatomi module yang tercatat di `.claude/profile/backenddev/module-structure.md`.
 
 Tolok ukurnya bergantung pada field `architecture` di `index.json`. Pada `layered`, yang dinilai adalah
 penempatan logika dan lompatan layer (handler memanggil repository). Pada `hexagonal`, yang dinilai
@@ -75,7 +75,7 @@ diulang di tiap `stacks/<stack-id>.md`. Sapuan wajib memeriksa keempatnya di sam
   transaksi ke ketersediaan sistem lain.
 - **Kolom yang dipakai di `WHERE` atau `ORDER BY` tanpa index** — `persistence`. Biayanya tidak
   terlihat pada data kecil dan baru muncul sebagai timeout setelah tabel tumbuh.
-- **Modul menyimpang dari anatomi standar di `.claude/profile/module-structure.md`** — `architecture`.
+- **Modul menyimpang dari anatomi standar di `.claude/profile/backenddev/module-structure.md`** — `architecture`.
   Profil adalah rekaman kode nyata repo; penyimpangan darinya membuat seluruh skill hilir menebak.
 
 ## Verification gate — mandatory, per candidate

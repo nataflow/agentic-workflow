@@ -37,10 +37,16 @@ grep -qE '"(react-native|expo)"\s*:' package.json && echo "react-native"
 grep -qE '"@sveltejs/kit"\s*:' package.json && echo "sveltekit"
 
 # 3. Svelte + Vite (tanpa kit)
-grep -qE '"svelte"\s*:' package.json && ! grep -qE '"@sveltejs/kit"' package.json && echo "svelte-vite"
+grep -qE '"svelte"\s*:' package.json && ! grep -qE '"@sveltejs/kit"' package.json \
+  && { grep -qE '"vite"\s*:' package.json || ls vite.config.* >/dev/null 2>&1; } && echo "svelte-vite"
 
 # 4. React + Vite
-grep -qE '"react"\s*:' package.json && ls vite.config.* >/dev/null 2>&1 && echo "react-vite"
+grep -qE '"react"\s*:' package.json \
+  && { grep -qE '"vite"\s*:' package.json || ls vite.config.* >/dev/null 2>&1; } && echo "react-vite"
+
+# 5. React/Svelte tanpa Vite (CRA `react-scripts`, Rollup) → di luar cakupan plugin
+# Resep grep di atas hanya bantuan baca manual; vonis yang mengikat adalah `hooks/detect.py`
+# (`frontend_from_package`), yang dipakai hook dan skrip prasyarat.
 ```
 
 ### A. Varian di dalam satu stack:

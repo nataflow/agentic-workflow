@@ -7,9 +7,9 @@ bawah ini, dengan judul persis seperti tertulis, berurutan, tanpa seksi tambahan
 skill `profile`) yang dibaca di Phase 0 masing-masing.
 
 `<stack-id>` sah: `react-vite`, `react-native`, `sveltekit`, `svelte-vite`. Nilai ini identik dengan
-field `stack` pada `.claude/profile/index.json` yang ditulis
+field `stack` pada `.claude/profile/frontenddev/index.json` yang ditulis
 `frontenddev:profile`. Next.js **tidak** termasuk: manifest yang memuat `next` ditolak di
-`## Detection` semua adapter dan di `hooks/lead-gate.sh`.
+`## Detection` semua adapter dan di `hooks/detect.py`.
 
 ## Aturan penulisan
 
@@ -61,7 +61,7 @@ Presentation; adapter tidak mengubah urutannya, hanya menamai berkas dan idiomny
 
 ## Tujuh seksi wajib
 
-### 1. `## Detection` — konsumen: `frontenddev:profile`, `hooks/lead-gate.sh`
+### 1. `## Detection` — konsumen: `frontenddev:profile`, `hooks/detect.py`
 
 Berkas manifest yang menandai stack, dependensi penanda framework, penanda pengecualian (`next`),
 dan aturan pemutus saat lebih dari satu penanda hadir. Wajib memuat perintah konkret yang membuktikan
@@ -141,7 +141,7 @@ Adapter baru boleh dipakai hanya bila seluruhnya benar:
 2. `## Review checklist` memenuhi ambang ≥12 butir / ≥5 dimensi.
 3. Seluruh perintah di `## Commands` sudah dieksekusi minimal sekali di repo nyata stack itu.
 4. Tidak ada butir yang identik dengan butir di adapter lain.
-5. `<stack-id>` terdaftar di `## Detection` milik `frontenddev:profile` dan di `hooks/lead-gate.sh`.
+5. `<stack-id>` terdaftar di `## Detection` milik `frontenddev:profile` dan di `hooks/detect.py`.
 
 Butuh seksi kedelapan = kontrak ini yang salah. Revisi berkas ini lebih dulu dan sesuaikan seluruh
 adapter yang sudah ada; dilarang menambah seksi lokal di satu adapter saja.

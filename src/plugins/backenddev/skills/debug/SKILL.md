@@ -111,7 +111,7 @@ Artefak tunggal `{taskdir}/RCA.md` mengikuti `templates/rca-template.md` — sek
 
 - `symptom` kosong atau tanpa gejala terukur: Hentikan eksekusi di Fase 0, jangan membuat taskdir, minta stacktrace atau langkah pemicu konkret.
 - `taskdir` diisi tetapi direktorinya tidak ada: Hentikan eksekusi, laporkan path yang dicari; dilarang mengalokasikan direktori pengganti diam-diam.
-- `.claude/profile/index.json` hilang atau field wajibnya kosong: Hentikan eksekusi, rutekan ke `backenddev:profile`, dilarang menebak `root_namespace` dari struktur folder.
+- `.claude/profile/backenddev/index.json` hilang atau field wajibnya kosong: Hentikan eksekusi, rutekan ke `backenddev:profile`, dilarang menebak `root_namespace` dari struktur folder.
 - `code-explorer` mengembalikan `confidence: low`, payload kosong, atau format rusak: Perbaiki slot `{objective}` menjadi satu pertanyaan bersimbol konkret dan dispatch ulang sekali. Lanjutkan dengan pembacaan kode manual jika balikannya tetap gagal, dan catat keterbatasannya di `## Rantai kausal`.
 - Tiga siklus hipotesis habis tanpa rantai kausal utuh: Terbitkan `RCA.md` berstatus `INCONCLUSIVE`.
 - Gejala hilang saat reproduksi dicoba (flaky): Catat sebagai defect nondeterministik, jadikan sumber nondeterminisme (concurrency, urutan test, zona waktu, cache) sebagai hipotesis H1, dan jangan menutup sesi berstatus `ROOT_CAUSE_CONFIRMED` tanpa bukti `file:line` konkret.

@@ -23,7 +23,7 @@ metadata:
 ## Parameter [REQUIRED]
 
 - `domain` — string — `[REQUIRED]` — Deskripsi cakupan API dalam bahasa natural dari user, contoh `management product`. Skill sendiri yang menelusuri lokasi endpoint-nya di `src/`. Hentikan eksekusi dan minta cakupan jika parameter kosong; dilarang berasumsi "seluruh API".
-- `base_branch` — string — default: `base_branch` dari `.claude/profile/index.json`, lalu `main`, lalu `master` — Hanya dibaca pada mode `POST_CHAIN` untuk membatasi cakupan ke endpoint yang berubah. Turunkan ke cakupan penuh `domain` dan catat sebagai ASUMSI di laporan jika branch tidak ada di `git branch -a`.
+- `base_branch` — string — default: `base_branch` dari `.claude/profile/backenddev/index.json`, lalu `main`, lalu `master` — Hanya dibaca pada mode `POST_CHAIN` untuk membatasi cakupan ke endpoint yang berubah. Turunkan ke cakupan penuh `domain` dan catat sebagai ASUMSI di laporan jika branch tidak ada di `git branch -a`.
 
 ## Workflow
 

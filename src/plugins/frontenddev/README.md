@@ -7,7 +7,7 @@ dan Svelte + Vite. Sepuluh skill dan lima subagent, dengan tiga aturan yang meny
 
 Plugin ini sengaja generic — ia tidak tahu apa-apa tentang brand token, komponen, atau konvensi repo
 tempat dijalankan, dan tidak tahu stack mana yang dipakai sampai profil menyebutnya. Pengetahuan
-spesifik-repo hidup di `.claude/profile/`, disiapkan sekali lewat skill `profile`; pengetahuan
+spesifik-repo hidup di `.claude/profile/frontenddev/`, disiapkan sekali lewat skill `profile`; pengetahuan
 spesifik-stack hidup di satu adapter `skills/profile/stacks/<stack-id>.md` yang dipilih dari field
 `stack` `index.json` profil itu. Next.js sengaja di luar cakupan.
 
@@ -16,7 +16,7 @@ spesifik-stack hidup di satu adapter `skills/profile/stacks/<stack-id>.md` yang 
 | Skill | Peran | Menulis | Dikunci oleh |
 |---|---|---|---|
 | `frontenddev:lead` | gerbang tiap permintaan: lane, sections, taskdir, pemulihan, eskalasi | — | — |
-| `frontenddev:profile` | prasyarat sekali per repo | `.claude/profile/` | — |
+| `frontenddev:profile` | prasyarat sekali per repo | `.claude/profile/frontenddev/` | — |
 | `frontenddev:task` | akar tiap taskdir | `TASK.md` + ledger `## Chain` | commit akar |
 | `frontenddev:ux-design` | Gate Flow | `FLOW.md` | `chain.py approve --row FLOW` |
 | `frontenddev:ui-design` | Gate Design | `UI.md` | `chain.py approve --row UI` |
@@ -59,7 +59,7 @@ menanggung ongkos itu demi alasan yang dapat disebut:
 ## Workflow
 
 ```
-permintaan ──► lead ──┬─► profile ─────────────► .claude/profile/
+permintaan ──► lead ──┬─► profile ─────────────► .claude/profile/frontenddev/
                       ├─► explore ─────────────► jawaban, berhenti
                       ├─► review (ad-hoc) ─────► laporan / frontenddev/reviews/, berhenti
                       │
@@ -274,7 +274,7 @@ kali.
 ```
 
 Lalu di tiap repo frontend, sekali: `setup frontenddev`. Skill `profile` mendeteksi stack, memindai repo
-dengan resep adapter, dan menulis `.claude/profile/` — `index.json` plus sembilan berkas `.md`, modular
+dengan resep adapter, dan menulis `.claude/profile/frontenddev/` — `index.json` plus sembilan berkas `.md`, modular
 supaya tiap konsumen membuka hanya yang rutenya butuh. `manual-notes.md` satu-satunya yang selamat dari
 tulis ulang penuh saat `REFRESH`. Jalankan ulang saat repo bergeser jauh: dependency baru, folder fitur
 baru, atau migrasi stack.
@@ -285,12 +285,27 @@ di React Native; `tsc` tidak membaca `.svelte`).
 
 ## Gate Hook
 
-Hook `SessionStart` (`hooks/lead-gate.sh`, matcher `startup|resume|clear|compact`) menyuntikkan
-pengingat gate `frontenddev:lead` dan memvalidasi profil sekali per sesi lewat
-`hookSpecificOutput.additionalContext`. Ia menyuntik hanya bila repo terdeteksi frontend — profil ada,
-atau manifest root/`apps/*`/`packages/*` memuat penanda stack tanpa `next` — dan diam di tempat lain.
-Profil hilang, `index.json` tidak sah, atau berkas profil kurang menghasilkan instruksi
-`frontenddev:profile`; profil valid menghasilkan pengingat standar.
+Hook `SessionStart` (`python3 hooks/detect.py --plugin frontenddev`, matcher
+`startup|resume|clear|compact`) menyuntikkan pengingat gate `frontenddev:lead` dan status profil sekali
+per sesi lewat `hookSpecificOutput.additionalContext`. `hooks/detect.py` identik byte-per-byte dengan
+milik `backenddev` dan dipakai juga oleh skrip prasyarat, sehingga vonis hook = vonis skrip. Teksnya
+ada di `hooks/gate_text.py`.
+
+- **Kapan menyuntik**: profil `.claude/profile/frontenddev/` ada, atau manifest (root git, workspace
+  terdeklarasi, `apps/*`, `packages/*`, `services/*`, anak langsung root) memuat penanda stack yang
+  didukung — React/Svelte wajib bersama Vite; Next.js, CRA, dan Rollup di luar cakupan. Di tempat
+  lain hook diam.
+- **Profil milik plugin lain** (`.claude/profile/index.json` lama milik `backenddev`) tidak pernah
+  dibaca atau ditimpa. Profil frontenddev di lokasi lama memicu lane `PROFILE` mode MIGRATE.
+- **Profil hilang, tidak sah, atau tidak lengkap**: permintaan kerja tetap lewat `frontenddev:lead`,
+  yang merutekan lane `PROFILE` (GENERATE | REFRESH | MIGRATE) lebih dulu lalu melanjutkan rute tertunda.
+- **Alur plugin lain**: permintaan yang memanggil atau melanjutkan `/analyst:*` atau `/quickdev:*`
+  secara eksplisit dikecualikan dari gate.
+- **Opt-out mekanis `.claude/workflow`**: berkas teks berisi nama plugin yang boleh menggerbangi repo,
+  dipisah spasi atau baris. Isi `quickdev` → hook `frontenddev` dan `backenddev` diam; isi
+  `frontenddev quickdev` → hanya hook `frontenddev` yang menyala. Berkas tidak ada → perilaku normal.
+- **Prasyarat**: `python3` (≥ 3.8; `tomllib` dipakai bila ≥ 3.11) di `PATH`. Di Windows yang hanya
+  punya `py`/`python`, hook tidak jalan — sama seperti hook `.sh` sebelumnya.
 
 ## Boundaries With Other Skills
 

@@ -41,7 +41,7 @@ metadata:
 2. Baca kode hanya untuk memetakan alur as-is; labeli tiap fakta `Observasi kode: <file:baris>`. Kuota sapuan: maks 3 panggilan `Glob`+`Grep`, potongan maks 40 baris, nol berkas penuh, nol query DB.
 3. Alur >1 modul, target luput pada `Grep` pertama, atau kuota habis: muat `dispatcher/explorer.md`, hidrasi slot `objective`, `taskdir`, dan `slug` — plus `konteks_diketahui` dan `batas_cakupan` bila tersedia — lalu dispatch `code-explorer` langsung tanpa skill pembungkus, dengan blok `Format laporan` template ikut berangkat utuh. Laporannya mendarat di `{taskdir}/.explore/{slug}.md` sekaligus kembali ke context. Kuota dispatch maks 1, naik ke 2 hanya bila alur terbukti menyentuh >1 modul; `Kedalaman` terkunci `ringkas`. Petakan balikannya lewat `### Penanganan Balikan` template itu. Balikan tidak konklusif atau dispatch gagal: `## Failure path` butir 8.
 4. Sajikan ringkasan observasi: temuan kode aktual dan komponen bisnis yang belum terakomodasi.
-5. Identifikasi entitas domain, enum status, dan service facade terkait; petakan invariant runtime dari `.claude/profile/invariants.md`.
+5. Identifikasi entitas domain, enum status, dan service facade terkait; petakan invariant runtime dari `.claude/profile/backenddev/invariants.md`.
 
 ### Fase 2 — Elisitasi Kebutuhan Domain
 
@@ -105,7 +105,7 @@ Kedua bentuk melampirkan blok `## BRD Review` `brd-reviewer` apa adanya tepat di
 
 ## Failure path
 
-1. **Prasyarat gagal**: `chain` kosong dan `TASK.md` tak memuat `chain:`: hentikan, minta `backenddev:analyst` meneruskannya — tanpa nilai itu reviewer tidak dapat membedakan dokumen hulu yang sah tidak ada dari rantai putus. `taskdir` belum dialokasikan: minta inisialisasi `tech-lead`. `.claude/profile/index.json` absen: `backenddev:profile`. Direktori tak terakses: periksa izin. Tree kotor: bersihkan.
+1. **Prasyarat gagal**: `chain` kosong dan `TASK.md` tak memuat `chain:`: hentikan, minta `backenddev:analyst` meneruskannya — tanpa nilai itu reviewer tidak dapat membedakan dokumen hulu yang sah tidak ada dari rantai putus. `taskdir` belum dialokasikan: minta inisialisasi `tech-lead`. `.claude/profile/backenddev/index.json` absen: `backenddev:profile`. Direktori tak terakses: periksa izin. Tree kotor: bersihkan.
 2. **Konflik aturan bisnis**: kebutuhan user bertentangan dengan aturan sistem, klarifikasi via `AskUserQuestion` lebih dulu.
 3. **Draft ditolak user**: perbarui `BR-{n}` sesuai poin penolakan, tulis ulang sampai sepakat.
 4. **Pertanyaan terbuka memblokir**: entri yang mengubah `Business rules`/`Target state`, tahan `DRAFT` dan jangan ajukan approval.

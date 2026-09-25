@@ -6,7 +6,7 @@ bawah ini, dengan judul persis seperti tertulis, berurutan, tanpa seksi tambahan
 (atau `stacks/<stack-id>.md` dari sisi skill `profile`) yang dibaca di Fase 0 masing-masing.
 
 `<stack-id>` sah: `java-spring`, `go`, `node`, `bun`, `rust`, `php`, `php-codeigniter`. Nilai ini identik
-dengan field `stack` pada `.claude/profile/index.json` yang ditulis `backenddev:profile`.
+dengan field `stack` pada `.claude/profile/backenddev/index.json` yang ditulis `backenddev:profile`.
 
 ## Aturan penulisan
 
@@ -56,7 +56,7 @@ sekadar daftar nama berkas.
 `layered` (handler → service → repository) versus `hexagonal` (ports & adapters / clean architecture,
 inti domain bebas infrastruktur) — adapter wajib memuat penanda pembeda keduanya beserta perintah
 pembuktiannya. Hasil pembacaan ini mengisi field `architecture` pada
-`.claude/profile/index.json`; nilai sah `layered`, `hexagonal`, `hybrid`, atau `tidak terdeteksi`.
+`.claude/profile/backenddev/index.json`; nilai sah `layered`, `hexagonal`, `hybrid`, atau `tidak terdeteksi`.
 Gaya arsitektur **bukan** stack: satu `<stack-id>` boleh melayani lebih dari satu gaya.
 
 ### 2. `## Commands` — konsumen: `backenddev:profile`, `backenddev:architect`
@@ -71,7 +71,7 @@ gerbang verifikasi penutup taskdir.
 `code-implementor` tidak pernah menyusun path adapter sendiri: `backenddev:architect` menghidrasi slot
 `{adapter_path}` di `skills/architect/dispatcher/implementor.md` dengan
 `${CLAUDE_PLUGIN_ROOT}/skills/profile/stacks/<stack>.md`, dan subagent berhenti `BLOCKED` bila slot itu
-absen. Direktori `.claude/profile/stacks/` tidak pernah ditulis `backenddev:profile` dan dilarang dirujuk.
+absen. Direktori `.claude/profile/backenddev/stacks/` tidak pernah ditulis `backenddev:profile` dan dilarang dirujuk.
 
 Urutan layer eksekusi kode (dipakai `code-implementor` untuk mengurutkan pekerjaan dalam satu brief),
 konvensi penamaan berkas, dan letak direktori tiap layer. Sertakan jebakan spesifik stack yang muncul
@@ -92,7 +92,7 @@ tipe, titik masuk HTTP, rantai pemanggil lintas layer, dan akses penyimpanan.
 `backenddev:profile` memakai resep ini di `references/scan-guide.md` titik 9 dan 14 untuk menurunkan
 `invariants.md` dan `surface-map.md`; `backenddev:audit` memakainya di Fase 1 untuk menyusun peta
 cakupan. `code-explorer` **bukan** konsumen langsung: ia dilarang membaca berkas adapter dan
-membaca hasil turunannya di `.claude/profile/` saja. Resep di seksi ini tetap sampai kepadanya
+membaca hasil turunannya di `.claude/profile/backenddev/` saja. Resep di seksi ini tetap sampai kepadanya
 lewat satu jalur: `system-analysis` dan `plan` menyalinnya apa adanya ke slot `{resep_navigasi}`
 prompt `dispatcher/explorer.md` masing-masing, seperti `{daftar_dimensi}` Profil B. Resep yang
 hanya dirujuk path-nya tidak pernah dijalankan, dan jalur async tanpa resep tidak tersapu siapa pun.

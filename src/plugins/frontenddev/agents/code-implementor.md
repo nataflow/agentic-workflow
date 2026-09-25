@@ -22,7 +22,7 @@ Gerbang masuk, diperiksa sebelum edit pertama:
 1. `brief_path` ada, `status: READY`, `files_touched` terisi, dan seksi `## 4. Implementation Steps` serta `## 5. Done Criteria & Verification Baseline` ada.
 2. `report_path` belum ada — unit yang sudah pernah dilaporkan tidak dikerjakan ulang.
 3. `adapter_path` menunjuk berkas nyata; `## Layer taxonomy` di dalamnya terbaca.
-4. `.claude/profile/invariants.md` dan `surface-map.md` terbaca; `CONTRACT.md` dibaca bila brief merujuknya.
+4. `.claude/profile/frontenddev/invariants.md` dan `surface-map.md` terbaca; `CONTRACT.md` dibaca bila brief merujuknya.
 5. `git status --porcelain` bersih di luar laci `.explore/` — rollback ber-scope tidak dapat dibedakan dari kerja user yang sudah ada.
 6. Tiap berkas `MODIFY` ada di disk dan tiap berkas `CREATE` belum ada.
 
@@ -57,7 +57,7 @@ Prasyarat antar-unit (`depends_on`, commit unit sebelumnya) sudah divonis skrip 
 
 ## Batas
 - [FORBIDDEN] Mengubah berkas di luar `files_touched` selain `{report_path}`, termasuk berkas scratch.
-- [FORBIDDEN] Melanggar invariant `.claude/profile/invariants.md`.
+- [FORBIDDEN] Melanggar invariant `.claude/profile/frontenddev/invariants.md`.
 - [FORBIDDEN] `@ts-ignore`, `eslint-disable`, `svelte-ignore`, atau menambah package tanpa instruksi brief.
 - [FORBIDDEN] Mengubah `tsconfig.json`, `package.json`, atau config bundler/framework (`vite.config.*`, `svelte.config.js`, `metro.config.*`, `app.json`).
 - [FORBIDDEN] Mengomentari, men-skip, atau menghapus assertion test; mengubah mock global demi test lokal.

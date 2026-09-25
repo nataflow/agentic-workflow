@@ -22,7 +22,7 @@ Verifikasi sendiri sebelum menyentuh diff. Tiap kegagalan mengembalikan `BLOCKED
 1. **Parameter**: `taskdir` dan `base_branch` terisi. Salah satu kosong → `BLOCKED` menyebut parameter yang hilang.
 2. **Taskdir**: `{taskdir}` ada di disk dan berformat `backenddev/docs/<YYMMDDhhmm>-<slug>/`. Tidak ada → `BLOCKED`, minta alokasi dari `backenddev:tech-lead`.
 3. **Brief set**: `{taskdir}` memuat minimal satu `brief-*.md`; kontrak penilaian diturunkan dari sana. Nihil → `BLOCKED`, kontrak acuan tidak ada, jalankan `backenddev:plan`.
-4. **Profil & adapter**: `.claude/profile/index.json` terbaca, dan adapter `${CLAUDE_PLUGIN_ROOT}/skills/profile/stacks/<stack>.md` — `<stack>` dari field `stack` — ada serta memuat `## Audit checklist`. Absen → `BLOCKED`, rutekan ke `backenddev:profile`.
+4. **Profil & adapter**: `.claude/profile/backenddev/index.json` terbaca, dan adapter `${CLAUDE_PLUGIN_ROOT}/skills/profile/stacks/<stack>.md` — `<stack>` dari field `stack` — ada serta memuat `## Audit checklist`. Absen → `BLOCKED`, rutekan ke `backenddev:profile`.
 5. **Merge-base**: `git merge-base <base_branch> HEAD` menghasilkan SHA. Gagal → `BLOCKED` beserta `base_branch` yang dicoba; dilarang menilai diff terhadap acuan tebakan.
 6. **Working tree**: `git status --porcelain` bersih. Berkas di bawah segmen `.explore/` adalah laci kerja `code-explorer`, bukan berkas kotor. Sisa lain → `BLOCKED`, minta tree dirapikan sebelum review.
 
@@ -32,7 +32,7 @@ Direktori `backenddev/issues/` tidak diperiksa di sini: ia dibuat dan diseed sen
 
 1. Tetapkan rentang wajib `$(git merge-base <base_branch> HEAD)..HEAD`; tolak `<base_branch>..HEAD` polos.
 2. Himpun **union** tabel `## File scope` seluruh `brief-*.md` sebagai kontrak acuan tunggal — dilarang menilai cakupan per brief.
-3. Baca `.claude/profile/invariants.md` dan tiap baris `.claude/profile/anti-patterns.md`. Baris diff yang cocok pola terlarang jadi temuan `P2` dimensi `architecture`, mengutip `file:line` diff dan baris profil yang dilanggar; dilarang dinaikkan ke `P1` — `P1` milik pelanggaran invariant.
+3. Baca `.claude/profile/backenddev/invariants.md` dan tiap baris `.claude/profile/backenddev/anti-patterns.md`. Baris diff yang cocok pola terlarang jadi temuan `P2` dimensi `architecture`, mengutip `file:line` diff dan baris profil yang dilanggar; dilarang dinaikkan ke `P1` — `P1` milik pelanggaran invariant.
 4. Baca `## Audit checklist` adapter stack sebagai sumber tunggal butir spesifik stack. Butir bertanda `hexagonal` dipakai **hanya** bila field `architecture` bernilai `hexagonal` atau `hybrid`; memakainya pada repo `layered` menghasilkan temuan palsu.
 5. Kecualikan perubahan di bawah `backenddev/` dan `.claude/` — artefak dokumen, bukan kode.
 6. Pindai `git log --oneline <range>`, petakan berkas `create`/`modify`/`delete`.
@@ -57,7 +57,7 @@ Direktori `backenddev/issues/` tidak diperiksa di sini: ia dibuat dan diseed sen
    - **IDOR** (`security`) — baris data diambil hanya dari identitas kiriman klien, tanpa klausa kepemilikan di query yang sama; pemeriksaan kepemilikan sesudah data terambil tetap membocorkan keberadaannya lewat waktu respons dan pesan error.
    - **Panggilan jaringan di dalam batas transaksi** (`transaction`) — HTTP keluar atau publish pesan sambil memegang transaksi menahan koneksi basis data selama I/O eksternal.
    - **Kolom `WHERE` atau `ORDER BY` tanpa index** (`persistence`) — biayanya tak terlihat pada data kecil dan muncul sebagai timeout setelah tabel tumbuh.
-   - **Modul menyimpang dari `.claude/profile/module-structure.md`** (`architecture`) — profil adalah rekaman kode nyata repo.
+   - **Modul menyimpang dari `.claude/profile/backenddev/module-structure.md`** (`architecture`) — profil adalah rekaman kode nyata repo.
 
    Definisi dimensi di atas adalah kembaran **diff-scoped** dari `skills/audit/references/dimensions.md` milik `backenddev:audit`. Perubahan definisi wajib menyentuh keduanya.
 

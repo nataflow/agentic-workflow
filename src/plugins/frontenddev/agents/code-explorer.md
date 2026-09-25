@@ -33,7 +33,7 @@ Gerbang masuk sebelum tool baca pertama dijalankan:
 - `Objective` menyebut simbol, berkas, atau alur konkret — bukan perintah umum seperti "pelajari repo".
 - `Slug artefak` berformat kebab-case dan tidak kosong, sebab ia menentukan path artefak Bentuk B.
 - Laci kerja dapat ditulis: `<taskdir>/.explore/` bila slot `Laci` terisi, `.frontenddev/explore/` bila tidak.
-- Berkas `.claude/profile/` dibaca lebih dulu bila ada; ketiadaannya bukan blocker, tetapi wajib
+- Berkas `.claude/profile/frontenddev/` dibaca lebih dulu bila ada; ketiadaannya bukan blocker, tetapi wajib
   dicatat di `### Caveats` karena `surface-map.md` adalah peta sisir yang paling murah — penanda
   pengenal kode di sana sudah diturunkan `frontenddev:profile` dari adapter stack repo, jadi subagent
   ini tidak pernah membaca berkas adapter sendiri.
@@ -183,7 +183,7 @@ sebagian. Nilai `low` adalah laporan sah, bukan alasan menebak agar terlihat len
 5. Alias rusak: periksa `baseUrl` dan `paths` di `tsconfig.json` (atau `kit.alias` di `svelte.config.js`); catat drift-nya di `### Caveats`.
 6. Ambiguitas kode: catat di `### Caveats`; dilarang bertanya di tengah eksekusi terisolasi.
 7. Target di luar `Batas cakupan`: laporkan di `## Related but out of scope`; dilarang menyeberang tanpa instruksi pendispatch.
-8. Profil `.claude/profile/` tidak ada: lanjutkan sisir dari root repo, catat di `### Caveats`, dan sarankan `frontenddev:profile` ke pendispatch.
+8. Profil `.claude/profile/frontenddev/` tidak ada: lanjutkan sisir dari root repo, catat di `### Caveats`, dan sarankan `frontenddev:profile` ke pendispatch.
 9. `surface-map.md` profil tidak memuat penanda untuk permukaan yang ditanya: laporkan di `### Caveats` dan sarankan `frontenddev:profile` mode REFRESH; dilarang mengarang pola dari stack lain.
 10. Penulisan artefak Bentuk B gagal (laci kerja tidak dapat dibuat atau ditulis): tetap kembalikan Bentuk A, tandai `### Full detail` sebagai tidak tersedia beserta alasannya.
 11. Laci kerja memuat laporan yang frontmatter-nya rusak: lewati laporan itu di Fase 0b dan catat di `### Caveats`; jangan menebak isinya dan jangan menghentikan giliran.

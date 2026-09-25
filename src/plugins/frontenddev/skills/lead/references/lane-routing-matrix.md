@@ -8,7 +8,7 @@ Panduan komprehensif penentuan jalur kerja (Lane Routing), resolusi path monorep
 
 | Jalur (Lane) | Kriteria Pemicu Masuk | Rantai Gate Wajib | Artefak Output |
 |---|---|---|---|
-| **PROFILE** | Profil `.claude/profile/` belum ada atau butuh sinkronisasi | Deteksi Stack → Pindai → Baseline → Tulis Profil | `.claude/profile/` |
+| **PROFILE** | Profil `.claude/profile/frontenddev/` belum ada atau butuh sinkronisasi | Deteksi Stack → Pindai → Baseline → Tulis Profil | `.claude/profile/frontenddev/` |
 | **FULL_PIPELINE** | Fitur baru atau perombakan alur/layout | Akar → Gate Flow dan/atau Gate Design → Gate Contract → Gate Breakdown (+ Plan Review) → architect → report | `TASK.md`, `FLOW.md`/`UI.md`, `CONTRACT.md`, `brief-*.md`, `REVIEW-PLAN.md`, `report-*.md`, `REVIEW.md`, `REPORT.md` |
 | **FAST_FORWARD** | Endpoint/logic data baru tanpa ubah alur & layout | Akar → Gate Contract → Gate Breakdown (+ Plan Review) → architect → report | `TASK.md`, `CONTRACT.md`, `brief-*.md`, `REVIEW-PLAN.md`, `report-*.md`, `REVIEW.md`, `REPORT.md` |
 | **REFACTOR_ARCH** | Restrukturisasi layer | sama dengan FAST_FORWARD | sama dengan FAST_FORWARD |

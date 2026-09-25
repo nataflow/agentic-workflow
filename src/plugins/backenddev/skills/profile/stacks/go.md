@@ -4,10 +4,12 @@ Go dengan framework HTTP/RPC. Ditulis mengikuti `_CONTRACT.md`; tujuh seksi, uru
 
 ## Detection
 
-Manifest: `go.mod` di root atau satu tingkat submodule.
+Manifest: `go.mod` di root, anggota `go.work`, `apps/*`/`services/*`, atau anak langsung root.
 
-- **Penanda wajib**: minimal satu framework server di `go.mod` —
-  `gin-gonic/gin`, `gofiber/fiber`, `labstack/echo`, `go-chi/chi`, `gorilla/mux`, `grpc-go`.
+- **Penanda wajib**: minimal satu framework server di blok atau baris `require` `go.mod` (baris
+  `// indirect` diabaikan; sufiks versi mayor `/vN` diterima) — `github.com/gin-gonic/gin`,
+  `github.com/gofiber/fiber`, `github.com/labstack/echo`, `github.com/go-chi/chi`,
+  `github.com/gorilla/mux`, `google.golang.org/grpc`.
   Modul Go tanpa satu pun penanda ini adalah pustaka atau CLI, bukan stack backend ini.
 - **Nama project**: baris `module <path>` pada `go.mod`; nama pendeknya = segmen terakhir path itu.
 - **Versi bahasa**: direktif `go 1.xx` pada `go.mod`; `toolchain` bila ada mengalahkannya.

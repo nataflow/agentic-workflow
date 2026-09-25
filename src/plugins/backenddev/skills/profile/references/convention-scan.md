@@ -1,6 +1,6 @@
 # Convention Scan — `profile`
 
-Panduan titik pemindaian **15–17** (`domain-map.md`, `code-conventions.md`, `anti-patterns.md`) untuk mengisi berkas modular di direktori `.claude/profile/`. Titik 1–14 ada di `scan-guide.md`; berkas ini melanjutkan penomorannya, tidak menggantikannya.
+Panduan titik pemindaian **15–17** (`domain-map.md`, `code-conventions.md`, `anti-patterns.md`) untuk mengisi berkas modular di direktori `.claude/profile/backenddev/`. Titik 1–14 ada di `scan-guide.md`; berkas ini melanjutkan penomorannya, tidak menggantikannya.
 
 **Sumber pola spesifik stack.** Panduan ini menetapkan *apa* yang dicari; *bagaimana* mencarinya di stack yang terdeteksi diambil dari `## Navigation recipes` dan `## Layer taxonomy` pada `../stacks/<stack-id>.md`. Turunkan sendiri dari struktur nyata modul jika target pencarian tidak ada di sana, lalu laporkan resep yang dipakai sebagai temuan di Fase 7. Dilarang memakai pola stack lain sebagai pengganti.
 

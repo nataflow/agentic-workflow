@@ -33,7 +33,7 @@ metadata:
 
 - Baca `TASK.md` (`SC-{n}`, `## Out of Scope` sebagai plafon endpoint/DTO/layer, `finding_source`/`findings`), lalu `FLOW.md`/`UI.md` sesuai `sections` — keduanya `APPROVED` dan utuh, dijamin skrip.
 - **Re-entry** (hop CONTRACT `[~]`): sumber perubahan dibaca dari disk, bukan ingatan sesi — alasan `reopen` di badan commit (`git log -1 --format=%B -- <taskdir>/TASK.md`), `REVIEW.md`, `.explore/closing-verification.md`, dan `## Triase` tiap `report-<NN>.md` untuk berkas yatim. Files Touched wajib mencakup union `files_touched` **seluruh** brief, termasuk `DONE`/`BLOCKED` (Check E menagihnya); pada eskalasi dari `HOTFIX_MINOR`, berkas brief `DONE` lama ikut dimasukkan. AC yang *Sumber*-nya menyebut SC yang kini gugur → revisi (buang token itu, atau buang AC bila tak memikul apa pun lagi) — `validate_doc.py` menolaknya.
-- Baca `.claude/profile/index.json` (`stack`), `stack.md`, `surface-map.md`, `invariants.md`, `layer-adoption.md`, dan `## Layer taxonomy` adapter `stacks/<stack>.md` — kosakata tabel Layer Shape.
+- Baca `.claude/profile/frontenddev/index.json` (`stack`), `stack.md`, `surface-map.md`, `invariants.md`, `layer-adoption.md`, dan `## Layer taxonomy` adapter `stacks/<stack>.md` — kosakata tabel Layer Shape.
 
 ### Phase 1 — Penelusuran Kode
 

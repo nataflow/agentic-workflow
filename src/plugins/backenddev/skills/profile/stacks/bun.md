@@ -5,10 +5,11 @@ tujuh seksi, urutan tetap.
 
 ## Detection
 
-Manifest: `package.json` bersama `bun.lockb` atau `bunfig.toml` di root.
+Manifest: `package.json` bersama `bun.lockb`, `bun.lock`, atau `bunfig.toml` (di direktori paket itu
+atau di root).
 
-- **Penanda wajib**: lockfile Bun (`bun.lockb`) atau `bunfig.toml`, **dan** framework server
-  `hono` atau `elysia` di `dependencies`. Salah satu saja tidak cukup: `hono` di atas Node adalah
+- **Penanda wajib**: `elysia` di `dependencies`, atau lockfile Bun (`bun.lockb` biner / `bun.lock`
+  teks) atau `bunfig.toml` **dan** `hono` di `dependencies`. Salah satu saja tidak cukup: `hono` di atas Node adalah
   stack `node`; `bun.lockb` tanpa framework server adalah CLI atau pustaka.
 - **Pemutus terhadap `node`**: bila `bun.lockb` hadir bersama `@nestjs/core` atau `express`, repo
   memakai Bun hanya sebagai package manager — stack-nya `node`, karena taksonomi layer dan jebakannya

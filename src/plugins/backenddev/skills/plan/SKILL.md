@@ -16,7 +16,7 @@ metadata:
 
 ## Precondition [REQUIRED]
 
-1. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/plan/scripts/check_preconditions.py --taskdir <taskdir> --entry-mode <entry_mode> [--chain <chain>] [--risk <risk>] [--file-scope <file_scope>]`. `PASS` (8/8) → lanjut ke Workflow. `FAIL` → hentikan eksekusi dan remediasi butir yang gagal: taskdir belum sah atau kosong → minta alokasi dari `backenddev:tech-lead`; `.claude/profile/index.json` belum ada → `backenddev:profile`; dokumen hulu belum siap → kembalikan ke penerbitnya; `chain`, `risk`, atau `entry_mode` tak selaras → kembalikan ke `backenddev:analyst`.
+1. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/plan/scripts/check_preconditions.py --taskdir <taskdir> --entry-mode <entry_mode> [--chain <chain>] [--risk <risk>] [--file-scope <file_scope>]`. `PASS` (8/8) → lanjut ke Workflow. `FAIL` → hentikan eksekusi dan remediasi butir yang gagal: taskdir belum sah atau kosong → minta alokasi dari `backenddev:tech-lead`; `.claude/profile/backenddev/index.json` belum ada → `backenddev:profile`; dokumen hulu belum siap → kembalikan ke penerbitnya; `chain`, `risk`, atau `entry_mode` tak selaras → kembalikan ke `backenddev:analyst`.
 2. Serap profil repositori mengikuti `references/entry-rules.md` bagian 0 — adapter stack `../profile/stacks/<stack>.md` beserta seksi `## Layer taxonomy`-nya, berkas profil yang wajib dibaca, dan batas struktur modul untuk slicing ada di sana. Berkas adapter tidak ada → hentikan eksekusi, rutekan ke `backenddev:profile`.
 
 ## Parameter [REQUIRED]
