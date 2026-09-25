@@ -47,4 +47,4 @@ Eksekusi satu brief implementasi.
 
 **Subagent mengembalikan:** Amplop `## Implementor Report — brief-{NN}-{unit}` dengan status `DONE` atau `BLOCKED`, memuat baris `Commit:` dan baris `Simbol Tersentuh:`.
 
-Baris `Simbol Tersentuh:` mengenumerasi simbol yang benar-benar diubah, termasuk yang **tidak** disebut kolom `Anchor` brief. `architect` Fase 3 butir 4 membandingkannya dengan hunk header `git show -U0`, dan selisih di antara keduanya dicatat apa adanya. Batas scope brief mengikat berkas **dan** simbol: berkas yang sama menampung banyak simbol, sehingga perbandingan tingkat berkas saja meloloskan penyuntingan simbol mana pun asalkan berkasnya kebetulan terdaftar.
+Baris `Simbol Tersentuh:` mengenumerasi simbol yang benar-benar diubah, termasuk yang **tidak** disebut kolom `Anchor` brief. `architect` Fase 3 butir 4 membandingkannya dengan peta simbol `scripts/symbol_map.py`, dan selisih di antara keduanya dicatat apa adanya. Batas scope brief mengikat berkas **dan** simbol: berkas yang sama menampung banyak simbol, sehingga perbandingan tingkat berkas saja meloloskan penyuntingan simbol mana pun asalkan berkasnya kebetulan terdaftar.

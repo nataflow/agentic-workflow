@@ -167,7 +167,7 @@ ______________________________________________________________________
 9. **Integritas Batas Cakupan (`## File scope` & `## Out of scope`)**:
 
    - Baris `modify` wajib menyertakan simbol `Anchor` (nama method, field, class), dan simbol itu wajib **disebut minimal satu langkah `## Steps`**. Anchor yang tak pernah dipakai langkah mana pun berarti brief menamai satu titik sisip lalu mengerjakan titik lain; `plan` menagihnya lewat Check N.
-   - Seluruh file yang disentuh wajib terdaftar. Implementor dilarang menyentuh file di luar tabel ini, **maupun simbol di luar kolom `Anchor` baris berkas itu**. Simbol tambahan yang ternyata harus ikut berubah dilaporkan implementor, bukan disunting diam-diam; `architect` membandingkan hunk header commit terhadap kolom ini.
+   - Seluruh file yang disentuh wajib terdaftar. Implementor dilarang menyentuh file di luar tabel ini, **maupun simbol di luar kolom `Anchor` baris berkas itu**. Simbol tambahan yang ternyata harus ikut berubah dilaporkan implementor, bukan disunting diam-diam; `architect` membandingkan peta simbol commit (`architect/scripts/symbol_map.py`) terhadap kolom ini.
    - Tidak ada seksi yang dibiarkan kosong tanpa penjelasan; jika nihil, tulis "tidak ada" beserta alasannya.
 
 10. **Pendaratan Migrasi (`## Migration` & `## Risk & rollback`)**: berlaku pada dua pemicu — `## Migration requirements` PRD yang bukan "tidak perlu" (jalur `PRD`), **dan** berkas migrasi baru yang ditetapkan scan Fase 2 butir 5 pada jalur tanpa PRD. Pemicu kedua ada karena urutan deploy dan rollback plan tidak pernah divonis hulu di jalur itu; tanpa aturan ini keduanya jatuh ke orang yang menjalankan deploy.
