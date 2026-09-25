@@ -1,0 +1,97 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  pytest:
+    name: pytest (py${{ matrix.python }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        # 3.9 = minimum pengguna (python3 bawaan macOS lama); tanpa tomllib, members workspace Cargo di-skip.
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        include:
+          - os: macos-latest        # git/path BSD dan filesystem case-insensitive
+            python: "3.13"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install --upgrade pip pytest
+      - run: python -m pytest
+
+  hooks:
+    name: hooks (JSON + shellcheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: manifest & hooks.json = JSON valid
+        run: |
+          for f in .claude-plugin/marketplace.json src/plugins/*/.claude-plugin/plugin.json src/plugins/*/hooks/hooks.json; do
+            python -m json.tool "$f" > /dev/null || { echo "JSON rusak: $f"; exit 1; }
+          done
+      - name: shellcheck skrip shell (fixture test)
+        run: |
+          files=$(git ls-files '*.sh')
+          [ -z "$files" ] && exit 0
+          command -v shellcheck >/dev/null || { sudo apt-get update && sudo apt-get install -y shellcheck; }
+          shellcheck --version
+          # shellcheck disable=SC2086
+          shellcheck -S warning $files
+      - name: output hook = kosong atau JSON valid
+        run: |
+          python -m pip install pytest
+          python -m pytest tests/hooks tests/test_smoke.py -q -k "hooks or detect or guard_bash"
+
+  lint:
+    name: lint plugin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0              # M7 membandingkan versi terhadap base PR
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: lint_plugins.py
+        env:
+          # Kosongkan bertahap: M3,M4 ← L7.1 · M5 ← L7.2 · R2 ← X1 (sinkron dengan DEFERRED di tests/test_lint_plugins.py)
+          LINT_IGNORE: M3,M4,M5,R2
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ -n "$BASE_REF" ]; then
+            python scripts/lint_plugins.py --ignore "$LINT_IGNORE" --base "origin/$BASE_REF"
+          else
+            python scripts/lint_plugins.py --ignore "$LINT_IGNORE"
+          fi
+
+  plugin-validate:
+    name: claude plugin validate
+    runs-on: ubuntu-latest
+    continue-on-error: true           # belum terbukti tanpa autentikasi; jadikan wajib bila hijau stabil
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - run: npm install -g @anthropic-ai/claude-code
+      - run: claude plugin validate .
