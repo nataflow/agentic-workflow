@@ -59,6 +59,25 @@ Menutup 19 temuan backenddev yang tersisa setelah Langkah 1–7: kontrak `issues
 7. **B13**: tambah field terstruktur `commit_template` di `index.json`.
 8. **B14**: `test: tidak berlaku` dianggap FAIL di tech-lead.
 
+## Catatan implementasi (2026-09-25)
+
+Keputusan user: kedelapan usulan dipakai — **B2** invariant dan scope `P1` · **B1** kolom `File` path relatif root · **B9** opsi A · **B10** re-route (a), amandemen TASK di taskdir yang sama · **B15 (e)** dua pemicu (ditambah re-route RCA dari B10 sebagai pemicu ketiga) · **B3** `--stack`/`--symptom`/`--profile-dir` dihapus · **B13** `commit_template` · **B14** `test: tidak berlaku` FAIL. Semuanya tercatat di Log Keputusan `ISSUES.md`; keputusan 05-1 ("document-api bebas bila `--stack` diisi") dicabut oleh B3.
+
+Selesai: B1–B19. Commit: `30dacff` (tahap 1), `070b6d1` (tahap 2), `ae4e096` (tahap 3), `b04d4be` (B13), `a593641` + `451294e` (B12). Hasil: `pytest` 1069 lulus, 1 gagal — `test_profile_paths[backenddev]`, kegagalan lama di luar 08b. `lint_plugins.py` 0 FAIL (6 WARN lama). Test baru: `tests/backenddev/test_08b_{findings_contract,audit_scope,args,tech_lead,git_state,commit_template,validate_doc}.py`, ditambah kasus B-bertanda di `test_adapter_commands`, `test_common_parsing`, `test_debug_audit_docapi_preconditions`, `test_l27_plan_state`, `test_l34_guard_bash`, `test_plan_preconditions`, `test_profile_preconditions`. Test di berkas ini ditulis ulang di atas `tests/conftest.py` (`chain_repo`, `make_repo`, `be_checks`), bukan `conftest` usulan berkas ini; profil ada di `.claude/profile/backenddev/` (L1.1).
+
+Penyimpangan dari rencana di bawah:
+
+- **B3.** Architect sudah 7 check (check 7 = `HALT.md`), jadi `base_branch` resolve dan merge-base masuk check 4 lewat `check_base_branch`, bukan check baru; hitungannya tetap 7/7. Report mendapat check 8 (8/8). Debug: `scope_hint` jadi check 7 (7/7). Document-api: `domain` jadi check 6 (6/6), profil wajib, `## API surface` dicek (B7b). Profile: `--mode` divalidasi di check 6, `--stack` di check 2 terhadap adapter terpasang.
+- **B6.** L5.5 sudah menyempitkan `is_scratch` ke laci `backenddev/docs/[<taskdir>/].explore/`. Sisa perbaikan: `dirty_paths` menyumbang path asal rename, `git_operation_in_progress` di architect check 4 dan report check 7, serta `verify_scope.py` (salinan identik kedua plugin) memakai `is_scratch` lokal alih-alih segmen `.explore` di mana pun.
+- **B10/B15 (e).** Re-route (a) menjadi pemicu ketiga amandemen gerbang (`gate-lifecycle.md` bagian 1a): gerbang menulis `lane: PRD_CONVERSION`, `chain: PRD_BRIEF`, `risk` naik ke `MAJOR` bila `MINOR`, dan ledger `PRD`/`BRIEF`, lalu `analyst` masuk lewat jalur resume Fase 0 di hop `PRD`. Subjek commit amandemen menjadi `docs(<slug>): amandemen akar TASK (<pemicu>)`, dan baris matriks commit ditambahkan di `gate-scope.md`.
+- **B12-A.** `validate_doc.py` ada di `skills/_common/`. B3 (berkas tidak ada) dan "user" B9 dimulai sebagai `WARN`. P9b hanya mencocokkan token ber-backtick di `sementara dipakai:`. P10 menolak nama berkas berekstensi sumber dan nama kelas test; path modul (`internal/order`) tetap sah, sesuai contoh template. Validator menangkap tiga cacat di contoh terisi (slug `Kategori nihil` BRD di luar lima kategori, aktor `terlarang` tanpa `boleh:`, dimensi 2 PRD tanpa jejak bersimbol), jadi contohnya diperbaiki. Fixture test mengekstrak contoh langsung dari template dan melengkapi Impact map PRD yang sengaja dipangkas (3/16) jadi 16 baris.
+- **B12-B.** Dikerjakan di worktree terpisah lalu di-cherry-pick. Hasilnya: katalog check plan pindah ke `plan/references/check-catalog.md`; explorer `system-analysis` dipecah jadi `explorer-surface.md` dan `explorer-blast.md`; blok `> Mengapa:` di SKILL plan, architect, task, dan analyst pindah ke `references/rationale.md`; butir 5–8 dan 10 bagian 2 `brief-template.md` diringkas. Re-entry tech-lead (tabel butir 4) sudah pindah sebelumnya. Muatan rantai planning (tech-lead → plan, tanpa adapter) turun dari 374.414 B menjadi 356.332 B (−18 KB, ±5 %), atau −25 KB bila Profil B tidak dimuat. Angka ini **di bawah** target ±40–50 KB: butir 2, 3, 4, 9, 11, dan 12 `brief-template.md` tidak diringkas karena tidak (seluruhnya) ditagih skrip atau dirujuk agent lain, dan pecahan explorer menambah kepala/tabel slot di tiap berkas.
+- **B13.** `finding_source` dibaca dari tingkat atas spec/matriks, bukan parameter `--finding-source` baru. Frontmatter brief mendapat `commit_scope`, yang dipakai penanda `wip(...)` implementor. Pesan commit reviewer/report tetap dari `commit_convention` (L3.6).
+- **B14.** `parse_commands` tinggal di `precondition_lib.py` dan menerima juga bentuk butir list `- kunci: nilai`. Check 6 lunak di mode `--read-only`.
+- **B17.** Kontrak adapter sudah memuat sembilan kunci sejak L3.1/L3.2. Yang diubah hanya gerbang kelayakan butir 3 dan konsumen per-brief; penjaganya test (`test_b17_*`), bukan lint.
+- **B18.** Status rantai architect tetap `COMPLETED | COMPLETED (WARNING)` karena dipakai tabel pengirim balik tech-lead. Yang diganti hanya label triase implementor (`Triase DONE`).
+- **B19.** L3.4 memakai `agent_type` di input hook, jadi pagar `Write`/`Edit` `code-explorer` langsung ditambahkan ke `hooks/guard_bash.py` (fail-closed), bukan berkas hook baru.
+
 ## Definisi selesai (seluruh berkas)
 
 - 19 checkbox di bawah tercentang, masing-masing sesuai "Selesai bila"-nya.
@@ -100,7 +119,7 @@ Pada setiap blok: `REPO=/home/fakhrulnugroho/work/natakode/nataflow/agentic-work
 ---
 
 ## B1 [Sedang] Skema `issues/README.md` bentrok.
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 3 jam · **Bergantung pada:** keputusan B2 (satu berkas kontrak untuk keduanya); dikerjakan bareng L2.1 · **Memblokir:** filter status temuan `tech-lead` (gate-scope bagian 6), prefix-match `audit` Fase 0 butir 6
 
@@ -219,7 +238,7 @@ Output aktual:
 ---
 
 ## B2 [Sedang] Tangga severity invariant tidak konsisten.
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 2 jam · **Bergantung pada:** keputusan user (severity invariant & scope); satu berkas dengan B1 · **Memblokir:** triase architect Fase 4 butir 3, seleksi temuan gerbang
 
@@ -283,7 +302,7 @@ Satu tabel severity di `findings-contract.md`, dirujuk kelima berkas, tanpa satu
 
 ---
 ## B3 [Sedang] Parameter diterima tapi tak pernah divalidasi.
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 1–1,5 hari · **Bergantung pada:** L5.5 (helper `_common`), L5.2 (pola taskdir debug), L1.1 (`PROFILE_DIR`), L6.1 · **Memblokir:** B6 (architect/report memakai helper yang sama)
 
@@ -426,7 +445,7 @@ Tiap baris tabel di atas bervonis "divalidasi" atau "dihapus dari skrip dan SKIL
 
 ---
 ## B4 [Sedang] Skrip audit crash dan salah vonis.
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 2 jam · **Bergantung pada:** L6.1 (conftest), L5.5 (opsional) · **Memblokir:** —
 
@@ -724,7 +743,7 @@ Kelima contoh reproduksi memberi vonis benar: source_root luar → FAIL dengan J
 ---
 
 ## B5 [Sedang] Stacktrace dioper lewat argumen shell.
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 1 jam · **Bergantung pada:** — (terkait B3 baris debug) · **Memblokir:** —
 
@@ -807,7 +826,7 @@ Opsi alternatif `--symptom-file <path>` (validasi berkas ada dan tidak kosong) m
 
 ---
 ## B6 [Sedang] Filter `.explore` terlalu luas; state git khusus tak terdeteksi.
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 4 jam · **Bergantung pada:** L5.5 (`dirty_paths` di `_common`), L6.1 · **Memblokir:** B3 (helper yang sama)
 
@@ -1290,7 +1309,7 @@ Keenam skenario reproduksi (dua path `.explore`, cherry-pick, merge, rebase di r
 
 ---
 ## B7 [Sedang] Kontrak mati/kontradiktif.
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 2 jam · **Bergantung pada:** B3 (document-api wajib profil), L5.5 (hapus path `.gemini`) · **Memblokir:** —
 
@@ -1372,7 +1391,7 @@ Profil non-git akan ditolak tech-lead (`base_branch` `tidak terdeteksi`, Failure
 ---
 
 ## B8 [Sedang] Predikat analyst menolak Approved yang sah.
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 1 jam · **Bergantung pada:** — · **Memblokir:** gerbang dokumen analyst Fase 4 untuk review bersih
 
@@ -1426,7 +1445,7 @@ String predikat identik di `chain-rules.md` dan kedua format reviewer.
 ---
 
 ## B9 [Sedang] Alat ukur `PRD_CONVERSION` saling bertentangan.
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 1 jam · **Bergantung pada:** keputusan user · **Memblokir:** B12 (butir 3 validator TASK)
 
@@ -1471,7 +1490,7 @@ Keputusan user dibutuhkan (A atau B).
 
 ---
 ## B10 [Sedang] Jalur RCA plan longgar dan tanpa muara eskalasi.
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 2 jam · **Bergantung pada:** L5.1 (`_frontmatter()` plan mencari `risk:` di seluruh isi, bukan hanya frontmatter), keputusan user (muara eskalasi) · **Memblokir:** B15 (c)
 
@@ -1604,7 +1623,7 @@ Sebelum L5.1, `_effective_risk()` bisa membaca `risk:` dari badan TASK (bukan fr
 ---
 
 ## B11 [Sedang] Lokasi `spec.json` tidak ditentukan.
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 1 jam · **Bergantung pada:** L2.7 (laci `.explore/` di-gitignore) · **Memblokir:** —
 
@@ -1669,7 +1688,7 @@ SKILL menyebut satu lokasi spec, dan skrip menolak lokasi lain.
 
 ---
 ## B12 [Sedang] Beban context dan self-test manual.
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 2–3 hari (validator ±1,5 hari, pemangkasan ±1 hari) · **Bergantung pada:** L5.1 (`read_frontmatter`), L5.9 (parser sadar fence/BOM), L5.6 (placeholder tanpa false positive), L6.1, **B9** (aturan butir 3 TASK) · **Memblokir:** —
 
@@ -1813,7 +1832,7 @@ Perkiraan total pemangkasan muatan rantai planning: ±40–50 KB (≈ 10–12 rb
 
 ---
 ## B13 [Rendah] `commit_message` dipaksa `feat(...)`.
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 3–4 jam · **Bergantung pada:** L3.6 (konvensi commit reviewer), keputusan user (`commit_template`) · **Memblokir:** —
 
@@ -1896,7 +1915,7 @@ Tidak ada lagi literal `"feat"` default di scaffold, dan scaffold serta validato
 ---
 
 ## B14 [Rendah] Cek tech-lead lemah.
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 2 jam · **Bergantung pada:** L5.5 (path `.gemini`), L6.3 (integritas berkas plugin) · **Memblokir:** —
 
@@ -2184,7 +2203,7 @@ Kedua contoh reproduksi → check 5 FAIL; contoh `commands.md` di template → P
 
 ---
 ## B15 [Rendah] Rujukan mati dan kontradiksi kecil.
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 2 jam · **Bergantung pada:** B10 (muara eskalasi RCA untuk poin b/c), keputusan user (poin e) · **Memblokir:** —
 
@@ -2221,7 +2240,7 @@ Kelima kontradiksi hilang, dan matriks commit memuat setiap commit yang ditulis 
 ---
 
 ## B16 [Rendah] Parsing argumen.
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 2 jam · **Bergantung pada:** L5.4 (parser chain bersama) · **Memblokir:** —
 
@@ -2375,7 +2394,7 @@ Kelima contoh reproduksi + kasus brief-10 memberi vonis benar tanpa traceback.
 ---
 
 ## B17 [Rendah] Drift dokumen adapter.
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 30 menit · **Bergantung pada:** — · **Memblokir:** —
 
@@ -2403,7 +2422,7 @@ Kontrak dan ketujuh adapter menyebut delapan kunci yang sama.
 ---
 
 ## B18 [Rendah] Drift istilah.
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 2 jam · **Bergantung pada:** keputusan user (kosakata) · **Memblokir:** —
 
@@ -2443,7 +2462,7 @@ Satu kosakata per jenis status, dan satu format envelope reviewer yang dirujuk a
 ---
 
 ## B19 [Rendah] Batas tulis code-explorer hanya lewat prompt.
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 30 menit (koreksi klaim); hook mengikuti L3.4 · **Bergantung pada:** L3.4 (verifikasi identitas subagen di input hook PreToolUse) · **Memblokir:** —
 
