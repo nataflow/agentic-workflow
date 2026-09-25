@@ -87,6 +87,27 @@
 - `grep -l 'from precondition_lib import' src/plugins/backenddev/skills/*/scripts/*.py | wc -l` = 14.
 - Setiap skrip reproduksi di berkas ini menghasilkan vonis kolom "harap".
 
+## Catatan implementasi (2026-09-25)
+
+Keputusan user: seluruh rekomendasi 1–5 (tujuh kunci di semua skrip dan document-api bebas bila `--stack` diisi; status persis huruf besar; kunci frontmatter ganda FAIL; di dalam inline code hanya slot berkosakata yang ditolak; `qa manual:` tak peka huruf di keempat pembaca). Keputusan ini tercatat di `Log Keputusan` `ISSUES.md`, yang lokal karena berkasnya di-gitignore. Suite dijalankan dengan `uvx --python 3.13 pytest -q`: **616 lulus**. Matriks reproduksi L5.2 dijalankan ulang apa adanya, hasilnya lima baris pertama FAIL dan dua baris terakhir PASS di kedelapan kolom. Skenario reproduksi lain dibuktikan lewat test padanannya, bukan lewat skrip bash-nya. Gerbang grep "Definisi selesai" bernilai nol. Ada **15** skrip yang mengimpor `precondition_lib`: 14 skrip di atas ditambah `profile/scripts/migrate_profile.py` yang lahir di Langkah 1.
+
+Penyimpangan dari rencana di bawah:
+
+- **Fondasi test (C.0/C.1) tidak dibangun.** L6.1 belum dikerjakan. Test ditaruh mengikuti konvensi repo yang sudah berjalan, yaitu `src/plugins/<plugin>/tests/` dengan fixture di `conftest.py` akar, bukan `tests/<plugin>/`. Golden `--json` 12 skrip × 4 fixture tidak direkam. Penggantinya adalah test regresi per skrip (`test_<skill>_preconditions.py`, `test_common_parsing.py`, `test_chain_consistency.py`, `test_validate_briefs_matching.py`, `frontenddev/tests/test_parsing_l5.py`, `analyst/tests/test_bom.py`). Karena tidak ada `xfail` warisan, skenario Reproduksi langsung menjadi test biasa. `load_module(path, name)` ditambahkan ke `conftest.py`, sebab `brief_status` backenddev kini mengimpor `precondition_lib` dan modul bernama sama itu bocor ke test frontenddev lewat `sys.modules`.
+- **Kode sudah bergeser sejak `34684ee`.** Nomor baris di tabel B tidak lagi berlaku. Kedua belas `check_preconditions.py` ternyata sudah mengimpor `_common` (resolver profil L1.1), dan status brief architect/report sudah dibaca dari frontmatter lewat `_common/brief_status.py` (Langkah 2). Untuk L5.9-BE, `brief_status.read_frontmatter` kini memakai `split_frontmatter`, dan `scan_briefs` membandingkan status persis lewat `doc_status`: `status: ready` menjadi `UNKNOWN` beserta alasannya. Check 3 architect sudah menahan rantai pada BLOCKED sejak L2.2, jadi ringkasan hitungan BLOCKED tidak ditambahkan. Yang ditambahkan adalah pesan "tak terbaca (…)" berikut nama berkasnya.
+- **Profil.** `PROFILE_DIR` konstanta tidak dibuat. `load_profile_index` membaca lewat `resolve_profile_dir` (lokasi baru `.claude/profile/backenddev/`, atau lokasi lama dengan catatan MIGRATE), menolak profil milik plugin lain, dan mengembalikan `ProfileIndex(data, error, action, dir, note, kind)`, bukan `(data, err)`. Dengan begitu tiap skrip tidak perlu mengulang pesan remediasi. tech-lead mode `--read-only` tetap soft-pass untuk `kind` `missing`/`foreign`.
+- **Tambahan API:** `TASKDIR_ACTION`, `has_heading` (dipakai report check 2 untuk `## Success Criteria` di luar fence), serta `format_text(entry_label=, footer=)` untuk label "Titik masuk" architect dan baris mode profile. `validate_briefs.py` tetap memakai `format_text`/`to_json` miliknya sendiri, sesuai tabel B.
+- **L5.4.** Pembungkus `_declared_chain` di analyst/business-analysis dipertahankan dengan nama `_task_chain`, supaya gerbang grep bersih. Parameter analyst yang asing tetap tercatat di `chain` JSON dalam huruf besar, dan check 4/5 FAIL dengan pesan `parse_chain`. Pada task, `--chain -` kini berarti "tanpa chain", tidak lagi FAIL.
+- **L5.5.** `dirty_paths` membuang laci `.explore` hanya di `backenddev/docs/**` (menutup separuh B6). Di analyst/task, `internal/.explore/q.go` kini terhitung kotor. architect/report kini memakai `-uall`. Semua kandidat `self.root/src/plugins/…`, `~/.gemini/…`, dan `~/.claude/plugins/…` dihapus, termasuk di `scaffold_brief.py`/`validate_briefs.py`, dan diganti `plugin_file`/`find_agent`.
+- **L5.3.** Test `test_anti_pattern_glob_tetap_berlaku` (Check P) tidak ditulis terpisah. Suite Check P yang sudah ada tetap hijau dengan `_path_matches` baru.
+- **Jalur frontenddev/analyst (L5.6–L5.9-FE, L5.9-analyst)** dikerjakan paralel di worktree, lalu di-cherry-pick. Penyimpangannya sebagai berikut:
+  - L5.8: butir opsional 3 (`-z`/quotePath untuk `dirty_lines` dan `ls-tree`) tidak dikerjakan. Test route group memakai `(app/(tabs))` karena aturan L4.2 menolak direktori tingkat atas.
+  - L5.7: `is_manual_cell` juga menerima sel berbacktick.
+  - L5.6: nama regex menjadi `PLACEHOLDER_ANGLE`, dan tindakannya menjadi satu konstanta `PLACEHOLDER_ACTION`. `validate_report` tetap memakai `PLACEHOLDER` sendiri. Template TASK butir 7 ikut diselaraskan.
+  - L5.9-FE: ditambah `fenced_mask`, supaya pemecah seksi mengabaikan heading di dalam fence tanpa membuang isi fence. `validate_task` membaca badan lewat `split_frontmatter`. `section_lines` masih memakai toggle lama.
+  - L5.9-analyst: `set_frontmatter_field` ternyata sudah mempertahankan BOM, jadi hanya docstring dan test yang ditambahkan.
+- **Di luar cakupan, hanya dicatat:** `_common/verify_scope.py` (identik byte di kedua plugin) punya parser frontmatter mentah yang tidak mengenal BOM.
+
 ---
 
 ## A. Rancangan API `_common` backenddev
@@ -725,7 +746,7 @@ Jalur frontenddev (L5.6–L5.9-FE) dan analyst ikut pola yang sama. Bedanya, fun
 
 ## L5.1 [Tinggi] Status dokumen backenddev dicari sebagai substring di seluruh isi
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 0,5 hari · **Bergantung pada:** C.0–C.2 (`split_frontmatter`, `doc_status`) · **Memblokir:** L5.9-BE (memakai `doc_status` yang sama)
 
@@ -886,7 +907,7 @@ Keempat bukti ISSUES terkonfirmasi. Kasus 5 adalah bukti tambahan.
 
 ## L5.2 [Sedang] Cek taskdir terbalik (logika OR) dan pola taskdir tidak ditegakkan
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 0,5 hari · **Bergantung pada:** C.2 (`check_taskdir`) · **Memblokir:** L5.5 (penghapusan `_resolve_taskdir`/`_get_rel_taskdir_str`)
 
@@ -1033,7 +1054,7 @@ Matriks reproduksi dijalankan ulang menghasilkan: lima baris pertama FAIL di ked
 
 ## L5.3 [Sedang] Pencocokan substring di `validate_briefs.py`
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 1 hari · **Bergantung pada:** C.0 (fixture brief di `tests/builders.py`) · **Memblokir:** —
 
@@ -1308,7 +1329,7 @@ Skrip reproduksi menghasilkan: (a) Check I PASS; (b1) Check E FAIL; (b2) Check E
 
 ## L5.4 [Sedang] Crash dan regex chain yang divergen di skrip analyst backenddev
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 0,5 hari · **Bergantung pada:** C.2 (`parse_chain`, `declared_chain`), L5.1 (`read_frontmatter`) · **Memblokir:** —
 
@@ -1437,7 +1458,7 @@ chain: PRD-BRIEF             BA=None       SA=''         plan=PRD-BRIEF
 
 ## L5.5 [Sedang] Duplikasi kode yang sudah divergen dan path mati
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev · **Estimasi:** 2 hari (bagian A + call site bagian B) · **Bergantung pada:** C.0, C.1 · **Memblokir:** L6.3 (aturan lint path), L1.1 (`PROFILE_DIR`)
 
@@ -1638,7 +1659,7 @@ rm -rf "$tmp"
 
 ## L5.6 [Sedang] False positive placeholder di tiga validator frontenddev
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 1 hari · **Bergantung pada:** C.0 (fondasi test) · **Memblokir:** —
 
@@ -1841,7 +1862,7 @@ Kolom ketiga validator pada tabel reproduksi sama dengan kolom "usulan", dan ket
 
 ## L5.7 [Sedang] Huruf besar-kecil `qa manual:` tidak konsisten
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 0,25 hari · **Bergantung pada:** — · **Memblokir:** L4.2 (validator REVIEW/REPORT substansi memakai `is_manual`)
 
@@ -2027,7 +2048,7 @@ Keputusan 5: aturan tak peka huruf di semua pembaca (disarankan) vs ejaan kanoni
 
 ## L5.8 [Sedang] Path non-ASCII dan route group berkurung ditolak
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 0,5 hari · **Bergantung pada:** — · **Memblokir:** L4.2 (`validate_report`)
 
@@ -2168,7 +2189,7 @@ Path yang mengandung koma masih pecah di `split(",")` (validate_report baris 112
 
 ## L5.9 [Rendah] Parsing tidak sadar code fence dan BOM
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev, frontenddev, analyst · **Estimasi:** 1 hari · **Bergantung pada:** L5.1 (`doc_status`), bagian A (`count_h1`, `iter_outside_fences`) · **Memblokir:** L2.2/L2.3 (mengubah fungsi architect yang sama)
 
