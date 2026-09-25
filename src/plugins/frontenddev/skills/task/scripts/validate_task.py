@@ -34,7 +34,7 @@ from precondition_lib import (  # noqa: E402
 
 HEADINGS = ("## Description", "## Success Criteria", "## Out of Scope", "## Chain")
 SC_LINE = re.compile(r"^- \[[ xX]\] \*\*SC-(\d+)\*\*:(.*)$")
-MEASURE = re.compile(r"— verifikasi:\s*(test|diff|typecheck|lint|build|QA manual:)", re.IGNORECASE)
+MEASURE = re.compile(r"— verifikasi:\s*(test|diff|typecheck|lint|build|qa\s+manual\s*:)", re.IGNORECASE)
 FORBIDDEN_MEASURE = re.compile(r"review manual|dinilai layak|terlihat bagus", re.IGNORECASE)
 DOWNSTREAM_DOCS = re.compile(r"\b(FLOW|UI|CONTRACT)\.md\b")
 FILE_REF = re.compile(r"`([\w@./+-]+\.[A-Za-z0-9]+):(\d+)(?:-\d+)?`")

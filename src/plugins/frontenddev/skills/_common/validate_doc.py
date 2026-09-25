@@ -34,6 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from precondition_lib import (  # noqa: E402
     FrontmatterError,
     find_repo_root,
+    is_manual_cell,
     normalize_taskdir,
     parse_sections,
     section_lines,
@@ -299,7 +300,7 @@ class DocValidator:
                 problems.append(f"`{ac}`: baris kurang kolom (wajib Skenario | Cara verifikasi | Sumber)")
                 continue
             how, source = cells[1].lower(), cells[-1]
-            if "test otomatis" not in how and "qa manual:" not in how:
+            if "test otomatis" not in how and not is_manual_cell(cells[1]):
                 problems.append(f"`{ac}`: Cara verifikasi bukan `test otomatis` atau `QA manual: <langkah>`")
             tokens = [m.group(0) for m in TOKEN.finditer(source)]
             if not tokens and source.strip("` ") not in ("—", "-"):

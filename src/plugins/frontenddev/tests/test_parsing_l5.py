@@ -5,7 +5,7 @@ import sys
 
 import pytest
 
-from conftest import FE_SKILLS, commit, fe_run, git, write_files
+from conftest import FE_MINOR_TD, FE_SKILLS, commit, fe_review_md, fe_run, write_files
 
 
 def load_fe(rel: str, name: str):
@@ -94,3 +94,96 @@ def test_bullet_route_group_sveltekit(make_repo):
 def test_parse_bullet(line, want):
     vr = load_fe("report/scripts/validate_report.py", "fe_validate_report_l58")
     assert vr.parse_bullet(line) == want
+
+
+# --- L5.7 `qa manual:` satu aturan di keempat pembaca ---------------------------------------
+
+@pytest.mark.parametrize("line,want", [
+    ("x — verifikasi: QA manual: buka", True),
+    ("x — verifikasi: qa manual: buka", True),
+    ("x — verifikasi: Qa Manual: buka", True),
+    ("x — verifikasi: QA  manual: buka", True),
+    ("cek QA manual: dulu — verifikasi: test", False),
+])
+def test_is_manual(line, want):
+    assert FE_LIB.is_manual(line) is want
+
+
+@pytest.mark.parametrize("cell,want", [
+    ("QA manual: klik tombol", True), ("qa  Manual: klik", True), ("`QA manual: klik`", True),
+    ("test otomatis", False), ("test otomatis, lalu QA manual: cek", False),
+])
+def test_is_manual_cell(cell, want):
+    assert FE_LIB.is_manual_cell(cell) is want
+
+
+def minor_manual(repo, measure: str, sc_text: str = "tombol order menampilkan label Pesan"):
+    """TASK.md `fe_minor_chain` dengan SC-1 beralat ukur `measure`; REVIEW.md memvonisnya PERLU VERIFIKASI MANUAL."""
+    task = repo / FE_MINOR_TD / "TASK.md"
+    text = task.read_text(encoding="utf-8")
+    old = "tombol order menampilkan label Pesan — verifikasi: test `OrderButton.test.tsx` hijau"
+    assert old in text
+    task.write_text(text.replace(old, f"{sc_text} — verifikasi: {measure}"), encoding="utf-8")
+    review = fe_review_md(repo).replace(
+        "| `SC-1` | terbukti | `src/features/order/OrderButton.test.tsx:1` |",
+        "| `SC-1` | PERLU VERIFIKASI MANUAL | klik tombol order |")
+    write_files(repo, {f"{FE_MINOR_TD}/REVIEW.md": review})
+    r = fe_run(repo, "architect/scripts/validate_review.py", "--taskdir", FE_MINOR_TD, "--json")
+    return {c["id"]: c for c in json.loads(r.stdout)["checks"]}["SC"]
+
+
+def test_review_perlu_verifikasi_manual_qa_huruf_kecil(fe_minor_chain):
+    sc = minor_manual(fe_minor_chain, "qa manual: klik tombol order, lihat label")
+    assert sc["status"] == "PASS", sc
+
+
+def test_review_qa_manual_di_deskripsi_bukan_alat_ukur(fe_minor_chain):
+    sc = minor_manual(fe_minor_chain, "test `OrderButton.test.tsx` hijau",
+                      sc_text="cek QA manual: dulu tombol order menampilkan label Pesan")
+    assert sc["status"] == "FAIL" and "bukan SC ber-alat-ukur" in json.dumps(sc)
+
+
+def test_report_manual_huruf_kecil_wajib_catatan(fe_minor_chain):
+    minor_manual(fe_minor_chain, "qa manual: klik tombol order, lihat label")
+    write_files(fe_minor_chain, {f"{FE_MINOR_TD}/REPORT.md":
+                                 "# Order button — perbaikan label — Report\n\n## Ringkasan\n\n"
+                                 "Tombol order kini berlabel Pesan.\n\n## Perubahan\n\n"
+                                 "- tombol order baru beserta test (src/features/order)\n\n"
+                                 "## Catatan\n\n- REVIEW.md P2-1: label belum memakai i18n; ditunda\n"})
+    r = fe_run(fe_minor_chain, "report/scripts/validate_report.py", "--taskdir", FE_MINOR_TD, "--json")
+    c5 = {c["id"]: c for c in json.loads(r.stdout)["checks"]}[5]
+    assert c5["status"] == "FAIL" and "SC QA manual tanpa" in c5["summary"], c5
+
+
+PROMO_TASK = """---
+status: ACTIVE
+lane: HOTFIX_MINOR
+sections: -
+created: 2026-01-01
+---
+# Banner promo
+
+## Description
+Perbaiki banner.
+
+## Success Criteria
+- [ ] **SC-1**: banner tampil di beranda — verifikasi: {measure}
+
+## Out of Scope
+- checkout — di luar permintaan
+
+## Chain
+"""
+
+
+def validate_task(repo, td=PROMO_TD) -> dict:
+    r = fe_run(repo, "task/scripts/validate_task.py", "--root", str(repo), "--taskdir", td, "--json")
+    return {c["id"]: c for c in json.loads(r.stdout)["checks"]}
+
+
+@pytest.mark.parametrize("measure", ["qa manual: buka beranda, lihat banner",
+                                     "QA  manual: buka beranda, lihat banner"])
+def test_validate_task_alat_ukur_manual_sah(make_repo, measure):
+    root = make_repo({f"{PROMO_TD}/TASK.md": PROMO_TASK.format(measure=measure)})
+    c3 = validate_task(root)[3]
+    assert c3["status"] == "PASS", c3

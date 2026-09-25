@@ -42,6 +42,7 @@ from precondition_lib import (  # noqa: E402
     chain_files,
     find_repo_root,
     git,
+    is_manual,
     normalize_taskdir,
     profile_dir_for,
     read_profile_stack,
@@ -209,7 +210,7 @@ class ReviewValidator:
                 why = self._evidence_problem(evidence)
                 if why:
                     p.append(f"`{s_id}` terbukti tanpa bukti sah: {why}")
-            if verdict == "PERLU VERIFIKASI MANUAL" and "QA manual:" not in line:
+            if verdict == "PERLU VERIFIKASI MANUAL" and not is_manual(line):
                 p.append(f"`{s_id}` bukan SC ber-alat-ukur `QA manual:` — wajib divonis terbukti/belum")
             if verdict == "belum terbukti":
                 blocked = True

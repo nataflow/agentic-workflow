@@ -419,6 +419,30 @@ def success_criteria(task_path: Path) -> Dict[str, str]:
     return out
 
 
+VERIFY_MARK = "— verifikasi:"
+_MANUAL = re.compile(r"`?\s*qa\s+manual\s*:", re.IGNORECASE)
+
+
+def measure_of(sc_text: str) -> str:
+    """Teks alat ukur sesudah penanda `— verifikasi:` pertama; kosong bila tidak ada."""
+    _, sep, tail = sc_text.partition(VERIFY_MARK)
+    return tail.strip() if sep else ""
+
+
+def is_manual(sc_text: str) -> bool:
+    """SC beralat ukur `QA manual:` — huruf besar-kecil dan spasi bebas, hanya di posisi alat ukur.
+
+    Satu aturan untuk `validate_task`, `validate_review`, dan `validate_report`:
+    `qa manual:` yang lolos akar tidak boleh ditolak reviewer atau dilupakan laporan.
+    """
+    return bool(_MANUAL.match(measure_of(sc_text)))
+
+
+def is_manual_cell(how: str) -> bool:
+    """Sel *Cara verifikasi* AC `CONTRACT.md` diawali `QA manual:` (aturan huruf yang sama dengan `is_manual`)."""
+    return bool(_MANUAL.match(how.strip()))
+
+
 # ================================================================ 3. lane & sections
 
 ROOTED_LANES = ("FULL_PIPELINE", "FAST_FORWARD", "REFACTOR_ARCH", "HOTFIX_MINOR")

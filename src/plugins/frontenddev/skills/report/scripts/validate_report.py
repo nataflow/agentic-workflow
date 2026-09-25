@@ -26,6 +26,7 @@ from precondition_lib import (  # noqa: E402
     chain_files,
     find_repo_root,
     format_report,
+    is_manual,
     normalize_taskdir,
     report_json,
     section_lines,
@@ -169,8 +170,7 @@ class ReportValidator:
         if "## Catatan" in self.sec and (not notes or all(EMPTY_NOTE.match(n.lstrip("- ")) for n in notes)):
             errors.append("Catatan kosong atau basa-basi — hapus heading-nya")
         manual = [m.group(1) for m in map(SC_LINE.match, (l.strip() for l in self.task.splitlines()))
-                  if m and "— verifikasi:" in m.group(2) and not re.search(r"—\s*gugur:", m.group(2))
-                  and m.group(2).split("— verifikasi:", 1)[1].strip().lower().startswith("qa manual:")]
+                  if m and not re.search(r"—\s*gugur:", m.group(2)) and is_manual(m.group(2))]
         review = self.taskdir / "REVIEW.md"
         joined = "\n".join(notes)
         if review.is_file():
