@@ -13,8 +13,16 @@ Subperintah:
              (exit 1) bila plafon putaran (2) atau plafon taskdir (8) habis —
              dispatch dilarang berangkat.
 - `record` — dipanggil sesudah balikan reviewer. Mencatat verdict ronde terakhir
-             beserta hitungan `BLOCKER [MEKANIS]`/`[SEMANTIK]`.
+             beserta hitungan `BLOCKER [MEKANIS]`/`[SEMANTIK]`. Gate contract menuntut
+             `--evidence` (balikan `contract-reviewer` apa adanya); gate plan menuntut
+             `REVIEW-PLAN.md` ber-`verdict` sama.
+- `commit` — satu-satunya jalur commit draft `CONTRACT.md` / batch brief pada lane
+             non-MINOR: ditolak kecuali ronde terakhir `PASS` atas konten disk dan epoch
+             sekarang. Commit-nya membawa trailer `Review-Round: <gate> r<n> t<total>
+             PASS <sidik>` — jejak ronde yang ikut ter-commit.
 - `status` — cetak ronde dan sisa plafon.
+- `rebuild` — state hilang padahal trailer mencatat ronde: tulis ulang hitungan taskdir
+             dari trailer (ronde sesudah commit terakhir tidak terpulihkan).
 
 **Putaran** adalah ronde ber-epoch sama yang dibuka sesudah ronde `PASS` terakhir
 yang **sudah diajukan** — kontennya pernah di-commit sesudah ronde itu dibuka
@@ -32,26 +40,41 @@ sama dengan konten yang disetujui, dan epoch-nya sama dengan epoch sekarang —
 suntingan atau `reopen` sesudah reviewer lolos membatalkan vonisnya. Commit
 `draft`/`revise`/`append` sesudah ronde tidak berpengaruh.
 
+**Batas yang dinyatakan apa adanya**: state di `.explore/` tidak di-commit.
+Berkas rusak atau berbentuk salah → `FAIL` (pulihkan dari `.bak`, salinan sebelum
+tulis terakhir). Berkas hilang → hitungan dari nol, **kecuali** trailer
+`Review-Round` di git mencatat ronde: maka `FAIL` sampai `rebuild`. Ronde yang
+belum pernah ikut commit tidak dapat dibuktikan sesudah lacinya dihapus.
+
 Zero external dependencies (Python Standard Library only).
 """
 
 import argparse
 import datetime
 import json
+import os
+import re
+import shutil
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from precondition_lib import (  # noqa: E402
-    BRIEF_GLOB, content_snapshot, find_repo_root, gate_targets_at, git, normalize_taskdir,
-    reopen_epoch, snapshot_at,
+    BRIEF_GLOB, content_snapshot, find_repo_root, gate_targets_at, git, git_ok, normalize_taskdir,
+    read_status, reopen_epoch, snapshot_at, taskdir_slug,
 )
 
 MAX_PER_CYCLE = 2
 MAX_PER_TASKDIR = 8
 MAX_DISPATCH_FAILED = 2
 GATES = ("contract", "plan")
+TRAILER = "Review-Round"
+SUBJECTS = {"contract": ("draft CONTRACT.md", "revise CONTRACT.md"),
+            "plan": ("draft breakdown (", "revise breakdown", "draft breakdown append (",
+                     "plan review ronde ")}
+REVIEW_LINE = re.compile(r"^-\s*Verdict:\s*(PASS|BLOCKED)\s*$", re.MULTILINE)
+BLOCKER_LINE = re.compile(r"^-\s*BLOCKER:\s*(\d+)\s*\[MEKANIS\]\s*·\s*(\d+)\s*\[SEMANTIK\]\s*$", re.MULTILINE)
 
 
 class Rounds:
@@ -67,15 +90,42 @@ class Rounds:
             return [f"{self.taskdir_rel}/CONTRACT.md"]
         return sorted(f"{self.taskdir_rel}/{p.name}" for p in self.taskdir.glob(BRIEF_GLOB))
 
+    def committed_rounds(self) -> int:
+        """Total ronde taskdir terbesar yang dicatat trailer `Review-Round` gate ini di git."""
+        out = git(self.root, "log", f"--format=%(trailers:key={TRAILER},valueonly)", "--", self.taskdir_rel)
+        rx = re.compile(rf"^{self.gate} r\d+ t(\d+)\b")
+        return max([int(m.group(1)) for m in map(rx.match, out.splitlines()) if m] or [0])
+
     def load(self) -> Dict[str, Any]:
-        try:
-            return json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+        name = self.path.name
+        if not self.path.exists():
+            committed = self.committed_rounds()
+            if committed:
+                raise SystemExit(f"REVIEW ROUND: [FAIL] `{name}` hilang padahal git mencatat {committed} ronde "
+                                 f"(trailer `{TRAILER}`) — pulihkan dari `{name}.bak`, atau jalankan "
+                                 "`review_round.py rebuild`; dilarang memulai hitungan dari nol.")
             return {"gate": self.gate, "rounds": []}
+        try:
+            state = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise SystemExit(f"REVIEW ROUND: [FAIL] `{name}` rusak ({exc.__class__.__name__}) — pulihkan "
+                             f"dari `{name}.bak`; dilarang menghapus atau menulis ulang dari nol.")
+        rounds = state.get("rounds") if isinstance(state, dict) else None
+        if not isinstance(rounds, list) or not all(isinstance(r, dict) for r in rounds):
+            raise SystemExit(f"REVIEW ROUND: [FAIL] `{name}` tidak berbentuk {{gate, rounds: [...]}} — "
+                             f"pulihkan dari `{name}.bak`.")
+        if len(rounds) < self.committed_rounds():
+            raise SystemExit(f"REVIEW ROUND: [FAIL] `{name}` memuat {len(rounds)} ronde, lebih pendek dari "
+                             f"jejak ronde ter-commit ({self.committed_rounds()}) — pulihkan dari `{name}.bak`.")
+        return state
 
     def save(self, state: Dict[str, Any]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+        if self.path.exists():
+            shutil.copy2(self.path, self.path.with_name(self.path.name + ".bak"))
+        tmp = self.path.with_name(self.path.name + ".tmp")
+        tmp.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+        os.replace(tmp, self.path)
 
     def epoch(self) -> int:
         return reopen_epoch(self.root, self.taskdir_rel, self.gate)
@@ -165,7 +215,7 @@ class Rounds:
         return (f"REVIEW ROUND OPEN: [PASS] {self.gate} ronde {entry['round']}/{MAX_PER_CYCLE} "
                 f"(taskdir {c['taskdir'] + 1}/{MAX_PER_TASKDIR}) atas {len(targets)} berkas")
 
-    def record(self, verdict: str, mechanical: int, semantic: int) -> str:
+    def record(self, verdict: str, mechanical: int, semantic: int, evidence: str = "") -> str:
         state = self.load()
         rounds = state.get("rounds", [])
         if not rounds or rounds[-1].get("verdict") is not None:
@@ -180,16 +230,27 @@ class Rounds:
             state["dispatch_failed"] = failed + 1
             self.save(state)
             return "REVIEW ROUND RECORD: dispatch gagal — ronde dibatalkan, tidak dihitung plafon"
-        if verdict == "PASS" and (mechanical or semantic):
+        if mechanical < 0 or semantic < 0:
+            raise SystemExit("REVIEW ROUND RECORD: [FAIL] hitungan BLOCKER tidak boleh negatif.")
+        if verdict == "PASS" and mechanical + semantic > 0:
             raise SystemExit("REVIEW ROUND RECORD: [FAIL] verdict PASS dengan BLOCKER > 0 adalah kontradiksi.")
-        if verdict == "BLOCKED" and not (mechanical or semantic):
+        if verdict == "BLOCKED" and mechanical + semantic == 0:
             raise SystemExit("REVIEW ROUND RECORD: [FAIL] verdict BLOCKED tanpa satu pun BLOCKER.")
         report = self.report_rel()
-        if report and not (self.root / report).is_file():
-            raise SystemExit(f"REVIEW ROUND RECORD: [FAIL] `{report}` tidak ada — reviewer belum menulis laporannya.")
+        if report:
+            if not (self.root / report).is_file():
+                raise SystemExit(f"REVIEW ROUND RECORD: [FAIL] `{report}` tidak ada — reviewer belum menulis laporannya.")
+            written = read_status(self.root / report, "verdict")
+            if written != verdict:
+                raise SystemExit(f"REVIEW ROUND RECORD: [FAIL] `{report}` ber-`verdict: {written or '(kosong)'}`, "
+                                 f"bukan `{verdict}` — catat vonis laporan apa adanya.")
+        else:
+            report = self.check_evidence(evidence, verdict, mechanical, semantic, rounds[-1]["round"])
         rounds[-1].update({"verdict": verdict, "mechanical": mechanical, "semantic": semantic,
                            "recorded": _now(),
                            "report": content_snapshot(self.root, [report]) if report else ""})
+        if not self.report_rel():
+            rounds[-1]["evidence"] = report
         state["rounds"] = rounds
         self.save(state)
         c = self.counts(state)
@@ -199,6 +260,81 @@ class Rounds:
                ("perbaiki lalu buka ronde menyempit" if c["cycle"] < MAX_PER_CYCLE
                 else "plafon habis — sajikan BLOCKER ke user"))
         return f"REVIEW ROUND RECORD: {self.gate} ronde {rounds[-1]['round']} {verdict} — {nxt}"
+
+    def check_evidence(self, evidence: str, verdict: str, mechanical: int, semantic: int, n: int) -> str:
+        """Gate contract: balikan `contract-reviewer` tersimpan dan cocok dengan flag `record`."""
+        hint = f"{self.taskdir_rel}/.explore/contract-review-r{n}.md"
+        if not evidence:
+            raise SystemExit("REVIEW ROUND RECORD: [FAIL] gate contract menuntut `--evidence <berkas>` — "
+                             f"simpan balikan `contract-reviewer` apa adanya ke `{hint}` lebih dulu.")
+        rel = normalize_taskdir(os.path.relpath(Path(evidence).resolve(), self.root)) \
+            if Path(evidence).is_absolute() else normalize_taskdir(evidence)
+        if not rel.startswith(f"{self.taskdir_rel}/.explore/"):
+            raise SystemExit(f"REVIEW ROUND RECORD: [FAIL] `--evidence` wajib di laci `{self.taskdir_rel}/.explore/`.")
+        path = self.root / rel
+        text = path.read_text(encoding="utf-8") if path.is_file() else ""
+        if "## Contract Review" not in text:
+            raise SystemExit(f"REVIEW ROUND RECORD: [FAIL] `{rel}` tidak ada atau tidak memuat blok `## Contract Review`.")
+        v, b = REVIEW_LINE.search(text), BLOCKER_LINE.search(text)
+        if not v or not b:
+            raise SystemExit(f"REVIEW ROUND RECORD: [FAIL] `{rel}` tanpa baris `- Verdict:` atau "
+                             "`- BLOCKER: <n> [MEKANIS] · <n> [SEMANTIK]`.")
+        if (v.group(1), int(b.group(1)), int(b.group(2))) != (verdict, mechanical, semantic):
+            raise SystemExit(f"REVIEW ROUND RECORD: [FAIL] flag ({verdict}, mekanis {mechanical}, semantik "
+                             f"{semantic}) ≠ balikan di `{rel}` ({v.group(1)}, mekanis {b.group(1)}, "
+                             f"semantik {b.group(2)}) — catat vonis reviewer apa adanya.")
+        return rel
+
+    def paths(self) -> List[str]:
+        """Path yang di-commit `commit`: target + laporan (plan), termasuk brief ter-track yang dihapus."""
+        paths = self.targets()
+        if self.gate == "plan":
+            tracked = git(self.root, "ls-files", "--", f"{self.taskdir_rel}/{BRIEF_GLOB}").split()
+            paths = sorted(set(paths) | set(tracked)) + [self.report_rel()]
+        return paths
+
+    def commit(self, subject: str) -> str:
+        slug = taskdir_slug(self.taskdir_rel)
+        prefix = f"docs({slug}): "
+        kinds = SUBJECTS[self.gate]
+        if not subject.startswith(prefix) or not subject[len(prefix):].startswith(kinds):
+            raise SystemExit(f"REVIEW ROUND COMMIT: [FAIL] subjek wajib `{prefix}<{' | '.join(k.strip() for k in kinds)}…>`.")
+        state = self.load()
+        problem = self.ready(state)
+        if problem:
+            raise SystemExit(f"REVIEW ROUND COMMIT: [FAIL] {problem} — jangan commit; lanjutkan dari "
+                             "validator + ronde reviewer gate ini.")
+        paths = self.paths()
+        last = state["rounds"][-1]
+        trailer = (f"{TRAILER}: {self.gate} r{last['round']} t{len(state['rounds'])} PASS "
+                   f"{last['snapshot'][:12]}")
+        ok, out = git_ok(self.root, "add", "-A", "--", *paths)
+        if ok:
+            if not git(self.root, "diff", "--cached", "--name-only", "--", *paths).strip():
+                raise SystemExit("REVIEW ROUND COMMIT: [FAIL] tidak ada perubahan untuk di-commit — "
+                                 "draft/batch ini sudah ter-commit.")
+            ok, out = git_ok(self.root, "commit", "-q", "-m", subject, "-m", trailer, "--", *paths)
+        if not ok:
+            git_ok(self.root, "reset", "-q", "--", *paths)
+            raise SystemExit(f"REVIEW ROUND COMMIT: [FAIL] `git commit` gagal (hook/lock?) — perbaiki "
+                             f"penyebabnya lalu ulangi: {out.strip()[-400:]}")
+        sha = git(self.root, "rev-parse", "--short", "HEAD").strip()
+        return f"REVIEW ROUND COMMIT: {self.gate} ronde {last['round']} PASS — commit {sha} ({trailer})"
+
+    def rebuild(self) -> str:
+        if self.path.exists():
+            raise SystemExit(f"REVIEW ROUND REBUILD: [FAIL] `{self.path.name}` masih ada — `rebuild` hanya "
+                             "untuk state yang hilang; berkas rusak dipulihkan dari `.bak`.")
+        committed = self.committed_rounds()
+        if not committed:
+            raise SystemExit("REVIEW ROUND REBUILD: [FAIL] tidak ada trailer ronde di git — tidak ada yang dipulihkan.")
+        # Ronde rekonstruksi mengisi plafon taskdir tetapi tidak pernah sah untuk approve
+        # (tanpa epoch/sidik) dan tidak dihitung di putaran berjalan (epoch -1).
+        rounds = [{"round": 0, "epoch": -1, "head": "", "snapshot": "", "verdict": "REKONSTRUKSI",
+                   "mechanical": 0, "semantic": 0, "opened": _now()} for _ in range(committed)]
+        self.save({"gate": self.gate, "rounds": rounds, "rebuilt": _now()})
+        return (f"REVIEW ROUND REBUILD: {self.gate} — {committed} ronde dipulihkan dari trailer "
+                f"(taskdir {committed}/{MAX_PER_TASKDIR}); approval menuntut satu ronde baru atas konten sekarang.")
 
     def status(self) -> str:
         state = self.load()
@@ -217,15 +353,24 @@ def _now() -> str:
     return datetime.datetime.now().isoformat(timespec="seconds")
 
 
+def nonneg(value: str) -> int:
+    n = int(value)
+    if n < 0:
+        raise argparse.ArgumentTypeError("hitungan BLOCKER tidak boleh negatif")
+    return n
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Plafon ronde reviewer dokumen frontenddev")
-    parser.add_argument("cmd", choices=("open", "record", "status"))
+    parser.add_argument("cmd", choices=("open", "record", "commit", "status", "rebuild"))
     parser.add_argument("--taskdir", required=True)
     parser.add_argument("--gate", required=True, choices=GATES)
     parser.add_argument("--root", default=None)
     parser.add_argument("--verdict", choices=("PASS", "BLOCKED", "DISPATCH_FAILED"))
-    parser.add_argument("--mechanical", type=int, default=0)
-    parser.add_argument("--semantic", type=int, default=0)
+    parser.add_argument("--mechanical", type=nonneg, default=0)
+    parser.add_argument("--semantic", type=nonneg, default=0)
+    parser.add_argument("--evidence", default="", help="gate contract: balikan reviewer di .explore/")
+    parser.add_argument("--subject", default="", help="commit: subjek Phase 6 contract / Phase 4 plan")
     args = parser.parse_args()
     rounds = Rounds(args.taskdir, args.gate, Path(args.root) if args.root else None)
     if args.cmd == "open":
@@ -233,7 +378,11 @@ def main() -> None:
     elif args.cmd == "record":
         if not args.verdict:
             raise SystemExit("REVIEW ROUND RECORD: [FAIL] `--verdict` wajib.")
-        print(rounds.record(args.verdict, args.mechanical, args.semantic))
+        print(rounds.record(args.verdict, args.mechanical, args.semantic, args.evidence))
+    elif args.cmd == "commit":
+        print(rounds.commit(args.subject))
+    elif args.cmd == "rebuild":
+        print(rounds.rebuild())
     else:
         print(rounds.status())
 

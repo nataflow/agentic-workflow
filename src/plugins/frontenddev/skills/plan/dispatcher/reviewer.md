@@ -151,7 +151,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/review_round.py open --taskdir {tas
 
 ### Penanganan Balikan
 
-Sesudah tiap balikan, catat vonisnya — `record` juga menyimpan sidik `REVIEW-PLAN.md`, dan `chain.py approve --row BRIEF` menolak approval tanpa ronde terakhir `PASS` atas konten yang persis sama, atau dengan `REVIEW-PLAN.md` basi (bukan laporan ronde terakhir):
+Sesudah tiap balikan, catat vonisnya — `record` menolak bila `verdict` frontmatter `REVIEW-PLAN.md` berbeda dari flag, menyimpan sidik laporannya, dan `chain.py approve --row BRIEF` menolak approval tanpa ronde terakhir `PASS` atas konten yang persis sama, atau dengan `REVIEW-PLAN.md` basi (bukan laporan ronde terakhir):
 
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/review_round.py record --taskdir {taskdir} --gate plan \
@@ -160,7 +160,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/review_round.py record --taskdir {t
 
 | Balikan subagent | Penanganan `plan` |
 | --- | --- |
-| `Verdict: PASS` | `record --verdict PASS`, lalu batch commit breakdown bersama `REVIEW-PLAN.md` |
+| `Verdict: PASS` | `record --verdict PASS`, lalu batch commit lewat `review_round.py commit --gate plan` (Phase 4), yang men-stage breakdown bersama `REVIEW-PLAN.md` |
 | `Verdict: BLOCKED`, seluruh `BLOCKER` `[MEKANIS]` | `record --verdict BLOCKED`; perbaiki brief sampai `validate_briefs.py` `PASS`, lalu ronde menyempit atas konten final |
 | `Verdict: BLOCKED`, ada `BLOCKER [SEMANTIK]` | `record --verdict BLOCKED`; rutekan tiap temuan ke pemilik pada `Rute Revisi` (brief → `plan` sendiri; DTO/layer → `chain.py reopen --row CONTRACT` lewat `frontenddev:lead`), lalu ronde menyempit bila plafon masih ada |
 | `Reason: Gate Breakdown belum tuntas` / `Dokumen hulu hilang` / `Frontmatter brief malformed` | Cacat dokumen, bukan cacat audit: `record --verdict DISPATCH_FAILED`, perbaiki dokumennya, lalu `open` ulang |

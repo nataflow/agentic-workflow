@@ -62,7 +62,7 @@ Tawarkan 2–3 opsi (Strict 5-Layer · Colocated Controller & View-Model · Shar
 
 ### Phase 6 — Commit Draft & Approval User
 
-1. Commit draft: `git add <taskdir>/CONTRACT.md` lalu `docs(<slug>): draft CONTRACT.md` (revisi berikutnya: `docs(<slug>): revise CONTRACT.md`).
+1. Commit draft lewat skrip, bukan `git commit` langsung: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/review_round.py commit --taskdir <taskdir> --gate contract --subject "docs(<slug>): draft CONTRACT.md"` (revisi berikutnya: `docs(<slug>): revise CONTRACT.md`). Skrip menolak kecuali ronde terakhir `PASS` atas konten disk sekarang, lalu meng-commit dengan trailer `Review-Round` — jejak ronde yang bertahan walau laci `.explore/` hilang.
 2. Sajikan ringkasan keputusan — endpoint beserta DTO, strategi cache, layer shape, Files Touched, tabel AC beserta sumbernya, verdict reviewer — lalu `AskUserQuestion`: *Setujui kontrak* · *Revisi (sebut poinnya)* · *Hentikan*.
 3. **Setuju** → `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py approve --taskdir <taskdir> --row CONTRACT --answer "<jawaban user apa adanya>"`. Skrip memvonis ulang validator dan ronde reviewer terakhir — wajib `PASS` atas konten final (sidik sama, di luar baris `status:`) **dan** tidak didahului `reopen` hop CONTRACT sesudah ronde itu dibuka; commit `draft`/`revise` sesudah ronde tidak membatalkannya — menulis `APPROVED`, dan mencentang ledger dalam satu commit (badan: `Konten disetujui: <sha>` + `Hop: CONTRACT`).
 4. **Revisi** → `chain.py revisions --taskdir <taskdir> --row CONTRACT` (plafon 2). Di bawah plafon → perbarui draft, lalu urutan tetap: `validate_doc.py` `PASS` → ronde reviewer atas konten final (Phase 5 butir 3; putaran baru, 2 ronde) → commit `docs(<slug>): revise CONTRACT.md` → ajukan ulang. Suntingan sesudah ronde `PASS` menuntut ronde baru. Plafon habis → hentikan, sajikan poin penolakan berurutan, serahkan ke `frontenddev:lead` Phase 8 (klarifikasi lingkup: amandemen akar, atau `chain.py abandon`).
@@ -101,9 +101,10 @@ Kontrak disetujui — tutup satu baris: `CONTRACT — APPROVED @ <sha konten> ·
 1. **Hop hulu belum sah**: hentikan di Precondition; kembali ke lead.
 2. **DTO backend bertentangan dengan kebutuhan UI**: rancang transformer di Service dan catat di *Decisions Not Taken*; kebutuhan yang tak tertutup sama sekali ditanyakan ke user sebelum draft.
 3. **Query key bertabrakan**: namespace unik pada root key.
-4. **Commit gagal** (hook, lock): perbaiki penyebab dan ulangi commit draft sebelum approval diajukan; dilarang mengajukan draft yang belum ter-commit.
+4. **Commit gagal** (hook, lock): perbaiki penyebab dan ulangi `review_round.py commit` yang sama sebelum approval diajukan; dilarang mengajukan draft yang belum ter-commit.
 5. **Baseline verifikasi absen di profil**: arahkan ke `frontenddev:profile`.
 6. **Adapter tidak ditemukan**: hentikan; Layer Shape tidak boleh ditulis dengan penamaan tebakan.
+7. **State ronde rusak atau hilang** (`review_round.py` FAIL `rusak`/`hilang padahal git mencatat`): pulihkan dari `.bak`; bila `.bak` juga tidak ada dan trailer mencatat ronde → `review_round.py rebuild`, lalu satu ronde baru atas konten sekarang. Dilarang menghapus state atau menulisnya dengan tangan.
 
 ## STYLE
 

@@ -60,7 +60,7 @@ Pecah per batas layer mengacu `references/slicing-patterns.md`: Unit 01 data & t
 
 ### Phase 4 — Batch Commit
 
-Satu commit untuk seluruh brief baru/berubah beserta `REVIEW-PLAN.md` (non-MINOR), staging per path. `REVIEW-PLAN.md` ronde terakhir selalu ikut commit yang sama. Bila batch sudah ter-commit lebih dulu (approval tertunda, Precondition 5), commit laporannya sendirian dengan subjek `docs(<slug>): plan review ronde <n>`.
+Satu commit untuk seluruh brief baru/berubah beserta `REVIEW-PLAN.md` (non-MINOR). Lane non-MINOR commit lewat skrip: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/review_round.py commit --taskdir <taskdir> --gate plan --subject "<subjek tabel>"` — menolak kecuali ronde terakhir `PASS` atas batch dan laporan di disk, men-stage brief + `REVIEW-PLAN.md` sendiri, dan menambah trailer `Review-Round`. Lane MINOR (tanpa ronde): `git add` per path lalu `git commit`. `REVIEW-PLAN.md` ronde terakhir selalu ikut commit yang sama. Bila batch sudah ter-commit lebih dulu (approval tertunda, Precondition 5), commit laporannya sendirian dengan subjek `docs(<slug>): plan review ronde <n>`.
 
 | Mode | Subjek commit |
 |---|---|
@@ -114,7 +114,7 @@ Breakdown disetujui — tutup satu baris: `PLAN — BRIEF @ READY <sha> · <N> b
 1. **Hop hulu belum sah**: hentikan di Precondition; kembali ke `frontenddev:lead` yang merutekan ke gate pemiliknya.
 2. **Kegagalan rekonsiliasi path**: berkas yang diasumsikan ada tidak ditemukan → sesuaikan brief; simbol acuan hilang total → dispatch explorer; tetap tidak ada → tanyakan path riil ke user.
 3. **Baseline terminal crash** (env belum siap): catat galat mentah, tandai baseline `UNVERIFIED_ENV_NOT_READY`, Done Criteria menyebut keadaan itu apa adanya.
-4. **Batch commit gagal** (hook, lock): perbaiki penyebabnya dan ulangi commit yang sama sebelum approval diajukan; dilarang `--no-verify`.
+4. **Batch commit gagal** (hook, lock): perbaiki penyebabnya dan ulangi commit yang sama sebelum approval diajukan; dilarang `--no-verify`. State ronde rusak/hilang → pulihkan dari `.bak`, atau `review_round.py rebuild` bila trailer mencatat ronde; dilarang menulis state dengan tangan.
 5. **Siklus dependensi**: refaktor DAG menjadi rantai linier satu arah.
 6. **Adapter tidak ditemukan**: hentikan; arahkan ke `frontenddev:profile` — brief tanpa penamaan adapter tidak boleh lahir.
 7. **Plafon ronde Plan Review habis dengan BLOCKER tersisa**: jangan commit; sajikan BLOCKER ke user dan rutekan ke gate pemilik lewat `frontenddev:lead`.

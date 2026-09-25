@@ -284,7 +284,10 @@ class Chain:
 
     def _require_review_pass(self, gate: str) -> None:
         """Ronde reviewer terakhir wajib `PASS` atas konten yang persis sama dan epoch reopen sekarang."""
-        problem = Rounds(self.taskdir_rel, gate, self.root).ready()
+        try:
+            problem = Rounds(self.taskdir_rel, gate, self.root).ready()
+        except SystemExit as exc:          # state ronde rusak/hilang: fail-closed, pesan apa adanya
+            raise ChainError(str(exc))
         if problem:
             raise ChainError(problem + ".")
 

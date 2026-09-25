@@ -133,7 +133,9 @@ Dan dua penjaga keadaan:
 
 - `_common/review_round.py` — plafon ronde reviewer dokumen (2 per putaran, 8 per taskdir; putaran baru
   dimulai sesudah dokumen yang lolos ronde `PASS` di-commit, atau sesudah `reopen` hop gate itu) disimpan di
-  `.explore/<gate>-review-state.json` beserta sidik konten, epoch reopen, dan `HEAD` tiap ronde.
+  `.explore/<gate>-review-state.json` beserta sidik konten, epoch reopen, dan `HEAD` tiap ronde. State rusak →
+  FAIL (pulihkan dari `.bak`); `commit` meng-commit draft/batch hanya sesudah ronde `PASS` dengan trailer
+  `Review-Round`, sehingga state yang hilang terdeteksi (`rebuild` memulihkan hitungannya).
 - `lead/scripts/taskdir_state.py` — memvonis keadaan tiap taskdir (`AKAR`, `GATE`, `DRIFT`,
   `EKSEKUSI`, `TERHENTI`, `PENUTUP`, `TEMUAN`, `LAPORAN`, `TUNTAS`, `DITUTUP`, `RUSAK`) beserta satu
   rute berikutnya, dari disk dan ledger — bukan dari ingatan sesi.

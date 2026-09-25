@@ -51,16 +51,19 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/review_round.py open --taskdir {tas
 
 ### Penanganan Balikan
 
-Catat tiap balikan sebelum melangkah:
+Simpan balikan apa adanya ke `{taskdir}/.explore/contract-review-r<ronde>.md` (tanpa menyunting satu karakter pun), lalu catat sebelum melangkah — `record` membandingkan `Verdict:` dan hitungan `BLOCKER:` berkas itu dengan flag-nya dan menolak bila berbeda:
 
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/review_round.py record --taskdir {taskdir} --gate contract \
-  --verdict <PASS|BLOCKED|DISPATCH_FAILED> --mechanical <n> --semantic <n>
+  --verdict <PASS|BLOCKED> --mechanical <n> --semantic <n> \
+  --evidence {taskdir}/.explore/contract-review-r<ronde>.md
 ```
+
+`DISPATCH_FAILED` tidak butuh `--evidence`.
 
 | Balikan subagent | Penanganan `contract` |
 | --- | --- |
-| `Verdict: PASS` | `record --verdict PASS`; serap ADVISORY yang menyederhanakan, abaikan yang menambah lingkup; commit draft (Phase 6) |
+| `Verdict: PASS` | `record --verdict PASS --evidence …`; serap ADVISORY yang menyederhanakan, abaikan yang menambah lingkup — suntingan apa pun sesudah ini menuntut ronde baru; commit draft lewat `review_round.py commit` (Phase 6) |
 | `Verdict: BLOCKED` | `record --verdict BLOCKED`; perbaiki tiap BLOCKER di draft, `validate_doc.py` sampai `PASS`, lalu ronde 2 menyempit bila plafon masih ada |
 | `BLOCKER [MEKANIS]` muncul | Catat vonis apa adanya (`record --verdict BLOCKED --mechanical <n>`); reviewer menghitung ulang yang sudah dijamin — periksa ulang `validate_doc.py`: `FAIL` → perbaiki sampai `PASS`; `PASS` → perlakukan temuan itu sebagai ADVISORY dan catat penyimpangannya. Lalu ronde menyempit — vonis `BLOCKED` tidak dapat disetujui tanpa ronde `PASS` sesudahnya |
 | Payload kosong, format rusak, atau error | `record --verdict DISPATCH_FAILED` (tidak dihitung plafon ronde; maksimal 2 per taskdir), ulangi maksimal sekali |
