@@ -20,7 +20,7 @@ def test_no_hardcoded_profile_path_in_python(plugin):
     bad = []
     for path in root.rglob("*.py"):
         rel = path.relative_to(root).as_posix()
-        if rel in PY_ALLOWED or rel.startswith("tests/"):
+        if rel in PY_ALLOWED:
             continue
         for no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             if PY_HARDCODED.search(line):

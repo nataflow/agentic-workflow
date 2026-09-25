@@ -1,10 +1,10 @@
 """Teks SKILL quickdev: namespace, deskripsi, koeksistensi dengan hook engineer (L1.3)."""
 import re
-from pathlib import Path
-
 import pytest
 
-SKILLS = sorted((Path(__file__).resolve().parents[1] / "skills").glob("*/SKILL.md"))
+from conftest import PLUGINS
+
+SKILLS = sorted((PLUGINS / "quickdev" / "skills").glob("*/SKILL.md"))
 IDS = [p.parent.name for p in SKILLS]
 
 
@@ -49,7 +49,7 @@ def test_disable_model_invocation(path):
 
 def test_profile_baseline_needs_permission_and_timeout():
     """L3.5 — baseline quickdev:profile dijalankan hanya sesudah izin, bertimeout, tanpa migrasi."""
-    root = Path(__file__).resolve().parents[1] / "skills" / "profile"
+    root = PLUGINS / "quickdev" / "skills" / "profile"
     text = (root / "SKILL.md").read_text(encoding="utf-8")
     fase2 = text.split("### Fase 2", 1)[1].split("\n### ", 1)[0]
     assert "AskUserQuestion" in fase2 and "TIMEOUT" in fase2 and "timeout" in fase2

@@ -239,7 +239,7 @@ def test_find_agent_tanpa_fallback_home(tmp_path, make_repo):
     """Reproduksi L5.5 #2: salinan `~/.gemini` tidak menutupi agent yang hilang dari plugin."""
     import shutil
     plug = tmp_path / "plug"
-    shutil.copytree(PLUGINS / "backenddev", plug, ignore=shutil.ignore_patterns("__pycache__", "tests"))
+    shutil.copytree(PLUGINS / "backenddev", plug, ignore=shutil.ignore_patterns("__pycache__"))
     (plug / "agents" / "code-explorer.md").unlink()
     home = tmp_path / "home"
     write_files(home, {".gemini/config/plugins/backenddev/agents/code-explorer.md": "# lama\n",

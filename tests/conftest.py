@@ -1,4 +1,4 @@
-"""Fixture bersama untuk `tests/` dan `src/plugins/*/tests/`.
+"""Fixture bersama untuk seluruh `tests/`.
 
 Semua test memanggil skrip plugin lewat `subprocess` dengan `sys.executable`,
 persis seperti hook dan skill memanggilnya, sehingga yang diuji adalah perilaku
@@ -14,7 +14,7 @@ from typing import Dict, Optional
 
 import pytest
 
-REPO = Path(__file__).resolve().parent
+REPO = Path(__file__).resolve().parents[1]
 PLUGINS = REPO / "src" / "plugins"
 
 BE_PROFILE_MD = ("stack", "module-structure", "domain-map", "surface-map", "code-conventions",
@@ -179,7 +179,7 @@ def chain_repo(make_repo):
 # --- Rantai frontenddev (Langkah 4) ------------------------------------------------------------
 
 FE_SKILLS = PLUGINS / "frontenddev" / "skills"
-FE_FIX = PLUGINS / "frontenddev" / "tests" / "fixtures"
+FE_FIX = REPO / "tests" / "frontenddev" / "fixtures"
 FE_TD = "frontenddev/docs/2609241200-orders-lacak"
 
 
