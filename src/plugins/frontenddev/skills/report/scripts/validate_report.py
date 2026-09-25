@@ -2,11 +2,13 @@
 """REPORT.md Validator.
 
 Memvonis bentuk `REPORT.md` terhadap `templates/report-template.md`: judul
-diturunkan dari H1 `TASK.md`, urutan heading, Ringkasan satu kalimat, butir
-Perubahan berakar pada berkas rantai dan mencakup seluruhnya, Catatan tidak
-basa-basi, tiap `SC-{n}` yang `REVIEW.md` vonis `PERLU VERIFIKASI MANUAL`
-tercatat di Catatan (sumbernya tabel `## Cakupan Success Criteria` `REVIEW.md`,
-bukan tebakan dari berkas rantai), dan nol placeholder.
+diturunkan dari H1 `TASK.md`, urutan heading, Ringkasan satu kalimat bermakna
+(≥ 5 kata, bukan "Selesai."), butir Perubahan bermakna (≥ 3 kata) yang berakar
+pada berkas rantai dan mencakup seluruhnya tanpa rujukan direktori tingkat atas,
+Catatan tidak basa-basi, tiap `SC-{n}` yang `REVIEW.md` vonis `PERLU VERIFIKASI
+MANUAL` dan tiap temuan `REVIEW.md` ber-`> Status: PLANNED|DEFERRED` tercatat di
+Catatan (sumbernya `REVIEW.md`, bukan tebakan dari berkas rantai), dan nol
+placeholder.
 
 Zero external dependencies (Python Standard Library only). Satu impor
 intra-plugin: `skills/_common/precondition_lib.py`, di-bootstrap relatif
@@ -38,6 +40,10 @@ SENTENCE_END = re.compile(r"[.!?](?=\s|$)")
 BULLET = re.compile(r"^- (.+) \(([^()]+)\)\s*$")
 PLACEHOLDER = re.compile(r"\{\{|<!--|<[^<>\n]+>")
 EMPTY_NOTE = re.compile(r"^(-|n/?a|tidak ada|nihil)\.?$", re.IGNORECASE)
+TRIVIAL = re.compile(r"^(selesai|done|beres|ok|oke|sudah|tuntas)\.?$", re.IGNORECASE)
+OPEN_FINDING = re.compile(r"^### \[(P[123]-\d+)\]")
+MIN_SUMMARY_WORDS = 5
+MIN_BULLET_WORDS = 3
 
 
 class ReportValidator:
@@ -97,9 +103,14 @@ class ReportValidator:
     def _check_3_summary(self) -> None:
         body = " ".join(l.strip() for l in self.sec.get("## Ringkasan", []) if l.strip())
         ends = len(SENTENCE_END.findall(INLINE_CODE.sub("``", body)))
-        ok = bool(body) and ends == 1 and SENTENCE_END.search(body.rstrip()[-1:] or "x") is not None
-        self._add(3, "Ringkasan satu kalimat", ok, f"{ends} akhir kalimat" if not ok else "lolos",
-                  "Tulis tepat satu kalimat yang diakhiri titik.")
+        words = len(INLINE_CODE.sub("kode", body).split())
+        errors = []
+        if not (bool(body) and ends == 1 and SENTENCE_END.search(body.rstrip()[-1:] or "x") is not None):
+            errors.append(f"{ends} akhir kalimat")
+        if body and (words < MIN_SUMMARY_WORDS or TRIVIAL.match(body.strip())):
+            errors.append(f"Ringkasan `{body}` terlalu umum (< {MIN_SUMMARY_WORDS} kata)")
+        self._add(3, "Ringkasan satu kalimat", not errors, "; ".join(errors) or "lolos",
+                  f"Tulis tepat satu kalimat hasil aktual (≥ {MIN_SUMMARY_WORDS} kata) yang diakhiri titik.")
 
     def _check_4_changes(self) -> None:
         lines = [l.strip() for l in self.sec.get("## Perubahan", []) if l.strip()]
@@ -115,6 +126,12 @@ class ReportValidator:
         def covers(ref: str, f: str) -> bool:
             return f == ref or f.startswith(ref + "/")
 
+        vague = [b.group(1) for b in bullets if b and len(b.group(1).split()) < MIN_BULLET_WORDS]
+        if vague:
+            errors.append(f"butir tanpa perubahan perilaku (< {MIN_BULLET_WORDS} kata): " + ", ".join(vague[:3]))
+        broad = [r for r in refs if "/" not in r and r not in files]
+        if broad:
+            errors.append("rujukan terlalu lebar (direktori tingkat atas): " + ", ".join(broad[:3]))
         stray = [r for r in refs if not any(covers(r, f) for f in files)]
         orphan = [f for f in files if not any(covers(r, f) for r in refs)]
         if stray:
@@ -123,7 +140,8 @@ class ReportValidator:
             errors.append("berkas rantai tak tercakup: " + ", ".join(orphan[:5]))
         self._add(4, "Perubahan berakar berkas rantai", not errors,
                   "; ".join(errors) or f"{len(lines)} butir mencakup {len(files)} berkas",
-                  "Tiap butir ditutup kurung berisi berkas/direktori rantai, dan tiap berkas rantai tercakup.")
+                  f"Tiap butir menyebut perubahan perilaku (≥ {MIN_BULLET_WORDS} kata) dan ditutup kurung berisi "
+                  "berkas/direktori rantai (bukan direktori tingkat atas); tiap berkas rantai tercakup.")
 
     def _check_5_notes(self) -> None:
         errors = []
@@ -134,21 +152,35 @@ class ReportValidator:
                   if m and "— verifikasi:" in m.group(2) and not re.search(r"—\s*gugur:", m.group(2))
                   and m.group(2).split("— verifikasi:", 1)[1].strip().lower().startswith("qa manual:")]
         review = self.taskdir / "REVIEW.md"
+        joined = "\n".join(notes)
         if review.is_file():
             _, rbody = split_frontmatter(review.read_text(encoding="utf-8"))
+            rlines = section_lines(rbody, "## Temuan")
+            for i, line in enumerate(rlines):
+                m = OPEN_FINDING.match(line.strip())
+                if not m:
+                    continue
+                block = []
+                for nxt in rlines[i + 1:]:
+                    if OPEN_FINDING.match(nxt.strip()):
+                        break
+                    block.append(nxt)
+                if re.search(r"^> Status:\s*(PLANNED|DEFERRED)\b", "\n".join(block), re.MULTILINE) \
+                        and not re.search(rf"\b{m.group(1)}\b", joined):
+                    errors.append(f"temuan {m.group(1)} belum dituntaskan di REVIEW.md tetapi absen dari Catatan")
             for line in section_lines(rbody, "## Cakupan Success Criteria"):
                 m = REVIEW_SC_ROW.match(line.strip())
                 if m and m.group(2).strip() == "PERLU VERIFIKASI MANUAL" and m.group(1) not in manual:
                     manual.append(m.group(1))
                 if m and m.group(2).strip() == "belum terbukti":
                     errors.append(f"{m.group(1)} belum terbukti di REVIEW.md — rantai ini tidak boleh dilaporkan")
-        joined = "\n".join(notes)
         missing = [sc for sc in manual
                    if not re.search(rf"\b{sc}\b.*PERLU VERIFIKASI MANUAL", joined)]
         if missing:
             errors.append("SC QA manual tanpa `PERLU VERIFIKASI MANUAL`: " + ", ".join(missing))
         self._add(5, "Catatan jujur", not errors, "; ".join(errors) or "lolos",
-                  "Catat tiap SC ber-`QA manual:` sebagai `SC-{n} — PERLU VERIFIKASI MANUAL: <langkah>`.")
+                  "Catat tiap SC ber-`QA manual:` sebagai `SC-{n} — PERLU VERIFIKASI MANUAL: <langkah>`, dan "
+                  "tiap temuan REVIEW.md ber-`> Status: PLANNED|DEFERRED` dengan ID-nya (`P2-1 — …`).")
 
     def _check_6_placeholder(self) -> None:
         hits = sorted(set(PLACEHOLDER.findall(INLINE_CODE.sub("", self.text))))
@@ -156,7 +188,8 @@ class ReportValidator:
                   "Isi seluruh slot template dan hapus komentar.")
 
     def format_text(self) -> str:
-        return format_report("report validate", self.results)
+        return format_report("report validate", self.results).replace(
+            "PRECONDITION CHECK: report validate", "REPORT VALIDATION:", 1)
 
     def to_json(self) -> str:
         return report_json(self.results, root=str(self.root), taskdir=self.taskdir_rel)

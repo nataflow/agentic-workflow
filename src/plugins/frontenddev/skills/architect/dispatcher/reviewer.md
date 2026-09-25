@@ -50,7 +50,8 @@ Review seluruh diff rantai untuk satu taskdir frontend.
 Jalankan validator lebih dulu, apa pun isi amplopnya — amplop adalah klaim, `REVIEW.md` di disk adalah bukti:
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/architect/scripts/validate_review.py --taskdir {taskdir}
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/architect/scripts/validate_review.py --taskdir {taskdir} \
+  --log {taskdir}/.explore/closing-verification.json
 ```
 
 | Keadaan | Penanganan `architect` |

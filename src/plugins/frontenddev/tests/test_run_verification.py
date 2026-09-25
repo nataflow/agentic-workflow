@@ -100,3 +100,12 @@ def test_architects_use_runner_not_tail(path):
     text = (PLUGINS / path).read_text(encoding="utf-8")
     assert "tail -40" not in text
     assert "run_verification.py" in text
+
+
+def test_closing_writes_machine_log(rv, tmp_path):
+    """L4.2 aturan 11 — log mesin di sebelah `closing-verification.md`, dibaca `validate_review.py --log`."""
+    run(rv, tmp_path, "baseline", "test=sh -c 'echo \"FAIL a.test.ts\"; exit 1'", "lint=true")
+    run(rv, tmp_path, "closing", "test=sh -c 'echo \"FAIL a.test.ts\"; exit 1'", "lint=true")
+    log = json.loads((tmp_path / "td/.explore/closing-verification.json").read_text(encoding="utf-8"))
+    assert [(e["cmd"], e["status"], e["new_errors"], e["baseline_status"]) for e in log] == \
+        [("test", "MERAH", 0, "MERAH"), ("lint", "HIJAU", 0, "HIJAU")]

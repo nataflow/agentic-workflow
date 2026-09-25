@@ -257,3 +257,80 @@ def fe_minor_chain(tmp_path):
                           capture_output=True, text=True, env={**os.environ, **GIT_ENV})
     assert proc.returncode == 0, proc.stdout + proc.stderr
     return root
+
+
+FE_DIMENSIONS = ["Layer Boundaries", "Data Flow & DTO", "API Layer", "State Scope & Ownership",
+                 "UI & 6-State Branches", "Platform Semantics", "Error Handling", "Performance & Leaks",
+                 "Test Quality & Coverage"]
+FE_P2_FINDING = ("### [P2-1] Label tidak memakai i18n\n\n> Status: PLANNED\n\n"
+                 "- **Location**: `src/features/order/OrderButton.tsx:1`\n"
+                 "- **Violation**: Dimensi 5 — label literal di presentasi.\n"
+                 "- **Evidence**: `<button>Pesan</button>`\n"
+                 "- **Recommendation**: ambil label dari kamus i18n.\n")
+
+
+def fe_review_md(repo: Path, **over: str) -> str:
+    """REVIEW.md rantai `fe_minor_chain` — default: WARNING sah ber-`[P2-1]` PLANNED (fixture positif L4.2).
+
+    `over` menimpa field: taskdir, stack, verdict, p2, reviewed_at, h1, summary_status, total,
+    verification, sc_evidence, findings, done, dims (daftar 9 status), dim_names (daftar 9 nama).
+    """
+    base = git(repo, "log", "--diff-filter=A", "--format=%h", "--", f"{FE_MINOR_TD}/TASK.md").split()[-1]
+    f = {"taskdir": FE_MINOR_TD, "stack": "react-vite", "verdict": "WARNING", "p2": "1",
+         "reviewed_at": "2026-09-25", "h1": "# Review Findings — order-checkout",
+         "summary_status": "WARNING", "total": "- Total Findings: 1 (0 P1, 1 P2, 0 P3)",
+         "verification": "| `test` | HIJAU | 0 |", "sc_evidence": "`src/features/order/OrderButton.test.tsx:1`",
+         "findings": FE_P2_FINDING, "done": "terpenuhi",
+         "dims": ["PASS"] * 4 + ["P2"] + ["PASS"] * 4, "dim_names": FE_DIMENSIONS, **over}
+    dims = "\n".join(f"| {i + 1} | {n} | {s} |" for i, (n, s) in enumerate(zip(f["dim_names"], f["dims"])))
+    return f"""---
+artifact: REVIEW
+taskdir: {f['taskdir']}
+stack: {f['stack']}
+verdict: {f['verdict']}
+p1: 0
+p2: {f['p2']}
+p3: 0
+base: {base}
+reviewed_at: {f['reviewed_at']}
+---
+
+{f['h1']}
+
+## Summary
+- Stack: react-vite
+{f['total']}
+- Overall Status: {f['summary_status']}
+
+## Verifikasi Penutup
+| Perintah | Hasil | Galat baru vs baseline |
+|---|---|---|
+{f['verification']}
+
+## Cakupan Success Criteria
+| SC | Vonis | Bukti |
+|---|---|---|
+| `SC-1` | terbukti | {f['sc_evidence']} |
+
+## Cakupan Acceptance Criteria
+| AC | Vonis | Bukti |
+|---|---|---|
+
+## Temuan
+
+{f['findings']}
+## Done Criteria DITUNDA
+| Brief | Butir | Vonis | Bukti |
+|---|---|---|---|
+| brief-01 | pnpm test nol galat baru | {f['done']} | HIJAU |
+
+## Umpan balik profil
+| Berkas | Pola warisan | Pola pengganti | Sumber |
+|---|---|---|---|
+| — | — | — | — |
+
+## 9 Dimensi
+| # | Dimensi | Status |
+|---|---|---|
+{dims}
+"""

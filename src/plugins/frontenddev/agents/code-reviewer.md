@@ -42,7 +42,7 @@ Verifikasi sendiri sebelum menyentuh diff. Kegagalan mana pun mengembalikan `Sta
 
 ## Fase 2 — Sembilan Dimensi
 
-Nilai baris yang berubah terhadap sembilan dimensi. Kandidat yang cocok lebih dari satu dimensi dicatat **satu** temuan dengan severity terburuk dan seluruh dimensinya disebut.
+Nilai baris yang berubah terhadap sembilan dimensi. Kandidat yang cocok lebih dari satu dimensi dicatat **satu** temuan dengan severity terburuk dan seluruh dimensinya disebut — tulis dimensinya di awal *Violation*: `Dimensi <n>[ & <m>] — …`.
 
 1. **Layer Boundaries** — DTO → Service → API layer → View-Model → Controller → Presentation. `[P1]` presentasi mengimpor dari `dto/`; `[P1]` fetch dari presentasi; `[P2]` logika query/state di berkas rute alih-alih Controller.
 2. **Data Flow, Typing & DTO** — `[P1]` `: any`/`as any` di DTO/Service/API layer/View-Model; `[P2]` field DTO dikonsumsi langsung di markup; `[P2]` View-Model mengembalikan DTO utuh.
@@ -75,7 +75,7 @@ Katalog ini kembaran diff-scoped `skills/review/references/nine-dimensions-catal
 
 1. Tulis (atau timpa utuh) `{taskdir}/REVIEW.md` persis bagian 1 `{template}` — delapan heading, urutan, dan kolom tabel disalin apa adanya. Temuan ber-ID `P{severity}-{n}` berurutan per severity, masing-masing dengan baris `> Status: PLANNED`.
 2. Isi `## Verifikasi Penutup` dari `{verification_log}` apa adanya; dilarang menjalankan ulang perintahnya.
-3. Turunkan `verdict` dari bagian 2 butir 6 template, lalu samakan `Overall Status` dan hitungan `p1`/`p2`/`p3`.
+3. Turunkan `verdict` dari bagian 2 butir 6 template, lalu samakan `Overall Status` = verdict, `Total Findings` dan `p1`/`p2`/`p3` = hitungan, dan status tiap dimensi = severity terburuk temuannya — `validate_review.py` menagih ketiganya.
 4. **Taskdir perbaikan** (`finding_source` ≠ `-`): di berkas `{finding_source}`, ubah baris `> Status:` tiap ID `findings` `TASK.md` yang benar-benar tertutup di diff menjadi `FIXED <YYYY-MM-DD> — lihat {taskdir}`. Satu-satunya suntingan di luar `REVIEW.md` yang diizinkan.
 
 ## Kalibrasi

@@ -30,7 +30,7 @@ reviewed_at: <YYYY-MM-DD>
 ## Verifikasi Penutup
 | Perintah | Hasil | Galat baru vs baseline |
 |---|---|---|
-| `<perintah dari commands.md profil>` | HIJAU \| MERAH \| TIMEOUT | 0 \| <n> |
+| `<nama perintah dari closing-verification.md>` | HIJAU \| MERAH \| TIMEOUT | 0 \| <n> |
 
 ## Cakupan Success Criteria
 | SC | Vonis | Bukti |
@@ -49,7 +49,7 @@ reviewed_at: <YYYY-MM-DD>
 > Status: PLANNED
 
 - **Location**: `<file:baris>`
-- **Violation**: <dimensi + penjelasan>
+- **Violation**: Dimensi <n>[ & <m>] — <penjelasan>
 - **Evidence**: <cuplikan>
 - **Recommendation**: <perbaikan konkret>
 
@@ -83,16 +83,19 @@ reviewed_at: <YYYY-MM-DD>
 
 Ditagih `validate_review.py`; `FAIL` menahan commit `REVIEW.md` dan membuat dispatch reviewer dianggap gagal (maks satu ulang):
 
-1. **Frontmatter**: `artifact: REVIEW`; `verdict` enum; `p1`/`p2`/`p3` bilangan; `base` = sha commit akar `TASK.md` (commit yang melahirkannya) — sha lain `FAIL`; `reviewed_at` `YYYY-MM-DD`.
-2. **Struktur**: tepat satu H1 `# Review Findings — `, lalu delapan heading `##` persis urutan bagian 1.
-3. **Cakupan Success Criteria**: tepat satu baris per `SC-{n}` aktif `TASK.md` (SC gugur — `~~…~~ — gugur: <alasan>` — tidak divonis), vonis `terbukti` | `belum terbukti` | `PERLU VERIFIKASI MANUAL`. `terbukti` menuntut bukti ber-`file:baris` atau perintah ber-backtick; `PERLU VERIFIKASI MANUAL` hanya sah untuk SC ber-alat-ukur `QA manual:`.
+1. **Frontmatter**: `artifact: REVIEW`; `taskdir` = path taskdir yang divalidasi; `stack` = `stack` profil; `verdict` enum; `p1`/`p2`/`p3` bilangan; `base` = sha commit akar `TASK.md` (commit yang melahirkannya) — sha lain `FAIL`; `reviewed_at` tanggal kalender sah `YYYY-MM-DD`, tidak lebih awal dari commit akar.
+2. **Struktur**: tepat satu H1 persis `# Review Findings — <slug>`, lalu delapan heading `##` persis urutan bagian 1.
+3. **Cakupan Success Criteria**: tepat satu baris per `SC-{n}` aktif `TASK.md` (SC gugur — `~~…~~ — gugur: <alasan>` — tidak divonis), vonis `terbukti` | `belum terbukti` | `PERLU VERIFIKASI MANUAL`. `terbukti` menuntut `path:baris` berkas rantai yang ada (baris dalam rentang berkas), atau perintah yang `HIJAU` di `## Verifikasi Penutup` — SC yang dibuktikan test lama yang tidak disentuh rantai memakai perintah hijau; `PERLU VERIFIKASI MANUAL` hanya sah untuk SC ber-alat-ukur `QA manual:`.
 4. **Cakupan Acceptance Criteria**: tepat satu baris per `AC-{n}` `CONTRACT.md` (lane non-MINOR), vonis `terbukti` | `belum terbukti` | `QA manual`.
-5. **Temuan**: jumlah `### [P1-n]`/`[P2-n]`/`[P3-n]` sama dengan `p1`/`p2`/`p3`, nomor berurutan per severity, tiap temuan membawa baris `> Status:`.
+5. **Temuan**: jumlah `### [P1-n]`/`[P2-n]`/`[P3-n]` sama dengan `p1`/`p2`/`p3`, nomor berurutan per severity, tiap temuan membawa baris `> Status:` dan *Violation* yang diawali `Dimensi <n>[ & <m>] —`.
 6. **Konsistensi verdict** — diturunkan mekanis, bukan dipilih:
-   - `BLOCKED` ⇔ `p1 > 0` **atau** satu saja SC `belum terbukti` **atau** verifikasi penutup merah: baris `TIMEOUT`, atau galat baru > 0. Baris `MERAH` bergalat baru 0 adalah merah warisan baseline — bukan `BLOCKED`.
+   - `BLOCKED` ⇔ `p1 > 0` **atau** satu saja SC `belum terbukti` **atau** satu saja Done Criteria `tidak terpenuhi` **atau** verifikasi penutup merah: baris `TIMEOUT`, atau galat baru > 0. Baris `MERAH` bergalat baru 0 adalah merah warisan baseline — bukan `BLOCKED`.
    - selain itu `WARNING` ⇔ `p2 > 0` atau satu saja AC `belum terbukti`.
    - selain itu `PASS`.
-7. **9 Dimensi**: sembilan baris bernomor 1–9.
+7. **9 Dimensi**: nomor 1–9 tepat sekali, nama persis bagian 1, status = severity terburuk temuan yang menyebut dimensi itu di *Violation* (tanpa temuan → `PASS`).
+8. **Summary**: `Overall Status` = verdict turunan; `Total Findings: <n> (<x> P1, <y> P2, <z> P3)` = hitungan temuan.
+9. **Done Criteria DITUNDA**: vonis `terpenuhi` | `tidak terpenuhi`; satu `tidak terpenuhi` → `BLOCKED`.
+10. **Verifikasi Penutup**: kolom perintah ber-backtick, disalin apa adanya dari `.explore/closing-verification.md`. Architect Phase 4 memvalidasi dengan `--log .explore/closing-verification.json`: himpunan perintah, hasil, dan galat baru wajib identik dengan log mesin, dan `MERAH` bergalat baru 0 sah hanya di atas baseline yang juga merah.
 
 Konsekuensi butir 6: rantai dengan janji akar yang belum terbukti **tidak pernah** sampai `frontenddev:report`, apa pun kebersihan kodenya.
 

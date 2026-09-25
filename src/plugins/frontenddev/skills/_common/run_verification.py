@@ -5,6 +5,7 @@ Mode:
   baseline  jalankan tiap perintah, simpan {taskdir}/.explore/verification-baseline.json
   closing   jalankan tiap perintah, bandingkan dengan baseline, tulis
             {taskdir}/.explore/closing-verification.md (format tabel yang dibaca validate_review.py)
+            dan log mesin closing-verification.json di sebelahnya (`validate_review.py --log`)
 
 Exit: 0 = tidak ada merah baru; 1 = ada TIMEOUT atau galat baru; 2 = argumen/IO salah.
 Hanya pustaka standar.
@@ -142,6 +143,10 @@ def main() -> int:
         print(f"CLOSING {r['name']}: {r['status']} exit={r['exit']} baru={r['new']} {r['duration_s']}s")
     out = Path(args.out) if args.out else explore / "closing-verification.md"
     out.write_text(render_md(results, baseline), encoding="utf-8")
+    log = [{"cmd": r["name"], "full": r["cmd"], "status": r["status"], "exit": r["exit"], "new_errors": r["new"],
+            "baseline_status": (baseline.get(r["name"]) or {}).get("status"),
+            "baseline_errors": len((baseline.get(r["name"]) or {}).get("signatures", []))} for r in results]
+    out.with_suffix(".json").write_text(json.dumps(log, indent=1), encoding="utf-8")
     print(f"VERDICT: {'MERAH' if red else 'HIJAU'} -> {out}")
     return 1 if red else 0
 
