@@ -145,7 +145,7 @@ Hasil review branch penutup diklasifikasikan ke dalam 4 tingkatan tindakan:
 
 | Severity    | Definisi Temuan                                             | Tindakan Architect                                     | Aksi Handoff Lanjutan                                  |
 | ----------- | ----------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------ |
-| **`P1`**    | Pelanggaran kontrak, file di luar scope, regresi fungsional | Laporkan di summary akhir; `REVIEW.md` sudah di-commit reviewer | Eskalasi ke `tech-lead`; ia merutekannya ke lane `PLANNING` dengan `finding_source` `{taskdir}/REVIEW.md` |
+| **`P1`**    | Pelanggaran kontrak, file di luar scope, regresi fungsional | Laporkan di summary akhir; `REVIEW.md` sudah di-commit reviewer | Eskalasi ke `tech-lead`; ia merutekannya ke lane `PLANNING` **pada taskdir yang sama** dengan `finding_source` `{taskdir}/REVIEW.md` dan `reentry_reason` |
 | **`P2`**    | Pelanggaran invariant arsitektur, anti-pola stack         | Laporkan di summary akhir (baris indeks sudah ditulis dan di-commit `code-reviewer`) | Ditangani pada siklus perbaikan rilis berikutnya       |
 | **`P3`**    | Style konvensi lokal, redundansi minor                      | Laporkan di summary akhir (baris indeks sudah ditulis dan di-commit `code-reviewer`) | Non-blocking backlog                                   |
 | **`CLEAN`** | 0 pelanggaran terhadap union brief                          | Nyatakan review bersih penuh                           | Siap untuk user membuat PR / merge                     |

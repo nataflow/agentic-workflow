@@ -56,7 +56,7 @@ Jalankan hop belum tercentang paling atas pada ledger `## Chain`, satu hop per g
 | `PRD` | `backenddev:system-analysis` | `PRD.md` `DRAFT` | Fase 4 |
 | `BRIEF` | `backenddev:plan` | `brief-*.md` `READY` | Fase 6 |
 
-0. **Re-entry — ledger sudah tercentang penuh.** Taskdir yang kembali dari gerbang membawa kegagalan hilir tidak punya hop belum tercentang, sehingga predikat butir 1 tidak pernah terpenuhi dan rantai berhenti tanpa jalan masuk. Bukalah hop-nya lebih dulu, jangan berimprovisasi masuk ke tengah fase. Tiga pemicunya: vonis `NOT_READY_FOR_IMPLEMENTATION` yang dikembalikan gerbang, verifikasi penutup `architect` merah karena cacat perencanaan (`architect` Failure path 4b), dan berkas terdampak yang tak dimiliki `## File scope` brief mana pun.
+0. **Re-entry — ledger sudah tercentang penuh.** Taskdir yang kembali dari gerbang membawa kegagalan hilir tidak punya hop belum tercentang, sehingga predikat butir 1 tidak pernah terpenuhi dan rantai berhenti tanpa jalan masuk. Bukalah hop-nya lebih dulu, jangan berimprovisasi masuk ke tengah fase. Empat pemicunya: vonis `NOT_READY_FOR_IMPLEMENTATION` yang dikembalikan gerbang, verifikasi penutup `architect` merah karena cacat perencanaan (`architect` Failure path 4b), berkas terdampak yang tak dimiliki `## File scope` brief mana pun, dan temuan `P1` `REVIEW.md` yang dikembalikan gerbang (hop pemilik: `BRIEF`, atau `PRD` bila temuan menunjuk kontrak).
 
    1. Tetapkan **satu** hop pemilik kegagalannya dari laporan masuk: predikat atau berkas yang gagal menunjuk `brief-*.md` → hop `BRIEF`; menunjuk kontrak, `AC-{n}`, atau permukaan PRD → hop `PRD`; menunjuk aturan bisnis `BR-{n}` → hop `BRD`. Kegagalan yang menunjuk dua hop sekaligus dibuka pada hop **paling hulu**.
    2. Ubah centang hop itu menjadi `- [~] <HOP> — <skill> → <artefak> @ re-entry <n> (was <sha lama>)`. Hop di bawahnya yang sudah tercentang ikut dibuka menjadi `- [ ]` tanpa penanda: artefaknya tidak dibatalkan, tetapi ia wajib berangkat ulang di atas hasil hop hulu yang baru.
@@ -156,7 +156,7 @@ Vonis `READY_FOR_IMPLEMENTATION` (15/15) → tutup satu baris tanpa blok: `### P
 - **Rantai** : <taskdir> · Chain <enum> · Risk <BREAKING | MAJOR | MINOR>
 - **Gerbang**: <predikat gagal beserta ID> — <bukti tiap kegagalan>
 - **Hop**    : tertahan di <HOP> · TASK <sha> · BRD <sha | —> · PRD <sha | —> · BRIEF <n READY @ sha | —>
-- **Re-entry**: <n>/2 · hop <HOP> dibuka karena <reentry_reason> @ <sha> | —
+- **Re-entry**: <n>/2 · hop <HOP> dibuka karena <reentry_reason> @ <sha> | — (putaran `REVIEW P1` ikut memakan plafon ini; putaran P1 ketiga kembali ke gerbang)
 - **Verifikasi Manual**: <tiap `AC-{n}` bertanda `QA manual:` + brief pengklaim + langkah konkretnya> | —
 - **Catatan**: <eskalasi · amandemen akar · `BR-DISANGGAH` disetujui user · asumsi `sementara dipakai:` pembentuk kontrak> | —
 ```

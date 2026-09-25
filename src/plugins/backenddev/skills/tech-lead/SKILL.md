@@ -118,7 +118,7 @@ Jalankan untuk rute yang menghasilkan artefak rancangan atau kode; lewati pada l
    - Dahulukan brief perbaikan via `backenddev:analyst` jika taskdir memuat brief `BLOCKED`.
    - Rutekan ke `backenddev:architect` jika taskdir memuat brief `READY`.
    - Rutekan ke `backenddev:analyst` jika taskdir memuat `BRD.md`/`PRD.md` berstatus `DRAFT`; approval dokumen milik skill itu.
-   - Buat taskdir bertimestamp baru untuk permintaan baru atau jika seluruh brief berstatus `DONE`.
+   - Buat taskdir bertimestamp baru untuk permintaan baru, atau jika seluruh brief berstatus `DONE`/`SUPERSEDED` **dan** `REPORT.md` sudah terbit. `REVIEW.md` ber-`P1` bukan rantai selesai — perbaikannya tetap di taskdir itu (Fase 5 butir 4).
    - Penulisan `TASK.md`: pada lane `PLANNING` milik `backenddev:analyst`, taskdir perbaikan temuan termasuk; gerbang berhenti pada provisi direktori. Pada lane `DEFECT_RCA`, panggil `backenddev:task` di sini — sesudah direktori ada, sebelum `debug` berangkat — dengan `lane` `DEFECT_RCA`, `chain` kosong, `risk` Keputusan 2, dan `evidence` berisi `file:line` Fase 1. Taskdir yang sudah memuat `TASK.md` dilewati (`references/gate-lifecycle.md` bagian 1a).
    - Salin laporan `code-explorer` Fase 1 ke laci taskdir begitu direktorinya ada: `mkdir -p <taskdir>/.explore && cp backenddev/docs/.explore/<slug>.md <taskdir>/.explore/gate-<slug>.md`, satu berkas per slug yang dispatch gerbang **ini** hasilkan (`references/gate-lifecycle.md` bagian 1). Tidak ada dispatch Fase 1 → lewati tanpa catatan.
 2. **Isolasi Branch**: Buat branch kerja bercabang langsung dari `base_branch`, bukan dari `HEAD` aktif (`references/gate-lifecycle.md` bagian 2).
@@ -151,7 +151,7 @@ Jalankan tiap kali skill hilir menutup dengan instruksi `kembali ke backenddev:t
    - Pengirim `architect` menutup severity `P2`, `P3`, atau `CLEAN`: Nyatakan rantai selesai, sebut branch aktif dan taskdir final. Rutekan ke `backenddev:document-api` hanya jika user memintanya eksplisit.
    - Pengirim `architect` mengisi slot **`Umpan balik profil`**: tanyakan lewat `AskUserQuestion` apakah preseden itu ditandai permanen di profil. Ya → jalankan `backenddev:profile` dengan `reported_anti_patterns` berisi entri itu apa adanya, lalu commit profilnya lewat butir 2. Tidak → buang, jangan simpan sebagai catatan. Pertanyaan ini berdiri sendiri dan tidak menahan penutupan rantai. Preseden yang terbukti menyesatkan saat eksekusi tidak pernah tertangkap sapuan statis `profile`; tanpa kanal ini pengetahuannya mati bersama taskdir dan rantai berikutnya menyalin preseden yang sama.
    - Pengirim `document-api` menyerahkan `docs/api/` belum ter-commit: Commit lewat butir 2, lalu nyatakan rantai selesai.
-4. Perlakukan severity `P1` dari `architect` sebagai permintaan kerja baru pada taskdir sama; dilarang memperbaiki di gerbang. Klasifikasikan ulang lewat Keputusan 2, lalu rutekan ke lane `PLANNING` dengan `finding_source` berisi `{taskdir}/REVIEW.md`.
+4. Perlakukan severity `P1` dari `architect` sebagai kerja lanjutan pada **taskdir yang sama**; dilarang memperbaiki di gerbang dan dilarang memprovisi taskdir baru (Fase 3 butir 1 tidak berlaku). Klasifikasikan ulang lewat Keputusan 2, seleksi temuan lewat `references/gate-scope.md` bagian 6, lalu berangkatkan lane `PLANNING` dengan `finding_source` `{taskdir}/REVIEW.md` **dan** `reentry_reason` `REVIEW P1: <ID temuan terpilih>`.
 5. Selesaikan akar masalah sesuai `## Failure path` jika skill hilir menutup `BLOCKED` atau rantai terputus; jangan membuat taskdir baru untuk menutupinya.
 
 ## Guardrails

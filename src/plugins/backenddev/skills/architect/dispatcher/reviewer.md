@@ -54,6 +54,6 @@ Review seluruh branch pekerjaan untuk satu direktori tugas.
 | Balikan menyebut `git commit` gagal, atau `REVIEW.md`/`backenddev/issues/README.md` ada tetapi uncommitted | Kunci sendiri **kedua** berkas itu dalam satu commit dengan staging path eksplisit dan pesan `docs(<slug>): add final review report`, lalu catat penyimpangannya — `## Failure path` butir 6 |
 | Payload kosong, format rusak, atau subagent error | Kegagalan dispatch, bukan cacat kerja subagent. Periksa disk lebih dulu lewat matriks bukti `references/lifecycle-recovery.md` sebelum menyimpulkan review tidak pernah berjalan |
 
-**Batas serap.** Verdict reviewer diteruskan utuh ke laporan penutup, tanpa parafrase maupun penyaringan temuan. Guardrail **STRICT NON-AUTHORING** berlaku penuh: temuan severity apa pun dilarang ditambal `architect` sendiri di `src/`, dan perbaikannya berjalan sebagai taskdir baru lewat gerbang.
+**Batas serap.** Verdict reviewer diteruskan utuh ke laporan penutup, tanpa parafrase maupun penyaringan temuan. Guardrail **STRICT NON-AUTHORING** berlaku penuh: temuan severity apa pun dilarang ditambal `architect` sendiri di `src/`, dan perbaikan `P1` berjalan di **taskdir yang sama** lewat gerbang (`tech-lead` Fase 5 butir 4 → lane `PLANNING` → `analyst` re-entry → `plan --append`), lalu satu review baru di putaran berikutnya (`REVIEW.md` basi, `references/lifecycle-recovery.md` bagian 1).
 
 **Subagent mengembalikan:** Path `{taskdir}/REVIEW.md` beserta satu tingkat severity tertinggi (`P1`, `P2`, `P3`, atau `CLEAN`), tanpa kutipan isi laporan ke context.

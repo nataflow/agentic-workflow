@@ -14,7 +14,7 @@ Format wajib `backenddev/docs/<YYMMDDhhmm>-<slug>/` — timestamp dari `date +%y
 | Taskdir memuat brief `BLOCKED` | Dahulukan brief perbaikan via `backenddev:analyst`; jangan menutupinya dengan taskdir baru |
 | Taskdir memuat brief `READY` | Rutekan ke `backenddev:architect` |
 | Taskdir memuat `BRD.md`/`PRD.md` berstatus `DRAFT` | Rutekan ke `backenddev:analyst`; gerbang dokumennya milik skill itu (bagian 4) |
-| Seluruh brief `DONE`, atau permintaannya memang baru | Buat taskdir bertimestamp baru |
+| Seluruh brief `DONE`/`SUPERSEDED` **dan** `REPORT.md` terbit, atau permintaannya memang baru | Buat taskdir bertimestamp baru. `REVIEW.md` ber-`P1` bukan rantai selesai: perbaikannya berjalan di taskdir yang sama |
 
 - Tambah suffix `-v2` dan konfirmasikan ke user sebelum dipakai jika slug hasil turunan bentrok dengan taskdir lain yang masih aktif.
 - Salin laporan `code-explorer` gerbang ke laci taskdir sesudah direktorinya siap: `mkdir -p <taskdir>/.explore && cp backenddev/docs/.explore/<slug>.md <taskdir>/.explore/gate-<slug>.md`, satu berkas per slug yang dispatch gerbang ini hasilkan. Salin, bukan pindah: lane tanpa taskdir tetap memerlukan laci gerbang sebagai satu-satunya rumah laporannya. Dilarang menyalin seluruh isi laci gerbang — laci itu menumpuk lintas task, dan laporan task lain yang ikut terbawa akan dipanen Tahap 0 skill hilir sebagai konteks yang salah. Prefiks `gate-` menjaga salinan itu dari ditimpa slug dispatch hilir; `slug:` di frontmatter tidak diubah, dan itulah yang dikutip skill hilir saat menyebut asal fakta warisan. Berkas salinan tetap berstatus laci kerja: tidak di-stage, tidak di-commit, tidak dihitung working tree kotor.

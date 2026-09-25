@@ -102,7 +102,8 @@ backenddev/
 | 1. Brief BLOCKED Ditemukan ──► Rutekan ke backenddev:analyst (brief perbaikan)    |
 | 2. Brief READY Belum Jalan ──► Rutekan langsung ke backenddev:architect            |
 | 3. Artefak DRAFT Ditemukan ──► Rutekan ke backenddev:analyst (gerbang dokumennya)  |
-| 4. Semua Brief DONE / Baru ──► Buat taskdir baru jika ada request pekerjaan baru  |
+| 4. Semua Brief DONE + REPORT.md / Baru ──► Buat taskdir baru untuk request baru   |
+| 5. REVIEW.md P1 ──► Taskdir sama, lane PLANNING + reentry_reason (bukan baru)     |
 +-----------------------------------------------------------------------------------+
 ```
 
@@ -112,7 +113,7 @@ backenddev/
 - **Format Taskdir**: `backenddev/docs/<YYMMDDhhmm>-<slug>/` dengan timestamp dari `date +%y%m%d%H%M`.
 - **Evaluasi `ls backenddev/docs/`**:
   - Pekerjaan yang sama & belum selesai → gunakan kembali taskdir tersebut.
-  - Pekerjaan lanjutan sesudah seluruh brief `DONE` → buat taskdir baru dengan timestamp baru.
+  - Pekerjaan lanjutan sesudah seluruh brief `DONE`/`SUPERSEDED` **dan** `REPORT.md` terbit → buat taskdir baru dengan timestamp baru. `REVIEW.md` ber-`P1` bukan rantai selesai: perbaikannya tetap di taskdir itu.
   - Domain sama tetapi pekerjaan berbeda → buat taskdir baru (`order-split` vs `order-split- export`).
 - **Penomoran Brief**: `brief-<NN>-<unit>.md` (`NN` dua digit urutan eksekusi 01, 02, dst.). Nomor brief tidak pernah dipakai ulang dalam satu taskdir.
 
