@@ -124,7 +124,7 @@ Di atasnya lima validator:
 | Validator | Menagih |
 |---|---|
 | `_common/validate_doc.py --kind flow\|ui\|contract` | frontmatter, heading persis template, ID `DD`/`ST`/`AC` berurutan, nol placeholder; untuk CONTRACT **keterlacakan dua arah** — tiap token `Sumber` AC nyata, dan tiap `SC` akar, `DD` FLOW, `ST` UI dipikul minimal satu AC |
-| `plan/scripts/validate_briefs.py` | 16 check S N D L T F B R V K O E C P G M — termasuk **G** (tiap `SC` dipikul brief lewat `fulfills`) dan **M** (remedi menunjuk brief `BLOCKED`, plafon 2 per unit asal, +1 per `reopen ... CONTRACT`) |
+| `plan/scripts/validate_briefs.py` | 16 check S N D L T F B R V K O E C P G M — termasuk **G** (tiap `SC` dipikul brief lewat `fulfills`) dan **M** (remedi menunjuk brief `BLOCKED`, plafon 2 per unit asal, +1 per re-entry kontrak: `reopen … CONTRACT`, atau eskalasi dari `HOTFIX_MINOR`) |
 | `task/scripts/validate_task.py` | struktur akar, pasangan lane/sections, `SC` ber-alat-ukur, bukti `file:baris` nyata, ledger `[ ]` (`--amend`: amandemen akar oleh `lead`, ledger boleh bercentang) |
 | `architect/scripts/validate_review.py` | tiap `SC` dan `AC` divonis dengan bukti; hitungan temuan; `base` = commit akar `TASK.md`; **verdict diturunkan**: `BLOCKED` ⇔ P1 / SC belum terbukti / verifikasi merah (`TIMEOUT` atau galat baru > 0; `MERAH` bergalat baru 0 adalah warisan baseline) |
 | `report/scripts/validate_report.py` | perubahan berakar berkas rantai; tiap SC `PERLU VERIFIKASI MANUAL` tercatat |

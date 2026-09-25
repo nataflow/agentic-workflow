@@ -991,7 +991,9 @@ class BriefValidator:
 
         Remedi atas remedi dihitung ke unit asal paling hulu: unit yang gagal
         tiga kali membuktikan cacatnya ada di kontrak, bukan di brief, dan brief
-        keempat hanya menambah satu commit `BLOCKED` lagi.
+        keempat hanya menambah satu commit `BLOCKED` lagi. Plafon bertambah satu per
+        re-entry kontrak: `reopen … CONTRACT`, atau eskalasi dari `HOTFIX_MINOR`
+        (satu-satunya eskalasi yang menambah hop CONTRACT).
         """
         cid, name = "M", "Remedi & plafon per unit asal"
         by_nn = {b["nn"]: b for b in self.briefs}
@@ -1023,8 +1025,11 @@ class BriefValidator:
                                           universal_newlines=True)
         except Exception:
             log = ""
+        # Re-entry kontrak: reopen yang membuka CONTRACT, atau eskalasi dari HOTFIX_MINOR yang
+        # menambah hop CONTRACT (rute resmi remedi ketiga lane MINOR).
         contract_reentries = sum(1 for l in log.splitlines()
-                                 if re.match(rf"^docs\({re.escape(slug)}\): reopen [A-Z ]*\bCONTRACT\b", l))
+                                 if re.match(rf"^docs\({re.escape(slug)}\): reopen [A-Z ]*\bCONTRACT\b", l)
+                                 or re.match(rf"^docs\({re.escape(slug)}\): eskalasi lane HOTFIX_MINOR → ", l))
         for origin, n in sorted(counts.items()):
             # Remedi ketiga dan seterusnya sah hanya sesudah kontrak dibuka ulang (satu per re-entry).
             if n > 2 + contract_reentries:

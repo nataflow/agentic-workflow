@@ -85,7 +85,7 @@ Brief `DONE`/`BLOCKED` tidak pernah disunting, jadi tidak pernah ikut di-stage.
 - **NO PER-UNIT VERIFICATION**: dilarang menulis instruksi menjalankan typecheck, lint, test, atau build di brief mana pun.
 - **ADAPTER NAMING ONLY**: path dan perintah mengikuti adapter `stack`; nama berkas stack lain adalah cacat Check K.
 - **PENELUSURAN LEWAT DISPATCH**: sapuan di atas kuota didelegasikan ke `code-explorer` lewat `dispatcher/explorer.md`; dilarang menyusun prompt sendiri.
-- **REMEDI BERPLAFON**: maksimal 2 brief remedi per unit asal (Check M), ditambah satu per `reopen ... CONTRACT` yang sudah terjadi; remedi ketiga tanpa re-entry kontrak dilarang — cacatnya di kontrak, rutekan `chain.py reopen --row CONTRACT` lewat lead (lane MINOR: `reopen --row BRIEF` lalu `escalate --lane FAST_FORWARD --sections architecture`).
+- **REMEDI BERPLAFON**: maksimal 2 brief remedi per unit asal (Check M), ditambah satu per re-entry kontrak yang sudah terjadi (`reopen … CONTRACT`, atau `escalate` dari `HOTFIX_MINOR`); remedi ketiga tanpa re-entry kontrak dilarang — cacatnya di kontrak, rutekan `chain.py reopen --row CONTRACT` lewat lead (lane MINOR: `reopen --row BRIEF` lalu `escalate --lane FAST_FORWARD --sections architecture`).
 - **BATCH COMMIT ONLY**: dilarang commit per brief; dilarang menahan commit menunggu persetujuan.
 - **RATIONALIZATION PREVENTION**:
   - "Semua digabung satu brief biar cepat" — brief besar membebani implementor dan menyulitkan rollback.
