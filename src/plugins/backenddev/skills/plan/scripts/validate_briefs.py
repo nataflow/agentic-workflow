@@ -52,12 +52,21 @@ import subprocess
 import sys
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-# Resolver profil `.claude/profile/backenddev/` tinggal di
+# Parser bersama dan resolver profil `.claude/profile/backenddev/` tinggal di
 # `skills/_common/precondition_lib.py`. Bootstrap path relatif terhadap berkas
 # ini, bukan terhadap cwd.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
+    VALID_RISKS,
+    FrontmatterError,
+    find_repo_root,
+    frontmatter_field,
+    is_under,
+    parse_enum,
+    read_text,
     resolve_profile_dir,
+    resolve_taskdir,
+    split_frontmatter,
 )
 from brief_status import LOCKED as LOCKED_STATUSES  # noqa: E402
 
@@ -88,7 +97,6 @@ FORBIDDEN_SECTIONS = ["Open questions", "Verification"]
 
 REQUIRED_FRONTMATTER = ["title", "source", "risk", "status", "commit_message"]
 
-VALID_RISKS = ["BREAKING", "MAJOR", "MINOR"]
 RISK_ORDER = {"MINOR": 1, "MAJOR": 2, "BREAKING": 3}
 
 PLACEHOLDERS = [
@@ -108,6 +116,31 @@ BUILD_TEST_COMMANDS = [
     "go test", "go build", "pytest", "cargo test", "cargo build",
     "php artisan test", "phpunit", "dotnet test", "make test", "make build",
 ]
+# Perintah utuh berbatas kata: di kiri tidak boleh `[\w./-]`, di kanan tidak boleh
+# `[\w-]`, sehingga "Mongo TestContainer", "cargo builder", dan "gotest" bukan perintah.
+BUILD_TEST_RE = re.compile(
+    r"(?<![\w./-])(" + "|".join(re.escape(c) for c in BUILD_TEST_COMMANDS) + r")(?![\w-])",
+    re.IGNORECASE)
+
+# Penolakan migrasi hanya dibaca dari baris isi PERTAMA seksi: "tidak perlu" di
+# tengah kalimat ("Kolom lama tidak perlu dihapus; tambah kolom x") bukan penolakan.
+NO_MIGRATION_RE = re.compile(
+    r"^(?:tidak\s+(?:perlu|diperlukan|dibutuhkan|ada)|nihil|n/?a|none)\b|^[—-]$", re.IGNORECASE)
+
+
+def _covers_ac(covers: Optional[str], num: str) -> bool:
+    """`AC-{num}` disebut utuh (AC-1 bukan bagian dari AC-10)."""
+    return bool(covers) and re.search(rf"\bAC-{re.escape(num)}\b", covers) is not None
+
+
+def _migration_declined(body: str) -> bool:
+    """Seksi migrasi kosong, atau baris isi pertamanya menolak migrasi."""
+    for line in body.splitlines():
+        s = line.strip()
+        if not s or s.startswith("<!--"):
+            continue
+        return bool(NO_MIGRATION_RE.match(s.lstrip("-* ").strip()))
+    return True
 
 # Langit-langit slicing (`../references/slicing-and-scan.md` bagian 3A butir 3).
 MAX_STEPS = 5
@@ -229,9 +262,9 @@ class BriefValidator:
         include_locked: bool = False,
     ):
         self.include_locked = include_locked
-        self.root = (target_root or self._find_repo_root()).resolve()
+        self.root = (target_root or find_repo_root()).resolve()
         self.taskdir_arg = taskdir
-        self.taskdir = self._resolve_taskdir()
+        self.taskdir = resolve_taskdir(self.root, taskdir)
         self.brief_filter = (brief or "").strip().lstrip("#") or None
         _risk = (risk_ceiling or "").strip().upper()
         self.risk_ceiling_arg = None if _risk in ("", "—", "-") else _risk
@@ -244,28 +277,12 @@ class BriefValidator:
 
     # -- infrastruktur -----------------------------------------------------
 
-    def _find_repo_root(self) -> Path:
-        try:
-            out = subprocess.check_output(
-                ["git", "rev-parse", "--show-toplevel"],
-                stderr=subprocess.DEVNULL,
-                universal_newlines=True,
-            ).strip()
-            if out and os.path.isdir(out):
-                return Path(out)
-        except Exception:
-            pass
-        return Path.cwd()
-
-    def _resolve_taskdir(self) -> Path:
-        td = Path(self.taskdir_arg)
-        return td if td.is_absolute() else self.root / td
-
     @staticmethod
     def _read(path: Path) -> Optional[str]:
+        """Isi berkas ternormalisasi (BOM dibuang, CRLF → LF), atau None bila tak terbaca."""
         try:
-            return path.read_text(encoding="utf-8")
-        except Exception:
+            return read_text(path)
+        except (OSError, UnicodeDecodeError):
             return None
 
     def _add(self, cid: str, name: str, status: str, summary: str,
@@ -540,14 +557,12 @@ class BriefValidator:
             "section_order": [],
         }
 
-        # Frontmatter YAML sederhana di antara sepasang `---`.
-        if lines and lines[0].strip() == "---":
-            for idx in range(1, len(lines)):
-                if lines[idx].strip() == "---":
-                    break
-                m = re.match(r"^([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$", lines[idx])
-                if m:
-                    brief["frontmatter"][m.group(1)] = m.group(2).strip().strip('"').strip("'")
+        # Frontmatter blok `---` pertama lewat parser bersama. Frontmatter rusak
+        # (tanpa pagar penutup, kunci ganda) terbaca kosong: Check S yang memvonis.
+        try:
+            brief["frontmatter"] = split_frontmatter(text)[0]
+        except FrontmatterError:
+            pass
 
         # Seksi level-2. Baris di dalam pagar kode diabaikan supaya `## ` yang
         # kebetulan muncul di snippet tidak terbaca sebagai heading.
@@ -573,7 +588,8 @@ class BriefValidator:
         brief["file_rows"] = self._parse_file_scope(brief)
         brief["steps"] = self._count_steps(brief)
         brief["interfaces"] = self._parse_interfaces(brief)
-        brief["status"] = (brief["frontmatter"].get("status") or "").strip().upper()
+        # Dibandingkan persis: `status: ready` bukan READY (fail-closed, sama dengan architect).
+        brief["status"] = (brief["frontmatter"].get("status") or "").strip()
         brief["locked"] = brief["status"] in LOCKED_STATUSES
         return brief
 
@@ -706,14 +722,15 @@ class BriefValidator:
     def _risk_ceiling(self) -> Optional[str]:
         if self.risk_ceiling_arg:
             return self.risk_ceiling_arg
-        if not self.task_text:
+        # Hanya frontmatter TASK.md: baris `risk:` di badan atau blok kode tidak terbaca.
+        raw = frontmatter_field(self.taskdir / "TASK.md", "risk")
+        if raw is None:
             return None
-        m = re.search(r"^risk:\s*([A-Za-z_-]+)\s*$", self.task_text, re.MULTILINE)
-        if not m:
-            return None
-        val = m.group(1).strip().upper()
         # `risk: -` menandai lane non-mutasi kode; plafon briefnya MINOR.
-        return "MINOR" if val in ("-", "—") else val
+        if raw.strip() in ("-", "—"):
+            return "MINOR"
+        val, _err = parse_enum(raw, VALID_RISKS, "risk")
+        return val or raw.strip().upper()
 
     # -- eksekusi ----------------------------------------------------------
 
@@ -926,13 +943,11 @@ class BriefValidator:
                         problems.append(
                             f"{b['name']}:{lineno}: penanda verifikasi `{marker.strip()}`"
                         )
-                low = line.lower()
-                for cmd in BUILD_TEST_COMMANDS:
-                    if cmd in low:
-                        problems.append(
-                            f"{b['name']}:{lineno}: perintah build/test `{cmd}`"
-                        )
-                        break
+                m = BUILD_TEST_RE.search(line)
+                if m:
+                    problems.append(
+                        f"{b['name']}:{lineno}: perintah build/test `{m.group(1).lower()}`"
+                    )
         self._verdict(cid, name, problems,
                       "nol verifikasi di seluruh brief",
                       "Hapus perintahnya — jangan dipindah ke seksi lain. "
@@ -1281,12 +1296,16 @@ class BriefValidator:
 
     @staticmethod
     def _path_matches(path: str, pattern: str) -> bool:
-        pattern = pattern.rstrip("/")
+        """Glob → `fnmatchcase`; nama lepas tanpa `/` → cocok per segmen; selain itu
+        prefix per segmen. Bukan substring: `src/order` tidak menaungi `src/orderhistory`."""
+        pattern = pattern.strip().strip("`").rstrip("/")
         if not pattern:
             return False
-        if pattern in path:
-            return True
-        return fnmatch.fnmatch(path, pattern) or fnmatch.fnmatch(path, pattern + "/*")
+        if any(ch in pattern for ch in "*?["):
+            return fnmatch.fnmatchcase(path, pattern) or fnmatch.fnmatchcase(path, pattern + "/*")
+        if "/" not in pattern:
+            return pattern in path.strip("/").split("/")
+        return is_under(path, pattern)
 
     # -- Check C -----------------------------------------------------------
 
@@ -1493,7 +1512,7 @@ class BriefValidator:
         ac = self._ac_entries()
         for num, kind in sorted(ac.items(), key=lambda kv: int(kv[0])):
             claimers = [b for b in self.live_briefs
-                        if b["covers"] and f"AC-{num}" in b["covers"]]
+                        if _covers_ac(b["covers"], num)]
             if not claimers:
                 continue  # sudah dilaporkan Check H
 
@@ -1531,7 +1550,7 @@ class BriefValidator:
             for b in claimers:
                 if kind == "qa manual":
                     rr = self._section_text(b, "Risk & rollback")
-                    if f"AC-{num}" not in rr:
+                    if not _covers_ac(rr, num):
                         problems.append(
                             f"{b['name']}: langkah manual `AC-{num}` tidak mendarat di "
                             f"`## Risk & rollback` — `## Analysis trace` bukan tempatnya"
@@ -1560,7 +1579,7 @@ class BriefValidator:
         problems: List[str] = []
 
         prd_req = self._doc_section(self.prd_text, "Migration requirements") or ""
-        prd_trigger = bool(prd_req.strip()) and "tidak perlu" not in prd_req.lower()
+        prd_trigger = not _migration_declined(prd_req)
 
         migration_files = [
             (b, r) for b in self.live_briefs for r in b["file_rows"]
@@ -1568,8 +1587,7 @@ class BriefValidator:
         ]
 
         owners = [b for b in self.live_briefs
-                  if self._section_text(b, "Migration").strip()
-                  and "tidak perlu" not in self._section_text(b, "Migration").lower()]
+                  if not _migration_declined(self._section_text(b, "Migration"))]
 
         # Tiga pemicu, bukan dua: brief yang menuliskan DDL tanpa mendaftarkan
         # berkas migrasinya di `## File scope` adalah cacat yang sama seriusnya —
