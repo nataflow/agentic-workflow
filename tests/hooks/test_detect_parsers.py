@@ -103,6 +103,7 @@ def test_go_work_use_block(tmp_path):
     assert "./cmd/api" in globs and "./lib" in globs
 
 
+@pytest.mark.skipif(detect.tomllib is None, reason="members workspace Cargo hanya dibaca lewat tomllib (Python >= 3.11)")
 def test_cargo_workspace_members(tmp_path):
     write_files(tmp_path, {
         "Cargo.toml": '[workspace]\nmembers = ["crates/*"]\n',
