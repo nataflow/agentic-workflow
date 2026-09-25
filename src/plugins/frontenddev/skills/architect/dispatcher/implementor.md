@@ -19,8 +19,8 @@ Eksekusi satu brief implementasi frontend.
 - Urutan Layer: DTO → service → API layer → view-model → controller → presentasi.
 - Verifikasi: DILARANG. Jangan jalankan typecheck, lint, test, build, atau aplikasi. Salin perintah
   `verification:` brief ke `## Verification` bertanda `DITUNDA`.
-- Commit & git: DILARANG, kecuali rollback ber-scope: `git restore -- <path files_touched>` untuk berkas
-  `MODIFY` dan `rm -- <path>` untuk berkas `CREATE` yang dibuat unit ini.
+- Terminal: tidak tersedia (tool `Bash` dicabut). Commit, git, dan rollback milik pendispatch; unit
+  `FAILED` mencatat tiap berkas `files_touched` yang sudah disentuh di `## Rollback`.
 - Stop Condition: gerbang masuk lengkap ada di definisi agent-mu — BERHENTI dan tulis `status: FAILED`
   beserta penghalangnya, jangan menebak.
 - Balikan: tulis `{report_path}` persis `Format laporan` di bawah, lalu kembalikan satu baris
@@ -52,7 +52,7 @@ status: DONE | FAILED
 - `<file:baris>` — <bug existing | drift kontrak | prasyarat kurang | preseden menyesatkan> — <alasan>
 
 ## Rollback
-- <Tidak dilakukan | berkas yang dipulihkan atau dihapus>
+- <Tidak perlu | berkas yang perlu dipulihkan (`MODIFY`) atau dihapus (`CREATE`) pendispatch>
 ```
 
 Aturan isi: `status: DONE` hanya bila seluruh langkah seksi 4 diterapkan dalam batas dan lolos self-check
@@ -73,7 +73,7 @@ statis; selain itu `FAILED`. Seksi kosong ditulis `- Tidak ada`, bukan dihapus. 
 ### Aturan untuk Pendispatch
 
 - **Gerbang masuk = Ingest.** Skrip prasyarat `--brief <NN>` `PASS` adalah satu-satunya gerbang; dilarang menggantinya dengan membaca frontmatter sendiri.
-- **Dispatch langsung tanpa skill pembungkus**: doktrin eksekusi — urutan layer, self-check statis, rollback ber-scope — duduk di `agents/code-implementor.md`. Dilarang menyalin potongannya ke prompt, dan dilarang menyalin isi brief, kontrak, profil, atau adapter; sebut path-nya.
+- **Dispatch langsung tanpa skill pembungkus**: doktrin eksekusi — urutan layer, self-check statis, pencatatan `## Rollback` — duduk di `agents/code-implementor.md`. Dilarang menyalin potongannya ke prompt, dan dilarang menyalin isi brief, kontrak, profil, atau adapter; sebut path-nya.
 - **Satu brief per dispatch, sekuensial**: unit berikutnya berangkat hanya sesudah commit unit sebelumnya mendarat dan tree kembali bersih.
 - **Tanpa verifikasi per unit**: dilarang menyisipkan instruksi menjalankan typecheck, lint, test, build, atau dev server.
 - **Audit hidrasi**: batalkan dispatch bila prompt masih memuat slot `{...}` mentah atau `TBD`/`TODO`. Penanda `<...>` di dalam `Format laporan` bukan slot.

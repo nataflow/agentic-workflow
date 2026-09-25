@@ -46,7 +46,7 @@ Enam butir batas ditegakkan di tingkat prompt:
 
 ## 3. Matriks Bukti Disk & Triase
 
-`report-<NN>.md` adalah klaim subagent, bukan bukti. Jalankan `git status --porcelain` (laci `.explore/` dibuang) dan sandingkan dengan `files_touched` **sebelum** cabang mana pun dibuka:
+`report-<NN>.md` adalah klaim subagent, bukan bukti. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/verify_scope.py --brief <brief_path> --worktree` **sebelum** cabang mana pun dibuka — skrip menyandingkan `git status --porcelain -uall` (laci `.explore/` dibuang) dengan `files_touched` + brief + `report-<NN>.md`. `PASS` (exit 0) = baris "hanya `files_touched` berubah"; `FAIL` (exit 1) = baris "ada berkas berubah di luar `files_touched`", dengan daftar berkas liarnya; exit 2 = brief tak terbaca, perbaiki pemanggilannya. Vonis scope diambil dari exit skrip, bukan dari pembacaan manual:
 
 | `report-<NN>.md` | Disk vs `files_touched` | Tindakan |
 |---|---|---|
@@ -55,7 +55,7 @@ Enam butir batas ditegakkan di tingkat prompt:
 | `status: DONE` | `## Changes` menyebut berkas yang tidak berubah | Laporan tidak jujur: perlakukan sebagai baris "kosong/rusak" di bawah |
 | `status: DONE` | hunk `git diff -U0` berkas `MODIFY` menyebut simbol di luar `Anchor` | Pelanggaran scope tingkat simbol: perlakuan sama dengan berkas liar |
 | `status: FAILED` | bersih | **Commit BLOCKED** |
-| `status: FAILED` | kotor di dalam `files_touched` | Rollback subagent gagal: `git restore -- <files_touched>` dan hapus berkas baru dalam scope, catat di `## Triase`, lalu **commit BLOCKED** |
+| `status: FAILED` | kotor di dalam `files_touched` | Rollback milik `architect` (implementor tidak punya terminal): `git restore -- <path>` berkas `MODIFY` dan `rm -- <path>` berkas `CREATE` yang disebut `## Rollback` laporan atau terbaca kotor, catat di `## Triase`, lalu **commit BLOCKED** |
 | absen / rusak | bersih (selain `report-<NN>.md` yang belum ter-commit) | Kegagalan dispatch: hapus `report-<NN>.md` rusak itu bila ada (Check 12 menuntut ia absen), lalu ulangi maksimal sekali dengan slot yang sama; brief tetap `READY` |
 | absen / rusak | kotor | **HENTIKAN.** Tampilkan berkas kotor ke user dan eskalasi; dilarang retry, rollback otomatis, dan commit |
 
@@ -111,7 +111,7 @@ status: DONE | FAILED
 - `<file:baris>` — <bug existing | drift kontrak | prasyarat kurang | preseden menyesatkan> — <alasan>
 
 ## Rollback
-- <Tidak dilakukan | berkas yang dipulihkan/dihapus>
+- <Tidak perlu | berkas yang perlu dipulihkan/dihapus pendispatch>
 
 ## Triase
 <ditulis architect: baris matriks bagian 3 yang berlaku, hasil pemeriksaan anchor, tindakan restore>
