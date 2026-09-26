@@ -13,7 +13,7 @@ DILARANG MEMBUAT ASUMSI STACK ATAU PERINTAH BASELINE TANPA BUKTI KONFIGURASI NYA
 1. Repositori target berada pada direktori kerja lokal yang dapat diakses dengan izin baca dan eksekusi perintah terminal.
 2. File konfigurasi proyek (seperti `package.json`, `tsconfig.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`, atau `pom.xml`) tersedia di root repositori atau di `workspace_dir`.
 3. Package manager dan runtime terkait (seperti `node`, `pnpm`, `npm`, `yarn`, `python`, `go`) telah terpasang di environment kerja.
-4. Berkas acuan template profil `references/backend-profile-template.md` dan `references/frontend-profile-template.md` tersedia di subdirektori references skill.
+4. Berkas acuan template profil `references/backend-profile-template.md`, `references/frontend-profile-template.md`, dan `references/fullstack-profile-template.md` tersedia di subdirektori references skill.
 
 ## Koeksistensi [REQUIRED]
 
@@ -26,11 +26,11 @@ DILARANG MEMBUAT ASUMSI STACK ATAU PERINTAH BASELINE TANPA BUKTI KONFIGURASI NYA
 
 ## Parameter [REQUIRED]
 
-- `type` — string — default `"auto"` — tipe repositori yang dipindai (`"backend"`, `"frontend"`, `"auto"`). Jika `"auto"`, skill menentukan tipe secara otomatis dari dependensi utama.
-- `target_path` — string — default `"repo-profile.md"` — path file keluaran untuk profil repositori yang dihasilkan (contoh: `repo-profile.md` atau `.dev/profile.md`).
+- `type` — string — default `"auto"` — tipe repositori yang dipindai (`"backend"`, `"frontend"`, `"fullstack"`, `"auto"`). Jika `"auto"`, skill menentukan tipe secara otomatis dari dependensi utama dan route server (Fase 0 butir 3).
+- `target_path` — string — default `"repo-profile.md"`, atau `<workspace_dir>/repo-profile.md` bila `workspace_dir` terisi — path file keluaran untuk profil repositori yang dihasilkan (contoh: `repo-profile.md` atau `.dev/profile.md`).
 - `mode` — string — default `"GENERATE"` — mode operasi pemindaian (`"GENERATE"` untuk pembuatan profil baru dari nol, `"REFRESH"` untuk pembaruan profil yang telah ada).
 - `skip_baseline_exec` — boolean — default `false` — bila `true`, melewati eksekusi perintah verifikasi runtime jika lingkungan berjalan pada restricted sandbox.
-- `workspace_dir` — string — default `""` — workspace yang diprofilkan pada monorepo (contoh: `apps/api`); satu workspace per profil, dengan `target_path` berbeda per workspace yang diteruskan sebagai `profile_path` ke skill quickdev hilir (`quickdev:explore`, `quickdev:plan`, …).
+- `workspace_dir` — string — default `""` — workspace yang diprofilkan pada monorepo (contoh: `apps/api`); satu workspace per profil, dengan `target_path` berbeda per workspace. Workspace dan cwd tiap perintah dicatat di profil (Section 1 `Workspace`, Section 5 kolom `Cwd`), bukan hanya di percakapan; `quickdev:plan` menyimpan path profil terpilih di metadata `Profile:` rencana.
 
 ## Workflow
 
@@ -50,8 +50,9 @@ DILARANG MEMBUAT ASUMSI STACK ATAU PERINTAH BASELINE TANPA BUKTI KONFIGURASI NYA
 3. Tentukan klasifikasi arsitektur repositori secara otomatis:
    - **Frontend Repository**: Ditandai oleh dependensi library UI dan rendering seperti `react`, `next`, `vue`, `nuxt`, `svelte`, `@angular/core`, `vite`, `tailwindcss`, `shadcn`.
    - **Backend Repository**: Ditandai oleh dependensi server dan framework REST/gRPC seperti `@nestjs/core`, `express`, `fastify`, `fastapi`, `django`, `flask`, `gin-gonic/gin`, `spring-boot`, `fiber`.
-   - **Fullstack / Monorepo Workspace**: Ditandai oleh struktur direktori gabungan seperti `apps/web`, `apps/api`, `packages/ui`, atau workspace manifest (`pnpm-workspace.yaml`, `lerna.json`, `turborepo`). Profil dibuat per workspace: bila `workspace_dir` kosong, tanyakan workspace target ke user lewat `AskUserQuestion`, klasifikasikan workspace itu sebagai backend atau frontend, lalu jadikan direktorinya root pemindaian Fase 1–2.
-4. Jika parameter `type` disetel eksplisit ke `"backend"` atau `"frontend"`, utamakan template pilihan user tersebut di atas deteksi otomatis.
+   - **Fullstack (satu paket)**: dependensi frontend **dan** route server di paket yang sama — Next route handlers/API routes (`app/api/**/route.ts`, `pages/api/**`), SvelteKit `+server.ts`/`+page.server.ts`, Remix/React Router `loader`/`action`, Nuxt `server/api/**`. Bukti wajib berupa minimal satu berkas route server nyata; `next`/`svelte` tanpa route server tetap frontend. Bukan monorepo.
+   - **Monorepo Workspace**: Ditandai oleh struktur direktori gabungan seperti `apps/web`, `apps/api`, `packages/ui`, atau workspace manifest (`pnpm-workspace.yaml`, `lerna.json`, `turborepo`). Profil dibuat per workspace: bila `workspace_dir` kosong, tanyakan workspace target ke user lewat `AskUserQuestion`, klasifikasikan workspace itu sebagai backend, frontend, atau fullstack dengan aturan di atas, lalu jadikan direktorinya root pemindaian Fase 1–2.
+4. Jika parameter `type` disetel eksplisit ke `"backend"`, `"frontend"`, atau `"fullstack"`, utamakan template pilihan user tersebut di atas deteksi otomatis.
 
 ### Fase 1 — Analisis Dependensi & Pemetaan Layer Arsitektur
 
@@ -70,6 +71,7 @@ DILARANG MEMBUAT ASUMSI STACK ATAU PERINTAH BASELINE TANPA BUKTI KONFIGURASI NYA
      - Petakan API service client (contoh: `src/services/`, `src/api/`, `src/lib/api-client.ts`, `src/utils/axios.ts`).
      - Identifikasi library state management (contoh: Zustand, Redux Toolkit, TanStack React Query, Jotai, Pinia).
      - Identifikasi paradigma styling dan design tokens (contoh: Tailwind CSS, CSS Modules, Styled Components, shadcn/ui).
+   - Untuk **Fullstack**: petakan layer Frontend di atas, lalu pola route server, modul server-only, validasi input, konvensi response/error, dan akses DB/ORM (Section 4 template fullstack).
 2. Catat seluruh alias path compiler (seperti `@/* -> src/*`, `@components/* -> src/components/*`) dari `tsconfig.json` atau `pyproject.toml`.
 
 ### Fase 2 — Eksekusi Baseline Verifikasi Nyata
@@ -79,12 +81,13 @@ DILARANG MEMBUAT ASUMSI STACK ATAU PERINTAH BASELINE TANPA BUKTI KONFIGURASI NYA
    - Perintah Linter: `pnpm lint`, `npm run lint`, `eslint .`, `ruff check .`, atau `golangci-lint run`.
    - Perintah Unit & Integration Test: `pnpm test`, `npm test`, `vitest run`, `jest`, `pytest`, atau `go test ./...`.
    - Perintah Build / Bundle Check: `pnpm build`, `npm run build`, `vite build`, atau `go build ./...`.
+   - Jenis tanpa runner atau konfigurasi di manifest (mis. repo tanpa test runner) dicatat `TIDAK_ADA`, bukan dikarang dan bukan `SKIPPED`.
 2. Sebelum eksekusi (kecuali `skip_baseline_exec: true`):
    - Catat `git status --porcelain` sebagai keadaan awal.
    - Sajikan satu `AskUserQuestion`: daftar perintah beserta risikonya — test yang tampak integrasi (membaca `.env`, docker-compose, Testcontainers, `DATABASE_URL`) ditandai "menyentuh DB/jaringan"; build ditandai "dapat menulis artefak". Opsi: `jalankan semua` · `lewati yang menyentuh DB/jaringan` · `lewati semua (SKIPPED)`.
 3. Jalankan perintah yang disetujui satu per satu dengan `timeout` tool Bash 300000 ms:
-   - Catat status (`PASSED`, `FAILED`, `TIMEOUT`, `SKIPPED`) beserta durasi waktu running.
-   - Tangkap baseline issues eksisting: jika terdapat error atau peringatan bawaan (misal: 2 lint warnings atau 1 skipped test), dokumentasikan secara transparan pada profil agar tidak menjadi false positive saat regresi di gate implementasi.
+   - Jalankan dari direktori kerja yang dicatat di kolom `Cwd` (`workspace_dir`, atau `.` untuk root) sebagai `(cd <Cwd> && <perintah>)` dari root repo.
+   - Tulis hasil tiap perintah ke tabel Section 5 template: Status (`PASSED`, `FAILED`, `TIMEOUT`, `SKIPPED`, `UNVERIFIED_ENV_NOT_READY`, `TIDAK_ADA`), Durasi, dan Known issues dengan penanda persis (`berkas:baris aturan`, nama test) — maksimal 10 baris, lebih dari itu `<n> issue — contoh: …` beserta perintah reproduksinya. `UNVERIFIED_ENV_NOT_READY` beserta pesan penyebab satu baris masuk kolom Known issues. `quickdev:execute` membedakan galat bawaan dari regresi hanya lewat kolom ini.
 4. Bandingkan `git status --porcelain` dengan keadaan awal. Berkas baru yang tidak di-ignore dicatat di profil sebagai "artefak build perlu di-ignore" dan dilaporkan ke user; dilarang menghapusnya sendiri.
 5. Dilarang mencatat perintah verifikasi rekaan yang tidak dapat dieksekusi di runtime aktual repositori.
 
@@ -93,6 +96,7 @@ DILARANG MEMBUAT ASUMSI STACK ATAU PERINTAH BASELINE TANPA BUKTI KONFIGURASI NYA
 1. Muat template acuan yang sesuai dari subdirektori references:
    - Gunakan struktur backend jika klasifikasi adalah backend (`references/backend-profile-template.md`).
    - Gunakan struktur frontend jika klasifikasi adalah frontend (`references/frontend-profile-template.md`).
+   - Gunakan struktur fullstack jika klasifikasi adalah fullstack satu paket (`references/fullstack-profile-template.md`).
 2. Isi setiap section header dengan data konkret hasil pemindaian dan eksekusi Fase 0–2:
    - Wajib menyertakan keenam section header template terpilih dengan teks heading persis.
    - Cantumkan fakta nyata, path relatif konkret, nama library spesifik, dan perintah baseline terverifikasi.
@@ -134,7 +138,7 @@ Skill ini menghasilkan berkas profil repositori terstruktur dan laporan terminal
    ```
    PROFILE: <target_path> — mode <GENERATE | REFRESH> — workspace <workspace_dir | root>
    STATUS: PROFILED
-   TIPE: <backend | frontend> — sumber <parameter type | deteksi manifes>
+   TIPE: <backend | frontend | fullstack> — sumber <parameter type | deteksi manifes> — server-side <pola route server | tidak>
    STACK: <runtime> / <framework> / <package manager>
    LAYER: <n> layer terpetakan — <daftar path layer ringkas>
    BASELINE: typecheck=<status> lint=<status> test=<status> build=<status>
@@ -142,12 +146,12 @@ Skill ini menghasilkan berkas profil repositori terstruktur dan laporan terminal
    UKURAN: <n> karakter (batas 10.000)
    HANDOFF: explore
    ```
-   Nilai `<status>`: `PASSED`, `FAILED`, `TIMEOUT`, `SKIPPED` (ditolak user atau `skip_baseline_exec`), atau `UNVERIFIED_ENV_NOT_READY`.
+   Nilai `<status>`: `PASSED`, `FAILED`, `TIMEOUT`, `SKIPPED` (ditolak user atau `skip_baseline_exec`), `UNVERIFIED_ENV_NOT_READY`, atau `TIDAK_ADA` (tanpa runner/konfigurasi).
 
 ## Failure path
 
 1. **File Konfigurasi Proyek Tidak Ditemukan**: Jika root repositori tidak memuat file konfigurasi yang dikenali, laporkan kegagalan deteksi stack, tawarkan opsi penentuan manual via parameter `type`, dan hentikan eksekusi sebelum menulis profil kosong.
-2. **Eksekusi Perintah Baseline Mengalami Error Fatal**: Jika perintah typecheck/lint/test menghasilkan error runtime karena dependensi belum terpasang (misal: modul node_modules tidak ditemukan), instruksikan user untuk menjalankan instalasi package manager terlebih dahulu, atau catat status `UNVERIFIED_ENV_NOT_READY` pada seksi baseline profil.
+2. **Eksekusi Perintah Baseline Mengalami Error Fatal**: Jika perintah typecheck/lint/test menghasilkan error runtime karena dependensi belum terpasang (misal: modul node_modules tidak ditemukan), instruksikan user untuk menjalankan instalasi package manager terlebih dahulu, atau catat status `UNVERIFIED_ENV_NOT_READY` pada tabel Section 5 profil beserta pesan penyebab satu baris di kolom Known issues.
 3. **Ukuran Profil Melebihi Kuota Plafon 10.000 Karakter**: Jika draf profil melebihi kuota 10.000 karakter, pangkas deskripsi narasi panjang menjadi ringkasan bullet-points padat dan gunakan format tabel ringkas untuk pemetaan layer.
 4. **Izin Tulis Filesystem Gagal**: Jika penulisan ke `target_path` gagal karena restriksi akses atau direktori induk belum dibuat, buat direktori induk secara otomatis atau laporkan error permission ke user.
 
@@ -155,5 +159,5 @@ Skill ini menghasilkan berkas profil repositori terstruktur dan laporan terminal
 
 - Gunakan kalimat imperatif aktif dan Observable Predicate pada setiap langkah instruksi workflow.
 - Tuliskan nama package, path file, dan perintah terminal dalam format inline code backticks.
-- Pertahankan teks section header berbahasa Inggris persis seperti template terpilih; header backend dan frontend berbeda, jangan dicampur.
+- Pertahankan teks section header berbahasa Inggris persis seperti template terpilih; header backend, frontend, dan fullstack berbeda, jangan dicampur.
 - Tingkatkan rasio sinyal terhadap token dengan menyajikan langkah kerja teknis yang presisi tanpa basa-basi naratif.

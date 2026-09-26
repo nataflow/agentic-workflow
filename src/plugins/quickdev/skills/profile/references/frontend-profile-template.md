@@ -7,6 +7,7 @@ Dokumen ini merupakan template acuan profil arsitektur untuk repositori Frontend
 ## 1. Project Overview & Runtime
 
 - **Repository Name**: `<nama-repo>`
+- **Workspace**: `<workspace_dir | . (root)>`
 - **Runtime & Language**: `<misal: TypeScript 5.x / JavaScript ES2024 / Node.js 20 LTS>`
 - **Core Framework**: `<misal: Next.js 14 (App Router) / React 18 / Vue 3 / Nuxt 3 / SvelteKit>`
 - **Build Tool & Bundler**: `<misal: Vite / Turbopack / Webpack>`
@@ -46,12 +47,14 @@ Struktur arsitektur folder frontend dan batasan layer:
 
 ## 5. Verification Baseline
 
-Perintah pengujian dan audit kualitas kode yang wajib dijalankan sebelum dan sesudah perubahan:
+Dijalankan dari root repo kecuali kolom Cwd menyebut lain. Status: `PASSED` | `FAILED` | `TIMEOUT` | `SKIPPED` | `UNVERIFIED_ENV_NOT_READY` | `TIDAK_ADA` (tidak ada runner/konfigurasi di manifest). Known issues memakai penanda persis (mis. `src/legacy/a.ts:12 no-explicit-any`, `test_order_refund`), maksimal 10 baris; bila lebih, tulis `<n> issue — contoh: …` beserta perintah untuk mereproduksi daftar lengkap. `UNVERIFIED_ENV_NOT_READY` diberi pesan penyebab satu baris di kolom Known issues.
 
-- **Typecheck**: `<perintah: misal pnpm typecheck / npx tsc --noEmit>`
-- **Linter**: `<perintah: misal pnpm lint / eslint src --ext .ts,.tsx>`
-- **Unit & Component Tests**: `<perintah: misal pnpm test / vitest run / jest>`
-- **Production Build Check**: `<perintah: misal pnpm build>`
+| Jenis | Perintah | Cwd | Status | Durasi | Known issues (baseline) |
+|---|---|---|---|---|---|
+| Typecheck | `<perintah: misal pnpm typecheck / npx tsc --noEmit>` | `.` | <status> | <detik> | `<berkas:baris kode/aturan>` per issue, atau `-` |
+| Linter | `<perintah: misal pnpm lint / eslint src --ext .ts,.tsx>` | `.` | <status> | <detik> | `<berkas:baris aturan>` per issue, atau `-` |
+| Test | `<perintah: misal pnpm test / vitest run / jest>` | `.` | <status> | <detik> | `<nama test gagal/skip>` per issue, atau `-` |
+| Build | `<perintah: misal pnpm build>` | `.` | <status> | <detik> | `<pesan galat ringkas>`, atau `-` |
 
 ## 6. Styling & Design System Rules
 

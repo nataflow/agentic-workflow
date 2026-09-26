@@ -7,6 +7,7 @@ Dokumen ini merupakan template acuan profil arsitektur untuk repositori Backend.
 ## 1. Project Overview & Runtime
 
 - **Repository Name**: `<nama-repo>`
+- **Workspace**: `<workspace_dir | . (root)>`
 - **Runtime & Language**: `<misal: Node.js 20 LTS / Python 3.11 / Go 1.22 / Java 21>`
 - **Framework**: `<misal: NestJS / Express / FastAPI / Gin / Spring Boot>`
 - **Package Manager**: `<misal: pnpm / npm / yarn / poetry / go modules / maven>`
@@ -49,12 +50,14 @@ Hierarki layer backend dan pemisahan tanggung jawab kode:
 
 ## 5. Verification Baseline
 
-Perintah pengujian dan audit kualitas kode yang wajib dijalankan sebelum dan sesudah perubahan:
+Dijalankan dari root repo kecuali kolom Cwd menyebut lain. Status: `PASSED` | `FAILED` | `TIMEOUT` | `SKIPPED` | `UNVERIFIED_ENV_NOT_READY` | `TIDAK_ADA` (tidak ada runner/konfigurasi di manifest). Known issues memakai penanda persis (mis. `src/legacy/a.ts:12 no-explicit-any`, `test_order_refund`), maksimal 10 baris; bila lebih, tulis `<n> issue — contoh: …` beserta perintah untuk mereproduksi daftar lengkap. `UNVERIFIED_ENV_NOT_READY` diberi pesan penyebab satu baris di kolom Known issues.
 
-- **Typecheck**: `<perintah: misal pnpm tsc --noEmit / mypy src>`
-- **Linter**: `<perintah: misal pnpm lint / ruff check . / golangci-lint run>`
-- **Unit & Integration Tests**: `<perintah: misal pnpm test / pytest / go test ./...>`
-- **Build / Bundle Check**: `<perintah: misal pnpm build / go build ./...>`
+| Jenis | Perintah | Cwd | Status | Durasi | Known issues (baseline) |
+|---|---|---|---|---|---|
+| Typecheck | `<perintah: misal pnpm tsc --noEmit / mypy src>` | `.` | <status> | <detik> | `<berkas:baris kode/aturan>` per issue, atau `-` |
+| Linter | `<perintah: misal pnpm lint / ruff check . / golangci-lint run>` | `.` | <status> | <detik> | `<berkas:baris aturan>` per issue, atau `-` |
+| Test | `<perintah: misal pnpm test / pytest / go test ./...>` | `.` | <status> | <detik> | `<nama test gagal/skip>` per issue, atau `-` |
+| Build | `<perintah: misal pnpm build / go build ./...>` | `.` | <status> | <detik> | `<pesan galat ringkas>`, atau `-` |
 
 ## 6. Error Handling & Logging Standards
 
