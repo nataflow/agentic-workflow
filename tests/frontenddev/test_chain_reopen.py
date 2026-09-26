@@ -1,6 +1,5 @@
 """`chain.py reopen` — kaskade divalidasi sebelum ditulis (L4.5), kuota per hop target (L4.9)."""
 import sys
-from pathlib import Path
 
 import pytest
 
@@ -54,14 +53,14 @@ def test_reopen_gagal_tulis_dipulihkan(approved, monkeypatch):
     sys.path.insert(0, str(FE_SKILLS / "_common"))
     import chain as chain_mod
     before = {rel: (approved / rel).read_text(encoding="utf-8") for rel in (TASK, CONTRACT)}
-    real = Path.write_text
+    real = chain_mod.write_keep_newline
 
-    def flaky(self, data, *a, **kw):
-        if self.name == "TASK.md":
+    def flaky(path, text):
+        if path.name == "TASK.md":
             raise OSError("disk penuh")
-        return real(self, data, *a, **kw)
+        return real(path, text)
 
-    monkeypatch.setattr(Path, "write_text", flaky)
+    monkeypatch.setattr(chain_mod, "write_keep_newline", flaky)
     with pytest.raises(chain_mod.ChainError, match="dipulihkan"):
         chain_mod.Chain(FE_TD, approved).reopen("CONTRACT", "uji")
     monkeypatch.undo()

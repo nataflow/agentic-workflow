@@ -388,6 +388,23 @@ def read_status(path: Path, field: str = "status") -> str:
     return value.strip() if isinstance(value, str) else ""
 
 
+def newline_of(path: Path) -> str:
+    r"""Gaya line ending mayoritas berkas: `\r\n` atau `\n` (default untuk berkas baru)."""
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return "\n"
+    crlf = data.count(b"\r\n")
+    return "\r\n" if crlf > data.count(b"\n") - crlf else "\n"
+
+
+def write_keep_newline(path: Path, text: str) -> None:
+    r"""Tulis `text` (ber-`\n`, hasil `read_text`) dengan gaya line ending berkas yang ditimpa."""
+    newline = newline_of(path)
+    with open(path, "w", encoding="utf-8", newline=newline) as fh:   # `Path.write_text(newline=)` baru ada di 3.10
+        fh.write(text)
+
+
 def set_frontmatter_field(text: str, key: str, value: str) -> str:
     """Ganti (atau sisipkan di akhir frontmatter) satu field skalar.
 

@@ -70,6 +70,7 @@ from precondition_lib import (  # noqa: E402
     task_lane_sections,
     taskdir_slug,
     verify_chain_row,
+    write_keep_newline,
 )
 from review_round import Rounds  # noqa: E402
 
@@ -134,7 +135,7 @@ class Chain:
                                  "commit draft/revisinya lebih dulu.")
 
     def commit(self, paths: List[str], subject: str, body: str = "",
-               originals: Optional[Dict[str, str]] = None) -> str:
+               originals: Optional[Dict[str, bytes]] = None) -> str:
         """Commit **hanya** `paths` — index user yang lain tidak ikut; gagal → isi dipulihkan."""
         ok, out = git_ok(self.root, "add", "--", *paths)
         if ok:
@@ -142,17 +143,18 @@ class Chain:
             ok, out = git_ok(self.root, *args)
         if not ok:
             git_ok(self.root, "reset", "-q", "--", *paths)
-            for rel, text in (originals or {}).items():
-                (self.root / rel).write_text(text, encoding="utf-8")
+            for rel, data in (originals or {}).items():
+                (self.root / rel).write_bytes(data)
             raise ChainError(f"`git commit` gagal (hook/lock?) — berkas dipulihkan ke keadaan "
                              f"semula: {out.strip()[-400:]}")
         return git(self.root, "rev-parse", "--short", "HEAD").strip()
 
-    def snapshot(self, *rels: str) -> Dict[str, str]:
-        return {r: (self.root / r).read_text(encoding="utf-8") for r in rels if (self.root / r).is_file()}
+    def snapshot(self, *rels: str) -> Dict[str, bytes]:
+        """Isi byte persis — pemulihan sesudah commit gagal tidak boleh mengubah line ending."""
+        return {r: (self.root / r).read_bytes() for r in rels if (self.root / r).is_file()}
 
     def write_task(self, text: str) -> None:
-        self.task.write_text(text, encoding="utf-8")
+        write_keep_newline(self.task, text)
 
     def briefs(self) -> List[Path]:
         return sorted(self.taskdir.glob(BRIEF_GLOB))
@@ -234,8 +236,7 @@ class Chain:
             self._require_review_pass("contract")
         sha = last_commit(self.root, rel)
         originals = self.snapshot(rel, self.task_rel)
-        path.write_text(set_frontmatter_field(path.read_text(encoding="utf-8"), "status", "APPROVED"),
-                        encoding="utf-8")
+        write_keep_newline(path, set_frontmatter_field(path.read_text(encoding="utf-8"), "status", "APPROVED"))
         tail = f"APPROVED {sha}" + (f" (re-entry {entry['n']}, was {entry['sha']})" if entry["mark"] == "~" else "")
         self.write_task(replace_chain_row(self.text(), row, chain_line(row, "x", tail)))
         new = self.commit([rel, self.task_rel], f"docs({self.slug}): approve {doc}",
@@ -323,7 +324,8 @@ class Chain:
                                  f"pulihkan dengan `git checkout {sha} -- {rel}`, lalu ulangi reopen. "
                                  "Tidak ada berkas yang diubah.")
             try:
-                staged[rel] = set_frontmatter_field(originals[rel], "status", "DRAFT")
+                staged[rel] = set_frontmatter_field((self.root / rel).read_text(encoding="utf-8"),
+                                                    "status", "DRAFT")
             except FrontmatterError as exc:
                 raise ChainError(f"`{rel}`: {exc} — pulihkan frontmatter dari commit tercentang "
                                  f"(`git show {sha}:{rel}`), lalu ulangi reopen. Tidak ada berkas yang diubah.")
@@ -335,14 +337,14 @@ class Chain:
             text = replace_chain_row(text, r, chain_line(r, "~", f"re-entry {k} (was {e['sha']})"))
         try:                                          # 2) tulis semuanya; gagal di tengah → pulihkan
             for rel, new_text in staged.items():
-                (self.root / rel).write_text(new_text, encoding="utf-8")
+                write_keep_newline(self.root / rel, new_text)
             self.write_task(text)
         except OSError as exc:
             stuck = []
             for rel, old in originals.items():
                 try:
-                    if (self.root / rel).read_text(encoding="utf-8") != old:
-                        (self.root / rel).write_text(old, encoding="utf-8")
+                    if (self.root / rel).read_bytes() != old:
+                        (self.root / rel).write_bytes(old)
                 except OSError:
                     stuck.append(rel)
             if stuck:
