@@ -101,7 +101,7 @@ Rantai bersih — seluruh brief `DONE`, verifikasi hijau, review `PASS`/`WARNING
 4. **Commit unit gagal** (hook, lock): ulangi sekali sesudah memeriksa penyebabnya; tetap gagal → hentikan dan serahkan riwayat git ke user. Dilarang `--no-verify`.
 5. **Perintah verifikasi melewati batas waktu**: `run_verification.py` membunuh pohon prosesnya pada `--timeout` (default 300 detik) dan mencatat `TIMEOUT` — bernilai merah; klasifikasi Phase 4 butir 1 tetap berjalan.
 6. **Reviewer gagal dua kali**: sebelum berhenti, bersihkan tree — buang `REVIEW.md` yang tidak sah (`git restore -- {taskdir}/REVIEW.md` bila ter-track, hapus bila baru) dan pulihkan suntingan `finding_source` yang belum ter-commit (`git restore -- <finding_source>`); lalu laporkan review tidak tuntas. `REPORT.md` tidak dipanggil.
-7. **Detached HEAD atau rebase berjalan**: hentikan di Precondition; minta user kembali ke branch sah.
+7. **Detached HEAD, rebase, atau `git am` yang berhenti**: hentikan di Precondition; minta user kembali ke branch sah.
 
 ## STYLE
 

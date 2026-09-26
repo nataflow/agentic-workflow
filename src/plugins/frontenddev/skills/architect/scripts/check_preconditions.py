@@ -51,6 +51,7 @@ from precondition_lib import (  # noqa: E402
     read_status,
     report_json,
     review_is_fresh,
+    taskdir_slug,
     typecheck_per_brief,
 )
 
@@ -225,14 +226,17 @@ class PreconditionChecker:
 
     def _check_9_head(self) -> None:
         name = "HEAD pada branch"
+        # `--git-path` menunjuk git dir yang benar juga di worktree/submodule, tempat `.git` berupa berkas.
+        paths = {d: git(self.root, "rev-parse", "--git-path", d).strip() for d in ("rebase-apply", "rebase-merge")}
+        ongoing = [d for d, p in paths.items() if p and (self.root / p).exists()]
+        if ongoing:
+            self._add(9, name, "FAIL", f"rebase/`git am` sedang berjalan (`{ongoing[0]}`)",
+                      "Selesaikan atau batalkan (`git rebase --abort` / `git am --abort`) dulu.")
+            return
         branch = git(self.root, "symbolic-ref", "--short", "-q", "HEAD").strip()
         if not branch:
             self._add(9, name, "FAIL", "detached HEAD",
                       "Checkout branch sah sebelum commit unit mana pun.")
-            return
-        rebase = any((self.root / ".git" / d).exists() for d in ("rebase-apply", "rebase-merge"))
-        if rebase:
-            self._add(9, name, "FAIL", "rebase sedang berjalan", "Selesaikan atau batalkan rebase dulu.")
             return
         self._add(9, name, "PASS", f"branch `{branch}`")
 
@@ -312,12 +316,14 @@ class PreconditionChecker:
             self._add(13, name, "WARN", f"`based_on` {m.group(1)} tidak ada di repo — kesegaran tak dapat divonis",
                       "Sebut ke user sebelum dispatch; brief mungkin ditulis di cabang lain.")
             return
+        # Hanya commit unit taskdir INI yang dikecualikan; `implement unit` milik taskdir lain tetap asing.
+        own_unit = re.compile(rf"^[a-z]+!?\({re.escape(taskdir_slug(self.taskdir_rel))}\)!?: implement unit \d+")
         stale = []
         for f in as_list(fm.get("files_touched")):
-            newer = git(self.root, "log", "--oneline", f"{m.group(1)}..HEAD", "--", f).strip()
-            own = [l for l in newer.splitlines() if "implement unit" not in l]
-            if own:
-                stale.append(f"{f} ({len(own)} commit)")
+            subjects = git(self.root, "log", "--format=%s", f"{m.group(1)}..HEAD", "--", f).splitlines()
+            foreign = [s for s in subjects if s.strip() and not own_unit.match(s)]
+            if foreign:
+                stale.append(f"{f} ({len(foreign)} commit)")
         if stale:
             self._add(13, name, "WARN", "berkas berubah sesudah brief ditulis: " + "; ".join(stale[:4]),
                       "Sebut ke user; brief yang tak lagi cocok dikembalikan ke `frontenddev:plan`.")
