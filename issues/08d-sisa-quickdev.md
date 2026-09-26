@@ -59,6 +59,23 @@ quickdev berjanji "review diff terhadap rencana satu berkas". Janji itu kini han
 | D13 | 1 jam |
 | **Total** | **±4,5 hari** (varian `plan_lock.py`) |
 
+## Catatan implementasi (2026-09-26)
+
+Keputusan user: **D1-a** varian A (`skills/_common/plan_lock.py`) · **D3** plafon 2 putaran · **D6** `<workspace_dir>/repo-profile.md` (L1.1 tidak memindahkan profil quickdev) · **D11** template ketiga `fullstack-profile-template.md`, bukan field `Server-side` (menyimpang dari rekomendasi berkas ini).
+
+Selesai: D1–D13. Commit: `edd5c87` (skrip), `01357c7` (plan/execute/review), `b389f7f` (profil + template), `aa4a59d` (explore/clarify), `b0fdefc` (README + test teks). Test baru: `tests/quickdev/test_08d_plan_lock.py` (16 kasus) dan `tests/quickdev/test_08d_text.py` (15 kasus), ditulis di atas `tests/conftest.py` (`make_repo`, `commit`, `git`, `run_script`), bukan fixture `git_repo`/`skill_script` usulan berkas ini; `plan_lock.py` masuk `CASES` smoke test. Lulus di Python 3.9 dan 3.13. `pytest tests`: 1161 lulus, 9 gagal — sama dengan catatan 08c (8 test frontenddev bergantung tanggal dan `test_profile_paths[backenddev]`). `lint_plugins.py` 0 FAIL (6 WARN lama).
+
+Penyimpangan dari rencana di bawah:
+
+- **D1.** `verify` membedakan rencana `APPROVED` tanpa `Plan-Hash` (format lama/ditulis tangan) dengan pesan migrasi sendiri. `close` ikut memanggil `verify` dan menuntut blok `IN_PROGRESS`, sehingga penutupan sesudah rencana diubah juga tertolak. `unlock` menolak alasan kosong.
+- **D2.** `close --status BLOCKED` menuntut `--blocked-step`. Tabel mode ditulis di Fase 0 `execute/SKILL.md` dan README.
+- **D7.** `--findings-text` diimplementasikan dan **wajib** bersama `--findings`, jadi temuan selalu tercatat sebelum kode diubah. Mode `manual` dengan hasil gagal ditutup `close --status BLOCKED` dari `VERIFICATION_MANUAL_REQUIRED` (satu-satunya transisi selain dari `IN_PROGRESS`); pemanggilan berikutnya masuk `resume` dan langsung ke verifikasi. `status --json` menambah `gates`, `remediation_round`, dan `remediation_cap`.
+- **D3.** `start --findings` juga menerima blok `COMPLETED (manual)`.
+- **D4.** Status `TIMEOUT` (L3.5) ikut di daftar status tabel dan diperlakukan seperti `SKIPPED` saat execute membandingkan.
+- **D8.** Review memakai satu rumus `git diff <BASE>`; untuk repo tanpa commit `<BASE>` = tree kosong. `git diff <tree kosong>` membaca isi unstaged juga, jadi tidak perlu `--cached`.
+- **D11.** Template fullstack punya 6 seksi (Section 4 = route server, data access, error). Monorepo tetap per workspace; workspace bisa diklasifikasikan fullstack. Output profile: `TIPE: <backend | frontend | fullstack> — … — server-side <pola | tidak>`.
+- **D13.** Output explore juga memuat baris `TIPE`. Deskripsi `plugin.json`/marketplace menyebut fullstack.
+
 ## Definisi selesai
 
 - Ke-13 item dicentang, masing-masing sudah memenuhi **Selesai bila**-nya.
@@ -80,7 +97,7 @@ quickdev berjanji "review diff terhadap rencana satu berkas". Janji itu kini han
 ---
 
 ## D1 [Tinggi] Rencana "satu berkas" tidak benar-benar terkunci
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** quickdev · **Estimasi:** 1 hari · **Bergantung pada:** D8, keputusan D1-a · **Memblokir:** D2, D3, D7
 
@@ -536,7 +553,7 @@ Verifikasi manual: jalankan alur quickdev pada repo contoh. Sesudah approval, mi
 ---
 
 ## D2 [Tinggi] execute tidak punya jalan masuk ulang sesudah BLOCKED atau sesi putus
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** quickdev · **Estimasi:** 0,5–1 hari · **Bergantung pada:** D1 (blok `## Execution Status`, `plan_lock.py start`), D8 · **Memblokir:** D7, D9
 
@@ -651,7 +668,7 @@ Verifikasi manual: di tengah execute rencana 3 langkah, hentikan sesi sesudah la
 ---
 
 ## D3 [Sedang] Loop review ↔ execute tanpa batas dan tanpa persetujuan user
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** quickdev · **Estimasi:** 1–2 jam · **Bergantung pada:** D1, D2 (`plan_lock.py start --findings`), D7 (temuan tersimpan) · **Memblokir:** —
 
@@ -702,7 +719,7 @@ Angka 2 adalah keputusan user (tabel keputusan). Plafon ini terpisah dari `max_f
 ---
 
 ## D4 [Sedang] Data baseline yang dibutuhkan execute tidak disediakan template
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** quickdev · **Estimasi:** 2–3 jam (tanpa L3.5) · **Bergantung pada:** L3.5 (satu PR) · **Memblokir:** D12
 
@@ -782,7 +799,7 @@ Profil lama (tanpa tabel) harus dibaca sebagai "status tidak diketahui", yaitu d
 ---
 
 ## D5 [Sedang] Perbaikan saat verifikasi tanpa batas cakupan
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** quickdev · **Estimasi:** 45 menit · **Bergantung pada:** D1/D2 (`close --status BLOCKED`, `unlock`) · **Memblokir:** —
 
@@ -822,7 +839,7 @@ Rencana yang terlalu sempit akan lebih sering BLOCKED. Ini sengaja: explore (dim
 ---
 
 ## D6 [Sedang] Monorepo tidak tahan lintas sesi
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** quickdev · **Estimasi:** 2 jam · **Bergantung pada:** D1 (metadata `Profile:`), D4 (kolom Cwd), keputusan L1.1 · **Memblokir:** —
 
@@ -878,7 +895,7 @@ Bila L1.1 memindahkan profil ke `.claude/profile/quickdev/`, butir 2 ikut. `Prof
 ---
 
 ## D7 [Sedang] State gate hanya hidup di percakapan
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** quickdev · **Estimasi:** 2 jam · **Bergantung pada:** D1, D2 · **Memblokir:** D3 (temuan tersimpan)
 
@@ -942,7 +959,7 @@ Verifikasi manual:
 ---
 
 ## D8 [Rendah] Predikat git literal
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** quickdev · **Estimasi:** 1 jam · **Bergantung pada:** — · **Memblokir:** D1, D2, D9
 
@@ -1008,7 +1025,7 @@ Ketiga kasus di Reproduksi memberi hasil benar dengan perintah persis dari SKILL
 ---
 
 ## D9 [Rendah] Instruksi mati di review
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** quickdev · **Estimasi:** 30 menit · **Bergantung pada:** D2 (`Base-Commit`) · **Memblokir:** —
 
@@ -1036,7 +1053,7 @@ Parameter `base_ref` ada dan divalidasi, Failure path 2 menunjuk jalur yang bena
 ---
 
 ## D10 [Rendah] Kontradiksi dan instruksi mati di clarify
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** quickdev · **Estimasi:** 1 jam · **Bergantung pada:** D7 (Failure path plan) · **Memblokir:** —
 
@@ -1068,7 +1085,7 @@ Verifikasi manual:
 ---
 
 ## D11 [Rendah] Fullstack tidak selaras
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** quickdev · **Estimasi:** 1,5 jam · **Bergantung pada:** keputusan D11 · **Memblokir:** —
 
@@ -1097,7 +1114,7 @@ Profile menghasilkan informasi server-side yang dipakai explore/clarify; tidak a
 ---
 
 ## D12 [Rendah] Repo tanpa infrastruktur test
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** quickdev · **Estimasi:** 45 menit · **Bergantung pada:** D4 (status `TIDAK_ADA`) · **Memblokir:** —
 
@@ -1125,7 +1142,7 @@ Status `TIDAK_ADA` ada di profil; plan dan execute punya jalur untuknya; guardra
 ---
 
 ## D13 [Rendah] Prasyarat tool dan klaim "ringan"
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** quickdev · **Estimasi:** 1 jam · **Bergantung pada:** — · **Memblokir:** —
 
