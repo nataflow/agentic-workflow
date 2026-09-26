@@ -63,8 +63,8 @@ SC_VERDICTS = ("terbukti", "belum terbukti", "PERLU VERIFIKASI MANUAL")
 AC_VERDICTS = ("terbukti", "belum terbukti", "QA manual")
 AC_ROW = re.compile(r"^\|\s*`?(AC-\d+)`?\s*\|")
 DIMENSIONS = ["Layer Boundaries", "Data Flow & DTO", "API Layer", "State Scope & Ownership",
-              "UI & 6-State Branches", "Platform Semantics", "Error Handling", "Performance & Leaks",
-              "Test Quality & Coverage"]
+              "UI & 6-State Branches", "Platform & Framework Boundary", "Error Handling", "Performance & Leaks",
+              "Test Quality"]
 DIM_STATUS = ("PASS", "P1", "P2", "P3")
 PATH_LINE = re.compile(r"`([^`\s]+):(\d+)(?:-\d+)?`")
 VIOLATION = re.compile(r"^- \*\*Violation\*\*:\s*Dimensi\s+([1-9](?:\s*(?:&|,)\s*[1-9])*)\s*—")

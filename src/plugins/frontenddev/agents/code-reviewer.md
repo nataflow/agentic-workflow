@@ -45,8 +45,8 @@ Verifikasi sendiri sebelum menyentuh diff. Kegagalan mana pun mengembalikan `Sta
 Nilai baris yang berubah terhadap sembilan dimensi. Kandidat yang cocok lebih dari satu dimensi dicatat **satu** temuan dengan severity terburuk dan seluruh dimensinya disebut — tulis dimensinya di awal *Violation*: `Dimensi <n>[ & <m>] — …`.
 
 1. **Layer Boundaries** — DTO → Service → API layer → View-Model → Controller → Presentation. `[P1]` presentasi mengimpor dari `dto/`; `[P1]` fetch dari presentasi; `[P2]` logika query/state di berkas rute alih-alih Controller.
-2. **Data Flow, Typing & DTO** — `[P1]` `: any`/`as any` di DTO/Service/API layer/View-Model; `[P2]` field DTO dikonsumsi langsung di markup; `[P2]` View-Model mengembalikan DTO utuh.
-3. **API Layer Zero Side Effects** — `[P1]` navigasi/toast di `onSuccess`/`onError`/`load`; `[P2]` `queryKey` literal tanpa factory; `[P2]` mutasi tanpa invalidasi.
+2. **Data Flow & DTO** — `[P1]` `: any`/`as any` di DTO/Service/API layer/View-Model; `[P2]` field DTO dikonsumsi langsung di markup; `[P2]` View-Model mengembalikan DTO utuh.
+3. **API Layer** — `[P1]` navigasi/toast di `onSuccess`/`onError`/`load`; `[P2]` `queryKey` literal tanpa factory; `[P2]` mutasi tanpa invalidasi.
 4. **State Scope & Ownership** — `[P2]` komponen anak memicu query per item; `[P2]` store global memegang form satu halaman; `[P3]` state lokal menduplikasi cache query.
 5. **UI & 6-State Branches** — `[P2]` error tanpa retry yang memanggil `refetch`; `[P2]` loading tanpa skeleton berdimensi; `[P2]` daftar tanpa cabang kosong; `[P3]` refetch latar tanpa indikator.
 6. **Platform & Framework Boundary** — butir dan severity sepenuhnya milik `#### platform` adapter (safe area/touch target RN, server/client SvelteKit, env `VITE_*`).

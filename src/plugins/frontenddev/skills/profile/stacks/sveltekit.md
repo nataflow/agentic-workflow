@@ -132,29 +132,23 @@ Offset baca di sekitar baris temuan `L`: `max(1, L-15)` sampai `L+35`; untuk `.s
 
 - **`import ... from '.../dto/...'` di `.svelte`.** P1. Grep: `Grep -n "from.*dto" --glob "*.svelte"`.
 - **`fetch(` langsung di `<script>` komponen presentasi.** P1. Lepas dari cache/invalidasi dan gagal di SSR.
-- **Logika query/state di `+page.svelte` alih-alih Controller.** P2. Tidak dapat diuji tanpa router.
 
 #### `data-flow`
 
-- **`: any` / `as any` di DTO, Service, View-Model.** P1. Grep: `Grep -n ": any\|as any" src/lib/`.
 - **`load` mengembalikan DTO mentah ke `data` prop tanpa View-Model.** P2.
 
 #### `api-layer`
 
 - **`goto(` atau toast di `createMutation`/`load`.** P1. Grep: `Grep -n "goto(\|toast" src/lib/**/api/ src/routes/**/+page*.ts`.
-- **`queryKey` literal tanpa factory.** P2. Grep: `Grep -n "queryKey: \['"`.
-- **Mutasi tanpa `invalidateQueries`/`invalidate(`.** P2.
 
 #### `state-scope`
 
-- **`createQuery(` di komponen baris/kartu.** P2. Fetch per item.
-- **`$state` global di `.svelte.ts` menyimpan state form satu halaman.** P2. Store menjadi god store.
+- **`$state` global di `.svelte.ts` menyimpan state form satu halaman.** P2. God store.
 
 #### `ui-states`
 
 - **`{:else if isError}` tanpa `onRetry`.** P2.
-- **`{#await}` tanpa cabang `{:catch}`.** P2. Error tak tertangani di template.
-- **Loading merender kosong alih-alih skeleton.** P2.
+- **`{#await}` tanpa `{:catch}`.** P2. Error tak tertangani di template.
 
 #### `platform`
 
@@ -164,19 +158,11 @@ Offset baca di sekitar baris temuan `L`: `max(1, L-15)` sampai `L+35`; untuk `.s
 
 #### `error-handling`
 
-- **`error.message` mentah di template.** P2.
 - **`+error.svelte` absen di segmen yang memuat `load` berpotensi gagal.** P3.
 
 #### `performance`
 
 - **`$effect` dengan `addEventListener`/`setInterval` tanpa `return`.** P2.
-- **Kalkulasi list berat di template alih-alih `$derived`.** P3.
-
-#### `tests`
-
-- **Test `render(` tanpa `expect(`.** P1.
-- **`it.skip`/`.only` tertinggal.** P1. Grep: `Grep -n "it\.skip\|test\.skip\|\.only("`.
-- **View-Model dites lewat render komponen alih-alih fungsi murni.** P3.
 
 ## UI & navigation surface
 

@@ -287,8 +287,8 @@ def fe_minor_chain(tmp_path):
 
 
 FE_DIMENSIONS = ["Layer Boundaries", "Data Flow & DTO", "API Layer", "State Scope & Ownership",
-                 "UI & 6-State Branches", "Platform Semantics", "Error Handling", "Performance & Leaks",
-                 "Test Quality & Coverage"]
+                 "UI & 6-State Branches", "Platform & Framework Boundary", "Error Handling", "Performance & Leaks",
+                 "Test Quality"]
 FE_P2_FINDING = ("### [P2-1] Label tidak memakai i18n\n\n> Status: PLANNED\n\n"
                  "- **Location**: `src/features/order/OrderButton.tsx:1`\n"
                  "- **Violation**: Dimensi 5 — label literal di presentasi.\n"

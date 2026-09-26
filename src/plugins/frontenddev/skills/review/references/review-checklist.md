@@ -39,7 +39,7 @@ Daftar periksa verifikasi cepat (*quick checklist*) per layer dan format laporan
 ### E. Presentation & Sub-Components:
 - [ ] Komponen layar hanya memanggil Controller dan membagikan props ke anak komponen.
 - [ ] Komponen anak tidak memicu fetch query mandiri secara terisolasi.
-- [ ] Seluruh 6 cabang state (Initial, Loading, Empty, Error, Ready, Stale) tertangani.
+- [ ] Seluruh 6 cabang state (normal, loading, kosong, error, initial, stale/mutating) tertangani di tiap layar.
 - [ ] Batas platform adapter dipatuhi: safe area & touch target ≥44 dp (RN), nol import server-only (SvelteKit), env `VITE_*` (SPA).
 
 ---
@@ -54,7 +54,7 @@ Daftar periksa verifikasi cepat (*quick checklist*) per layer dan format laporan
 
 ### [P1] DTO Response Leaking directly into CartItem Component
 - **Location**: `src/features/checkout/components/CartItem.tsx:14`
-- **Violation**: Dimension 1 (Layer Boundaries) & Dimension 2 (DTO Integrity). Komponen presentasi mengimpor `CartItemResponseDTO` langsung dari folder dto.
+- **Violation**: Dimension 1 (Layer Boundaries) & Dimension 2 (Data Flow & DTO). Komponen presentasi mengimpor `CartItemResponseDTO` langsung dari folder dto.
 - **Evidence**:
   ```typescript
   import { CartItemResponseDTO } from '../dto/cart.dto';
@@ -66,7 +66,7 @@ Daftar periksa verifikasi cepat (*quick checklist*) per layer dan format laporan
 
 ### [P2] Query Error State Missing Retry Action Button
 - **Location**: `src/features/checkout/pages/CheckoutPage.tsx:42`
-- **Violation**: Dimension 5 (6-State Branches) & Dimension 7 (Error Handling).
+- **Violation**: Dimension 5 (UI & 6-State Branches) & Dimension 7 (Error Handling).
 - **Evidence**:
   ```typescript
   if (isError) return <div className="text-red-500">Terjadi kesalahan.</div>;

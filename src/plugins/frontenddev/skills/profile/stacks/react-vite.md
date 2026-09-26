@@ -128,13 +128,11 @@ Offset baca di sekitar baris temuan `L`: `max(1, L-15)` sampai `L+35`.
 
 #### `data-flow`
 
-- **`: any` atau `as any` di DTO, Service, atau View-Model.** P1. Typecheck mati di jalur data. Grep: `Grep -n ": any\|as any" src/features/`.
 - **Field DTO snake_case dipakai langsung di markup.** P2. Tanda View-Model dilewati.
 
 #### `api-layer`
 
 - **`navigate(`, `router.`, atau `toast` di `hooks/api/`.** P1. Grep: `Grep -n "navigate(\|toast\.\|useNavigate(" src/features/**/hooks/api/`.
-- **`queryKey` berupa string atau array literal tanpa factory.** P2. Tabrakan cache dan invalidasi meleset. Grep: `Grep -n "queryKey: \['"`.
 - **Mutasi tanpa `invalidateQueries` di `onSettled`.** P2. Daftar tetap basi sesudah tulis.
 
 #### `state-scope`
@@ -152,19 +150,10 @@ Offset baca di sekitar baris temuan `L`: `max(1, L-15)` sampai `L+35`.
 - **`process.env.*` di kode browser.** P1. `undefined` di bundle Vite. Grep: `Grep -n "process\.env\." src/`.
 - **Alias hanya di salah satu `tsconfig`/`vite.config`.** P2. Build dan typecheck saling bertentangan.
 
-#### `error-handling`
-
-- **`error.message` mentah ditampilkan ke user.** P2. Teks `AxiosError: Request failed with status code 500` bocor ke layar.
-
 #### `performance`
 
 - **`useEffect` dengan `addEventListener`/`setInterval` tanpa `return`.** P2. Grep: `Grep -n "addEventListener\|setInterval" src/features/`, cek ada `return () =>`.
 - **Kalkulasi list berat di badan komponen tanpa `useMemo`.** P3.
-
-#### `tests`
-
-- **`test(` yang hanya `render(` tanpa `expect(`.** P1. Coverage semu.
-- **`it.skip`/`test.only` tertinggal.** P1. Grep: `Grep -n "it\.skip\|test\.skip\|\.only("`.
 
 ## UI & navigation surface
 

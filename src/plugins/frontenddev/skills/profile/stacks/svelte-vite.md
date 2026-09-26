@@ -127,13 +127,11 @@ Offset baca di sekitar baris temuan `L`: `max(1, L-15)` sampai `L+35`; untuk `.s
 
 #### `data-flow`
 
-- **`: any` / `as any` di jalur data.** P1. Grep: `Grep -n ": any\|as any" src/features/`.
 - **Field DTO snake_case dipakai di template.** P2. View-Model dilewati.
 
 #### `api-layer`
 
 - **`navigate(`/`push(` atau toast di `api/`.** P1. Grep: `Grep -n "navigate(\|push(\|toast" src/features/**/api/`.
-- **`queryKey` literal tanpa factory.** P2. Grep: `Grep -n "queryKey: \['"`.
 - **Parameter query diberikan sebagai nilai, bukan getter.** P2. Query membeku pada nilai awal.
 
 #### `state-scope`
@@ -153,19 +151,10 @@ Offset baca di sekitar baris temuan `L`: `max(1, L-15)` sampai `L+35`; untuk `.s
 - **Dua library router dipakai bersamaan.** P2. Param dibaca dari sumber berbeda.
 - **Alias hanya di salah satu `tsconfig`/`vite.config`.** P2.
 
-#### `error-handling`
-
-- **`error.message` mentah di template.** P2.
-
 #### `performance`
 
 - **`$effect` dengan listener/timer tanpa `return`.** P2.
 - **Kalkulasi berat di template alih-alih `$derived`.** P3.
-
-#### `tests`
-
-- **Test `render(` tanpa `expect(`.** P1.
-- **`it.skip`/`.only` tertinggal.** P1. Grep: `Grep -n "it\.skip\|test\.skip\|\.only("`.
 
 ## UI & navigation surface
 

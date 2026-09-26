@@ -129,14 +129,9 @@ Offset baca di sekitar baris temuan `L`: `max(1, L-15)` sampai `L+35`.
 - **`import ... from '../dto/...'` di `*Screen.tsx`, `components/`, atau `app/**`.** P1. Grep: `Grep -n "from.*dto" src/features/**/{screens,components}/ app/`.
 - **Logika query/state di berkas `app/**`.** P2. Rute Expo Router tidak dapat diuji tanpa router.
 
-#### `data-flow`
-
-- **`: any` / `as any` di jalur data.** P1. Grep: `Grep -n ": any\|as any" src/features/`.
-
 #### `api-layer`
 
 - **`router.push`, `navigation.navigate`, atau `Toast.show` di `hooks/api/`.** P1. Grep: `Grep -n "router\.\|navigation\.\|Toast\." src/features/**/hooks/api/`.
-- **`queryKey` tanpa factory.** P2. Grep: `Grep -n "queryKey: \['"`.
 
 #### `state-scope`
 
@@ -155,10 +150,6 @@ Offset baca di sekitar baris temuan `L`: `max(1, L-15)` sampai `L+35`.
 - **`BackHandler.addEventListener` tanpa `remove()` di cleanup.** P2. Grep: `Grep -n "BackHandler\.addEventListener"`, cek `return`.
 - **Form tanpa `KeyboardAvoidingView`.** P3.
 
-#### `error-handling`
-
-- **`error.message` mentah di `<Text>`.** P2.
-
 #### `performance`
 
 - **`FlatList` tanpa `keyExtractor` atau dengan `renderItem` inline yang membuat closure baru per render tanpa memo.** P3.
@@ -166,8 +157,6 @@ Offset baca di sekitar baris temuan `L`: `max(1, L-15)` sampai `L+35`.
 
 #### `tests`
 
-- **Test hanya `render(` tanpa `expect(`.** P1.
-- **`it.skip`/`.only` tertinggal.** P1. Grep: `Grep -n "it\.skip\|test\.skip\|\.only("`.
 - **Typecheck diklaim hijau dari test hijau.** P1 pada laporan review — Metro membuang tipe.
 
 ## UI & navigation surface

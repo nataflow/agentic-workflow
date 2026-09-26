@@ -25,7 +25,8 @@ field `stack` pada `.claude/profile/frontenddev/index.json` yang ditulis
    sesi, jadi ukurannya tetap biaya context nyata. Adapter yang menembus batas atas wajib dipangkas
    dari butir yang paling jarang terbukti, bukan dari seksi yang hilang.
 5. **Nol duplikasi lintas-adapter.** Butir yang berlaku di semua stack adalah tanda butir itu salah
-   tempat; ia milik `SKILL.md` atau `references/` skill, bukan adapter.
+   tempat; ia milik `SKILL.md` atau `references/` skill (predikat review: katalog netral), bukan
+   adapter. Pengecualian sempit: gerbang kelayakan butir 4.
 
 ## Enam layer kanonik (netral stack)
 
@@ -45,17 +46,19 @@ Presentation; adapter tidak mengubah urutannya, hanya menamai berkas dan idiomny
 
 ## Sembilan dimensi review (netral stack)
 
-| # | Dimensi | Cakupan |
-|---|---|---|
-| 1 | `layer-boundaries` | DTO terisolasi dari presentasi, Controller dipanggil dari presentasi, Service murni |
-| 2 | `data-flow` | Nol `any`, View-Model memetakan seluruh field DTO ke `*UI` |
-| 3 | `api-layer` | Nol navigasi/toast di API layer, query key array factory |
-| 4 | `state-scope` | State query di Controller, tidak ada fetch tersembunyi di komponen anak |
-| 5 | `ui-states` | 6 cabang state: initial, loading, empty, error+retry, ready, mutating |
-| 6 | `platform` | Batas framework & platform: safe area, touch target, server/client boundary |
-| 7 | `error-handling` | Error backend dipetakan ke pesan manusiawi, retry aktif |
-| 8 | `performance` | Cleanup efek/subscription, memoisasi kalkulasi berat |
-| 9 | `tests` | Test View-Model/Service punya assertion nyata, tidak di-skip |
+Sumber tunggal nama dimensi. Adapter memakai kolom **Slug** sebagai `#### <slug>`; template REVIEW/AUDIT, `agents/code-reviewer.md`, katalog, dan SKILL memakai kolom **Nama** persis.
+
+| # | Slug | Nama | Cakupan |
+|---|---|---|---|
+| 1 | `layer-boundaries` | Layer Boundaries | DTO terisolasi dari presentasi, Controller dipanggil dari presentasi, Service murni |
+| 2 | `data-flow` | Data Flow & DTO | Nol `any`, View-Model memetakan seluruh field DTO ke `*UI` |
+| 3 | `api-layer` | API Layer | Nol navigasi/toast di API layer, query key array factory |
+| 4 | `state-scope` | State Scope & Ownership | State query di Controller, tidak ada fetch tersembunyi di komponen anak |
+| 5 | `ui-states` | UI & 6-State Branches | 6 cabang state per layar: normal, loading, kosong, error (+retry), initial, stale/mutating |
+| 6 | `platform` | Platform & Framework Boundary | Batas framework & platform: safe area, touch target, server/client boundary |
+| 7 | `error-handling` | Error Handling | Error backend dipetakan ke pesan manusiawi, retry aktif |
+| 8 | `performance` | Performance & Leaks | Cleanup efek/subscription, memoisasi kalkulasi berat |
+| 9 | `tests` | Test Quality | Test View-Model/Service punya assertion nyata, tidak di-skip |
 
 ---
 
@@ -114,7 +117,7 @@ kebocoran DTO ke presentasi, state global, form & skema, batas framework.
 `surface-map.md`; `code-explorer` **bukan** konsumen langsung: ia dilarang membaca berkas adapter
 dan membaca hasil turunannya di profil saja.
 
-### 5. `## Review checklist` — konsumen: `frontenddev:review`
+### 5. `## Review checklist` — konsumen: `frontenddev:review`, `agents/code-reviewer.md` (review penutup `frontenddev:architect`)
 
 Butir dikelompokkan per dimensi dengan sub-heading `#### <dimensi>`, tiap butir memuat predikat
 pelanggaran, severity (`P1`/`P2`/`P3`), dan bila mungkin resep grep. Hanya dimensi yang punya butir
@@ -141,7 +144,7 @@ Adapter baru boleh dipakai hanya bila seluruhnya benar:
 1. Tujuh seksi hadir, judul persis, berurutan, tanpa seksi tambahan.
 2. `## Review checklist` memenuhi ambang ≥12 butir / ≥5 dimensi.
 3. Seluruh perintah di `## Commands` sudah dieksekusi minimal sekali di repo nyata stack itu.
-4. Tidak ada butir yang identik dengan butir di adapter lain.
+4. Tidak ada butir netral stack di adapter (predikat yang sudah ada di `skills/review/references/nine-dimensions-catalog.md`). Butir yang sama di dua adapter sefamili (Svelte, SPA Vite) sah hanya bila memakai idiom atau resep grep/glob yang spesifik keluarga itu.
 5. `<stack-id>` terdaftar di `## Detection` milik `frontenddev:profile` dan di `hooks/detect.py`.
 
 Butuh seksi kedelapan = kontrak ini yang salah. Revisi berkas ini lebih dulu dan sesuaikan seluruh

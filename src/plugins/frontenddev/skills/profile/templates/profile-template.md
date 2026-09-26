@@ -115,7 +115,7 @@ Pelanggaran = blocker, bukan gaya.
 1. **Zero DTO Leak to Presentation**: Komponen presentasi dilarang mengimpor interface `*DTO` langsung. Data wajib dipetakan melalui View-Model (React: `use*ViewModel`; Svelte: `to*UI()`) ke `*UI`.
 2. **No Direct Data-Fetching in Presentation Components**: Dilarang memanggil `fetch`/`axios` di dalam efek komponen presentasi. Data fetching wajib via Controller dan API layer.
 3. **Query Key Factory Array Discipline**: Query key wajib memakai array factory terpusat (`ORDER_KEYS.all`, `ORDER_KEYS.detail(id)`), dilarang raw string concatenation.
-4. **Mandatory 6-State Branches for Async Screens**: Setiap layar asinkron wajib menyediakan state: Initial, Loading (Skeleton CLS-safe), Empty, Error + Retry Action, Ready, Mutating.
+4. **Mandatory 6-State Branches for Async Screens**: Setiap layar asinkron wajib menyediakan state: normal, loading (skeleton berdimensi, CLS aman), kosong, error + aksi retry, initial, stale/mutating.
 5. **Strict Design Token Theme Usage**: Styling wajib menggunakan token tema, dilarang arbitrary hardcoded styling.
 6. **Framework Boundary Scoping**: `<sesuai adapter — React Native: SafeAreaInsets dan touch target ≥44dp; SvelteKit: nol import `$lib/server`/`$env/static/private` di client; SPA Vite: env hanya `VITE_*`>`.
 

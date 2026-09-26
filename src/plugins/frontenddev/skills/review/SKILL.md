@@ -35,7 +35,7 @@ description: Gunakan ketika kode frontend di luar rantai taskdir aktif perlu din
 
 ### Phase 2 — Sembilan Dimensi
 
-Nilai baris yang berubah (target `diff`/`taskdir`) atau berkas di `path` terhadap `references/nine-dimensions-catalog.md` dan predikat adapter: 1 Layer Boundaries · 2 Data Flow & DTO · 3 API Layer · 4 State Scope · 5 Enam Cabang State · 6 Platform & Framework · 7 Error Handling · 8 Performance & Leaks · 9 Test Quality. Adapter menang bila keduanya menyebut butir yang sama. Katalog ini kembaran `agents/code-reviewer.md` Fase 2 — perubahan definisi menyentuh keduanya.
+Nilai baris yang berubah (target `diff`/`taskdir`) atau berkas di `path` terhadap `references/nine-dimensions-catalog.md` dan predikat adapter: 1 Layer Boundaries · 2 Data Flow & DTO · 3 API Layer · 4 State Scope & Ownership · 5 UI & 6-State Branches · 6 Platform & Framework Boundary · 7 Error Handling · 8 Performance & Leaks · 9 Test Quality. Adapter menang bila keduanya menyebut butir yang sama. Katalog ini kembaran `agents/code-reviewer.md` Fase 2 — perubahan definisi menyentuh keduanya.
 
 ### Phase 3 — Triase & Severity
 

@@ -71,10 +71,10 @@ reviewed_at: <YYYY-MM-DD>
 | 3 | API Layer | PASS |
 | 4 | State Scope & Ownership | PASS |
 | 5 | UI & 6-State Branches | PASS |
-| 6 | Platform Semantics | PASS |
+| 6 | Platform & Framework Boundary | PASS |
 | 7 | Error Handling | PASS |
 | 8 | Performance & Leaks | PASS |
-| 9 | Test Quality & Coverage | PASS |
+| 9 | Test Quality | PASS |
 ````
 
 ---
@@ -174,8 +174,8 @@ reviewed_at: 2026-09-25
 | 3 | API Layer | PASS |
 | 4 | State Scope & Ownership | PASS |
 | 5 | UI & 6-State Branches | P2 |
-| 6 | Platform Semantics | PASS |
+| 6 | Platform & Framework Boundary | PASS |
 | 7 | Error Handling | P2 |
 | 8 | Performance & Leaks | PASS |
-| 9 | Test Quality & Coverage | PASS |
+| 9 | Test Quality | PASS |
 ````
