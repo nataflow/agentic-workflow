@@ -876,6 +876,28 @@ Test dan lint baru berguna bila dijalankan otomatis di setiap perubahan. Hook sh
 - **`-S warning`** menyembunyikan temuan level info/style di masa depan juga. Alternatif lebih ketat: `-e SC2016` saja.
 - **`claude plugin validate`** memvalidasi struktur marketplace; ia tidak menggantikan lint rujukan markdown (R1/R2) di L6.3.
 
+**Status (2026-09-26):** workflow sudah aktif sejak repo punya remote `origin` (github.com/nataflow/agentic-workflow). Run terakhir di GitHub (`36125890596`, commit `d04b9c0`) **merah** di semua job `pytest`, sedangkan `hooks`, `lint`, dan `plugin-validate` hijau. Log run itu tidak bisa diambil lagi lewat `gh`; penyebab yang sudah dicatat di 08a adalah `test_profile_paths[backenddev]`.
+
+Perbaikan lokal (commit `0ee4e8d`):
+- README backenddev lolos lint path profil.
+- Fixture `reviewed_at` tidak lagi memakai tanggal literal. Tanggal itu jadi basi keesokan harinya dan membuat 8 test frontenddev merah mulai 2026-09-26.
+- Nama dimensi fixture mengikuti C7.
+- Test baru mengunci `reviewed_at` sebelum commit akar.
+
+Emulasi keempat job atas HEAD `57e4ef4` dijalankan pada clone `--depth 1`, dengan `HOME` kosong dan tanpa konfigurasi git global. Semuanya hijau:
+- JSON manifest;
+- `shellcheck -S warning`;
+- `lint_plugins.py` 0 FAIL, dan juga 0 FAIL dengan `--base origin/main` sesudah versi naik;
+- test hook;
+- `pytest` py3.9: 1201 lulus + 1 skip `tomllib`;
+- `pytest` py3.13: 1202 lulus, termasuk `test_php_build_keeps_dev` dengan composer terpasang.
+
+**Sisa, menunggu keputusan user:**
+- (1) Push `main` ke `origin`. User memilih belum push.
+- (2) Branch protection `main` dengan status check `pytest`/`hooks`/`lint`, tanpa `enforce_admins`. User setuju dipasang sesudah run CI pertama hijau.
+
+Checkbox dicentang sesudah keduanya terjadi.
+
 ---
 
 ## L6.3 [Sedang] Skrip lint plugin
