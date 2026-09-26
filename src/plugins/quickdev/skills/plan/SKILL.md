@@ -10,10 +10,11 @@ DILARANG MEMULAI IMPLEMENTASI ATAU MENULIS KODE SUMBER SEBELUM DOKUMEN RENCANA D
 
 ## Precondition [REQUIRED]
 
-1. `quickdev:explore` dan `quickdev:clarify` telah selesai dengan status `EXPLORED` dan `CLARIFIED` (atau `SKIPPED`).
+1. Status `quickdev:explore` dan `quickdev:clarify` dibaca dari percakapan (`EXPLORED`, `CLARIFIED` atau `SKIPPED`) atau dari user, lalu ditulis ke metadata `Gates:` rencana. Keduanya tidak ada di percakapan → Failure path 5; `DILEWATI` hanya atas pilihan eksplisit user.
 2. Spesifikasi kebutuhan fungsional, kontrak data API, skema payload, atau alur UI/UX telah terkunci tanpa ambiguitas yang tersisa.
 3. Direktori kerja repositori memiliki izin tulis aktif untuk membuat folder `plan/` dan berkas rencana implementasi markdown.
 4. Profil repositori pada `profile_path` tersedia sebagai panduan arsitektur dan baseline verifikasi; bila absen, hentikan dan arahkan pemanggil ke `quickdev:profile` (jangan `backenddev:profile`/`frontenddev:profile`) karena perintah baseline rencana wajib diambil dari profil.
+5. `python3` (3.9+) tersedia untuk `plan_lock.py`, yang mengunci rencana saat approval.
 
 ## Koeksistensi [REQUIRED]
 
@@ -27,10 +28,10 @@ DILARANG MEMULAI IMPLEMENTASI ATAU MENULIS KODE SUMBER SEBELUM DOKUMEN RENCANA D
 ## Parameter [REQUIRED]
 
 - `task_name` — string — `[REQUIRED]` — nama unik tugas dalam format kebab-case (contoh: `user-auth-jwt`, `order-status-filter`). Bila pemanggil tidak memberikannya, turunkan dari permintaan user dan konfirmasikan bersama draf di Fase 3.
-- `task_spec` — string — `[REQUIRED]` — spesifikasi yang disepakati di gate sebelumnya; bila tidak dikirim, ambil dari laporan `explore` dan spesifikasi `clarify` terakhir di percakapan.
+- `task_spec` — string — `[REQUIRED]` — spesifikasi yang disepakati di `quickdev:clarify`; bila tidak dikirim, ambil dari laporan `quickdev:explore` dan spesifikasi `quickdev:clarify` terakhir di percakapan (tidak ada → Failure path 5). Section 1 rencana menjadi satu-satunya sumber spesifikasi bagi `quickdev:execute` dan `quickdev:review`.
 - `plan_dir` — string — default `"plan"` — direktori penyimpanan dokumen rencana implementasi di repositori.
-- `profile_path` — string — default `"repo-profile.md"` — path profil hasil `quickdev:profile`; bila tidak ditemukan, gunakan fallback `.dev/profile.md`.
-- `require_test_plan` — boolean — default `true` — bila `true`, Section 4 wajib memuat skenario test unit/integration beserta langkah test di Section 3; bila `false`, Section 4 cukup memuat perintah verifikasi baseline.
+- `profile_path` — string — default `"repo-profile.md"` — path profil hasil `quickdev:profile`; bila tidak ditemukan, gunakan fallback `.dev/profile.md`. Bila repo memuat lebih dari satu profil (`git ls-files '*repo-profile.md'`), tanyakan workspace mana lewat `AskUserQuestion`, jangan memakai root diam-diam. Path terpilih ditulis ke metadata `Profile:` sehingga skill hilir membacanya dari rencana.
+- `require_test_plan` — boolean — default `true`, **kecuali** baris Test Section 5 profil berstatus `TIDAK_ADA` → default `false` — bila `true`, Section 4 wajib memuat skenario test unit/integration beserta langkah test di Section 3; bila `false`, Section 4 cukup memuat perintah verifikasi baseline. Repo tanpa test runner: Section 4 menulis `Tests: repo tanpa test runner — verifikasi: typecheck/lint/build tercatat + langkah QA manual`. Menambah framework test hanya sebagai langkah rencana eksplisit yang disetujui user.
 - `include_rollback` — boolean — default `true` — bila `false`, Section 5 (rollback) tidak ditulis.
 
 ## Workflow
@@ -66,12 +67,13 @@ DILARANG MEMULAI IMPLEMENTASI ATAU MENULIS KODE SUMBER SEBELUM DOKUMEN RENCANA D
    - File target yang akan dibuat atau diubah (path relatif presisi).
    - Simbol, kelas, atau fungsi yang ditambahkan maupun dimodifikasi.
    - Kriteria selesai (acceptance criteria) per langkah atomik.
+3. Bila laporan `quickdev:explore` menyebut modul konsumen terdampak (pemanggil simbol yang signature atau kontraknya berubah), tambahkan langkah "sesuaikan konsumen" dengan berkasnya. `quickdev:execute` hanya boleh memperbaiki galat verifikasi di berkas Section 3, jadi konsumen yang tidak direncanakan membuat eksekusi `BLOCKED`.
 
 ### Fase 2 — Penyusunan Dokumen Rencana (`<plan_dir>/<task_name>.md`)
 
 1. Tulis dokumen rencana lengkap ke `<plan_dir>/<task_name>.md` dengan struktur format standar:
    - Header dokumen: `# Implementation Plan — <task_name>`
-   - Metadata blok: `Status: DRAFT`, `Author: quickdev:plan`, `Date: <timestamp>`
+   - Metadata: baris polos `Kunci: nilai` tepat di bawah H1 (tanpa butir/tebal): `Status: DRAFT`, `Author: quickdev:plan`, `Date: <ISO>`, `Profile: <profile_path>`, `Gates: explore=<EXPLORED|DILEWATI> clarify=<CLARIFIED|SKIPPED|DILEWATI>`. Baris `Approved-At`, `Approval`, dan `Plan-Hash` hanya ditulis `plan_lock.py lock`.
    - Section 1: `## 1. Overview & Objectives` (Tujuan, deskripsi masalah, dan keputusan terkunci dari `clarify` agar spesifikasi tidak bergantung pada riwayat percakapan)
    - Section 2: `## 2. Architecture & Layer Impact` (Tabel modul yang disentuh beserta dampaknya terhadap komponen sekitar)
    - Section 3: `## 3. Atomic Implementation Steps` (Rincian langkah demi langkah bernomor urut dilengkapi checkbox interaktif `- [ ]`)
@@ -88,13 +90,13 @@ DILARANG MEMULAI IMPLEMENTASI ATAU MENULIS KODE SUMBER SEBELUM DOKUMEN RENCANA D
 2. Minta persetujuan eksplisit user (Approval Gate):
    - Minta user memberikan persetujuan eksplisit ("approve" / "setuju") atau memberikan poin revisi.
 3. Tangani evaluasi respons balik user:
-   - **Jika user meminta revisi atau penyesuaian**: Perbarui dokumen `<plan_dir>/<task_name>.md` sesuai feedback, pertahankan `Status: DRAFT`, dan ajukan draf pembaruan untuk review ulang.
-   - **Jika user menyatakan persetujuan eksplisit**: Perbarui status di header berkas markdown menjadi `Status: APPROVED`.
+   - **Jika user meminta revisi atau penyesuaian**: Perbarui dokumen `<plan_dir>/<task_name>.md` sesuai feedback, pertahankan `Status: DRAFT`, dan ajukan draf pembaruan untuk review ulang. Rencana yang sudah memuat `## Execution Status`: revisi hanya Section 1–5 lewat Edit terarah; blok itu dan checkbox langkah yang teksnya tidak berubah dipertahankan.
+   - **Jika user menyatakan persetujuan eksplisit**: jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py lock --plan <plan_dir>/<task_name>.md --answer "<jawaban user apa adanya>" --profile <profile_path>`. `LOCK FAIL` → perbaiki sebabnya; dilarang menulis `Status: APPROVED` dengan tangan.
 
 ### Fase 4 — Penguncian Status Terminal & Handoff
 
 1. Pastikan berkas `<plan_dir>/<task_name>.md` telah berstatus `APPROVED` di filesystem:
-   - Catat timestamp persetujuan resmi dan pastikan seluruh checklist siap dieksekusi.
+   - Pastikan keluaran `LOCK PASS` memuat sidik; `Approved-At`, `Approval`, dan `Plan-Hash` sudah ditulis skrip.
 2. Set status terminal `PLAN_APPROVED`.
 3. Alirkan dokumen rencana yang telah disetujui ke gate eksekusi: `execute`.
 
@@ -104,7 +106,7 @@ DILARANG MEMULAI IMPLEMENTASI ATAU MENULIS KODE SUMBER SEBELUM DOKUMEN RENCANA D
 - MUST NOT mengizinkan transisi status ke `PLAN_APPROVED` tanpa persetujuan eksplisit tertulis dari user.
 - MUST NOT membuat langkah implementasi yang ambigu tanpa menyebutkan path berkas target yang pasti.
 - MUST NOT melompati seksi strategi pengujian dan verifikasi baseline dalam dokumen rencana.
-- MUST NOT menimpa berkas rencana yang telah berstatus `APPROVED` tanpa instruksi revisi eksplisit dari user.
+- MUST NOT mengubah Section 1–5 berkas `APPROVED`. Revisi atas permintaan user: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py unlock --plan <plan_path> --reason "<alasan>"` → revisi → approval ulang (`lock`). Blok `## Execution Status` dipertahankan apa adanya. Rencana `APPROVED` tanpa `Plan-Hash` (format lama) diperlakukan sama: `unlock`, lalu minta user menyetujui ulang.
 - Keputusan ruang lingkup fitur dan persetujuan arsitektur rencana implementasi tetap milik mutlak user.
 
 ## Output [REQUIRED]
@@ -122,6 +124,8 @@ Skill ini menghasilkan dokumen rencana implementasi terstruktur dan status termi
    LANGKAH: <n> langkah atomik, <n> berkas target
    LAYER: <daftar layer tersentuh>
    RISIKO: <migrasi skema | dependensi baru | perubahan kontrak publik | ->
+   KUNCI: Plan-Hash <12 hex> — Approval "<kutipan jawaban user>"
+   GATES: explore=<…> clarify=<…> — profil <profile_path>
    VERIFIKASI: <perintah baseline yang akan dijalankan execute>
    REVISI: <n> putaran sebelum disetujui
    HANDOFF: execute (plan_path=<plan_dir>/<task_name>.md)
@@ -131,8 +135,9 @@ Skill ini menghasilkan dokumen rencana implementasi terstruktur dan status termi
 
 1. **User Menolak Draf Rencana**: Jika user menolak rencana atau meminta perubahan besar pada arsitektur, jangan lanjutkan ke eksekusi; diskusikan alternatif pendekatan, perbarui dokumen draf rencana di `plan/<task-name>.md`, dan ajukan kembali untuk review hingga disetujui.
 2. **Nama Task Duplikat / Berkas Plan Sudah Ada**: Jika file `plan/<task-name>.md` telah ada dan berstatus `APPROVED` dari pekerjaan sebelumnya, tawarkan opsi nama task baru (misal: `<task-name>-v2`) atau minta izin eksplisit untuk menimpa draf lama.
-3. **Spesifikasi Masih Memiliki Celah / Ambiguitas**: Jika saat perumusan langkah ditemukan celah logika yang belum terjawab, tunda penyelesaian rencana dan tawarkan `quickdev:clarify` untuk detail yang hilang.
+3. **Spesifikasi Masih Memiliki Celah / Ambiguitas**: Jika saat perumusan langkah ditemukan celah logika yang belum terjawab, tunda penyelesaian rencana dan tawarkan `quickdev:clarify` untuk detail yang hilang. Kembali ke `quickdev:clarify` maksimal satu kali per tugas; bila celah masih ada sesudahnya, `AskUserQuestion`: *Lanjut dengan asumsi tertulis di Section 1* · *Perkecil lingkup* · *Batal*.
 4. **Izin Tulis Direktori Plan Gagal**: Jika pembuatan folder `plan/` atau penulisan berkas gagal karena kendala hak akses, laporkan path tujuan dan instruksikan penyesuaian izin filesystem.
+5. **Explore/clarify tidak ada di percakapan**: tanyakan lewat `AskUserQuestion`: *Jalankan `quickdev:explore` dulu (disarankan)* · *Lanjut tanpa explore — saya sebutkan berkas targetnya* · *Batal*. Opsi kedua menulis `Gates: explore=DILEWATI clarify=DILEWATI` dan disebut di Fase 3.
 
 ## STYLE
 

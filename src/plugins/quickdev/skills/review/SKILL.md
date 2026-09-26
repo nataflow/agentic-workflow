@@ -10,11 +10,12 @@ DILARANG MELAPORKAN SATU TEMUAN PUN TANPA BUKTI PATH BERKAS DAN NOMOR BARIS NYAT
 
 ## Precondition [REQUIRED]
 
-1. Blok penutupan di `plan_path` memuat `Execution Status: COMPLETED`, atau `VERIFICATION_MANUAL_REQUIRED` yang hasil perintah manualnya sudah dikonfirmasi lolos oleh user; selain itu (blok absen atau status lain), hentikan review dan kembalikan pemanggil ke `quickdev:execute`.
+1. `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py verify --plan <plan_path>` → `VERIFY PASS`, **dan** `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py status --plan <plan_path> --json` → `execution.Status` ∈ {`COMPLETED`, `COMPLETED (manual)`}. `VERIFICATION_MANUAL_REQUIRED` → kembalikan ke `quickdev:execute` (mode `manual`) untuk mencatat konfirmasi user; status lain atau blok absen → kembalikan ke `quickdev:execute`. `verify` FAIL → rencana berubah sesudah approval; hentikan dan arahkan ke `quickdev:plan`.
 2. Direktori kerja adalah git repository valid (`git rev-parse --is-inside-work-tree` bernilai `true`); bila gagal, hentikan dan laporkan blocker environment.
-3. Terdapat minimal satu berkas berubah di luar `plan_path` dan `profile_path`, dihitung dari gabungan `git diff HEAD --name-only` dan `git ls-files --others --exclude-standard` (berkas untracked); bila nol, hentikan review dan laporkan status `NO_CHANGES` tanpa menulis temuan rekaan.
+3. Terdapat minimal satu berkas berubah di luar `<plan_dir>/` (direktori `plan_path`) dan `profile_path`, dihitung dari gabungan `git diff <BASE> --name-only` dan `git ls-files --others --exclude-standard` (berkas untracked); `<BASE>` ditetapkan di Fase 1 butir 2. Bila nol, hentikan review dan laporkan status `NO_CHANGES` (Failure path 2) tanpa menulis temuan rekaan.
 4. Dokumen rencana pada `plan_path` (misal `plan/<task-name>.md`) tersedia di filesystem sebagai kontrak pembanding; bila hilang, hentikan dan minta path yang benar kepada user.
 5. Berkas profil pada `profile_path` (atau fallback-nya) tersedia sebagai acuan konvensi layer, penamaan, dan baseline verifikasi.
+6. `python3` (3.9+) tersedia untuk `plan_lock.py` (hanya subperintah baca `verify` dan `status`).
 
 ## Koeksistensi [REQUIRED]
 
@@ -27,25 +28,27 @@ DILARANG MELAPORKAN SATU TEMUAN PUN TANPA BUKTI PATH BERKAS DAN NOMOR BARIS NYAT
 
 ## Parameter [REQUIRED]
 
-- `plan_path` — string — [REQUIRED] — path relatif dokumen rencana berstatus `COMPLETED`; wajib resolve ke berkas markdown nyata di filesystem.
-- `profile_path` — string — default `repo-profile.md` — bila tidak ditemukan, gunakan fallback `.dev/profile.md`; bila keduanya absen, precondition 5 gagal.
+- `plan_path` — string — [REQUIRED] — path relatif dokumen rencana yang blok `## Execution Status`-nya `COMPLETED`; wajib resolve ke berkas markdown nyata di filesystem.
+- `profile_path` — string — default: nilai `Profile:` di metadata `plan_path`; bila absen, `repo-profile.md`, lalu `.dev/profile.md`; bila semuanya absen, precondition 5 gagal.
 - `scope_paths` — array<string> — default `[]` — daftar path pembatas cakupan review; nilai kosong berarti seluruh berkas dalam diff dinilai. Setiap entri wajib berada di dalam daftar berkas hasil diff.
 - `strict` — bool — default `false` — bila `true`, temuan berseveritas `MINOR` ikut memblokir dan memaksa status `CHANGES_REQUIRED`.
-- `include_staged` — bool — default `true` — bila `true`, gunakan `git diff HEAD` (staged + unstaged); bila `false`, gunakan `git diff` (unstaged saja). Berkas untracked selalu ikut dinilai pada kedua nilai karena berkas baru hasil `quickdev:execute` tidak pernah di-stage.
+- `include_staged` — bool — default `true` — bila `true`, gunakan `git diff <BASE>` (committed sejak base + staged + unstaged); bila `false`, gunakan `git diff` (unstaged saja) dan berlaku hanya bila `<BASE>` = `HEAD` — selain itu abaikan dan catat di baris `MODE`. Berkas untracked selalu ikut dinilai pada kedua nilai karena berkas baru hasil `quickdev:execute` tidak pernah di-stage.
+- `base_ref` — string — default `""` — commit pembanding. Kosong → `Base-Commit` blok `## Execution Status` `plan_path`; blok tanpa `Base-Commit` → `HEAD`. Terisi → wajib resolve lewat `git rev-parse --verify <base_ref>^{commit}`; bila gagal, hentikan.
 
 ## Workflow
 
 ### Fase 1 — Validasi Precondition & Pengumpulan Diff
 
-1. Verifikasi kelima precondition secara berurutan; setiap kegagalan menghentikan skill seketika dengan pesan blocker spesifik, bukan peringatan lunak.
-2. Kumpulkan daftar berkas terdampak dari dua sumber: `git diff HEAD --name-status` (atau `git diff --name-status` bila `include_staged` bernilai `false`) untuk berkas tracked, dan `git ls-files --others --exclude-standard` untuk berkas untracked (catat berstatus `A`). Keluarkan `plan_path` dan `profile_path` dari daftar karena keduanya artefak gate, bukan hasil implementasi.
-3. Kumpulkan isi perubahan beserta nomor baris: `git diff HEAD -U3` (atau `git diff -U3` bila `include_staged` bernilai `false`) untuk berkas tracked, dengan pemetaan setiap hunk ke rentang baris berkas hasil; untuk berkas untracked, baca berkas utuh dan perlakukan seluruh barisnya sebagai baris tambahan. Bukti `file:line` wajib merujuk nomor baris berkas hasil.
-4. Terapkan filter `scope_paths` bila tidak kosong; catat jumlah berkas yang tersaring keluar sebagai catatan cakupan, jangan diamkan secara senyap.
-5. Predikat lanjut: daftar berkas dalam cakupan berjumlah minimal satu. Bila nol setelah filter, hentikan dan laporkan cakupan kosong.
+1. Verifikasi keenam precondition secara berurutan; setiap kegagalan menghentikan skill seketika dengan pesan blocker spesifik, bukan peringatan lunak. Bila review dijalankan di sesi yang sama dengan `quickdev:execute`, nyatakan di ringkasan (`MODE: … sesi-sama=ya`) dan sarankan user menjalankan ulang `/quickdev:review` di sesi baru untuk putaran terakhir.
+2. Tetapkan `<BASE>`: `base_ref` bila terisi; selain itu `execution.Base-Commit` dari `plan_lock.py status --json`; blok tanpa `Base-Commit` → `HEAD`. `Base-Commit: none` (repo tanpa commit) → `<BASE>` = tree kosong `$(git hash-object -t tree /dev/null)`. `Base-Note` terisi → sebutkan di ringkasan bahwa kerja yang di-commit sebelum base tidak terlihat.
+3. Kumpulkan daftar berkas terdampak dari dua sumber: `git diff <BASE> --name-status` (atau `git diff --name-status` bila `include_staged` bernilai `false`) untuk berkas tracked, dan `git ls-files --others --exclude-standard` untuk berkas untracked (catat berstatus `A`). Keluarkan seluruh berkas di bawah `<plan_dir>/` dan `profile_path` dari daftar karena keduanya artefak gate, bukan hasil implementasi.
+4. Kumpulkan isi perubahan beserta nomor baris: `git diff <BASE> -U3` (atau `git diff -U3` bila `include_staged` bernilai `false`) untuk berkas tracked, dengan pemetaan setiap hunk ke rentang baris berkas hasil; untuk berkas untracked, baca berkas utuh dan perlakukan seluruh barisnya sebagai baris tambahan. Bukti `file:line` wajib merujuk nomor baris berkas hasil.
+5. Terapkan filter `scope_paths` bila tidak kosong; catat jumlah berkas yang tersaring keluar sebagai catatan cakupan, jangan diamkan secara senyap.
+6. Predikat lanjut: daftar berkas dalam cakupan berjumlah minimal satu. Bila nol setelah filter, hentikan dan laporkan cakupan kosong.
 
 ### Fase 2 — Rekonstruksi Kontrak Pembanding
 
-1. Baca `plan_path` dan ekstrak kontrak yang mengikat: daftar langkah atomik, path berkas target yang direncanakan, strategi verifikasi, dan definisi selesai per langkah.
+1. Baca `plan_path` dan ekstrak kontrak yang mengikat: daftar langkah atomik, path berkas target yang direncanakan, strategi verifikasi, dan definisi selesai per langkah. Kontrak = isi `plan_path` yang lolos `verify` (sidik = yang disetujui user; kutipan persetujuan di baris `Approval:`). Temuan putaran sebelumnya ada di baris `Findings-<n>` blok `## Execution Status`.
 2. Baca `profile_path` dan ekstrak konvensi yang mengikat: struktur layer arsitektur, konvensi penamaan berkas dan simbol, pola error handling, lokasi test suite, serta perintah baseline typecheck, lint, dan test.
 3. Susun dua himpunan pembanding secara eksplisit: himpunan berkas yang direncanakan (dari `plan_path`) dan himpunan berkas yang benar-benar berubah (dari Fase 1).
 4. Hitung selisih dua arah: berkas berubah tetapi tidak direncanakan (indikasi scope creep) dan berkas direncanakan tetapi tidak berubah (indikasi langkah terlewat).
@@ -80,13 +83,13 @@ Untuk dimensi 7, telusuri pemanggil setiap simbol yang diubah menggunakan pencar
 
 1. Tentukan status terminal: `CHANGES_REQUIRED` bila terdapat minimal satu temuan `BLOCKER` atau `MAJOR`, atau bila `strict` bernilai `true` dan terdapat temuan `MINOR`. Selain itu `REVIEWED`.
 2. Sajikan daftar temuan terurut menurun berdasarkan severity, lalu tabel cakupan tujuh dimensi, lalu ringkasan akhir maksimal 17 baris.
-3. Bila status `CHANGES_REQUIRED`, tawarkan `quickdev:execute` dengan `review_findings` (dan `plan_path` yang sama) untuk remediasi; jalankan hanya bila user setuju; dilarang memperbaiki sendiri di sesi review.
+3. Bila status `CHANGES_REQUIRED`: sajikan temuan, lalu `AskUserQuestion`: *Remediasi otomatis (putaran <n+1>/2)* · *Revisi rencana (`quickdev:plan`)* · *Terima apa adanya — keputusan commit di tangan user*. Opsi pertama tidak ditawarkan bila `remediation_round` (dari `plan_lock.py status --json`) sudah 2. Hanya opsi pertama yang memanggil `quickdev:execute` dengan `review_findings` dan `plan_path` yang sama; jawaban user dikutip apa adanya di laporan. Dilarang memperbaiki sendiri di sesi review.
 4. Bila status `REVIEWED`, nyatakan bahwa keputusan commit atau merge menunggu tindakan user.
 
 ## Guardrails
 
 - MUST NOT mengedit, menulis, memformat, atau menghapus berkas kode sumber, test, maupun konfigurasi apa pun.
-- MUST NOT menjalankan `git commit`, `git stash`, `git checkout`, `git reset`, `git clean`, `git push`, atau perintah git lain yang memutasi state repositori; hanya perintah baca (`git diff`, `git status`, `git log`, `git ls-files`, `git rev-parse`) yang diizinkan.
+- MUST NOT menjalankan `git commit`, `git stash`, `git checkout`, `git reset`, `git clean`, `git push`, atau perintah git lain yang memutasi state repositori; hanya perintah baca (`git diff`, `git status`, `git log`, `git ls-files`, `git rev-parse`, `git hash-object -t tree /dev/null`) yang diizinkan. Dari `plan_lock.py` hanya `verify` dan `status`.
 - MUST NOT mengubah `plan_path`, `profile_path`, atau berkas artefak gate hulu mana pun, termasuk mencentang checklist rencana.
 - MUST NOT menyetujui, melakukan merge, atau menyatakan perubahan siap rilis — keputusan itu milik mutlak user.
 - MUST NOT melaporkan temuan berbasis dugaan, praktik umum, atau ingatan tanpa bukti baris nyata pada berkas dalam cakupan diff.
@@ -110,7 +113,7 @@ Skill ini menghasilkan laporan terminal saja tanpa artefak berkas.
 3. **Status Terminal**: `REVIEWED` | `CHANGES_REQUIRED` | `NO_CHANGES`
 4. **Ringkasan Akhir (Maksimal 17 Baris)**:
    ```
-   REVIEW: <task-name> — working tree (tracked + untracked)
+   REVIEW: <task-name> — <BASE>..working tree (tracked + untracked)
    STATUS: REVIEWED | CHANGES_REQUIRED | NO_CHANGES
    CAKUPAN: <n> berkas dinilai, <n> berkas tersaring keluar oleh scope_paths
    PLAN: <plan_path> — <n> langkah terverifikasi terimplementasi
@@ -119,14 +122,15 @@ Skill ini menghasilkan laporan terminal saja tanpa artefak berkas.
    DIMENSI CLEAN: <daftar dimensi tanpa temuan>
    SCOPE CREEP: <daftar berkas berubah di luar rencana | ->
    LANGKAH TERLEWAT: <daftar langkah rencana tanpa perubahan kode | ->
-   MODE: strict=<true|false>, include_staged=<true|false>
-   HANDOFF: gate execute (remediasi) | user (keputusan commit/merge) | tidak ada (NO_CHANGES)
+   MODE: strict=<true|false>, include_staged=<true|false>, sesi-sama=<ya|tidak>, base=<Base-Commit | base_ref | HEAD>
+   REMEDIASI: putaran <n>/2 — pilihan user "<jawaban apa adanya>" | -
+   HANDOFF: execute (remediasi) | plan (revisi) | user (keputusan commit/merge) | tidak ada (NO_CHANGES)
    ```
 
 ## Failure path
 
 1. **`quickdev:execute` belum COMPLETED**: hentikan review, jangan baca diff, dan arahkan pemanggil menyelesaikan implementasi beserta verifikasi baseline di `quickdev:execute`.
-2. **Working tree bersih**: bila `git diff HEAD` dan `git ls-files --others --exclude-standard` tidak memuat berkas di luar `plan_path` dan `profile_path`, laporkan status `NO_CHANGES` beserta kemungkinan penyebab (perubahan sudah ter-commit sehingga review perlu menargetkan rentang commit), lalu hentikan tanpa temuan rekaan.
+2. **Tidak ada perubahan sejak base**: bila `git diff <BASE>` dan `git ls-files --others --exclude-standard` tidak memuat berkas di luar `<plan_dir>/` dan `profile_path`, laporkan `NO_CHANGES`; bila `git log <Base-Commit>..HEAD` tidak kosong sementara `<BASE>` bukan `Base-Commit`, perubahan sudah ter-commit → ulangi dengan `base_ref=<Base-Commit>` (atau commit yang disebut user). Hentikan tanpa temuan rekaan.
 3. **Dokumen rencana hilang atau tidak terbaca**: hentikan dan minta `plan_path` yang benar; dilarang melanjutkan review kontrak berdasarkan rekonstruksi tebakan dari isi diff.
 4. **Berkas profil absen**: bila `profile_path` dan fallback `.dev/profile.md` sama-sama tidak ada, hentikan dan arahkan pemanggil menjalankan `quickdev:profile` lebih dahulu.
 5. **Diff terlalu besar untuk dinilai utuh**: laporkan jumlah berkas dan baris terdampak, lalu minta user mempersempit lewat `scope_paths`; dilarang menilai sebagian secara diam-diam dan melaporkannya sebagai cakupan penuh.
