@@ -44,6 +44,8 @@ FORBIDDEN_MEASURE = re.compile(r"review manual|dinilai layak|terlihat bagus", re
 DOWNSTREAM_DOCS = re.compile(r"\b(FLOW|UI|CONTRACT)\.md\b")
 FILE_REF = re.compile(r"`([\w@./+-]+\.[A-Za-z0-9]+):(\d+)(?:-\d+)?`")
 OOS_LINE = re.compile(r"^- .+ — .+$")
+GUGUR = re.compile(r"—\s*gugur:")  # sama dengan precondition_lib.success_criteria
+MAX_ACTIVE_SC = 7
 
 
 class TaskValidator:
@@ -112,10 +114,22 @@ class TaskValidator:
                   "Ikuti bagian 1 template persis.")
 
     def _check_2_numbering(self) -> None:
-        nums = [int(m.group(1)) for m in self._sc_lines()]
-        ok = 1 <= len(nums) <= 7 and nums == list(range(1, len(nums) + 1))
-        self._add(2, "Penomoran SC-{n}", ok, f"SC {nums}" if nums else "nol butir SC",
-                  "Nomori 1–7 butir berurutan dari SC-1 tanpa lompatan atau ganda.")
+        lines = self._sc_lines()
+        nums = [int(m.group(1)) for m in lines]
+        dropped = [f"SC-{m.group(1)}" for m in lines if GUGUR.search(m.group(2))]
+        active = len(nums) - len(dropped)
+        errors = []
+        if nums != list(range(1, len(nums) + 1)):
+            errors.append(f"SC {nums} tidak berurutan dari SC-1")
+        if not 1 <= active <= MAX_ACTIVE_SC:
+            errors.append(f"{active} SC aktif, sah 1–{MAX_ACTIVE_SC}")
+        if dropped and not self.amend:
+            errors.append(f"SC gugur {dropped} hanya sah pada amandemen akar (`--amend`)")
+        summary = "; ".join(errors) or (f"SC {nums}" + (f" ({active} aktif, gugur: {', '.join(dropped)})"
+                                                         if dropped else ""))
+        self._add(2, "Penomoran SC-{n}", not errors, summary if nums else "nol butir SC",
+                  f"Nomori berurutan dari SC-1 tanpa lompatan atau ganda; 1–{MAX_ACTIVE_SC} SC aktif "
+                  "(SC gugur `~~…~~ — gugur:` tetap bernomor dan tidak dihitung).")
 
     def _check_3_measure(self) -> None:
         bad = []
@@ -198,7 +212,7 @@ class TaskValidator:
                   "dilarang mengetik baris ledger dengan tangan.")
 
     def format_text(self) -> str:
-        return format_report("task self-test", self.results)
+        return format_report("TASK.md", self.results, kind="TASK VALIDATION")
 
     def to_json(self) -> str:
         return report_json(self.results, root=str(self.root), taskdir=self.taskdir_rel)

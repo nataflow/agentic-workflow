@@ -36,7 +36,7 @@ def test_positif_catatan_menyebut_temuan_pass(fe_minor_chain):
     rc, checks = validate(fe_minor_chain)
     assert rc == 0, checks
     r = fe_run(fe_minor_chain, "report/scripts/validate_report.py", "--taskdir", TD)
-    assert r.stdout.startswith("REPORT VALIDATION: [PASS]")
+    assert r.stdout.startswith("REPORT VALIDATION: REPORT.md [PASS]")
 
 
 def test_temuan_fixed_tidak_ditagih(fe_minor_chain):

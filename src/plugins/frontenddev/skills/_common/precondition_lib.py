@@ -752,14 +752,16 @@ AddFn = Callable[..., None]
 
 
 def format_report(title: str, results: List[Dict[str, Any]],
-                  resolved: Optional[Dict[str, str]] = None) -> str:
-    """Keluaran teks baku skrip prasyarat; `resolved` menjadi baris `Terselesaikan:`."""
+                  resolved: Optional[Dict[str, str]] = None,
+                  kind: str = "PRECONDITION CHECK") -> str:
+    """Keluaran teks baku skrip prasyarat/validator; `kind` = label baris pertama
+    (`PRECONDITION CHECK`, `REPORT VALIDATION`, ...); `resolved` menjadi baris `Terselesaikan:`."""
     results = sorted(results, key=lambda r: (str(r["id"]).zfill(3)))
     passed = sum(1 for r in results if r["status"] == "PASS")
     warned = sum(1 for r in results if r["status"] == "WARN")
     failed = sum(1 for r in results if r["status"] == "FAIL")
     label = "FAIL" if failed else ("PASS (WARN)" if warned else "PASS")
-    lines = [f"PRECONDITION CHECK: {title} [{label}] ({passed}/{len(results)} passed"
+    lines = [f"{kind}: {title} [{label}] ({passed}/{len(results)} passed"
              + (f", {warned} warn)" if warned else ")")]
     for r in results:
         lines.append(f"[{r['id']}] {r['name']:<32} : {r['status']} ({r['summary']})")

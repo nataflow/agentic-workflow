@@ -213,8 +213,7 @@ class ReportValidator:
                   "Isi seluruh slot template dan hapus komentar.")
 
     def format_text(self) -> str:
-        return format_report("report validate", self.results).replace(
-            "PRECONDITION CHECK: report validate", "REPORT VALIDATION:", 1)
+        return format_report("REPORT.md", self.results, kind="REPORT VALIDATION")
 
     def to_json(self) -> str:
         return report_json(self.results, root=str(self.root), taskdir=self.taskdir_rel)
