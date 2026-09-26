@@ -67,6 +67,23 @@ Menutup 14 temuan sisa frontenddev (2 Sedang, 12 Rendah) dengan perubahan kecil 
 | C14 | 0,75 jam |
 | **Total** | **± 23 jam (± 3 hari kerja)** |
 
+## Catatan implementasi (2026-09-26)
+
+Keputusan user: **C8** gerbang 4 `_CONTRACT.md` diganti (tanpa butir netral stack; butir sama di dua adapter sefamili sah bila idiomnya khas keluarga itu) · **C13** PATCH boleh dipanggil di luar `architect`, dengan konfirmasi `AskUserQuestion` sebelum menulis. **C11** ambang macet diseragamkan ke 5 menit (usulan berkas ini).
+
+Selesai: C1–C14. Commit: `495c7a3` (C12, C5), `329e402` (C3), `268d08d` (C2), `56423e9` (C4), `6b018e9` (C6), `64beddf` (C11, C14), `2c00243` (C1, C9), `d80a89f` (C7, C8), `f15b0d6` (C10, C13). Test baru: `tests/frontenddev/test_08c_{task_report,chain_newline,validate_doc_ui,taskdir_state,architect_preconditions,review_preconditions,text,profile}.py` (65 kasus, lulus di Python 3.9 dan 3.13), ditulis di atas `tests/conftest.py` (`make_repo`, `commit`, `write_files`, `FE_SKILLS`), bukan `conftest` usulan berkas ini. `pytest tests`: 1126 lulus, 9 gagal — semuanya sudah gagal sebelum 08c: 8 test frontenddev bergantung tanggal (fixture `reviewed_at: 2026-09-25` lebih awal dari commit akar yang dibuat hari test berjalan) dan `test_profile_paths[backenddev]` (tercatat di 08b). `lint_plugins.py` 0 FAIL (6 WARN lama).
+
+Penyimpangan dari rencana di bawah:
+
+- **C3.** `write_keep_newline` memakai `open(..., newline=)`, bukan `Path.write_text(newline=)`, karena CI masih menjalankan Python 3.9. `reopen` (L4.5) membaca teks kaskade dari disk, bukan dari `originals` yang kini `bytes`; `test_chain_reopen.py::test_reopen_gagal_tulis_dipulihkan` mem-patch `chain.write_keep_newline`.
+- **C4.** Kode sudah bertambah keadaan `LAPORAN TERTUNDA`, jadi docstring memuat 15 langkah. Repo non-git dengan `--json` mencetak `{"status": "FAIL", "error": …}` agar smoke test `--json` tetap JSON.
+- **C5.** `validate_report.py` sudah berlabel `REPORT VALIDATION:` lewat `.replace()`; kini lewat parameter `kind` dan menjadi `REPORT VALIDATION: REPORT.md`.
+- **C7.** Nama dimensi juga dipakai `validate_review.py` (`DIMENSIONS`), `tests/conftest.py`, dan fixture `audit_valid.md`, jadi ketiganya ikut diganti. Label enam cabang di `profile-template.md` (invariant 4) juga diselaraskan.
+- **C8.** Selain 5 butir umum + 2 butir identik katalog, sveltekit dilepas 4 butir lain yang predikatnya sudah ada di katalog (logika query di `+page.svelte`, mutasi tanpa invalidasi, `createQuery(` di kartu, kalkulasi berat tanpa `$derived`) dan 2 frasa diringkas: 13.686 karakter, 12 butir / 8 dimensi. Ukuran lain: react-vite 12.373 (13/7), react-native 12.871 (14/7), svelte-vite 12.554 (16/7). Resep grep ketiga predikat pindah ke katalog.
+- **C10.** L1.1 sudah memasang penolakan di Check 3; sisa perbaikannya `os.path.normpath` (bentuk `./…/` sah), teks SKILL, dan `target_app` di template. Butir 4 (membuang `--profile-dir` dari skrip lain) tidak dikerjakan.
+- **C13.** Syarat 4 (direktori profil bersih) dan kepemilikan `plugin` ikut ditagih `_resolve_patch`. Check 6 mempertahankan nama `Mode & kepemilikan profil`.
+- **C1.** Usulan lint L6.3 diwujudkan sebagai test (`test_08c_text.py`): tiap seksi di tabel Penanganan Balikan dispatcher explorer wajib muncul sebagai heading Format laporan. Begitu pula nama dimensi C7 dan ambang adapter C8.
+
 ## Definisi selesai
 
 - Ke-14 checkbox tercentang, masing-masing sesudah kriteria **Selesai bila**-nya terpenuhi.
@@ -174,7 +191,7 @@ def as_json(proc):
 
 ## C1 [Sedang] Dispatcher explorer lead menunggu seksi yang tidak selalu ada.
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 0,5 jam · **Bergantung pada:** — · **Memblokir:** —
 
@@ -283,7 +300,7 @@ Anggaran Bentuk A (400–900 token) tidak berubah: seksi tanpa temuan tetap diha
 
 ## C2 [Sedang] Validator UI hanya menagih total state.
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 2,5 jam · **Bergantung pada:** — · **Memblokir:** —
 
@@ -711,7 +728,7 @@ Skenario (b) dan (c) FAIL dengan pesan yang menyebut layar dan cabangnya, skenar
 
 ## C3 [Rendah] `chain.py approve` mengubah CRLF menjadi LF.
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 1,5 jam · **Bergantung pada:** — · **Memblokir:** L4.5 (sebaiknya dikerjakan sesudah C3)
 
@@ -1044,7 +1061,7 @@ Approve atas UI.md dan TASK.md ber-CRLF menghasilkan diff 1 baris per berkas, be
 
 ## C4 [Rendah] `taskdir_state.py` kode mati dan vonis menyesatkan.
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 2 jam · **Bergantung pada:** — · **Memblokir:** —
 
@@ -1373,7 +1390,7 @@ Direktori non-pola yang kosong tetap diabaikan saat pindai (tidak ada yang hilan
 
 ## C5 [Rendah] Batas SC 1–7.
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 1 jam · **Bergantung pada:** C12 (berkas sama, urutan bebas) · **Memblokir:** —
 
@@ -1581,7 +1598,7 @@ Kombinasi 6+2, 5+3, dan 1+7 lolos dengan `--amend`; 8 aktif dan 0 aktif gagal; S
 
 ## C6 [Rendah] Filter commit architect.
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 1,5 jam · **Bergantung pada:** — · **Memblokir:** —
 
@@ -1800,7 +1817,7 @@ Commit `implement unit` milik slug lain memicu WARN Check 13, commit unit milik 
 
 ## C7 [Rendah] Penamaan 9 dimensi tidak seragam.
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 1,5 jam · **Bergantung pada:** — · **Memblokir:** C8
 
@@ -1903,7 +1920,7 @@ Kesembilan nama dan enam label cabang sama di semua berkas di atas, `_CONTRACT.m
 
 ## C8 [Rendah] Adapter melanggar kontraknya sendiri.
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 2,5 jam · **Bergantung pada:** C7 · **Memblokir:** —
 
@@ -1973,7 +1990,7 @@ Kelima predikat umum hanya ada di katalog (dengan grep), keempat adapter ≤ 14.
 
 ## C9 [Rendah] "Tepat sekali" vs "ulangi maksimal sekali".
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 0,25 jam · **Bergantung pada:** — · **Memblokir:** —
 
@@ -2011,7 +2028,7 @@ Tidak ada kalimat di `architect/SKILL.md` yang melarang dispatch ulang reviewer 
 
 ## C10 [Rendah] Profil: parameter dan template.
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 1 jam · **Bergantung pada:** **L1.1** · **Memblokir:** C13
 
@@ -2144,7 +2161,7 @@ def test_profile_dir_kanonik_diterima(react, value):
 
 ## C11 [Rendah] Rentang skill review bukan berkas rantai.
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 1,5 jam · **Bergantung pada:** — · **Memblokir:** — (dikerjakan satu PR dengan C14)
 
@@ -2245,7 +2262,7 @@ Target `taskdir` hanya menilai berkas rantai (sama dengan `chain.py files`), SKI
 
 ## C12 [Rendah] Label keluaran salah.
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 0,5 jam · **Bergantung pada:** — · **Memblokir:** —
 
@@ -2360,7 +2377,7 @@ Baris pertama `validate_report.py` dan `validate_task.py` berlabel `REPORT VALID
 
 ## C13 [Rendah] REFRESH profil penuh untuk satu baris drift.
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 5 jam · **Bergantung pada:** **L1.1**, C10 · **Memblokir:** —
 
@@ -2496,7 +2513,7 @@ Umpan balik profil dari architect menambah baris `drift.md` dalam satu commit ta
 
 ## C14 [Rendah] Target `path` skill review tidak dibatasi ke dalam repo.
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** frontenddev · **Estimasi:** 0,75 jam · **Bergantung pada:** C11 (berkas sama) · **Memblokir:** —
 
