@@ -6,14 +6,14 @@ disable-model-invocation: true
 
 ## THE IRON LAW
 
-PENELUSURAN CODEBASE WAJIB MENGHASILKAN BUKTI FAKTUAL BERUPA PATH FILE DAN NOMOR BARIS SIMBOL TANPA ASUMSI REKAAN. DILARANG MELAKUKAN PERUBAHAN ATAU PENULISAN KODE SUMBER SELAMA PROSES EKSPLORASI BERJALAN. SETIAP SIMBOL UTAMA (FUNGSI, KELAS, TIPE, HOOK, ENDPOINT) YANG RELEVAN DENGAN PERMINTAAN USER WAJIB DITELUSURI HINGGA PEMANGGIL DAN DEFINISI SUMBERNYA SAMPAI KEDALAMAN `trace_depth`. DILARANG MELANJUTKAN KE TAHAP PERENCANAAN TANPA MENGETAHUI DAMPAK PERUBAHAN TERHADAP MODUL SEKITAR.
+PENELUSURAN CODEBASE WAJIB MENGHASILKAN BUKTI FAKTUAL BERUPA PATH FILE DAN NOMOR BARIS SIMBOL TANPA ASUMSI REKAAN. DILARANG MELAKUKAN PERUBAHAN ATAU PENULISAN KODE SUMBER SELAMA PROSES EKSPLORASI BERJALAN. SETIAP SIMBOL UTAMA (FUNGSI, KELAS, TIPE, HOOK, ENDPOINT) YANG RELEVAN DENGAN PERMINTAAN USER WAJIB DITELUSURI HINGGA PEMANGGIL DAN DEFINISI SUMBERNYA SAMPAI KEDALAMAN `trace_depth`. DILARANG MELANJUTKAN KE TAHAP PERENCANAAN TANPA MENGETAHUI DAMPAK PERUBAHAN TERHADAP MODUL SEKITAR. KEDALAMAN PENELUSURAN DAN ANALISIS DAMPAK MENGIKUTI SKALA FASE 0.
 
 ## Precondition [REQUIRED]
 
 1. Repositori target berada di direktori lokal dan dapat dibaca menggunakan tool pencarian simbol dan pembaca berkas.
 2. Profil repositori pada `profile_path` dianjurkan tersedia sebagai referensi layer arsitektur dan konvensi penamaan; bila absen, skill tetap berjalan lewat Failure path 3.
 3. Permintaan pengguna memiliki domain fitur, bug, atau area fungsional kode yang jelas untuk ditelusuri.
-4. Tool `Glob` (pola nama berkas), `Grep` (pencarian teks), dan `Read` (pembaca berkas) tersedia.
+4. Pencarian berkas/teks: tool `Glob`/`Grep` bila tersedia; bila tidak, Bash baca-saja: `git ls-files | grep -i '<pola>'` (nama berkas), `grep -rn --include='*.<ext>' '<pola>' <dir>` atau `rg -n '<pola>'` bila terpasang (isi). `Read` wajib.
 
 ## Koeksistensi [REQUIRED]
 
@@ -31,14 +31,14 @@ PENELUSURAN CODEBASE WAJIB MENGHASILKAN BUKTI FAKTUAL BERUPA PATH FILE DAN NOMOR
 - `trace_depth` — integer — default `2` — kedalaman penelusuran pemanggil dan dependensi simbol (rentang 1 hingga 4).
 - `target_symbol` — string — default `""` — nama spesifik fungsi, kelas, interface, tipe, atau route handler yang menjadi fokus utama penelusuran.
 - `include_tests` — boolean — default `true` — indikasi apakah penelusuran wajib menyertakan file unit test dan integration test terkait.
-- `profile_path` — string — default `"repo-profile.md"` — path profil hasil `quickdev:profile` (samakan dengan `target_path` di sana); bila tidak ditemukan, gunakan fallback `.dev/profile.md`.
+- `profile_path` — string — default `"repo-profile.md"` — path profil hasil `quickdev:profile` (samakan dengan `target_path` di sana); bila tidak ditemukan, gunakan fallback `.dev/profile.md`. Bila repo memuat lebih dari satu profil (`git ls-files '*repo-profile.md'`), tanyakan workspace mana lewat `AskUserQuestion`, jangan memakai root diam-diam.
 
 ## Workflow
 
 ### Fase 0 — Inisialisasi Konteks & Resolusi Profil Repositori
 
 1. Muat konteks profil repositori dari `profile_path`:
-   - Identifikasi jenis arsitektur proyek (Backend, Frontend, atau Fullstack).
+   - Identifikasi jenis dari baris `TIPE`/template profil: `backend`, `frontend`, atau `fullstack` (template fullstack, atau beberapa profil workspace yang sama-sama tersentuh `query`).
    - Catat pola struktur folder (contoh: Feature-based architecture vs Layer-based architecture).
    - Catat alias path compiler (contoh: `@/* -> src/*`, `~/* -> src/*`) untuk mempermudah resolusi file import dan export modul.
 2. Analisis parameter `query` dan `target_symbol` yang diberikan pemanggil:
@@ -47,13 +47,16 @@ PENELUSURAN CODEBASE WAJIB MENGHASILKAN BUKTI FAKTUAL BERUPA PATH FILE DAN NOMOR
 3. Tentukan boundary direktori pencarian berdasarkan parameter `scope_dir`:
    - Jika `scope_dir` ditentukan, batasi penelusuran awal pada direktori tersebut.
    - Jika `scope_dir` kosong, tetapkan direktori pencarian pada root folder sumber (`src/`, `app/`, `internal/`, `pkg/`, atau `lib/`).
+4. Tentukan skala dari permintaan dan temuan pertama, lalu nyatakan di Output (`SKALA: kecil | standar`):
+   - **kecil**: ≤2 berkas, tanpa perubahan kontrak publik, skema, atau env → `trace_depth=1`; Fase 3 hanya pemanggil langsung dan test berkas target; env/DB dilewati dan dicatat `tidak relevan`.
+   - **standar**: selain itu → aturan penuh Fase 1–3.
 
-### Fase 1 — Pemetaan File & Simbol (Grep & File Discovery)
+### Fase 1 — Pemetaan File & Simbol (Pencarian Nama Berkas & Teks)
 
-1. Jalankan `Glob` dengan pola yang menggabungkan entitas domain dan peran layer (contoh: `**/*order*controller*`, `**/*order*.service.*`, `**/*Order*Dto*`, `**/use*Order*`):
+1. Jalankan pencarian nama berkas (alat per Precondition 4) dengan pola yang menggabungkan entitas domain dan peran layer (contoh: `**/*order*controller*`, `**/*order*.service.*`, `**/*Order*Dto*`, `**/use*Order*`):
    - Peran layer acuan: controller/route/handler, service/usecase, DTO/schema/entity, component/hook/page.
    - Pola peran tanpa entitas (`*type*`, `*api*`, `*page*`) hanya dipakai di dalam `scope_dir` yang sudah sempit karena menghasilkan ratusan kandidat tak relevan.
-2. Jalankan pencarian teks mendalam (Grep Search) terhadap istilah kunci dan `target_symbol`:
+2. Jalankan pencarian teks mendalam (alat per Precondition 4) terhadap istilah kunci dan `target_symbol`:
    - Cari deklarasi definisi simbol utama: `class <Symbol>`, `function <symbol>`, `const <symbol> =`, `interface <Symbol>`, `type <Symbol>`.
    - Cari definisi route HTTP atau endpoint path: `@Get('/path')`, `router.post('/path')`, `app.get('/path')`, `export async function GET()`.
    - Cari penggunaan database queries atau ORM entities: `prisma.<model>`, `repository.find`, `db.select()`, `Schema.find()`, `db.query()`.
@@ -79,7 +82,7 @@ PENELUSURAN CODEBASE WAJIB MENGHASILKAN BUKTI FAKTUAL BERUPA PATH FILE DAN NOMOR
 
 ### Fase 3 — Analisis Dampak & Identifikasi Area Kritis (Impact Assessment)
 
-1. Evaluasi potensi efek samping (side effects) jika kode pada modul target dimodifikasi:
+1. Evaluasi potensi efek samping (side effects) jika kode pada modul target dimodifikasi (skala `kecil`: hanya pemanggil langsung dan test berkas target):
    - Pindai berkas lain yang mengimpor simbol yang akan diubah (reverse dependency search lintas codebase).
    - Identifikasi apakah perubahan kontrak data (request/response DTO) dapat merusak modul konsumen frontend atau backend lain.
    - Identifikasi skema database, tabel relasi, indeks, atau foreign keys yang terikat dengan entitas yang ditelusuri.
@@ -108,7 +111,7 @@ PENELUSURAN CODEBASE WAJIB MENGHASILKAN BUKTI FAKTUAL BERUPA PATH FILE DAN NOMOR
 - MUST NOT menyajikan path file atau nama simbol fiktif tanpa konfirmasi riil dari pencarian codebase aktual.
 - MUST NOT mengabaikan analisis dampak ke modul hilir yang mengimpor simbol yang ditelusuri.
 - MUST NOT melompati penelusuran test suite yang relevan dengan area kode yang dieksplorasi, kecuali `include_tests: false`.
-- MUST NOT menghentikan penelusuran pada layer permukaan tanpa memeriksa implementasi logika bisnis inti.
+- MUST NOT menghentikan penelusuran pada layer permukaan tanpa memeriksa implementasi logika bisnis inti, sesuai skala Fase 0.
 - Keputusan penetapan cakupan tugas akhir tetap berada di bawah kendali dan persetujuan user.
 
 ## Output [REQUIRED]
@@ -127,6 +130,8 @@ Skill ini menghasilkan laporan eksplorasi codebase terstruktur dan laporan termi
    ```
    EXPLORE: <query> — scope <scope_dir | root sumber>
    STATUS: EXPLORED
+   SKALA: kecil | standar — <alasan satu frasa>
+   TIPE: <backend | frontend | fullstack>
    PROFIL: <path profil terpakai | heuristik (profil absen)>
    BERKAS KUNCI: <n> berkas, <n> simbol ditelusuri (trace_depth=<n>)
    ALUR: <entry point> -> ... -> <sink data>

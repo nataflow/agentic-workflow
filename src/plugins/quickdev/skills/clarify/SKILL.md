@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 ## THE IRON LAW
 
-DILARANG MEMBUAT ASUMSI SPESIFIKASI PADA BAGIAN YANG AMBIGU TANPA KONFIRMASI EKSPLISIT DARI USER. KLARIFIKASI WAJIB BERADAPTASI SECARA DINAMIS BERDASARKAN PROFIL ARSITEKTUR REPO (BACKEND BERFOKUS PADA KONTRAK API/DATA, FRONTEND BERFOKUS PADA ALUR UI/UX/STATE). BILA SELURUH KEBUTUHAN TELAH JELAS DAN TERVERIFIKASI 100% DARI HASIL EKSPLORASI, SKILL WAJIB MENGAMBIL JALUR CEPAT (FAST-PATH SKIP) KE TAHAP PERENCANAAN TANPA MENGAJUKAN PERTANYAAN BASA-BASI. DILARANG MELAKUKAN PERUBAHAN ATAU PENULISAN KODE PADA SKILL INI.
+DILARANG MEMBUAT ASUMSI SPESIFIKASI PADA BAGIAN YANG AMBIGU TANPA KONFIRMASI EKSPLISIT DARI USER. KLARIFIKASI WAJIB BERADAPTASI SECARA DINAMIS BERDASARKAN PROFIL ARSITEKTUR REPO (BACKEND BERFOKUS PADA KONTRAK API/DATA, FRONTEND BERFOKUS PADA ALUR UI/UX/STATE). BILA SELURUH KEBUTUHAN TELAH JELAS DAN TERVERIFIKASI 100% DARI HASIL EKSPLORASI, SKILL WAJIB MENGAMBIL JALUR CEPAT (FAST-PATH SKIP) KE TAHAP PERENCANAAN TANPA MENGAJUKAN PERTANYAAN BASA-BASI, KECUALI `skip_if_clear: false` (SATU KONFIRMASI RINGKASAN, BUKAN PERTANYAAN BASA-BASI). DILARANG MELAKUKAN PERUBAHAN ATAU PENULISAN KODE PADA SKILL INI.
 
 ## Precondition [REQUIRED]
 
@@ -27,9 +27,9 @@ DILARANG MEMBUAT ASUMSI SPESIFIKASI PADA BAGIAN YANG AMBIGU TANPA KONFIRMASI EKS
 ## Parameter [REQUIRED]
 
 - `explore_summary` — string — `[REQUIRED]` — ringkasan hasil temuan dari `quickdev:explore` yang mencakup file target, simbol, dan potensi celah spesifikasi; bila pemanggil tidak mengirimnya, ambil dari laporan `quickdev:explore` terakhir di percakapan.
-- `profile_type` — string — default `"auto"` — tipe domain klarifikasi (`"backend"`, `"frontend"`, `"auto"`). Jika `"auto"`, membaca tipe dari profil repositori atau konteks file yang dieksplorasi.
-- `profile_path` — string — default `"repo-profile.md"` — path profil hasil `quickdev:profile` (bukan `.claude/profile/` milik backenddev/frontenddev); bila tidak ditemukan, gunakan fallback `.dev/profile.md`.
-- `skip_if_clear` — boolean — default `true` — bila `true`, melaporkan `SKIPPED` dan menawarkan `quickdev:plan` jika tidak ditemukan ambiguitas atau celah spesifikasi.
+- `profile_type` — string — default `"auto"` — tipe domain klarifikasi (`"backend"`, `"frontend"`, `"fullstack"`, `"auto"`). Jika `"auto"`, membaca tipe dari profil repositori atau konteks file yang dieksplorasi.
+- `profile_path` — string — default `"repo-profile.md"` — path profil hasil `quickdev:profile` (bukan `.claude/profile/` milik backenddev/frontenddev); bila tidak ditemukan, gunakan fallback `.dev/profile.md`. Bila repo memuat lebih dari satu profil (`git ls-files '*repo-profile.md'`), tanyakan workspace mana lewat `AskUserQuestion`, jangan memakai root diam-diam.
+- `skip_if_clear` — boolean — default `true` — bila `true`, melaporkan `SKIPPED` dan menawarkan `quickdev:plan` jika tidak ditemukan ambiguitas atau celah spesifikasi. `false` → meski tanpa ambiguitas, sajikan ringkasan spesifikasi terkunci sebagai **satu** `AskUserQuestion` (*Spesifikasi benar* · *Ada koreksi (sebut)*) sebelum `SKIPPED`; koreksi dipetakan seperti jawaban Fase 3.
 - `batch_limit` — integer — default `3` — batas pertanyaan per batch (maksimal 4, batas satu panggilan `AskUserQuestion`).
 - `allow_assumptions` — boolean — default `false` — bila `true`, mengizinkan penetapan asumsi teknis terukur jika user mendelegasikan keputusan secara eksplisit.
 
@@ -46,6 +46,7 @@ DILARANG MEMBUAT ASUMSI SPESIFIKASI PADA BAGIAN YANG AMBIGU TANPA KONFIRMASI EKS
      - Jika seluruh detail teknis telah terbukti pasti dari codebase eksisting dan permintaan user telah lengkap tanpa multitafsir:
      - Set status klarifikasi menjadi `SKIPPED` (Fast-Path Skip).
      - Susun ringkasan konfirmasi spesifikasi terkunci berdasarkan fakta eksplorasi.
+     - `skip_if_clear: false` → ajukan satu konfirmasi ringkasan (lihat Parameter) sebelum `SKIPPED`.
      - Laporkan `SKIPPED` dalam satu baris dan tawarkan `quickdev:plan`; jangan memanggilnya sebelum user setuju.
    - **Kondisi B: Ditemukan Celah / Ambiguitas Spesifikasi**:
      - Jika terdapat parameter hilang, kontrak API belum pasti, atau alur UI/UX belum terdefinisi:
@@ -68,12 +69,12 @@ DILARANG MEMBUAT ASUMSI SPESIFIKASI PADA BAGIAN YANG AMBIGU TANPA KONFIRMASI EKS
      - *Penanganan Cabang State UI*: Klarifikasi representasi visual tiap cabang state yang dikonvensikan profil (contoh: loading skeleton vs spinner, empty state + CTA, error banner + retry).
      - *Routing & Query Parameters*: Klarifikasi sinkronisasi state URL dengan filter tabel, pencarian instan, pagination cursor, dan status tab aktif.
      - *Form Validation & Interactivity*: Klarifikasi perilaku validasi instan (onBlur vs onSubmit), disable state tombol submit selama request in-flight, dan konfirmasi modal sebelum aksi destruktif.
-4. **Cabang Dinamis C — Fullstack / Monorepo**:
-   - Jalankan klarifikasi komprehensif yang mencakup integrasi boundary antara API contract backend dan data demand komponen UI frontend.
+4. **Cabang Dinamis C — Fullstack**: dipakai bila profil bertipe `fullstack` dan berkas target explore mencakup route server (Section 4 profil) **dan** berkas UI, atau bila berkas target tersebar di lebih dari satu profil workspace.
+   - Gabungkan pertanyaan cabang A untuk sisi server dan cabang B untuk sisi UI, dengan prioritas boundary: bentuk payload yang dikirim UI ke route server, status/error yang ditampilkan UI, dan tempat validasi (klien, server, atau keduanya); tetap maksimal `batch_limit` per batch.
 
 ### Fase 2 — Formulasi Pertanyaan Terarah (Batching & Opsi Konkret)
 
-1. Rancang pertanyaan klarifikasi dalam satu batch terpadu (maksimal `batch_limit` pertanyaan); bila ambiguitas melebihi `batch_limit`, dahulukan yang memblokir rencana dan ajukan sisanya sebagai batch berikutnya setelah jawaban batch pertama dipetakan:
+1. Rancang pertanyaan klarifikasi dalam satu batch terpadu (maksimal `batch_limit` pertanyaan); bila ambiguitas melebihi `batch_limit`, dahulukan yang memblokir rencana dan ajukan sisanya sebagai batch berikutnya setelah jawaban batch pertama dipetakan — maksimal 3 batch per pemanggilan; bila ambiguitas masih tersisa sesudah batch ke-3, `AskUserQuestion`: *Lanjut dengan asumsi tertulis di Section 1 rencana* · *Perkecil lingkup* · *Batal*:
    - Setiap pertanyaan wajib menyertakan konteks teknis temuan dari codebase (menyebut nama file, endpoint, atau fungsi terkait).
    - Setiap pertanyaan wajib memberikan opsi-opsi solusi konkret beserta rekomendasi teknis terbaik bertanda `(Recommended)`.
    - Dilarang mengajukan pertanyaan terbuka yang terlalu abstrak tanpa opsi implementasi nyata.
@@ -96,7 +97,7 @@ DILARANG MEMBUAT ASUMSI SPESIFIKASI PADA BAGIAN YANG AMBIGU TANPA KONFIRMASI EKS
 ## Guardrails
 
 - MUST NOT membuat asumsi sendiri pada parameter kritis yang tidak disebutkan di laporan eksplorasi maupun prompt user.
-- MUST NOT mengajukan pertanyaan klarifikasi jika seluruh kebutuhan sudah terdefinisi pasti dan tidak ada ambiguitas (wajib Fast-Path Skip).
+- MUST NOT mengajukan pertanyaan klarifikasi jika seluruh kebutuhan sudah terdefinisi pasti dan tidak ada ambiguitas (wajib Fast-Path Skip), kecuali `skip_if_clear: false` (satu konfirmasi ringkasan, bukan pertanyaan basa-basi).
 - MUST NOT mengajukan pertanyaan teknis yang tidak relevan dengan profil repositori (contoh: menanyakan Tailwind styling pada repo pure backend).
 - MUST NOT mengajukan pertanyaan secara mencicil satu per satu tanpa batching terstruktur.
 - MUST NOT melakukan modifikasi atau penulisan kode sumber dalam skill ini.
@@ -125,9 +126,9 @@ Skill ini menghasilkan dokumen spesifikasi kebutuhan terklarifikasi dan status t
 
 ## Failure path
 
-1. **User Tidak Merespons / Dialog Dibatalkan**: Jika sesi interaksi tidak menghasilkan jawaban, simpan status draf klarifikasi, catat poin-poin yang belum terjawab, dan tawarkan fallback menggunakan konvensi default pada `profile_path` sebelum meminta konfirmasi ulang.
+1. **User Tidak Merespons / Dialog Dibatalkan**: jangan menulis berkas. Sajikan blok `CLARIFY — TERTAHAN` di Output: keputusan yang sudah terkunci, pertanyaan tersisa beserta opsi, dan fallback konvensi `profile_path`. Sesi berikutnya melanjutkan dari blok itu (atau dari Section 1 rencana bila `quickdev:plan` sudah berjalan).
 2. **Jawaban User Bertentangan dengan Pola Arsitektur Repo**: Jika keputusan user melanggar aturan inti pada `profile_path` (misal: meminta controller mengakses database langsung pada arsitektur Clean Architecture), jelaskan risiko teknis secara transparan, berikan alternatif yang mematuhi layer arsitektur, dan minta konfirmasi final dari user.
-3. **Laporan Eksplorasi Tidak Memadai**: Jika `explore_summary` tidak memuat data yang cukup untuk memformulasikan opsi klarifikasi, tawarkan `quickdev:explore` ulang untuk area kode yang kurang lengkap.
+3. **Laporan Eksplorasi Tidak Memadai**: Jika `explore_summary` tidak memuat data yang cukup untuk memformulasikan opsi klarifikasi, tawarkan `quickdev:explore` ulang untuk area kode yang kurang lengkap — maksimal satu kali per tugas; sesudahnya, `AskUserQuestion`: *Lanjut dengan asumsi tertulis di Section 1 rencana* · *Perkecil lingkup* · *Batal*.
 4. **Konflik Preferensi Stakeholder**: Jika user mengajukan kebutuhan yang ambigu secara konseptual, berikan skenario use-case konkret untuk membantu user memilih pendekatan implementasi yang paling stabil.
 
 ## STYLE
