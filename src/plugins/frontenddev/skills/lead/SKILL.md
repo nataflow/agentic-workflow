@@ -50,7 +50,9 @@ Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/lead/scripts/taskdir_state.py`. T
 | `LAPORAN` | `frontenddev:architect` (Phase 5) — umpan balik profil dulu, lalu architect menyerahkan ke `report` |
 | `LAPORAN TERTUNDA` | `REPORT.md` tertulis tetapi commit-nya gagal → `frontenddev:architect` Phase 5 butir 4 (validasi lalu commit); dilarang membuka taskdir baru |
 | `DITUTUP` | `TASK.md` `status: ABANDONED` (`chain.py abandon`) — tidak tampil di pemindaian |
-| `RUSAK` | artefak tanpa `TASK.md`, pasangan lane/sections tidak sah, `lane`/`sections` berubah di luar commit akar (`kunci TASK`) atau `chain.py escalate`, atau ledger ≠ jadwal sections → laporkan ke user; dilarang menambal akar atau ledger dengan tangan |
+| `RUSAK` | taskdir yang disebut tidak ada, nama direktori di luar pola `<YYMMDDhhmm>-<slug>`, artefak tanpa `TASK.md`, pasangan lane/sections tidak sah, `lane`/`sections` berubah di luar commit akar (`kunci TASK`) atau `chain.py escalate`, atau ledger ≠ jadwal sections → laporkan ke user; dilarang menambal akar atau ledger dengan tangan |
+
+Skrip keluar `[FAIL] ... bukan repo git` → hentikan; rantai frontenddev menuntut git.
 
 Permintaan baru saat ada taskdir terbuka → tanyakan lewat `AskUserQuestion`: lanjutkan taskdir itu, atau buka taskdir baru (yang lama tetap terbuka dan akan muncul lagi di pemindaian berikutnya). Taskdir ber-brief `BLOCKED` dilarang ditinggal diam-diam.
 

@@ -6,21 +6,29 @@ keadaan beserta **satu** rute berikutnya, dari fakta disk dan ledger — bukan
 dari ingatan sesi, dan bukan dari model yang membaca frontmatter satu per satu.
 Tabel keadaan yang dulu hidup sebagai prosa di Phase 2 kini hidup di sini.
 
-Urutan vonis (yang pertama cocok menang):
+Urutan vonis (yang pertama cocok menang) — sama persis dengan `classify()`:
 
-1. `RUSAK`      — artefak rantai tanpa `TASK.md`, atau pasangan lane/sections tidak sah.
-2. `AKAR`       — taskdir kosong, atau `TASK.md` belum ter-commit → `frontenddev:task`.
-3. `DRIFT`      — hop `[x]` yang kontennya berubah sesudah disetujui → `chain.py reopen`.
-4. `GATE`       — hop ledger pertama yang belum `[x]` → skill pemiliknya (beserta mode `plan`).
-5. `EKSEKUSI`   — brief `READY` dapat berangkat → `frontenddev:architect`.
-6. `TERHENTI`   — brief `BLOCKED` tanpa remedi → `chain.py reopen --row BRIEF` → `plan` APPEND.
-7. `PENUTUP`    — seluruh brief tertutup, `REVIEW.md` absen → `frontenddev:architect` Phase 4.
-8. `TEMUAN`     — `REVIEW.md` ber-verdict `BLOCKED` → kerja baru lewat lead (`finding_source`).
-   Perbaikannya di taskdir yang sama: reopen BRIEF → `plan` APPEND → review ulang.
-9. `LAPORAN`    — `REVIEW.md` `PASS`/`WARNING`, `REPORT.md` absen → `frontenddev:report`.
-10. `LAPORAN TERTUNDA` — `REPORT.md` tertulis tetapi belum ter-commit (commit report gagal)
-   → `frontenddev:architect` Phase 5 butir 4.
-11. `TUNTAS`    — `REPORT.md` ada dan ter-commit.
+1. `RUSAK`      — direktori tidak ada, nama di luar pola `<YYMMDDhhmm>-<slug>`, atau
+                  artefak rantai tanpa `TASK.md`.
+2. `AKAR`       — taskdir kosong → `frontenddev:task`.
+3. `DITUTUP`    — `TASK.md` `status: ABANDONED` (`chain.py abandon`).
+4. `RUSAK`      — pasangan lane/sections tidak sah atau diubah di luar akar/eskalasi.
+5. `AKAR`       — `TASK.md` belum ter-commit → `frontenddev:task` (commit akar).
+6. `RUSAK`      — ledger `## Chain` ≠ jadwal sections.
+7. `DRIFT`      — hop `[x]` yang kontennya berubah sesudah disetujui → `chain.py reopen`.
+8. `GATE`       — hop ledger pertama yang belum `[x]` → skill pemiliknya (beserta mode `plan`).
+9. `TERHENTI`   — brief `BLOCKED` tanpa remedi → `chain.py reopen --row BRIEF` → `plan` APPEND.
+10. `EKSEKUSI`  — brief `READY` dapat berangkat → `frontenddev:architect`.
+11. `PENUTUP`   — seluruh brief tertutup, `REVIEW.md` absen atau basi → `architect` Phase 4.
+12. `TEMUAN`    — `REVIEW.md` `BLOCKED` → reopen BRIEF → `plan` APPEND brief perbaikan di
+                  taskdir yang sama → review ulang.
+13. `LAPORAN`   — `REVIEW.md` `PASS`/`WARNING`, `REPORT.md` absen → `architect` Phase 5.
+14. `LAPORAN TERTUNDA` — `REPORT.md` tertulis tetapi belum ter-commit (commit report gagal)
+                  → `architect` Phase 5 butir 4.
+15. `TUNTAS`    — `REPORT.md` ada dan ter-commit.
+
+Repo non-git tidak divonis per taskdir: skrip keluar `FAIL` karena akar dan
+ledger hanya dapat dibuktikan lewat riwayat commit.
 
 Zero external dependencies (Python Standard Library only). Satu impor
 intra-plugin: `skills/_common/precondition_lib.py`.
@@ -31,7 +39,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
@@ -41,6 +49,7 @@ from precondition_lib import (  # noqa: E402
     brief_closure,
     expected_rows,
     find_repo_root,
+    is_git_repo,
     review_is_fresh,
     is_committed,
     lane_sections_problem,
@@ -55,23 +64,18 @@ TASKDIR_NAME = re.compile(r"^\d{10}-[a-z0-9-]+$")
 CHAIN_ARTIFACTS = ("FLOW.md", "UI.md", "CONTRACT.md", "REVIEW-PLAN.md", "REVIEW.md", "REPORT.md")
 
 
-def followups(root: Path) -> Dict[str, str]:
-    """`{path finding_source: taskdir penerus}` dari frontmatter seluruh `TASK.md`."""
-    out: Dict[str, str] = {}
-    base = root / DOCS
-    if not base.is_dir():
-        return out
-    for task in sorted(base.glob("*/TASK.md")):
-        source = read_status(task, "finding_source").strip().strip("./")
-        if source:
-            out[source] = f"{DOCS}/{task.parent.name}"
-    return out
-
-
-def classify(root: Path, rel: str, successors: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+def classify(root: Path, rel: str) -> Dict[str, str]:
     taskdir = root / rel
     task = taskdir / "TASK.md"
     out = {"taskdir": rel, "lane": "-", "state": "", "next": "", "detail": ""}
+    if not taskdir.is_dir():
+        out.update(state="RUSAK", next="periksa path taskdir; taskdir dibuat lead Phase 5",
+                   detail="direktori tidak ada")
+        return out
+    if not TASKDIR_NAME.match(taskdir.name):
+        out.update(state="RUSAK", next="laporkan ke user",
+                   detail=f"nama `{taskdir.name}` di luar pola <YYMMDDhhmm>-<slug> (huruf kecil, angka, `-`)")
+        return out
     artifacts = [a for a in CHAIN_ARTIFACTS if (taskdir / a).is_file()] + \
                 [p.name for p in taskdir.glob("brief-*.md")]
     if not task.is_file():
@@ -164,16 +168,21 @@ def main() -> None:
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
     root = (Path(args.root) if args.root else find_repo_root()).resolve()
+    if not is_git_repo(root):
+        error = f"`{root}` bukan repo git — akar dan ledger tidak dapat dibuktikan"
+        print(json.dumps({"status": "FAIL", "error": error}, indent=2) if args.json
+              else f"TASKDIR STATE: [FAIL] {error}")
+        sys.exit(1)
     if args.taskdir:
         rels = [args.taskdir.strip().strip("/").replace("./", "")]
     else:
         base = root / DOCS
+        # Nama di luar pola tetap dilaporkan (RUSAK) bila berisi berkas, bukan diabaikan diam-diam.
         rels = [f"{DOCS}/{p.name}" for p in sorted(base.iterdir())
-                if p.is_dir() and TASKDIR_NAME.match(p.name)] if base.is_dir() else []
-    successors = followups(root)
-    rows = [classify(root, r, successors) for r in rels]
+                if p.is_dir() and (TASKDIR_NAME.match(p.name) or any(p.glob("*.md")))] if base.is_dir() else []
+    rows = [classify(root, r) for r in rels]
     if not args.all and not args.taskdir:
-        rows = [r for r in rows if r["state"] not in ("TUNTAS", "DILANJUTKAN", "DITUTUP")]
+        rows = [r for r in rows if r["state"] not in ("TUNTAS", "DITUTUP")]
     if args.json:
         print(json.dumps(rows, indent=2))
         return
