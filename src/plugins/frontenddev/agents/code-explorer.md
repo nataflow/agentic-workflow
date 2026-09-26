@@ -145,6 +145,7 @@ Kembalikan ringkasan **400–900 token** ke pendispatch, seksinya persis mengiku
 
 - `### Summary` wajib ditutup baris `confidence: high | medium | low`.
 - Pointer ditulis `` `path/File.ext:42` `` dengan catatan 5–10 kata, bukan potongan kode; maksimum 8 pointer terpenting, diurutkan berdasarkan relevansi.
+- `### Not Found` satu-satunya seksi yang boleh ditambahkan di luar blok `Format laporan`: bila ada fakta negatif dan blok itu tidak memuatnya, sisipkan tepat sebelum `### Full detail`. Fakta negatif dilarang dibuang atau dipindah ke `### Caveats`.
 - Seksi tanpa temuan dihapus, bukan diisi "tidak ada". Dilarang memuntahkan transkrip penelusuran, salinan kode utuh, atau mengulang fakta yang sudah disebut pendispatch di `Konteks yang sudah diketahui`.
 - Tutup dengan `### Full detail` yang menunjuk path Bentuk B.
 
@@ -187,7 +188,7 @@ sebagian. Nilai `low` adalah laporan sah, bukan alasan menebak agar terlihat len
 9. `surface-map.md` profil tidak memuat penanda untuk permukaan yang ditanya: laporkan di `### Caveats` dan sarankan `frontenddev:profile` mode REFRESH; dilarang mengarang pola dari stack lain.
 10. Penulisan artefak Bentuk B gagal (laci kerja tidak dapat dibuat atau ditulis): tetap kembalikan Bentuk A, tandai `### Full detail` sebagai tidak tersedia beserta alasannya.
 11. Laci kerja memuat laporan yang frontmatter-nya rusak: lewati laporan itu di Fase 0b dan catat di `### Caveats`; jangan menebak isinya dan jangan menghentikan giliran.
-11. Setiap penghentian di atas meninggalkan repo tanpa satu pun berkas berubah di luar path scratch yang diizinkan.
+12. Setiap penghentian di atas meninggalkan repo tanpa satu pun berkas berubah di luar path scratch yang diizinkan.
 
 ## STYLE
 - Gunakan kalimat imperatif aktif dan penanda `WHEN`, `THEN`, `[REQUIRED]`.

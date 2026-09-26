@@ -52,6 +52,9 @@ punya temuan dihapus, bukan diisi "tidak ada".
 ### Caveats
 <unknown, ambiguitas kode, atau penyimpangan konvensi dari `surface-map.md` profil>
 
+### Not Found
+<simbol, berkas, atau rute yang dicari tetapi TIDAK ditemukan, beserta direktori yang sudah disisir>
+
 ### Full detail
 <path Bentuk B yang benar-benar ditulis>
 ```
