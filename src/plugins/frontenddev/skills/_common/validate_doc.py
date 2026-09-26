@@ -28,7 +28,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from precondition_lib import (  # noqa: E402
@@ -91,9 +91,47 @@ SPECS: Dict[str, Dict[str, Any]] = {
 
 DD_ROW = re.compile(r"^\|\s*`?(DD-\d+)`?\s*\|")
 ST_HEAD = re.compile(r"^###\s+(ST-\d+)\.\s")
+ST_TITLE = re.compile(r"^###\s+(ST-\d+)\.\s+(.*)$")
 AC_ROW = re.compile(r"^\|\s*`?(AC-\d+)`?\s*\|(.*)\|\s*$")
 TOKEN = re.compile(r"\b(SC|DD|ST)-\d+\b")
 FILES_ROW = re.compile(r"^\s*[-*]\s+`(CREATE|MODIFY)`\s+`[^`<>]+`")
+# Enam cabang wajib per layar (ui-design Phase 4). Jenis sebuah ST = kata kunci
+# yang muncul PALING AWAL di judulnya ("State Error saat Loading" = error).
+STATE_KINDS = (
+    ("normal", re.compile(r"\b(normal|ready)\b", re.IGNORECASE)),
+    ("loading", re.compile(r"\b(loading|skeleton)\b", re.IGNORECASE)),
+    ("kosong", re.compile(r"\b(kosong|empty)\b", re.IGNORECASE)),
+    ("error", re.compile(r"\b(error|failure|gagal)\b", re.IGNORECASE)),
+    ("initial", re.compile(r"\b(initial|idle)\b", re.IGNORECASE)),
+    ("stale/mutating", re.compile(r"\b(stale|mutating|optimistic)\b", re.IGNORECASE)),
+)
+KIND_NAMES = [k for k, _ in STATE_KINDS]
+
+
+def state_kind(title: str) -> str:
+    hits = [(m.start(), kind) for kind, rx in STATE_KINDS for m in [rx.search(title)] if m]
+    return min(hits)[1] if hits else ""
+
+
+def per_screen_problems(heads: List[Tuple[str, str]]) -> List[str]:
+    """Blok enam ST berurutan = satu layar (ST-1..6, ST-7..12, ...); tiap blok
+    wajib memuat keenam jenis cabang tepat sekali. Urutan di dalam blok bebas."""
+    problems: List[str] = []
+    for start in range(0, len(heads), 6):
+        block = heads[start:start + 6]
+        label = f"layar {start // 6 + 1} ({block[0][0]}..{block[-1][0]})"
+        seen: Dict[str, List[str]] = {}
+        for sid, title in block:
+            kind = state_kind(title)
+            if not kind:
+                problems.append(f"{label}: judul `{sid}` tidak menyebut jenis cabang ({', '.join(KIND_NAMES)})")
+                continue
+            seen.setdefault(kind, []).append(sid)
+        problems += [f"{label}: cabang `{k}` ganda ({', '.join(v)})" for k, v in seen.items() if len(v) > 1]
+        missing = [k for k in KIND_NAMES if k not in seen]
+        if missing:
+            problems.append(f"{label}: cabang hilang — {', '.join(missing)}")
+    return problems
 
 
 def body_after(heading: str, body: str) -> List[str]:
@@ -155,6 +193,10 @@ class DocValidator:
         heading = SPECS["ui"]["headings"][2]
         lines = section_lines(body if body is not None else self.body, heading)
         return [m.group(1) for m in (ST_HEAD.match(l.strip()) for l in lines) if m]
+
+    def st_heads(self) -> List[Tuple[str, str]]:
+        lines = section_lines(self.body, SPECS["ui"]["headings"][2])
+        return [(m.group(1), m.group(2)) for m in (ST_TITLE.match(l.strip()) for l in lines) if m]
 
     # ------------------------------------------------------------------ checks
 
@@ -230,11 +272,12 @@ class DocValidator:
             seq = sequential(ids, prefix)
             if seq:
                 problems.append(seq)
-        if prefix == "ST" and 0 < len(ids) < 6:
-            problems.append(f"hanya {len(ids)} cabang ST — enam cabang state wajib dirancang "
-                            "(normal, loading, kosong, error, initial, stale/mutating)")
+        if prefix == "ST" and ids:
+            problems += per_screen_problems(self.st_heads())
         self._add("I", f"Penomoran {prefix}", problems, f"{len(ids)} {prefix} berurutan",
-                  f"Nomori `{prefix}-{{n}}` berurutan dari `{prefix}-1` tanpa lompatan.")
+                  f"Nomori `{prefix}-{{n}}` berurutan dari `{prefix}-1` tanpa lompatan"
+                  + ("; tiap layar tepat enam ST (ST-1..6, ST-7..12, ...), satu per cabang "
+                     "normal, loading, kosong, error, initial, stale/mutating." if prefix == "ST" else "."))
 
     def _check_contract(self) -> None:
         # Files Touched

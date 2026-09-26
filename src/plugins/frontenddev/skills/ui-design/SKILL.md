@@ -46,7 +46,7 @@ Tawarkan 2–3 opsi — Standard Card/List · Compact/Dense Table · Visual-Driv
 ### Phase 4 — Prioritas Informasi & Enam Cabang
 
 - **P1** judul, nilai utama, status utama, CTA primer · **P2** tanggal, kategori, referensi, badge sekunder · **P3** helper text, filter minor, tautan ketentuan.
-- **Enam cabang wajib per layar**: normal/ready, loading (skeleton berdimensi, anti-CLS), kosong (ikon + CTA kontekstual), error (pesan manusiawi + *Coba Lagi* yang memanggil handler Controller), initial/idle, stale/mutating (indikator mikro, cegah double-submit). Nomori `ST-{n}` berurutan lintas layar.
+- **Enam cabang wajib per layar**: normal/ready, loading (skeleton berdimensi, anti-CLS), kosong (ikon + CTA kontekstual), error (pesan manusiawi + *Coba Lagi* yang memanggil handler Controller), initial/idle, stale/mutating (indikator mikro, cegah double-submit). Nomori `ST-{n}` berurutan lintas layar, **enam per layar** (`ST-1..6` layar 1, `ST-7..12` layar 2); cabang yang tidak relevan tetap ditulis beserta alasannya.
 - Loading, error, dan refetch dikoordinasikan Controller layar; komponen anak menerima props murni.
 
 ### Phase 5 — Tulis Draft
@@ -65,7 +65,7 @@ Tawarkan 2–3 opsi — Standard Card/List · Compact/Dense Table · Visual-Driv
 ## Guardrails
 
 - **REKAM `based_on`**: frontmatter memuat `based_on: <sha 7 digit> (<tanggal>)` saat berkas ditulis.
-- **SIX STATES MANDATORY**: validator menolak kurang dari enam `ST-{n}`; cabang yang tidak dirancang lolos ke produksi tanpa penanganan.
+- **SIX STATES MANDATORY**: validator menolak layar (blok enam `ST-{n}`) yang tidak memuat keenam cabang tepat sekali; cabang yang tidak dirancang lolos ke produksi tanpa penanganan.
 - **STATE SCOPE SENTRAL**: dilarang merancang query atau mutasi terisolasi di komponen anak.
 - **TOKEN DARI PROFIL**: warna, spacing, radius, tipografi dari `visual.md`; literal tanpa token dicatat sebagai keputusan eksplisit.
 - **PLATFORM FROM ADAPTER**: aturan mobile untuk repo web, atau sebaliknya, adalah cacat.
