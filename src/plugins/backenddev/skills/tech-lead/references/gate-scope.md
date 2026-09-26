@@ -102,6 +102,18 @@ Gerbang tidak memilih panjang rantai di framing ini: kedua contoh memakai lane y
 
 Slot `Finding Source` hadir hanya pada framing ini, dan `analyst` meneruskannya ke `task` beserta `plan`: ia yang menyalakan re-verification temuan di `plan` Fase 2 dan penandaan baris `> Status:` di berkas asalnya. Framing perbaikan temuan **tidak pernah menyebut `entry_mode`** — jalur masuk `plan` diturunkan `analyst` dari `chain`, persis seperti lane `PLANNING` lainnya. Temuan yang terbukti butuh kontrak baru tidak dikembalikan ke gerbang: ia pemicu eskalasi chain nomor 1 milik `analyst`.
 
+### B-2. Lane `PLANNING` → `analyst` (dari tiket analyst `READY`)
+
+> Rancang dan terbitkan brief untuk tiket `analyst/tickets/2609231400-cicilan-pembayaran/TICKET.md`. **Taskdir**: `backenddev/docs/2609241000-invoice-installment/` **Risk Level**: `MAJOR`. **Ticket Source**: `analyst/tickets/2609231400-cicilan-pembayaran/TICKET.md` — `TAC-1`…`TAC-7`, `TBR-1`…`TBR-3`. **Evidence**: `internal/invoice/service.go:88`. **File Scope**: `internal/invoice/`. **Acceptance Criteria**: `TASK.md` terkunci dengan tiap `TAC-{n}` dipikul `SC-{n}` atau tercatat di `## Out of Scope` beralasan, tiap hop ledger `## Chain` tercentang beserta sha-nya, seluruh brief `READY` ter-commit. **Stop Condition**: tiket tidak lagi `READY` atau disunting sesudah approve (prasyarat `task` check 7 `FAIL`) → BERHENTI, kembalikan ke `analyst:spec`.
+
+Kontrak serah-terima tiket (`ticket_source`):
+
+1. **Nilai**: path `analyst/tickets/<YYMMDDhhmm>-<slug>/TICKET.md` relatif root repo, diteruskan apa adanya. Dilarang disimpulkan dari isi `request`: permintaan yang tampak seperti kartu tiket tanpa path → tanyakan path-nya lewat `AskUserQuestion`. Terisi → `request` = kartu tiket (H1 sampai akhir `## Lampiran`) apa adanya.
+2. **Namespace**: kartu menulis `AC-{n}`/`BR-{n}`; di seluruh artefak backenddev keduanya dirujuk `TAC-{n}`/`TBR-{n}` agar tidak bertabrakan dengan `AC-{n}` PRD dan `BR-{n}` BRD. Kartu analyst tidak diubah.
+3. **Fase 1 butir 4**: tiap `TAC-{n}` dihitung satu permukaan yang disebut `request`.
+4. **Syarat tiket**: frontmatter `status: READY` dan `elicitation: CLOSED`; di repo git, commit terakhir yang menyentuh berkas bersubjek `docs(ticket): kunci TICKET <slug> READY` atau `docs(ticket): ref TICKET <slug>` dan berkasnya bersih. Penilainya prasyarat `task` check 7, bukan gerbang.
+5. **Jalur**: gerbang → `analyst` (slot `Ticket Source`) → `task` (keterpikulan `TAC-{n}`) dan, bila sumbu bisnis tetap aktif, `business-analysis` (serap `TBR-{n}`); `analyst/references/chain-rules.md` bagian 1.1 dan 2.1.
+
 ### C. Lane `AUDIT_SWEEP` → `audit`
 
 > Audit modul `internal/warehouse/` terhadap 6 dimensi arsitektur. **Scope**: Seluruh berkas sumber di bawah package tersebut. **Acceptance Criteria**: File temuan ditulis ke `backenddev/issues/` berlabel `CONFIRMED`/`PLAUSIBLE`, indeks `backenddev/issues/README.md` diperbarui. **Stop Condition**: Kandidat tidak memiliki bukti `file:line` konkret dibuang (bukan jadi P3).

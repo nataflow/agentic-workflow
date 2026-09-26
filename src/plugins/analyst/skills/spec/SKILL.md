@@ -90,7 +90,7 @@ Repo git (`git=ya`): `git -C <root> add <ticketdir>/TICKET.md <ticketdir>/review
 
 ## Output [REQUIRED]
 
-Tiket disetujui — tutup satu baris: `SPEC — READY · <ticketdir>/TICKET.md @<sidik> · <type> · <priority> · <n> AC · <n> BR · <commit <sha> | tanpa git> — serah-terima manual: tempel kartu TICKET.md (catatan elisitasi boleh ikut sebagai jejak) sebagai permintaan ke backenddev:tech-lead dan/atau frontenddev:lead (gerbang engineer belum membaca format ini; lihat README Serah Terima).` Selain itu sajikan blok berikut dan hapus baris bernilai `—`:
+Tiket disetujui — tutup satu baris: `SPEC — READY · <ticketdir>/TICKET.md @<sidik> · <type> · <priority> · <n> AC · <n> BR · <commit <sha> | tanpa git> — serahkan ke engineer: backenddev:tech-lead dan/atau frontenddev:lead dengan ticket_source: <ticketdir>/TICKET.md (lihat README Serah Terima).` Selain itu sajikan blok berikut dan hapus baris bernilai `—`:
 
 ```markdown
 ### SPEC — <MENUNGGU KEPUTUSAN | TERTAHAN>

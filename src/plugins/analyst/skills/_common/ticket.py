@@ -162,8 +162,8 @@ def classify(root: Path, rel: str) -> Dict[str, str]:
         row.update(state="DRIFT", route="TICKET READY disunting sesudah disetujui — analyst:spec REVISE "
                                         "(reopen) atau pulihkan isinya")
     else:
-        row.update(state="READY", route="selesai — tempel kartu ke backenddev:tech-lead / frontenddev:lead "
-                                        "(serah-terima manual)")
+        row.update(state="READY", route="selesai — serahkan path TICKET.md sebagai ticket_source ke "
+                                        "backenddev:tech-lead / frontenddev:lead")
     return row
 
 
@@ -363,7 +363,8 @@ def cmd_approve(root: Path, args: argparse.Namespace) -> int:
                  approved_hash=sealed, approval=clean_value(args.answer))
     msg = f"APPROVE PASS: {rel}/{TICKET_FILE} READY @{sealed}"
     if is_git_repo(root) and not args.no_commit:
-        # Subjek ini (dan `ref TICKET`) menandai tiket terkunci; ubah bersama pembacanya bila ada.
+        # Subjek ini (dan `ref TICKET`) menandai tiket terkunci. Pembacanya: `ticket_source_verdict`
+        # di `_common/precondition_lib.py` backenddev dan frontenddev — ubah ketiganya bersamaan.
         paths = [f"{rel}/{TICKET_FILE}"] + ([f"{rel}/{REVIEW_FILE}"] if report else [])
         ok, out = git_commit(root, paths, f"docs(ticket): kunci TICKET {rel.split('-', 1)[-1]} READY")
         if not ok:

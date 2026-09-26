@@ -62,7 +62,7 @@ Katalog ini kembaran diff-scoped `skills/review/references/nine-dimensions-catal
    - `terbukti`: alat ukur butir itu terpenuhi pada rentang diff — test yang namanya disebut ada dan hijau di `{verification_log}`, atau `file:baris` perubahan yang dituntut benar-benar ada. Sebut buktinya ber-backtick.
    - `PERLU VERIFIKASI MANUAL`: **hanya** untuk butir ber-alat-ukur `QA manual:`; salin langkahnya.
    - `belum terbukti`: selain itu. Satu saja menjadikan verdict `BLOCKED` — janji akar yang tidak mendarat tidak boleh dilaporkan tuntas, sebersih apa pun kodenya.
-2. **Acceptance Criteria** (bila `CONTRACT.md` ada) — satu baris per `AC-{n}`: `terbukti` (berkas test yang menyebut nomor AC itu, atau `file:baris` perilakunya), `QA manual` (butir `QA manual:`), atau `belum terbukti`.
+2. **Acceptance Criteria** (bila `CONTRACT.md` ada) — satu baris per `AC-{n}`: `terbukti` (berkas test yang menyebut nomor AC itu, atau `file:baris` perilakunya), `QA manual` (butir `QA manual:`), atau `belum terbukti`. `TAC-{n}` adalah nomor tiket analyst, bukan `AC-{n}` CONTRACT: test yang hanya menyebut `TAC-3` bukan bukti `AC-3`.
 3. **Done Criteria DITUNDA** — tiap butir `DITUNDA` di `report-<NN>.md` divonis dari `{verification_log}`.
 
 ## Fase 4 — Gerbang Bukti

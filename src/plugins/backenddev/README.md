@@ -84,7 +84,7 @@ PROFILE → EXEC_BRIEF → AUDIT_SWEEP → DEFECT_RCA → PLANNING → API_DOCS 
 | `EXEC_BRIEF` | `architect` |
 | `AUDIT_SWEEP` | `audit` |
 | `DEFECT_RCA` | `debug` → `RCA.md`; bila `ROOT_CAUSE_CONFIRMED` → `plan` dengan `entry_mode: RCA` |
-| `PLANNING` | `analyst`, termasuk perbaikan temuan `backenddev/issues/` dan `REVIEW.md` (`finding_source`) |
+| `PLANNING` | `analyst`, termasuk perbaikan temuan `backenddev/issues/` dan `REVIEW.md` (`finding_source`) serta tiket analyst `READY` (`ticket_source`) |
 | `API_DOCS` | `document-api` |
 | `EXPLORE_FACT` | dijawab di Fase 1 `tech-lead`, berhenti |
 
@@ -231,8 +231,12 @@ Tiap skill punya `skills/<skill>/scripts/check_preconditions.py` yang dijalankan
   `.claude/profile/backenddev/`. Di repo
   fullstack kedua hook menyala dengan deteksinya masing-masing. backenddev hanya melihat `dependencies`
   server, jadi manifest frontend tidak memicunya.
-- **analyst**: tiket `READY` diserahkan dengan menempelkan isi `TICKET.md` sebagai permintaan ke
-  `/backenddev:tech-lead`. Skill `backenddev:analyst` berbeda dari plugin `analyst`.
+- **analyst**: tiket `READY` diserahkan ke `/backenddev:tech-lead` lewat parameter `ticket_source`
+  (path `analyst/tickets/<YYMMDDhhmm>-<slug>/TICKET.md`). `AC-{n}`/`BR-{n}` kartu dirujuk `TAC-{n}`/`TBR-{n}`;
+  tiap `TAC-{n}` dipikul `SC-{n}` atau tercatat di `## Out of Scope` (`validate_doc.py` T10), dan tiket yang
+  disunting sesudah approve ditolak prasyarat `task` check 7. Kontrak lengkap:
+  `skills/tech-lead/references/gate-scope.md` bagian 4 B-2. Skill `backenddev:analyst` berbeda dari plugin
+  `analyst`.
 - **quickdev**: permintaan `/quickdev:*` dilewati gerbang. Untuk repo yang sepenuhnya memakai quickdev,
   tulis `.claude/workflow`.
 - **`.claude/workflow`**: berkas teks berisi nama plugin yang boleh menggerbangi repo, dipisah spasi atau

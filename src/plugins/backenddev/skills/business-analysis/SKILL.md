@@ -25,6 +25,7 @@ user-invocable: false
 - `feature_slug` — string — `[OPTIONAL]` — slug fitur; dipakai Fase 0 saat cek konflik domain.
 - `target_domain` — string — `[OPTIONAL]` — mempersempit pemindaian Fase 1 ke satu domain.
 - `preserve_history` — boolean — default `true` — pertahankan nomor `BR-{n}` lama saat tulis ulang.
+- `ticket_source` — string — default `""` — path `TICKET.md` `READY` analyst yang diteruskan `backenddev:analyst` (bagian 2.1 `analyst/references/chain-rules.md`); menyalakan mode serap tiket di Fase 2 dan Fase 4 butir 1. Dilarang disimpulkan sendiri.
 
 ## Workflow
 
@@ -49,6 +50,7 @@ Baca `references/elicitation-guide.md` sebelum menyusun pertanyaan.
 1. Ajukan 1-3 pertanyaan per giliran; tiap opsi memuat trade-off bisnis dan mitigasi risiko. Dilarang bertanya menetes lintas giliran atau kuesioner panjang sekaligus.
 2. Gali 6 pilar wajib (Problem, Actors, Current State, Target State, Business Rules, Out of Scope) tanpa asumsi sepihak, plus 2 opsional (Edge Cases, Business Metrics).
 3. Pilar opsional yang tertunda: tulis alasannya sebagai penegasan eksplisit di seksi BRD pemiliknya.
+4. **Mode serap tiket** (`ticket_source` terisi): baca kartu `TICKET.md` (H1 sampai akhir `## Lampiran`) dan pilar catatan elisitasinya lebih dulu. Aktor, kondisi, dan aturan yang sudah tertulis di sana sudah disetujui peminta lewat `analyst:spec` — dilarang ditanyakan ulang. Pertanyaan hanya untuk fakta di luar tiket yang membuat sumbu bisnis aktif (bagian 1.1 `analyst/references/chain-rules.md`). Jawaban yang bertentangan dengan tiket → berhenti dan laporkan ke `backenddev:analyst`; tiket dikoreksi lewat `analyst:spec`, bukan ditimpa BRD.
 
 ### Fase 3 — Konfirmasi Fakta Pra-Penyusunan
 
@@ -62,7 +64,7 @@ Ini **konfirmasi fakta, bukan gerbang keputusan**. Keputusan lingkup atas BRD di
 
 Tulis tepat satu `{taskdir}/BRD.md` mengikuti `templates/brd-template.md`; tulis ulang utuh bila sudah ada. Sembilan seksi baku, urutannya, dan frontmatter (`title`, `requester`, `status: DRAFT`) mengikat.
 
-1. `## Business rules`, `## Edge cases`, dan `## Business metrics` bernomor permanen: `- **BR-{n}**: <aturan mutlak>`, `- **EC-{n}**: <penanganan>`, `- **BM-{n}**: <metrik beserta baseline, target, dan baris `digerakkan: SC-{n}`>`; pertahankan penomoran lama bila `preserve_history` `true`. Aturan yang berubah makna dipensiunkan dan terbit ulang bernomor baru, jejaknya di baris `Pensiun:`; nomor pensiun tak dipakai ulang.
+1. `## Business rules`, `## Edge cases`, dan `## Business metrics` bernomor permanen: `- **BR-{n}**: <aturan mutlak>`, `- **EC-{n}**: <penanganan>`, `- **BM-{n}**: <metrik beserta baseline, target, dan baris `digerakkan: SC-{n}`>`; pertahankan penomoran lama bila `preserve_history` `true`. Aturan yang berubah makna dipensiunkan dan terbit ulang bernomor baru, jejaknya di baris `Pensiun:`; nomor pensiun tak dipakai ulang. Mode serap tiket: tiap `BR-{m}` kartu tiket masuk sebagai `BR-{n}` yang berakhiran `— Asal: TBR-{m}`, rumusannya dipertahankan.
 2. Tulis observasi kode terpisah: `Observasi kode: <file:baris> · <penjelasan fakta>`.
 3. Isi seksi tanpa item dengan penegasan eksplisit, dan tahan `## Open questions` di maksimum tiga entri non-blocking.
 4. **Uji kecukupan.** Tiap `BR-{n}` menutup bagian akar yang belum ditutup aturan lain; yang tidak menutup apa pun dihapus, bukan dicarikan akar. Pengetatan yang tidak diminta, kewajiban audit/log/notifikasi yang tak disinggung user maupun akar, dan aturan bersyarat masa depan ("bila nanti") adalah rancangan analis, dan rancangan bukan isi BRD.

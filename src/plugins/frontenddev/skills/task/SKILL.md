@@ -15,8 +15,8 @@ user-invocable: false
 
 ## Precondition [REQUIRED]
 
-1. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/task/scripts/check_preconditions.py --taskdir <taskdir> --lane <lane> --sections <sections> [--finding-source <path>]` — `--sections -` untuk `HOTFIX_MINOR`.
-2. `PASS` (7/7 checks) → lanjut ke Workflow. `FAIL` → hentikan dan remediasi butir gagal: taskdir tidak sah → kembali ke `frontenddev:lead` Phase 5; profil hilang → `frontenddev:profile`; `TASK.md` sudah ada → serahkan ke lead tanpa menimpanya; pasangan `lane`/`sections` tidak sah (`HOTFIX_MINOR` ⇔ kosong; `FAST_FORWARD`/`REFACTOR_ARCH` ⇔ tepat `architecture`; `FULL_PIPELINE` memuat `flow` atau `ui`) → kembalikan ke lead, jangan dikoreksi sendiri; `finding_source` tidak ada atau belum ter-commit → laporkan ke user; template hilang → pulihkan berkas plugin; working tree kotor → laporkan ke user, jangan di-stash sendiri.
+1. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/task/scripts/check_preconditions.py --taskdir <taskdir> --lane <lane> --sections <sections> [--finding-source <path>] [--ticket-source <path>]` — `--sections -` untuk `HOTFIX_MINOR`.
+2. `PASS` (8/8 checks) → lanjut ke Workflow. `FAIL` → hentikan dan remediasi butir gagal: taskdir tidak sah → kembali ke `frontenddev:lead` Phase 5; profil hilang → `frontenddev:profile`; `TASK.md` sudah ada → serahkan ke lead tanpa menimpanya; pasangan `lane`/`sections` tidak sah (`HOTFIX_MINOR` ⇔ kosong; `FAST_FORWARD`/`REFACTOR_ARCH` ⇔ tepat `architecture`; `FULL_PIPELINE` memuat `flow` atau `ui`) → kembalikan ke lead, jangan dikoreksi sendiri; `finding_source` tidak ada atau belum ter-commit → laporkan ke user; template hilang → pulihkan berkas plugin; working tree kotor → laporkan ke user, jangan di-stash sendiri; `ticket_source` tidak `READY` atau disunting sesudah approve (check 8) → hentikan dan kembalikan ke lead, yang mengembalikannya ke `analyst:spec`.
 
 ## Parameter [REQUIRED]
 
@@ -28,6 +28,7 @@ user-invocable: false
 - `clarification` — list — default `[]` — pasangan tanya-jawab lead Phase 7; sumber utama `## Out of Scope`.
 - `finding_source` — string — default `""` — path berkas temuan review ad-hoc (`frontenddev/reviews/<berkas>.md`) bila akar berangkat dari temuan; menyalakan Phase 3 butir 5. Temuan `REVIEW.md` rantai sendiri diperbaiki di taskdir yang sama, bukan lewat akar baru.
 - `finding_ids` — list — default `[]` — ID temuan terpilih. Kosong padahal `finding_source` terisi → seluruh temuan `PLANNED` di berkas itu.
+- `ticket_source` — string — default `""` — path `TICKET.md` `READY` analyst saat akar berangkat dari tiket (lead `## Parameter`); menyalakan Phase 3 butir 6. Dilarang disimpulkan dari isi `request`.
 
 ## Workflow
 
@@ -69,10 +70,11 @@ Susun 1–7 butir berformat `- [ ] **SC-{n}**: <hasil terukur> — verifikasi: <
 3. Cantumkan nama layar, rute, komponen, state, teks, atau angka spesifik. Tolak kata sifat tanpa ambang.
 4. **Uji kecukupan**: butir yang memperkenalkan permukaan di luar `request` dan `evidence` dihapus. Angka 7 plafon, bukan target.
 5. **Akar dari temuan**: `finding_source` terisi → sebelum menulis SC, buka `file:baris` tiap temuan terpilih. Temuan yang kodenya sudah berubah (pelanggarannya tak lagi ada) ditandai `> Status: OBSOLETE <YYYY-MM-DD>` di berkas asal dan **tidak** masuk `findings`; seluruhnya OBSOLETE → jangan tulis `TASK.md`; commit berkas asal saja (`docs(review): tandai temuan OBSOLETE`, path eksplisit) dan laporkan ke lead bahwa tidak ada kerja tersisa. Sisanya: tulis frontmatter `finding_source` dan `findings`, dan tiap temuan memikul **tepat satu** butir `SC-{n}` yang menyebut ID-nya beserta `file:baris` temuan itu; alat ukurnya ditambah `> Status: FIXED atas <ID> di <finding_source>`. Dilarang menggabungkan dua temuan ke satu butir maupun memecah satu temuan.
+6. **Akar dari tiket analyst**: `ticket_source` terisi → baca kartu `TICKET.md` (H1 sampai akhir `## Lampiran`). Tiap `AC-{n}` kartu dirujuk sebagai `TAC-{n}` dan wajib disebut **minimal satu** butir `SC-{n}`, atau tercatat di `## Out of Scope` sebagai `- TAC-{n} <ringkas> — <alasan: porsi backend | ditunda | tiket terpisah>`. Tulis frontmatter `ticket_source:`. Kalimat Given/When/Then tiket dilarang disalin apa adanya sebagai SC — SC tetap menamai layar, rute, atau aksi, dan `TAC-{n}` ditulis di prosa hasil.
 
 ### Phase 4 — Out of Scope, Penulisan & Penguncian
 
-1. Tulis minimal satu butir `## Out of Scope` berformat `- <yang tidak dikerjakan> — <alasan>` dari tiga sumber: modul bersinggungan di luar cakupan, opsi yang ditolak di `clarification`, dan isu eksplorasi yang ditunda. Bila ketiganya nihil, tulis batas feature root.
+1. Tulis minimal satu butir `## Out of Scope` berformat `- <yang tidak dikerjakan> — <alasan>` dari empat sumber: modul bersinggungan di luar cakupan, opsi yang ditolak di `clarification`, isu eksplorasi yang ditunda, dan `TAC-{n}` tiket yang bukan porsi taskdir ini (Phase 3 butir 6). Bila keempatnya nihil, tulis batas feature root.
 2. Baca `templates/task-template.md` bagian 1, isi placeholder, tulis ke `{taskdir}/TASK.md` dengan `status: ACTIVE`, `lane`, dan `sections` — tanpa baris ledger.
 3. **Ledger**: jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py init --taskdir <taskdir>`; skrip menulis `## Chain` tepat sesuai `sections`. Dilarang mengetik baris ledger dengan tangan.
 4. **Self-test akar**: jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/task/scripts/validate_task.py --taskdir <taskdir>` untuk butir mekanis (1–4, 6, 7, 9), lalu nilai sendiri butir 5 dan 8 bagian 2 template. Satu butir gagal → perbaiki `TASK.md`, ulangi dari butir 2.

@@ -3,7 +3,8 @@
 
 Memvonis prasyarat `frontenddev:task` sebelum Phase 1 dibuka: bentuk taskdir,
 profil, ketiadaan `TASK.md`, keabsahan pasangan `lane`/`sections`, keberadaan
-`finding_source`, berkas template, dan kebersihan working tree.
+`finding_source`, berkas template, kebersihan working tree, dan `ticket_source`
+analyst yang READY serta terkunci.
 
 Zero external dependencies (Python Standard Library only). Satu impor
 intra-plugin: `skills/_common/precondition_lib.py`, di-bootstrap relatif
@@ -31,6 +32,7 @@ from precondition_lib import (  # noqa: E402
     parse_sections,
     read_status,
     report_json,
+    ticket_source_verdict,
 )
 
 PROFILE_REQUIRED = ("index.json", "surface-map.md")
@@ -40,12 +42,14 @@ PLUGIN_FILES = ("templates/task-template.md", "scripts/validate_task.py",
 
 class PreconditionChecker:
     def __init__(self, taskdir: str, lane: str, sections: str = "", finding_source: str = "",
-                 root: Optional[Path] = None, profile_dir: Optional[str] = None):
+                 root: Optional[Path] = None, profile_dir: Optional[str] = None,
+                 ticket_source: str = ""):
         self.root = (root or find_repo_root()).resolve()
         self.taskdir_rel = normalize_taskdir(taskdir)
         self.lane = (lane or "").strip().upper()
         self.sections = parse_sections(sections)
         self.finding_source = (finding_source or "").strip()
+        self.ticket_source = (ticket_source or "").strip()
         self.profile_dir = profile_dir_for(self.root, profile_dir)
         self.skill_dir = Path(__file__).resolve().parents[1]
         self.results: List[Dict[str, Any]] = []
@@ -58,7 +62,7 @@ class PreconditionChecker:
         })
 
     def run_all(self) -> bool:
-        """Jalankan 7 check; hanya `FAIL` yang menahan."""
+        """Jalankan 8 check; hanya `FAIL` yang menahan."""
         taskdir_ok = check_taskdir(self._add, 1, self.root, self.taskdir_rel)
         self.stack = check_profile(self._add, 2, self.profile_dir, PROFILE_REQUIRED)
         self._check_3_absent(taskdir_ok)
@@ -66,6 +70,8 @@ class PreconditionChecker:
         self._check_5_finding_source()
         check_plugin_files(self._add, 6, self.skill_dir, PLUGIN_FILES)
         check_worktree(self._add, 7, self.root)
+        # Ditambahkan di akhir supaya nomor check 1–7 yang sudah dirujuk tetap.
+        self._add(8, "ticket_source READY & terkunci", *ticket_source_verdict(self.root, self.ticket_source))
         return not any(r["status"] == "FAIL" for r in self.results)
 
     def _check_3_absent(self, taskdir_ok: bool) -> None:
@@ -112,7 +118,8 @@ class PreconditionChecker:
 
     def to_json(self) -> str:
         return report_json(self.results, root=str(self.root), taskdir=self.taskdir_rel,
-                           lane=self.lane, sections=self.sections, stack=self.stack)
+                           lane=self.lane, sections=self.sections, stack=self.stack,
+                           ticket_source=self.ticket_source)
 
 
 def main() -> None:
@@ -123,6 +130,8 @@ def main() -> None:
                         help="sections handoff lead (`flow,ui`, `architecture`, atau `-` untuk MINOR)")
     parser.add_argument("--finding-source", default="", dest="finding_source",
                         help="path REVIEW.md asal, bila ada")
+    parser.add_argument("--ticket-source", default="", dest="ticket_source",
+                        help="path TICKET.md analyst (analyst/tickets/<YYMMDDhhmm>-<slug>/TICKET.md), bila akar dari tiket")
     parser.add_argument("--profile-dir", default=None, dest="profile_dir",
                         help="direktori profil, default .claude/profile/frontenddev (lokasi lama .claude/profile hanya dibaca untuk MIGRATE)")
     parser.add_argument("--root", default=None, help="root repo target")
@@ -131,7 +140,7 @@ def main() -> None:
 
     checker = PreconditionChecker(
         taskdir=args.taskdir, lane=args.lane, sections=args.sections,
-        finding_source=args.finding_source,
+        finding_source=args.finding_source, ticket_source=args.ticket_source,
         root=Path(args.root) if args.root else None, profile_dir=args.profile_dir,
     )
     ok = checker.run_all()

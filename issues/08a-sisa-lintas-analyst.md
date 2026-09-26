@@ -415,8 +415,9 @@ Nol `${CLAUDE_PLUGIN_ROOT}` di `src/plugins/*/agents/*.md`, dan ketiga dispatche
 ---
 
 ## A1 [Tinggi] Serah-terima ke hilir tidak dikenali
-- [ ] Selesai
-- [x] Varian minimal (2026-09-25) — varian penuh menunggu L1.3 dan keputusan A1-a/A1-b
+- [x] Selesai
+- [x] Varian minimal (2026-09-25)
+- [x] Varian penuh `ticket_source` (2026-09-26) — A1-a (i), A1-b (i)+(ii)
 
 **Plugin:** analyst, backenddev, frontenddev · **Estimasi:** minimal 30 menit · penuh 1,5–2 hari · **Bergantung pada:** keputusan A1-a/b/c; L1.3 (untuk versi penuh) · **Memblokir:** —
 
@@ -606,6 +607,21 @@ Hasilnya chain `BRD_PRD_BRIEF`, dan `business-analysis` Fase 2 "Elisitasi Kebutu
 - Deteksi DRIFT berbasis subjek commit bergantung pada pesan commit analyst (`ticket.py:297`). Bila format pesan itu berubah, check hilir ikut diubah. Catat keterkaitan ini sebagai komentar di kedua sisi.
 - `ticket.py ref` (A12) mengubah berkas sesudah READY. Subjek commit-nya harus masuk daftar yang diterima check DRIFT.
 - Opsi A1-a (ii) (analyst menulis `TAC-n`) mengubah `validate_doc.py` (`AC_LINE`, `BR_LINE`, `BR_TOKEN`), kedua template, dan `ticket-reviewer`. Kartu yang dilihat peminta non-engineer juga ikut berubah.
+
+### Catatan implementasi varian penuh (2026-09-26)
+
+Keputusan user: **A1-a (i)** kartu tetap `AC-{n}`/`BR-{n}`, hilir merujuk `TAC-{n}`/`TBR-{n}` · **A1-b (i)+(ii)** butir 2–4 chain-rules §1.1 hanya atas fakta di luar tiket, dan bila sumbu tetap aktif `business-analysis` menyerap `TBR-{n}`. Hasil: `pytest` 1202 lulus; `lint_plugins.py` 0 FAIL. `tests/test_a1_ticket_source.py` (31 kasus) — 27 merah tanpa patch; 4 sisanya kontrol "tanpa tiket".
+
+Penyimpangan dan tambahan terhadap rencana di atas:
+
+- **Pembaca tunggal per plugin.** Logika tiket tinggal di `_common/precondition_lib.py` masing-masing plugin: `ticket_source_verdict` (READY/CLOSED + DRIFT berbasis subjek commit, path wajib `analyst/tickets/<YYMMDDhhmm>-<slug>/TICKET.md`) dan `ticket_carry_problems` (TAC hilang **dan** TAC hantu). Keduanya dipakai prasyarat `task` dan validator akar, bukan disalin ke tiap skrip. Subjek yang diterima dicocokkan persis beserta slug, tidak sekadar awalannya.
+- **Nomor check.** Check tiket ditambahkan **di akhir**: backenddev `task` check 7 (7/7), frontenddev `task` check 8 (8/8). Test lama yang menagih check 5/6/7 tidak bergeser.
+- **backenddev ikut divalidasi mekanis.** Rencana hanya menagih `validate_task.py` frontenddev. `validate_doc.py --kind task` backenddev kini punya **T10** (dibaca dari frontmatter `ticket_source:`, tanpa argumen CLI baru); self-test template butir 10.
+- **`tech-lead/SKILL.md` di bawah anggaran 14000 byte** (`test_skill_size_budget`). SKILL hanya memuat parameter `ticket_source` dan slot `Ticket Source`; kontrak lengkap (namespace, Fase 1 butir 4 menghitung tiap `TAC-{n}`, syarat tiket, jalur) dipindah ke `gate-scope.md` bagian 4 B-2. Teks redundan dipangkas agar muat (13998 byte).
+- **A1-b (ii).** `business-analysis`: parameter `ticket_source`, Fase 2 butir 4 (mode serap tiket — dilarang menanyakan ulang fakta tiket; jawaban yang bertentangan dikembalikan ke `analyst:spec`), Fase 4 butir 1 (`BR-{n}` berakhiran `— Asal: TBR-{m}`); aturan penulisan di `brd-template.md`. `ids()` validator memakai `\b`, sehingga `TBR-2` tidak terhitung `BR-2`.
+- **Tabrakan ID di reviewer.** `frontenddev/agents/code-reviewer.md` butir AC: test yang hanya menyebut `TAC-3` bukan bukti `AC-3`. Regex skrip (`AC_ROW`) sudah berjangkar awal sel, jadi tidak terdampak.
+- **Klaim analyst** (plugin.json, marketplace, README Serah Terima ditulis ulang, `spec` Output, `ticket-template.md`, rute `READY` `ticket.py`) menyebut `ticket_source`; butir "Rujukan `AC-{n}` di `TASK.md` engineer" dihapus dari "Sengaja Belum Ada". Komentar kopling subjek commit ada di `ticket.py` dan kedua `precondition_lib.py`. README backenddev/frontenddev memuat kontrak ringkasnya.
+- **Belum dijalankan**: verifikasi manual sesi nyata (tiket `cicilan-pembayaran` → `backenddev:tech-lead` dengan `ticket_source`, chain turun ke `PRD_BRIEF`). Jalur mekanisnya (tiket hasil `ticket.py approve` → prasyarat → validator) sudah diuji end-to-end di test.
 
 ---
 

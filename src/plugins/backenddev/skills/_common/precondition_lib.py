@@ -506,6 +506,96 @@ TASKDIR_ACTION = ("Minta direktori kerja sah dari gerbang `backenddev:tech-lead`
                   "(format: backenddev/docs/<YYMMDDhhmm>-<slug>/, sudah diprovisi).")
 
 
+# ============================================================ tiket analyst (`ticket_source`)
+# Kontrak serah-terima: `tech-lead/references/gate-scope.md` bagian 4 B-2. Kartu menulis
+# `AC-{n}`/`BR-{n}`; artefak backenddev merujuknya `TAC-{n}`/`TBR-{n}`. Subjek commit di
+# `ticket_source_verdict` ditulis `analyst/skills/_common/ticket.py` (`approve`, `ref`) —
+# ubah keduanya bersamaan bila formatnya berubah.
+
+TICKET_PATH_RE = re.compile(r"analyst/tickets/\d{10}-([a-z0-9]+(?:-[a-z0-9]+)*)/TICKET\.md")
+TICKET_AC_RE = re.compile(r"^- \*\*AC-(\d+)\*\*:")
+TICKET_ELICIT_H2 = re.compile(r"^## +Catatan Elisitasi\s*$")
+TICKET_ACTION = "Kembalikan ke `analyst:spec` (reopen → approve ulang); rantai engineer dilarang menyunting tiket."
+
+
+def normalize_ticket_path(value: Optional[str]) -> str:
+    rel = (value or "").strip().replace("\\", "/")
+    return rel[2:] if rel.startswith("./") else rel
+
+
+def ticket_card(text: str) -> str:
+    """Kartu tiket: badan sesudah frontmatter sampai sebelum `## Catatan Elisitasi` (di luar fence)."""
+    try:
+        _, body = split_frontmatter(text)
+    except FrontmatterError:
+        body = normalize_text(text)
+    lines = body.split("\n")
+    stop = next((no - 1 for no, line in iter_outside_fences(body) if TICKET_ELICIT_H2.match(line)), len(lines))
+    return "\n".join(lines[:stop])
+
+
+def ticket_acs(text: str) -> List[int]:
+    """Nomor `AC-{n}` kartu tiket, baris kanonik `- **AC-{n}**: …` di luar fence."""
+    card = ticket_card(text)
+    return sorted({int(m.group(1)) for _, line in iter_outside_fences(card) for m in [TICKET_AC_RE.match(line)] if m})
+
+
+def ticket_source_verdict(root: Path, value: Optional[str]) -> Tuple[str, str, str]:
+    """`(status, ringkasan, tindakan)` untuk `ticket_source`: kosong → PASS; tiket wajib READY dan terkunci."""
+    rel = normalize_ticket_path(value)
+    if not rel:
+        return "PASS", "bukan dari tiket analyst", ""
+    m = TICKET_PATH_RE.fullmatch(rel)
+    if not m:
+        return ("FAIL", f"`{rel}` bukan path TICKET.md analyst (analyst/tickets/<YYMMDDhhmm>-<slug>/TICKET.md)",
+                "Minta path dari keluaran `analyst:spec` (`SPEC — READY · <ticketdir>/TICKET.md`).")
+    path = root / rel
+    if not path.is_file():
+        return "FAIL", f"`{rel}` tidak ada di disk", "Minta path dari keluaran `analyst:spec`."
+    try:
+        fm, _ = read_frontmatter(path)
+    except (OSError, UnicodeDecodeError, FrontmatterError) as exc:
+        return "FAIL", f"`{rel}`: frontmatter tak terbaca ({exc})", TICKET_ACTION
+    status, elicit = fm.get("status") or "-", fm.get("elicitation") or "-"
+    if status != "READY" or elicit != "CLOSED":
+        return ("FAIL", f"tiket berstatus `{status}`, elisitasi `{elicit}` — wajib `READY` dan `CLOSED`",
+                "Selesaikan tiket di `analyst:spec` sampai READY.")
+    rc, inside = _git_out(root, "rev-parse", "--is-inside-work-tree")
+    if rc != 0 or inside != "true":
+        return "PASS", f"{rel} READY (bukan repo git — DRIFT tidak dinilai)", ""
+    slug = m.group(1)
+    locks = (f"docs(ticket): kunci TICKET {slug} READY", f"docs(ticket): ref TICKET {slug}")
+    _, subject = _git_out(root, "log", "-1", "--format=%s", "--", rel)
+    _, dirty = _git_out(root, "status", "--porcelain", "--", rel)
+    if dirty:
+        return "FAIL", f"`{rel}` disunting sesudah dikunci (belum di-commit) — DRIFT", TICKET_ACTION
+    if subject not in locks:
+        return ("FAIL", f"commit terakhir `{rel}` bersubjek `{subject or '(tidak ada)'}`, bukan kunci READY — DRIFT",
+                TICKET_ACTION)
+    return "PASS", f"{rel} READY terkunci ({subject})", ""
+
+
+def ticket_carry_problems(root: Path, value: Optional[str], carried: str, out_of_scope: str) -> List[str]:
+    """Tiap `AC-{n}` kartu wajib muncul sebagai `TAC-{n}` di `carried` (SC aktif) atau `out_of_scope`."""
+    rel = normalize_ticket_path(value)
+    if not rel:
+        return []
+    try:
+        acs = ticket_acs(read_text(root / rel))
+    except (OSError, UnicodeDecodeError):
+        return [f"`ticket_source: {rel}` tidak terbaca"]
+    if not acs:
+        return [f"`ticket_source: {rel}` tanpa baris `- **AC-{{n}}**:` di kartunya"]
+    both = carried + "\n" + out_of_scope
+    cited = {int(n) for n in re.findall(r"\bTAC-(\d+)\b", both)}
+    lost = [f"TAC-{n}" for n in acs if n not in cited]
+    ghost = [f"TAC-{n}" for n in sorted(cited - set(acs))]
+    p = [f"TAC tanpa SC pemikul maupun `## Out of Scope`: {', '.join(lost)}"] if lost else []
+    if ghost:
+        p.append(f"TAC tanpa `AC-{{n}}` di kartu tiket (rujukan hantu): {', '.join(ghost)}")
+    return p
+
+
 # ============================================================ profil & berkas plugin
 
 @dataclass

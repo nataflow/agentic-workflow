@@ -16,6 +16,7 @@ sections: [<flow, ui, architecture — sesuai handoff lead; [] untuk HOTFIX_MINO
 created: <YYYY-MM-DD>
 finding_source: <path REVIEW.md asal>
 findings: [<P1-1>, <P2-3>]
+ticket_source: <path TICKET.md analyst>
 ---
 
 # <Fitur — jenis kerja, maksimal 8 kata>
@@ -52,7 +53,7 @@ Baris `## Chain` memuat **tepat** hop yang dijadwalkan `sections`, berurutan: `F
 
 Sha di baris `[x]` adalah commit **konten** yang disetujui user. Gerbang hilir memvonis isi dokumen sekarang identik dengan isinya di sha itu, kecuali baris `status:`; suntingan sesudah approval tanpa `reopen` gagal di setiap skrip prasyarat hilir.
 
-Baris `finding_source:` dan `findings:` hanya ditulis bila akar berangkat dari temuan review; permintaan kerja biasa menghilangkan keduanya sepenuhnya.
+Baris `finding_source:` dan `findings:` hanya ditulis bila akar berangkat dari temuan review; permintaan kerja biasa menghilangkan keduanya sepenuhnya. Baris `ticket_source:` hanya ditulis bila akar berangkat dari tiket analyst (`SKILL.md` Phase 3 butir 6).
 
 ______________________________________________________________________
 
@@ -68,7 +69,7 @@ Dijalankan `task` atas `TASK.md` yang baru ditulis, sebelum commit Phase 4 beran
 4. **Bukti berpaut kode**: `## Description` memuat minimal satu `file:baris`, dan tiap rujukan menunjuk berkas yang ada dengan nomor baris dalam rentang berkasnya.
 5. **Ambang terukur**: tiap butir menyebut nama layar, rute, komponen, state, teks, atau angka spesifik. Kata sifat tanpa ambang ("lebih rapi", "lebih cepat", "intuitif") adalah kegagalan.
 6. **Batas kerja bersuara**: `## Out of Scope` memuat minimal satu butir berformat `- <yang tidak dikerjakan> — <alasan>`.
-7. **Nol placeholder & temuan terpikul**: tidak ada `TBD`, `TODO`, `FIXME`, `diisi nanti`, atau sisa slot `<...>` (termasuk slot template seperti `<slug>` di dalam backtick). JSX (`<Skeleton />`), generik TS, dan operator perbandingan (`< 300 ms`) bukan placeholder. Bila `finding_source` terisi, tiap ID di `findings` disebut **tepat satu** butir `SC-{n}`, dan butir itu memuat `> Status: FIXED`.
+7. **Nol placeholder & temuan terpikul**: tidak ada `TBD`, `TODO`, `FIXME`, `diisi nanti`, atau sisa slot `<...>` (termasuk slot template seperti `<slug>` di dalam backtick). JSX (`<Skeleton />`), generik TS, dan operator perbandingan (`< 300 ms`) bukan placeholder. Bila `finding_source` terisi, tiap ID di `findings` disebut **tepat satu** butir `SC-{n}`, dan butir itu memuat `> Status: FIXED`. Bila `ticket_source` terisi, tiap `AC-{n}` kartu tiket disebut sebagai `TAC-{n}` di minimal satu butir `SC-{n}` aktif atau di `## Out of Scope`, dan tidak ada `TAC-{n}` yang nomornya absen dari kartu.
 8. **Kecukupan akar**: tiap `SC-{n}` menamai permukaan yang disebut `request` atau terbukti di `evidence`. Butir yang memperkenalkan permukaan di luar keduanya dihapus, dilarang dicarikan akar susulan.
 9. **Ledger `## Chain`**: baris hop persis `expected_rows(sections)` dan seluruhnya `[ ]` — ditulis `chain.py init`, bukan diketik.
 

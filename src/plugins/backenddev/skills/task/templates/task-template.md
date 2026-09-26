@@ -13,6 +13,7 @@ chain: <BRD_PRD_BRIEF | PRD_BRIEF | BRIEF>
 lane: <PRD_CONVERSION | DIRECT_BRIEF | DEFECT_RCA | EXEC_BRIEF>
 risk: <BREAKING | MAJOR | MINOR | ->
 created: <YYYY-MM-DD>
+ticket_source: <path TICKET.md analyst>
 ---
 
 # <Domain — jenis kerja, maksimal 8 kata>
@@ -50,6 +51,8 @@ created: <YYYY-MM-DD>
 
 `## Counters` ditulis `task` berisi header tabel saja dan hanya diisi `analyst/scripts/chain_counters.py` (plafon loop re-entry, transisi chain, amandemen akar, penolakan user, pengembalian Open questions, ronde reviewer BRD/PRD); dilarang disunting tangan. Lane non-planning ikut memuatnya.
 
+Baris `ticket_source:` hanya ditulis bila akar berangkat dari tiket analyst (`SKILL.md` Fase 3 butir 7); permintaan lain menghilangkannya sepenuhnya.
+
 ______________________________________________________________________
 
 ## 2. Self-test Akar
@@ -71,6 +74,7 @@ Dijalankan `task` atas `TASK.md` yang baru ditulis, sebelum commit Fase 5 berang
    - **8b** [T8b, hanya `--fresh`]: seluruh hop `## Chain` belum tercentang.
 
 9. **Kecukupan akar** [T9 MANUAL]: tiap `SC-{n}` menamai permukaan yang disebut `request` atau terbukti di `evidence` — endpoint, modul, aturan, status, atau artefak. Butir yang memperkenalkan permukaan di luar keduanya adalah kegagalan: hapus butirnya, dilarang dicarikan akar susulan. Jumlah butir dinilai dari cakupan, bukan dari plafon — rangkaian yang sudah menutup seluruh permukaan yang diminta lalu ditambah butir demi mendekati angka 7 gagal di butir ini, sekalipun tiap butirnya lolos butir 2–4.
+10. **Keterpikulan tiket** [T10, hanya bila frontmatter `ticket_source:` ada]: tiap `AC-{n}` kartu `TICKET.md` disebut sebagai `TAC-{n}` di minimal satu butir `SC-{n}` aktif atau di `## Out of Scope`, dan tidak ada `TAC-{n}` yang nomornya absen dari kartu. Nomor tiket selalu ber-prefix `T` — `AC-{n}` polos tetap token terlarang butir 3.
 
 Hasilnya: keluaran validator ditambah satu baris per butir `MANUAL` (`butir <n>: lolos` atau `butir <n>: gagal — <rincian>`), dan commit Fase 5 dilarang berangkat sebelum seluruhnya lolos.
 

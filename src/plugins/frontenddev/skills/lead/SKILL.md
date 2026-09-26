@@ -25,6 +25,7 @@ description: Gunakan ketika ada permintaan kerja baru atau susulan di repo front
 - `target_app` — string — default `""` — target app pada monorepo (`apps/web`, `apps/mobile`).
 - `finding_source` — string — default `""` — path berkas temuan review ad-hoc (`frontenddev/reviews/<berkas>.md`) bila kerja ini lahir dari temuan. `REVIEW.md` `BLOCKED` rantai aktif tidak memakai parameter ini — ia diperbaiki di taskdir yang sama (Phase 8).
 - `finding_ids` — list — default `[]` — ID temuan yang dikerjakan; kosong padahal `finding_source` terisi berarti seluruh temuan `PLANNED`.
+- `ticket_source` — string — default `""` — path `analyst/tickets/<YYMMDDhhmm>-<slug>/TICKET.md` berstatus `READY` bila kerja ini lahir dari tiket analyst. Terisi → `prompt` = kartu tiket (H1 sampai akhir `## Lampiran`) apa adanya, dan tiap `AC-{n}`/`BR-{n}` kartu dirujuk `TAC-{n}`/`TBR-{n}` di seluruh artefak frontenddev agar tidak bertabrakan dengan `AC-{n}` CONTRACT. Dilarang disimpulkan dari isi `prompt`: permintaan yang tampak seperti kartu tiket tanpa path → tanyakan path-nya lewat `AskUserQuestion`.
 
 ## Workflow
 
@@ -106,7 +107,7 @@ Dokumen gate lahir `DRAFT` dan di-commit; approval hanya lewat `AskUserQuestion`
 ### Phase 7 — Klarifikasi & Kunci Akar
 
 - Ketidakjelasan intent atau cakupan → maksimal 3 pertanyaan lewat `AskUserQuestion` dengan opsi konkret beserta trade-off; dilarang menanyakan yang sudah ada di profil.
-- **Penguncian akar** — selalu pada lane berakar: panggil `frontenddev:task` dengan `{ taskdir, lane, sections, request, evidence, clarification, finding_source, finding_ids }`. `evidence` diisi `file:baris` sapuan Phase 1 atau laporan explorer; fitur baru memakai titik sambungnya dari `surface-map.md`. Gate pertama berangkat hanya sesudah `TASK ROOT LOCKED` tanpa `TERTAHAN`.
+- **Penguncian akar** — selalu pada lane berakar: panggil `frontenddev:task` dengan `{ taskdir, lane, sections, request, evidence, clarification, finding_source, finding_ids, ticket_source }`. `evidence` diisi `file:baris` sapuan Phase 1 atau laporan explorer; fitur baru memakai titik sambungnya dari `surface-map.md`. Gate pertama berangkat hanya sesudah `TASK ROOT LOCKED` tanpa `TERTAHAN`.
 
 ### Phase 8 — Kanal Eskalasi & Re-entry
 

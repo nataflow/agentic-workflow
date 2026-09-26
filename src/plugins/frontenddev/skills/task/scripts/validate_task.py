@@ -35,6 +35,7 @@ from precondition_lib import (  # noqa: E402
     report_json,
     find_placeholders,
     split_frontmatter,
+    ticket_carry_problems,
 )
 
 HEADINGS = ("## Description", "## Success Criteria", "## Out of Scope", "## Chain")
@@ -193,9 +194,15 @@ class TaskValidator:
                     errors.append(f"{fid} dipikul {len(owners)} butir, wajib tepat satu")
                 elif "Status: FIXED" not in owners[0].group(2):
                     errors.append(f"SC pemikul {fid} tanpa `> Status: FIXED`")
+        ticket = self.fm.get("ticket_source")
+        if ticket:
+            carried = "\n".join(m.group(2) for m in self._sc_lines() if not GUGUR.search(m.group(2)))
+            errors += ticket_carry_problems(self.root, ticket, carried,
+                                            "\n".join(self.sections.get("## Out of Scope", [])))
         self._add(7, "Nol placeholder & temuan terpikul", not errors,
                   "; ".join(errors) or "lolos",
-                  "Hapus sisa placeholder; tiap ID temuan dipikul tepat satu SC ber-`> Status: FIXED`.")
+                  "Hapus sisa placeholder; tiap ID temuan dipikul tepat satu SC ber-`> Status: FIXED`; "
+                  "tiap `AC-{n}` tiket muncul sebagai `TAC-{n}` di SC aktif atau `## Out of Scope`.")
 
     def _check_9_chain(self, text: str) -> None:
         entries = read_chain(text)

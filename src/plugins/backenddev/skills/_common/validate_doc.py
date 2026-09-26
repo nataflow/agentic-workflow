@@ -32,6 +32,7 @@ from precondition_lib import (  # noqa: E402
     normalize_text,
     resolve_taskdir,
     split_frontmatter,
+    ticket_carry_problems,
 )
 
 # --- konstanta kanonik (salinan penegak; rumahnya template masing-masing) ---------------------
@@ -318,6 +319,13 @@ class Validator:
             done = [h for mark, h in ledger if mark != " "]
             self.add("T8b", "Kondisi awal ledger", [f"hop sudah bertanda: {', '.join(done)}"] if done else [])
         self.manual("T9", "Kecukupan akar", "task-template bagian 2 butir 9")
+
+        # T10 — akar dari tiket analyst: tiap `AC-{n}` kartu dipikul `TAC-{n}` (gate-scope bagian 4 B-2).
+        ticket = (fm.get("ticket_source") or "").strip()
+        if ticket:
+            active = "\n".join(l for l in sc_lines if "~~" not in l)
+            self.add("T10", "Keterpikulan TAC tiket",
+                     ticket_carry_problems(self.root, ticket, active, d.section_text("Out of Scope")))
 
     # ------------------------------------------------------------------ BRD
 

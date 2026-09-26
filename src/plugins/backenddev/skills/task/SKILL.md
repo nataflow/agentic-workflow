@@ -15,8 +15,8 @@ user-invocable: false
 
 ## Precondition [REQUIRED]
 
-1. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/task/scripts/check_preconditions.py --taskdir <taskdir> --lane <lane> [--chain <chain>]`. Hilangkan `--chain` pada lane `DEFECT_RCA`/`EXEC_BRIEF`.
-2. `PASS` (6/6 checks) → lanjut ke Workflow. `FAIL` → hentikan dan remediasi butir gagal: taskdir belum sah → minta alokasi ke `backenddev:tech-lead`; profil atau commit convention belum lengkap → `backenddev:profile`; `TASK.md` sudah ada → serahkan ke gerbang; `chain` di luar enum atau tak selaras dengan `lane` → kembalikan ke `backenddev:analyst`; working tree kotor → bersihkan dulu.
+1. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/task/scripts/check_preconditions.py --taskdir <taskdir> --lane <lane> [--chain <chain>] [--ticket-source <ticket_source>]`. Hilangkan `--chain` pada lane `DEFECT_RCA`/`EXEC_BRIEF`.
+2. `PASS` (7/7 checks) → lanjut ke Workflow. `FAIL` → hentikan dan remediasi butir gagal: taskdir belum sah → minta alokasi ke `backenddev:tech-lead`; profil atau commit convention belum lengkap → `backenddev:profile`; `TASK.md` sudah ada → serahkan ke gerbang; `chain` di luar enum atau tak selaras dengan `lane` → kembalikan ke `backenddev:analyst`; working tree kotor → bersihkan dulu; `ticket_source` tidak `READY` atau disunting sesudah approve (check 7) → hentikan dan kembalikan ke gerbang, yang mengembalikannya ke `analyst:spec`.
 
 ## Parameter [REQUIRED]
 
@@ -28,6 +28,7 @@ user-invocable: false
 - `evidence` — list — `[REQUIRED]` — minimal satu `file:line` hasil eksplorasi gerbang; daftar kosong menghentikan skill.
 - `clarification` — list — default `[]` — pasangan tanya-jawab gerbang; sumber utama `## Out of Scope`.
 - `finding_source` — string — default `""` — path berkas temuan asal (`backenddev/issues/<file>.md` atau `{taskdir}/REVIEW.md`) saat akar berangkat dari temuan terpilih; menyalakan Fase 3 butir 6. Kosong pada permintaan kerja biasa; dilarang disimpulkan dari isi `request`.
+- `ticket_source` — string — default `""` — path `TICKET.md` `READY` analyst saat akar berangkat dari tiket (`tech-lead/references/gate-scope.md` bagian 4 B-2); menyalakan Fase 3 butir 7. Dilarang disimpulkan dari isi `request`.
 
 ## Workflow
 
@@ -66,15 +67,16 @@ Susun 1–7 butir berformat `- [ ] **SC-{n}**: <hasil terukur> — verifikasi: <
 4. Cantumkan nama entitas, threshold numerik, atau status spesifik. Tolak kata sifat tanpa ambang ukur ("lebih cepat", "optimal").
 5. **Uji kecukupan.** Tiap butir berakar pada permukaan yang disebut `request` atau terbukti di `evidence`; yang memperkenalkan permukaan di luar keduanya dihapus, bukan dicarikan akar susulan. Berhenti begitu tiap permukaan yang diminta punya satu butir pemikul — angka 7 adalah plafon, bukan target.
 6. **Akar yang berangkat dari temuan.** `finding_source` terisi → tiap temuan terpilih memikul **tepat satu** butir `SC-{n}` yang menyebut ID temuannya (`P1-1`, `P2-3`) beserta `file:line` yang disebut temuan itu, dan alat ukurnya ditambah `baris > Status: FIXED atas <ID temuan> di <finding_source>` di samping alat ukur lane-nya. `finding_source` = `{taskdir}/REVIEW.md` → alat ukur tambahannya `ID temuan tidak muncul di REVIEW.md putaran berikutnya`, bukan penanda `FIXED`: `REVIEW.md` ditulis ulang reviewer tiap putaran, sehingga penanda di dalamnya hilang sendiri. Klausa ini berlaku di atas kolom alat ukur lane mana pun, `PRD_CONVERSION` termasuk: temuan yang naik jadi rantai ber-PRD tetap wajib ditandai di berkas asalnya, dan tanpa penandaan itu ia terpilih ulang di batch berikutnya lalu dikerjakan dua kali. Dilarang menggabungkan dua temuan ke satu butir maupun memecah satu temuan jadi beberapa butir — jumlahnya sudah dikunci seleksi gerbang berplafon tujuh (`tech-lead/references/gate-scope.md` bagian 6).
+7. **Akar dari tiket analyst.** `ticket_source` terisi → baca kartu `TICKET.md` (H1 sampai akhir `## Lampiran`). Tiap `AC-{n}` kartu dirujuk sebagai `TAC-{n}` dan wajib disebut **minimal satu** butir `SC-{n}`, atau tercatat di `## Out of Scope` sebagai `- TAC-{n} <ringkas> — <alasan: porsi frontend | ditunda | tiket terpisah>`. Kalimat Given/When/Then tiket dilarang disalin apa adanya sebagai SC — SC tetap menamai permukaan teknis (endpoint, transisi, aturan), dan `TAC-{n}` ditulis di prosa hasil, bukan di alat ukur.
 
 ### Fase 4 — Penetapan Out of Scope
 
-Tulis minimal satu butir berformat `- <yang tidak dikerjakan> — <alasan>` dari 3 sumber: modul bersinggungan di luar File Scope gerbang; opsi yang disingkirkan pada `clarification`; isu eksplorasi yang ditunda. Daftar kosong dilarang — bila ketiganya nihil, tulis batas modul dari File Scope.
+Tulis minimal satu butir berformat `- <yang tidak dikerjakan> — <alasan>` dari 4 sumber: modul bersinggungan di luar File Scope gerbang; opsi yang disingkirkan pada `clarification`; isu eksplorasi yang ditunda; dan `TAC-{n}` tiket yang bukan porsi taskdir ini (Fase 3 butir 7). Daftar kosong dilarang — bila keempatnya nihil, tulis batas modul dari File Scope.
 
 ### Fase 5 — Penulisan & Penguncian Commit
 
 1. Baca `templates/task-template.md` bagian 1, isi placeholder dari Fase 1–4, tulis ke `{taskdir}/TASK.md` dengan `status: ACTIVE`.
-2. `chain` terisi: tulis frontmatter `chain:` bernilai persis itu dan seksi `## Chain` berisi tepat hop chain tersebut, seluruhnya belum tercentang, mengikuti bagian 2 `analyst/references/chain-rules.md`. `chain` kosong: hilangkan baris frontmatter dan seksi itu sepenuhnya.
+2. `chain` terisi: tulis frontmatter `chain:` bernilai persis itu dan seksi `## Chain` berisi tepat hop chain tersebut, seluruhnya belum tercentang, mengikuti bagian 2 `analyst/references/chain-rules.md`. `chain` kosong: hilangkan baris frontmatter dan seksi itu sepenuhnya. `ticket_source` terisi: tulis frontmatter `ticket_source:` bernilai persis path itu; kosong: hilangkan barisnya.
 3. **Self-test akar**: sebelum butir 4 berangkat, jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/validate_doc.py --kind task --taskdir <taskdir> --fresh [--finding-source <finding_source>]`. `FAIL` → perbaiki seluruh pelanggaran satu keluaran, lalu jalankan sekali lagi. Butir `MANUAL` (T3b, T4, T9) dinilai sendiri memakai predikat bagian 2 berkas itu; rumah kanonik predikatnya di sana, dilarang ditulis ulang di sini.
 4. Stage eksplisit `{taskdir}/TASK.md`, lalu commit dengan `commit_convention` profil bersubjek `docs(<slug>): kunci TASK sebagai akar rantai`.
 5. Catat SHA commit dan kembalikan kendali ke pemanggilnya — `backenddev:analyst` pada lane planning, `backenddev:tech-lead` pada lane lainnya.

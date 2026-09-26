@@ -314,6 +314,11 @@ ada di `hooks/gate_text.py`.
   yang merutekan lane `PROFILE` (GENERATE | REFRESH | MIGRATE) lebih dulu lalu melanjutkan rute tertunda.
 - **Alur plugin lain**: permintaan yang memanggil atau melanjutkan `/analyst:*` atau `/quickdev:*`
   secara eksplisit dikecualikan dari gate.
+- **Tiket analyst**: tiket `READY` diserahkan ke `/frontenddev:lead` lewat parameter `ticket_source`
+  (path `analyst/tickets/<YYMMDDhhmm>-<slug>/TICKET.md`). `AC-{n}`/`BR-{n}` kartu dirujuk `TAC-{n}`/`TBR-{n}`
+  agar tidak bertabrakan dengan `AC-{n}` CONTRACT; tiap `TAC-{n}` dipikul `SC-{n}` atau tercatat di
+  `## Out of Scope` (`validate_task.py` check 7), dan tiket yang disunting sesudah approve ditolak prasyarat
+  `task` check 8.
 - **Opt-out mekanis `.claude/workflow`**: berkas teks berisi nama plugin yang boleh menggerbangi repo,
   dipisah spasi atau baris. Isi `quickdev` → hook `frontenddev` dan `backenddev` diam; isi
   `frontenddev quickdev` → hanya hook `frontenddev` yang menyala. Berkas tidak ada → perilaku normal.

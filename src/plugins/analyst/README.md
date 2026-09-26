@@ -50,7 +50,7 @@ permintaan ──► intake ──┬─► di luar wilayah (kerja teknis murni)
                             spec ─► kartu DRAFT di atas catatan → validate_doc → ticket-reviewer (≤2 ronde)
                                     → commit → AskUserQuestion → ticket.py approve → READY (+ commit)
                                                                    │
-                         tempel TICKET.md sebagai permintaan ke ──┘ backenddev:tech-lead / frontenddev:lead
+                    ticket_source: <ticketdir>/TICKET.md ke ──┘ backenddev:tech-lead / frontenddev:lead
 ```
 
 Permintaan yang sudah lengkap tetap melewati `elicit`: fakta diisi dari permintaan asli, dikonfirmasi sekali,
@@ -131,12 +131,25 @@ eksplisit (`docs(ticket): ...`); di luar git, commit dilewati dan disebut di Out
 
 ## Serah Terima ke Engineer
 
-Serah-terima **masih manual**: tempel kartu `TICKET.md` (H1 sampai `## Lampiran`) sebagai permintaan ke
-`backenddev:tech-lead` dan/atau `frontenddev:lead`. Gerbang engineer belum mengenal format ini:
-`BR-{n}` tiket tidak dihitung sebagai aturan yang sudah disepakati, sehingga `backenddev:analyst` dapat
-menjadwalkan BRD dan menanyakan ulang aturannya — sebutkan saat menempel bahwa aturan di tiket sudah
-disetujui peminta. Nomor `AC-{n}`/`BR-{n}` tiket bertabrakan dengan nomor PRD/BRD/CONTRACT; rujuk
-sebagai "AC-3 tiket <slug>". Catatan elisitasi boleh ikut sebagai jejak asal-usul tiap AC.
+Tiket `READY` diserahkan lewat parameter `ticket_source` = path `<ticketdir>/TICKET.md` ke
+`backenddev:tech-lead` dan/atau `frontenddev:lead` (baris penutup `SPEC — READY` memuatnya). Kontraknya:
+
+- **Syarat**: frontmatter `status: READY` dan `elicitation: CLOSED`; di repo git, commit terakhir yang
+  menyentuh berkas bersubjek `docs(ticket): kunci TICKET <slug> READY` atau `docs(ticket): ref TICKET <slug>`,
+  dan berkasnya bersih. Tiket yang disunting sesudah approve ditolak prasyarat `task` kedua plugin (DRIFT)
+  dan dikembalikan ke `analyst:spec`.
+- **Yang dibaca**: kartu saja (H1 sampai akhir `## Lampiran`); catatan elisitasi hanya jejak, bukan sumber
+  kriteria.
+- **Namespace**: kartu tetap menulis `AC-{n}`/`BR-{n}`. Di hilir keduanya dirujuk `TAC-{n}`/`TBR-{n}` agar
+  tidak bertabrakan dengan `AC-{n}` PRD/CONTRACT dan `BR-{n}` BRD.
+- **Keterlacakan**: tiap `TAC-{n}` dipikul minimal satu `SC-{n}` di `TASK.md` engineer, atau tercatat di
+  `## Out of Scope` beralasan (mis. porsi frontend). Validator `TASK.md` kedua plugin menagihnya.
+- **Kesepakatan aturan**: aktor, kondisi, dan `TBR-{n}` yang tertulis di tiket dihitung sudah disetujui.
+  `backenddev:analyst` tidak menjadwalkan BRD hanya karena fakta itu; bila BRD tetap terbit karena fakta di
+  luar tiket, `business-analysis` menyerap `TBR-{n}` tanpa menanyakannya ulang (`— Asal: TBR-{m}`).
+
+Mengubah format subjek commit `approve`/`ref` di `_common/ticket.py` berarti mengubah pembacanya juga
+(`ticket_source_verdict` di `_common/precondition_lib.py` backenddev dan frontenddev).
 
 Engineer menerbitkan `TASK.md` teknisnya sendiri —
 lengkap dengan `file:baris`, alat ukur teknis, dan ledger — dari tiket itu. Nama `TICKET.md` sengaja berbeda
@@ -162,5 +175,3 @@ Untuk repo yang hanya memakai analyst, tulis `.claude/workflow` tanpa nama plugi
 - **`split`** — pemecahan epic menjadi beberapa tiket. Sementara ini `intake` memilih satu tujuan per tiket dan
   mengembalikan sisanya sebagai antrian tiket.
 - **`acceptance`** — UAT: membaca `REPORT.md` engineer dan memvonis AC tiket dalam bahasa bisnis.
-- **Rujukan `AC-{n}` di `TASK.md` engineer** — keterlacakan AC → SC menuntut perubahan gerbang `backenddev`/
-  `frontenddev`, ditunda sampai alur plugin ini terbukti.

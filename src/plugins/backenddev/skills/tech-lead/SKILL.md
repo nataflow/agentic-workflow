@@ -9,12 +9,12 @@ description: Gunakan ketika ada permintaan kerja baru atau susulan di repo backe
 - Tetapkan rute dan risk level, lalu jalankan langkah pertama di giliran yang sama.
 - Dilarang membuat, mengedit, atau menghapus berkas kode secara langsung.
 - Buktikan setiap keputusan rute dari kode aktual; **isi prompt** tiap dispatch gerbang bersumber dari `dispatcher/explorer.md` terhidrasi penuh, tidak pernah dari prompt yang disusun sendiri.
-- Inisialisasi taskdir dan branch sebelum mendelegasikan pekerjaan ke downstream.
+- Inisialisasi taskdir dan branch sebelum delegasi ke hilir.
 
 ## Precondition [REQUIRED]
 
-1. Fase 0 (tiap permintaan): `python3 ${CLAUDE_PLUGIN_ROOT}/skills/tech-lead/scripts/check_preconditions.py --read-only`. `FAIL` di mode ini berarti repo tak terbaca (bukan git, `index.json` rusak) → hentikan dan laporkan.
-2. Fase 3 butir 0 (hanya lane yang memprovisi taskdir/branch: `PLANNING`, `DEFECT_RCA`, `EXEC_BRIEF`, `AUDIT_SWEEP`, `API_DOCS`): skrip yang sama tanpa `--read-only`, ditambah `--re-entry` bila masuk lewat Fase 5. `PASS` (6/6) → lanjut. `FAIL` → remediasi: profil (`commands.md`, `base_branch`) bermasalah → rute `PROFILE`; tree kotor di luar zona artefak → minta user stash/commit; HEAD detached → minta checkout ke `base_branch`.
+1. Fase 0 (tiap permintaan): `python3 ${CLAUDE_PLUGIN_ROOT}/skills/tech-lead/scripts/check_preconditions.py --read-only`. `FAIL` di sini berarti repo tak terbaca (bukan git, `index.json` rusak) → hentikan dan laporkan.
+2. Fase 3 butir 0 (hanya lane yang memprovisi taskdir/branch: `PLANNING`, `DEFECT_RCA`, `EXEC_BRIEF`, `AUDIT_SWEEP`, `API_DOCS`): skrip yang sama tanpa `--read-only`, ditambah `--re-entry` bila masuk lewat Fase 5. `PASS` (6/6) → lanjut. `FAIL` → remediasi: profil (`commands.md`, `base_branch`) bermasalah → rute `PROFILE`; tree kotor di luar zona artefak → minta user stash/commit; HEAD detached → minta checkout `base_branch`.
 
 ## Parameter [REQUIRED]
 
@@ -23,6 +23,7 @@ description: Gunakan ketika ada permintaan kerja baru atau susulan di repo backe
 - `base_branch` — string — `[OPTIONAL]` — Acuan pencabangan; default dari profil; keduanya kosong → hentikan.
 - `strict_mode` — boolean — default `false` — Naikkan risk level 1 tingkat pada Keputusan 2 jika bernilai `true`.
 - `feature_slug` — string — `[OPTIONAL]` — Slug `<domain>-<jenis-kerja>`; default 2–4 kata dari `request`.
+- `ticket_source` — string — default `""` — Path `TICKET.md` `READY` analyst (`references/gate-scope.md` bagian 4 B-2); jangan ditebak dari `request`.
 
 ## Workflow
 
@@ -30,7 +31,7 @@ description: Gunakan ketika ada permintaan kerja baru atau susulan di repo backe
 
 1. **Satu titik sah**: dispatch hanya `code-explorer` di Fase 1 butir 2.
 2. **Predikat pra-panggil**: muat `dispatcher/explorer.md`, hidrasi seluruh slotnya, audit hasilnya; prompt yang masih memuat slot `{...}` mentah atau tanpa blok `Format laporan` dibatalkan.
-3. **Template adalah teks, bukan peluncur**: peluncurnya tool subagent harness. Template gagal dimuat → sapuan manual berkuota; jangan mengarang prompt.
+3. **Template adalah teks, bukan peluncur**: gagal dimuat → sapuan manual berkuota; jangan mengarang prompt.
 
 ### Gerbang Masuk — Evaluasi Pemicu & Pengecualian
 
@@ -61,7 +62,7 @@ Tepat 1 kali per pemicu, hanya bila tersisa ambiguitas rute atau batas modul (`r
 
 ### Keputusan 1 — Pemilihan Jalur Kerja (Routing Lane)
 
-Baca `references/decisions.md` bagian 6 **sebelum** memilih lane: tabel kondisi masuk, rute awal, artefak, dan presedensi `PROFILE` → `EXEC_BRIEF` → `AUDIT_SWEEP` → `DEFECT_RCA` → `PLANNING` → `API_DOCS` → `EXPLORE_FACT`. Pilih satu dari tujuh lane itu; dilarang mengarang lane baru. Lane `PLANNING` menampung seluruh kerja perancangan — termasuk perbaikan temuan `backenddev/issues/` dan `REVIEW.md` ber-`finding_source` — dan panjang rantainya diputuskan `backenddev:analyst`, bukan gerbang.
+Baca `references/decisions.md` bagian 6 **sebelum** memilih lane: tabel kondisi masuk, rute awal, artefak, dan presedensi `PROFILE` → `EXEC_BRIEF` → `AUDIT_SWEEP` → `DEFECT_RCA` → `PLANNING` → `API_DOCS` → `EXPLORE_FACT`. Dilarang mengarang lane baru. Lane `PLANNING` menampung seluruh kerja perancangan — termasuk perbaikan temuan `backenddev/issues/` dan `REVIEW.md` ber-`finding_source` — dan panjang rantainya diputuskan `backenddev:analyst`, bukan gerbang.
 
 ### Keputusan 2 — Klasifikasi Tingkat Risiko (Risk Level)
 
@@ -78,7 +79,7 @@ Jalankan untuk rute yang menghasilkan artefak rancangan atau kode; lewati pada l
 
 ### Fase 4 — Framing Delegasi & Serah Terima
 
-1. Sertakan framing deterministik tiap handoff: Target Skill, Taskdir, File Scope, Risk Level, Acceptance Criteria, Stop Conditions (`references/gate-scope.md` bagian 4), plus `evidence` `file:line` Fase 1 dan — hanya pada perbaikan temuan — slot `Finding Source` (bagian 4 B-1). Dilarang `File Scope` seluruh `src/` atau slot `TBD`.
+1. Sertakan framing deterministik tiap handoff: Target Skill, Taskdir, File Scope, Risk Level, Acceptance Criteria, Stop Conditions (`references/gate-scope.md` bagian 4), plus `evidence` `file:line` Fase 1, dan slot `Finding Source` (perbaikan temuan, bagian 4 B-1) atau `Ticket Source` (tiket analyst, B-2). Dilarang `File Scope` seluruh `src/` atau slot `TBD`.
 2. Artefak dikunci penulisnya (`gate-scope.md` bagian 3); commit kode milik rantai `architect`.
 3. Jalankan langkah pertama rute di giliran yang sama.
 
@@ -88,7 +89,7 @@ Jalankan untuk rute yang menghasilkan artefak rancangan atau kode; lewati pada l
 2. Commit artefak yang menunggu (profil, laporan `audit`, `RCA.md`, `docs/api/`) dengan staging path eksplisit tiap path slot `Menunggu commit` pengirim (`references/gate-scope.md` bagian 3).
 3. Tentukan langkah lanjut dari tabel pengirim balik `references/gate-lifecycle.md` bagian 6 butir 3 — `analyst`, amandemen akar, `debug`, `plan` jalur RCA, `audit`, `architect` (`COMPLETED`/`COMPLETED (WARNING)`, `TERTAHAN (scope)`, `HALT.md`, `Umpan balik profil`), `document-api`.
 4. Perlakukan severity `P1` dari `architect` sebagai kerja lanjutan pada **taskdir yang sama**; dilarang memperbaiki di gerbang dan dilarang memprovisi taskdir baru (Fase 3 butir 1 tidak berlaku). Klasifikasikan ulang lewat Keputusan 2, seleksi temuan lewat `references/gate-scope.md` bagian 6, lalu berangkatkan lane `PLANNING` dengan `finding_source` `{taskdir}/REVIEW.md` **dan** `reentry_reason` `REVIEW P1: <ID temuan terpilih>`.
-5. Skill hilir menutup `BLOCKED` atau rantai terputus → selesaikan akar masalah sesuai `## Failure path`; jangan membuat taskdir baru untuk menutupinya.
+5. Skill hilir menutup `BLOCKED` atau rantai terputus → selesaikan akar masalah sesuai `## Failure path`; jangan menutupinya dengan taskdir baru.
 
 ## Guardrails
 
@@ -96,7 +97,7 @@ Jalankan untuk rute yang menghasilkan artefak rancangan atau kode; lewati pada l
 - **PENCABANGAN HANYA DARI BASE BRANCH**: dilarang mencabangkan di atas branch kerja lain.
 - **COMMIT ARTEFAK MILIK PENULISNYA**: gerbang meng-commit hanya artefak `profile`, `audit`, `debug`, `document-api` di Fase 5, amandemen akar `TASK.md`, dan pencabutan `HALT.md` scope yang diterima user. Dilarang commit ulang dokumen terkunci atau staging wildcard.
 - **LARANGAN GIT DESTRUKTIF**: dilarang `git push`, `git merge`, `git rebase`, `gh pr create`, atau `git branch -D` tanpa otorisasi eksplisit user.
-- **RATIONALIZATION PREVENTION**: dilarang menganggap perubahan field response sebagai MINOR; menutupi taskdir `BLOCKED` dengan direktori baru; mendispatch implementor tanpa `architect`; berasumsi user setuju breaking tanpa PRD; melanjutkan sapuan setelah kuota habis; meminta stash/commit untuk pertanyaan baca-kode; atau menyusun prompt dispatch di luar template.
+- **RATIONALIZATION PREVENTION**: dilarang menganggap perubahan field response sebagai MINOR; menutupi taskdir `BLOCKED` dengan direktori baru; mendispatch implementor tanpa `architect`; berasumsi user setuju breaking tanpa PRD; melanjutkan sapuan setelah kuota habis; atau meminta stash/commit untuk pertanyaan baca-kode.
 
 ## Output [REQUIRED]
 
@@ -127,4 +128,4 @@ Re-entry Fase 5 memakai `### TECH-LEAD RE-ENTRY DECISION` berslot **Pengirim Bal
 
 ## STYLE
 
-- Imperatif aktif, Bahasa Indonesia baku, temuan ber-`file:line`, enum persis seperti tabel keputusan.
+- Imperatif aktif, Bahasa Indonesia baku, temuan ber-`file:line`, enum persis tabel keputusan.

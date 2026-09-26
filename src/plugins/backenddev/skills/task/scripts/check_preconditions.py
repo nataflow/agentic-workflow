@@ -2,7 +2,7 @@
 """Task Precondition Validator.
 
 Automates verification of repository preconditions before task skill execution.
-Runs checks 1 through 5 in a single pass and produces a compact, actionable report.
+Runs checks 1 through 7 in a single pass and produces a compact, actionable report.
 Zero external dependencies (Python Standard Library only). Satu impor intra-plugin:
 `skills/_common/precondition_lib.py` (parser taskdir, chain, status git, profil,
 keluaran), di-bootstrap relatif terhadap berkas ini.
@@ -28,6 +28,7 @@ from precondition_lib import (  # noqa: E402
     legacy_suffix,
     load_profile_index,
     parse_chain,
+    ticket_source_verdict,
     to_json,
 )
 
@@ -65,6 +66,7 @@ class PreconditionChecker:
         lane: Optional[str] = None,
         chain: Optional[str] = None,
         target_root: Optional[Path] = None,
+        ticket_source: Optional[str] = None,
     ):
         self.root = (target_root or find_repo_root()).resolve()
         self.taskdir_arg = taskdir
@@ -72,17 +74,19 @@ class PreconditionChecker:
         # Kosong/`-` berarti tanpa chain (lane non-planning); nilai asing dilaporkan check 6.
         self.chain_arg, self.chain_err = parse_chain(chain)
         self.td = check_taskdir(self.root, taskdir)
+        self.ticket_source = (ticket_source or "").strip()
         self.results: List[Dict[str, Any]] = []
 
 
     def run_all(self) -> bool:
-        """Run checks 1 through 6."""
+        """Run checks 1 through 7."""
         self._check_1_taskdir()
         self._check_2_profile()
         self._check_3_task_absence()
         self._check_4_lane()
         self._check_5_git_worktree_and_status()
         self._check_6_chain()
+        self._check_7_ticket_source()
         return all(r["status"] == "PASS" for r in self.results)
 
     def _check_6_chain(self):
@@ -145,6 +149,17 @@ class PreconditionChecker:
             "status": "PASS",
             "summary": f"Chain {self.chain_arg} selaras dengan lane terminal {self.lane_arg}",
             "action": "",
+        })
+
+    def _check_7_ticket_source(self):
+        # Ditambahkan di akhir supaya nomor check 1–6 yang sudah dirujuk tetap.
+        status, summary, action = ticket_source_verdict(self.root, self.ticket_source)
+        self.results.append({
+            "id": 7,
+            "name": "Ticket Source READY & Terkunci",
+            "status": status,
+            "summary": summary,
+            "action": action,
         })
 
     def _check_1_taskdir(self):
@@ -326,7 +341,8 @@ class PreconditionChecker:
         return format_text("task", self.results)
 
     def to_json(self) -> str:
-        return to_json(self.root, self.results, taskdir=self.taskdir_arg, lane=self.lane_arg, chain=self.chain_arg)
+        return to_json(self.root, self.results, taskdir=self.taskdir_arg, lane=self.lane_arg, chain=self.chain_arg,
+                       ticket_source=self.ticket_source)
 
 
 def main():
@@ -335,12 +351,15 @@ def main():
     parser.add_argument("--lane", type=str, required=False, help="Terminal lane enum")
     parser.add_argument("--chain", type=str, nargs="?", const="", default=None,
                         help="Chain enum (BRD_PRD_BRIEF | PRD_BRIEF | BRIEF); kosong/tanpa nilai pada lane non-planning")
+    parser.add_argument("--ticket-source", type=str, default="", dest="ticket_source",
+                        help="path TICKET.md analyst (analyst/tickets/<YYMMDDhhmm>-<slug>/TICKET.md), bila akar dari tiket")
     parser.add_argument("--root", type=str, default=None, help="Root path of target repository")
     parser.add_argument("--json", action="store_true", help="Output JSON format")
     args = parser.parse_args()
 
     target_root = Path(args.root) if args.root else None
-    checker = PreconditionChecker(taskdir=args.taskdir, lane=args.lane, chain=args.chain, target_root=target_root)
+    checker = PreconditionChecker(taskdir=args.taskdir, lane=args.lane, chain=args.chain, target_root=target_root,
+                                  ticket_source=args.ticket_source)
     passed = checker.run_all()
 
     if args.json:

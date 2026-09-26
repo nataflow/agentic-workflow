@@ -10,11 +10,13 @@ Derivasi `chain` (bagian 1), pemetaan hop ke parameter skill (bagian 2), pemicu 
 
 BRD wajib terbit bila **minimal satu** butir berikut benar:
 
-1. Aturan bisnis yang disentuh belum disepakati user, dan tidak terbukti sebagai konstanta, guard, atau `BR-{n}` di taskdir mana pun.
+1. Aturan bisnis yang disentuh belum disepakati user, dan tidak terbukti sebagai konstanta, guard, `BR-{n}` di taskdir mana pun, atau `TBR-{n}` tiket `ticket_source` (`BR-{n}` kartu `TICKET.md` `READY` — sudah disetujui user lewat `analyst:spec`).
 2. Alur yang berubah melibatkan lebih dari satu aktor manusia, atau memperkenalkan aktor sistem baru (scheduler, webhook consumer, queue listener).
 3. Urutan langkah kerja manusia berubah, bukan hanya perilaku teknis yang menopangnya.
 4. Kebijakan operasional berubah: kuota, batas waktu, hak persetujuan, aturan pembatalan, atau aturan pembagian biaya.
 5. Ada pertanyaan yang jawabannya menentukan nilai sebuah konstanta atau cabang alur, dan jawabannya tidak ditemukan di kode maupun di taskdir mana pun — permintaan tidak dapat dirumuskan sebagai perubahan perilaku teknis tanpa memutuskan aturan bisnisnya lebih dulu. Ini satu-satunya butir berpredikat penilaian: vonis aktifnya wajib membawa pertanyaan konkret itu ke `AskUserQuestion` Fase 1 butir 4, dilarang disimpulkan sendiri.
+
+**Tiket analyst sebagai bukti kesepakatan.** `ticket_source` terisi → butir 2–4 dinilai hanya atas aktor, urutan kerja, dan kebijakan yang **tidak** tertulis di kartu tiket (H1 sampai akhir `## Lampiran`) atau di pilar `Aktor`/`Aturan Bisnis`/`Kondisi Diinginkan` catatan elisitasinya; yang tertulis dihitung disepakati. Butir 5 aktif hanya untuk pertanyaan yang tidak dijawab tiket. Tiket yang tidak lagi `READY`, atau disunting sesudah approve, bukan bukti — hentikan dan kembalikan ke `analyst:spec`. Bila sumbu tetap aktif karena fakta di luar tiket, BRD terbit dalam mode serap tiket (bagian 2.1).
 
 Nol butir aktif berarti BRD **tidak** terbit — termasuk pada `risk: BREAKING`. Pecahnya kontrak teknis bukan predikat bisnis: menghapus kolom yang nol konsumennya adalah `BREAKING` yang tidak punya satu pun aktor, aturan, atau biaya pembiaran untuk digali, dan BRD yang dipaksakan di atasnya terisi seremonial.
 
@@ -107,6 +109,8 @@ Membuka hop **tidak menurunkan status artefaknya**: `BRD.md`/`PRD.md` `APPROVED`
 **`finding_source` — penanda akar yang berangkat dari temuan.** Gerbang mengisinya dengan path berkas temuan (`backenddev/issues/<file>.md` atau `{taskdir}/REVIEW.md`) dan mengosongkannya pada permintaan kerja biasa. `analyst` meneruskannya apa adanya ke **dua** titik: ke `task`, yang menambahkan penandaan baris `> Status:` ke alat ukur tiap `SC-{n}` pemikul temuan; dan ke `plan`, yang menyalakan re-verification temuan beserta pembuangan `PLAUSIBLE` tak terjawab di Fase 2-nya. Hop `BRD` dan `PRD` tidak memikulnya — keduanya bekerja atas aturan dan kontrak, bukan atas berkas laporan.
 
 Nilai ini menempel pada **asal-usul akar**, bukan pada panjang rantai, sehingga ketiga aturan di atas ikut berjalan pada rantai ber-PRD juga. Nilai yang putus di tengah rantai tidak menghasilkan kegagalan yang terlihat: ia mematikan ketiganya diam-diam, dan temuan yang sudah diperbaiki orang lain tetap masuk batch lalu dikerjakan ulang.
+
+**`ticket_source` — penanda akar yang berangkat dari tiket analyst.** Gerbang mengisinya dengan path `TICKET.md` `READY` (`tech-lead/references/gate-scope.md` bagian 4 B-2) dan mengosongkannya pada permintaan lain. `analyst` meneruskannya apa adanya ke `task`, yang menagih keterpikulan tiap `TAC-{n}` (Fase 3 butir 7), dan — bila sumbu bisnis bagian 1.1 tetap aktif — ke `business-analysis`, yang menyerap tiap `TBR-{n}` ke `## Business rules` sebagai `BR-{n}` berakhiran `— Asal: TBR-{m}` tanpa menanyakannya ulang. Hop `PRD` dan `BRIEF` tidak memikulnya; keterlacakan tiket mengalir lewat `SC-{n}`. Kartu menulis `AC-{n}`/`BR-{n}`; di artefak backenddev keduanya selalu dirujuk `TAC-{n}`/`TBR-{n}` agar tidak bertabrakan dengan `AC-{n}` PRD dan `BR-{n}` BRD.
 
 `entry_mode` diteruskan eksplisit ke `plan` sebagai salah satu dari `PRD` | `RCA` | `LANGSUNG`. Nilai bawaan dan resolusi dari artefak di disk sudah dihapus dari kontrak `plan`: keduanya menyimpulkan jalur dari apa yang kebetulan ada, sehingga chain ber-PRD yang PRD-nya gagal terbit turun diam-diam jadi jalur `LANGSUNG` dan seluruh pemeriksaan ber-gate PRD dilewati tanpa satu pun kegagalan tercatat. `plan` yang dipanggil tanpa nilai ini berhenti di check 3 prasyaratnya.
 

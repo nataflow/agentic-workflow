@@ -2,7 +2,7 @@
 
 Rumah kanonik bentuk **kartu** di `analyst/tickets/<YYMMDDhhmm>-<slug>/TICKET.md` — H1 dan tujuh H2 di atas `## Catatan Elisitasi`. Frontmatter dan catatan elisitasi berumah di `skills/elicit/templates/elicit-template.md`. Bagian 1 adalah kerangka yang disalin ke artefak, bagian 2 aturan yang ditagih `skills/_common/validate_doc.py --kind ticket` dan self-test penulis, bagian 3 contoh terisi yang **tidak** tersalin ke artefak. `SKILL.md` merujuk ke sini dan dilarang menulis ulang kerangkanya.
 
-Kartu setara kartu detail di Jira/Trello: dibaca peminta, product owner, QA, dan engineer. Isinya **apa** dan **kenapa**, tidak pernah **bagaimana** — pemecahan teknis, estimasi, dan pembagian backend/frontend milik engineer lewat `backenddev:tech-lead` / `frontenddev:lead`, yang menerbitkan `TASK.md` teknisnya sendiri dari kartu ini (serah-terima manual — gerbang engineer belum membaca format TICKET.md). `## Catatan Elisitasi` di bawah kartu tetap ikut di berkas yang sama sebagai jejak asal-usul tiap AC dan aturan.
+Kartu setara kartu detail di Jira/Trello: dibaca peminta, product owner, QA, dan engineer. Isinya **apa** dan **kenapa**, tidak pernah **bagaimana** — pemecahan teknis, estimasi, dan pembagian backend/frontend milik engineer lewat `backenddev:tech-lead` / `frontenddev:lead`, yang menerima path tiket ini sebagai `ticket_source`, merujuk `AC-{n}`/`BR-{n}` di sini sebagai `TAC-{n}`/`TBR-{n}`, lalu menerbitkan `TASK.md` teknisnya sendiri. `## Catatan Elisitasi` di bawah kartu tetap ikut di berkas yang sama sebagai jejak asal-usul tiap AC dan aturan.
 
 ---
 

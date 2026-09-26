@@ -27,6 +27,7 @@ user-invocable: false
 - `file_scope` — string — `[REQUIRED]` — slot `File Scope` laporan rute gerbang; diteruskan apa adanya ke `plan` sebagai pembanding Check E.
 - `chain` — enum — default `auto` — `BRD_PRD_BRIEF` | `PRD_BRIEF` | `BRIEF`; `auto` menurunkannya dari dua sumbu Fase 1.
 - `finding_source` — string — default `""` — Path berkas temuan asal (`backenddev/issues/<file>.md` atau `{taskdir}/REVIEW.md`) saat akar berangkat dari temuan terpilih; kosong pada permintaan kerja biasa. Diteruskan apa adanya ke `task` dan `plan` menurut bagian 2.1 `references/chain-rules.md`; dilarang disimpulkan dari isi `request`.
+- `ticket_source` — string — default `""` — Path `TICKET.md` `READY` analyst dari slot `Ticket Source` gerbang; kosong bila akar tidak berangkat dari tiket. Menyalakan pengakuan `TBR-{n}` di bagian 1.1 `references/chain-rules.md`, lalu diteruskan apa adanya ke `task` dan, bila sumbu bisnis tetap aktif, ke `business-analysis` (bagian 2.1). Dilarang disimpulkan dari isi `request`.
 - `reentry_reason` — string — default `""` — Alasan gerbang mengembalikan taskdir yang ledger-nya sudah tercentang penuh: predikat gerbang yang gagal, perintah verifikasi penutup yang merah, atau daftar berkas yatim. Terisi → Fase 3 butir 0 berangkat lebih dulu. Kosong pada taskdir berledger penuh → rantai berhenti tanpa hop yang dapat dijalankan; minta gerbang menyebutkan alasannya, dilarang menebak hop pemiliknya.
 
 ## Workflow
@@ -52,7 +53,7 @@ Tiga keadaan normal masuk lewat jalur ini: taskdir ber-`BRD.md`/`PRD.md` `DRAFT`
 
 ### Fase 2 — Perumusan Akar Rantai
 
-1. Panggil `backenddev:task` dengan `taskdir`, `lane` terminal chain (matriks bagian 1.3 `references/chain-rules.md`, kolom keempat), `risk`, `request`, `evidence`, `clarification`, `chain`, dan `finding_source` apa adanya.
+1. Panggil `backenddev:task` dengan `taskdir`, `lane` terminal chain (matriks bagian 1.3 `references/chain-rules.md`, kolom keempat), `risk`, `request`, `evidence`, `clarification`, `chain`, `finding_source`, dan `ticket_source` apa adanya.
 2. Tangkap laporan `### TASK ROOT LOCKED`; `Uji Akar` bukan `9/9 lolos` atau `Commit` bernilai `GAGAL` → `## Failure path` butir 2.
 3. Verifikasi `TASK.md` **yang baru diterbitkan `task` di giliran ini** memuat frontmatter `chain:` sesuai Fase 1 dan seksi `## Chain` berisi tepat hop chain itu, seluruhnya belum tercentang. Butir ini tidak berlaku pada jalur resume Fase 0.
 
@@ -78,7 +79,7 @@ Jalankan hop belum tercentang paling atas pada ledger `## Chain`, satu hop per g
 
    **Plafon dua re-entry per taskdir**, dihitung terpisah dari eskalasi chain Fase 5 dan amandemen akar Fase 4a, dan dimateraikan `chain_counters.py` di `## Counters` `TASK.md` — bukan di ingatan sesi. Permintaan ketiga → `## Failure path` butir 9.
 
-1. Serahkan `taskdir`, `chain`, dan `risk` ke tiap skill hop tanpa kecuali; `system-analysis` menerima `risk` bernama `risk_level`, dan `plan` menerima `entry_mode`, `file_scope`, beserta `finding_source` menurut bagian 2.1 `references/chain-rules.md`. Dilarang membiarkan hop menyimpulkan `chain` dari keberadaan berkas.
+1. Serahkan `taskdir`, `chain`, dan `risk` ke tiap skill hop tanpa kecuali; `system-analysis` menerima `risk` bernama `risk_level`, `plan` menerima `entry_mode`, `file_scope`, beserta `finding_source`, dan `business-analysis` menerima `ticket_source` bila terisi, menurut bagian 2.1 `references/chain-rules.md`. Dilarang membiarkan hop menyimpulkan `chain` dari keberadaan berkas.
 2. Tangkap laporan penutup skill hop **beserta blok `## <BRD|PRD|Brief> Review` reviewer-nya apa adanya**. Laporan menyatakan artefaknya tidak terbit, commit-nya gagal, verdict reviewer bukan `Approved`, atau blok review-nya tidak dilampirkan → `## Failure path` butir 3.
 3. Evaluasi Fase 5 lebih dulu tiap kali laporan hop menyebut pemicu eskalasi; hop dianggap belum tuntas sampai evaluasi itu selesai.
 4. Jalankan Fase 4a lebih dulu tiap kali laporan hop meminta amandemen `## Success Criteria` atau `## Out of Scope` `TASK.md`; hop ditahan apa adanya sampai keputusan user turun.
