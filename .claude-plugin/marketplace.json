@@ -36,7 +36,7 @@
     },
     {
       "name": "quickdev",
-      "description": "Skill alur kerja ringan untuk repo backend dan frontend: profil repo, penelusuran kode, klarifikasi spesifikasi, rencana satu berkas, eksekusi terverifikasi, dan review diff terhadap rencana — tanpa taskdir maupun subagent",
+      "description": "Skill alur kerja ringan untuk repo backend, frontend, dan fullstack: profil repo, penelusuran kode, klarifikasi spesifikasi, rencana satu berkas, eksekusi terverifikasi, dan review diff terhadap rencana — tanpa taskdir maupun subagent",
       "source": "./src/plugins/quickdev",
       "author": {
         "name": "Fakhrul Nugroho",

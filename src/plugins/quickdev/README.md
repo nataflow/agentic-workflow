@@ -1,7 +1,7 @@
 # quickdev
 
-Alur kerja ringan untuk repo backend dan frontend: enam skill tanpa taskdir, tanpa subagent, tanpa hook, dan
-tanpa skrip. Setiap tugas punya **satu berkas rencana** (`plan/<task>.md`), sedangkan perubahan kodenya
+Alur kerja ringan untuk repo backend, frontend, dan fullstack: enam skill tanpa taskdir, tanpa subagent, tanpa
+hook, dan dengan satu skrip (`skills/_common/plan_lock.py`, pengunci rencana). Setiap tugas punya **satu berkas rencana** (`plan/<task>.md`), sedangkan perubahan kodenya
 boleh menyentuh banyak berkas dan layer. Semua kerja berlangsung di percakapan utama.
 
 ## Kapan Dipakai
@@ -21,8 +21,8 @@ gerbang `backenddev:tech-lead` atau `frontenddev:lead`.
 /plugin install quickdev@fakhrulnugroho
 ```
 
-Prasyarat: `git`, dan toolchain repo sendiri untuk baseline dan verifikasi. quickdev tidak menjalankan skrip
-Python sendiri.
+Prasyarat: `git`, `python3` (3.9+, hanya stdlib) untuk `plan_lock.py`, dan toolchain repo sendiri untuk
+baseline dan verifikasi.
 
 ## Enam Skill
 
@@ -41,40 +41,59 @@ menutup dengan status dan **menawarkan** langkah berikutnya, lalu menunggu user.
 
 | Skill | Yang dilakukan |
 |---|---|
-| `profile` | Mendeteksi tipe repo (backend/frontend), menulis profil 6 seksi dari template, dan menjalankan baseline perintah. Mode `GENERATE`/`REFRESH`. |
-| `explore` | Menelusuri kode untuk satu `query` sampai `trace_depth` (1–4). Menawarkan `clarify`, atau `plan` bila tidak ada celah. |
-| `clarify` | Maksimal `batch_limit` pertanyaan per putaran (default 3, maksimal 4). Melewati dirinya (`SKIPPED`) bila spesifikasi sudah jelas. |
-| `plan` | Menulis `plan/<task>.md` sebagai `DRAFT`, lalu mengubahnya menjadi `APPROVED` hanya dengan persetujuan eksplisit user. |
-| `execute` | Menjalankan langkah rencana `APPROVED`, memverifikasi, dan memperbaiki maksimal `max_fix_iterations` kali. |
-| `review` | Menilai diff terhadap rencana dengan 7 dimensi dan severity `BLOCKER`/`MAJOR`/`MINOR`. Hanya laporan di terminal. |
+| `profile` | Mendeteksi tipe repo (backend/frontend/fullstack satu paket), menulis profil 6 seksi dari template, dan menjalankan baseline perintah. Mode `GENERATE`/`REFRESH`. |
+| `explore` | Menelusuri kode untuk satu `query` sampai `trace_depth` (1–4), dengan skala `kecil` (≤2 berkas, tanpa kontrak/skema/env) atau `standar`. Tanpa tool `Glob`/`Grep`, memakai `git ls-files`/`grep`. Menawarkan `clarify`, atau `plan` bila tidak ada celah. |
+| `clarify` | Maksimal `batch_limit` pertanyaan per batch (default 3, maksimal 4) dan 3 batch per pemanggilan. Melewati dirinya (`SKIPPED`) bila spesifikasi sudah jelas. |
+| `plan` | Menulis `plan/<task>.md` sebagai `DRAFT`, lalu menguncinya (`plan_lock.py lock`) menjadi `APPROVED` hanya dengan persetujuan eksplisit user. |
+| `execute` | Menjalankan langkah rencana `APPROVED` yang lolos `verify`, memverifikasi terhadap baseline profil, dan memperbaiki maksimal `max_fix_iterations` kali di berkas rencana saja. |
+| `review` | Menilai diff sejak `Base-Commit` terhadap rencana dengan 7 dimensi dan severity `BLOCKER`/`MAJOR`/`MINOR`. Hanya laporan di terminal. |
 
 - **`execute`**: `COMPLETED` membuka `review`. `VERIFICATION_MANUAL_REQUIRED` menahan `review` sampai user
-  mengonfirmasi hasil perintah manual. `BLOCKED` tidak membuka `review`; user memilih melanjutkan perbaikan,
-  merevisi lewat `/quickdev:plan`, atau rollback.
+  menjalankan perintah manual dan `/quickdev:execute` (mode `manual`) mencatat konfirmasinya. `BLOCKED` tidak
+  membuka `review`; user memilih melanjutkan (`/quickdev:execute` lagi → mode `resume`), merevisi lewat
+  `/quickdev:plan`, atau rollback.
 - **`review`**: `CHANGES_REQUIRED` bila ada minimal satu temuan BLOCKER/MAJOR, atau MINOR dengan
-  `strict=true`. User lalu dapat menjalankan `/quickdev:execute` dengan `review_findings` untuk putaran
-  remediasi.
+  `strict=true`. Review lalu bertanya: remediasi otomatis (maksimal 2 putaran), revisi rencana, atau terima
+  apa adanya. Hanya opsi pertama yang menjalankan `execute` dengan `review_findings`.
+
+`execute` menurunkan mode dari berkas rencana (`plan_lock.py start`), tanpa parameter tambahan:
+
+| Keadaan rencana | Mode |
+|---|---|
+| belum ada blok `## Execution Status`, nol `[x]` | `awal` — tree harus bersih selain `plan/` dan profil |
+| blok `IN_PROGRESS`/`BLOCKED`, atau ada `[x]` tanpa blok | `resume` — kerja parsial uncommitted diizinkan |
+| blok `COMPLETED` + `review_findings` | `remediasi` — plafon 2 putaran |
+| blok `VERIFICATION_MANUAL_REQUIRED` | `manual` — mencatat konfirmasi user |
+| blok `COMPLETED` tanpa temuan | `selesai` — tawarkan `review` |
 
 ## Artefak
 
-**Profil** — `repo-profile.md` di root repo (`target_path`; alternatif yang dikenali skill hilir:
-`.dev/profile.md`). Berisi 6 seksi dari template backend atau frontend, di bawah 10.000 karakter (`wc -m`).
+**Profil** — `repo-profile.md` di root repo, atau `<workspace_dir>/repo-profile.md` per workspace monorepo
+(`target_path`; alternatif yang dikenali skill hilir: `.dev/profile.md`). Berisi 6 seksi dari template
+backend, frontend, atau fullstack, di bawah 10.000 karakter (`wc -m`). Section 1 mencatat `Workspace`;
+Section 5 berupa tabel baseline (Perintah, Cwd, Status, Durasi, Known issues).
 Profil ini terpisah dari `.claude/profile/<plugin>/` milik backenddev/frontenddev dan tidak bertabrakan
 dengannya.
 
 Baseline (`profile` Fase 2) meminta izin lewat satu pertanyaan sebelum menjalankan apa pun, dengan opsi
 jalankan semua, lewati yang menyentuh DB/jaringan, atau lewati semua. Setiap perintah dibatasi timeout 5
 menit, dan statusnya dicatat sebagai `PASSED`, `FAILED`, `TIMEOUT`, `SKIPPED`, atau
-`UNVERIFIED_ENV_NOT_READY`. Migrasi dan perintah yang mengubah skema/data tidak pernah dijalankan. Berkas
+`UNVERIFIED_ENV_NOT_READY`; jenis tanpa runner di manifest dicatat `TIDAK_ADA`. `execute` membedakan galat
+bawaan dari regresi lewat kolom Known issues. Migrasi dan perintah yang mengubah skema/data tidak pernah dijalankan. Berkas
 baru yang muncul sesudah baseline dilaporkan sebagai "artefak build perlu di-ignore", tidak dihapus.
 
 **Rencana** — `plan/<task>.md` (`plan_dir`, `task_name` kebab-case):
 
 ```markdown
 # Implementation Plan — user-auth-jwt
-Status: DRAFT            ← APPROVED hanya sesudah persetujuan eksplisit user
+Status: APPROVED                       ← hanya ditulis plan_lock.py lock
 Author: quickdev:plan
-Date: <timestamp>
+Date: <ISO>
+Profile: repo-profile.md               ← dibaca execute/review lintas sesi
+Gates: explore=EXPLORED clarify=SKIPPED
+Approved-At: <ISO>                     ← ditulis lock
+Approval: "setuju, lanjut"              ← jawaban user apa adanya
+Plan-Hash: sha256:<64 hex>             ← sidik Section 1–5
 
 ## 1. Overview & Objectives
 ## 2. Architecture & Layer Impact
@@ -82,14 +101,20 @@ Date: <timestamp>
 ## 4. Verification & Testing Strategy
 ## 5. Rollback & Contingency Strategy  ← bila include_rollback
 
-Execution Status: COMPLETED            ← blok penutup, ditimpa tiap putaran execute
-Verification: <ringkasan>
-Remediation Round: 0
-Timestamp: <ISO-Date>
+## Execution Status                    ← ditulis plan_lock.py start/close/confirm
+- Status: COMPLETED
+- Base-Commit: <sha | none>            ← pembanding diff review, tidak pernah ditimpa
+- Remediation-Round: 0
+- Verification: "<ringkasan>"
+- Blocked-Step: -
+- Timestamp: <ISO>
 ```
 
-Rencana `APPROVED` tidak ditimpa tanpa instruksi revisi. Nama yang sudah dipakai ditawarkan sebagai
-`<task>-v2`.
+Sidik mencakup `## 1.` sampai sebelum `## Execution Status`, dengan checkbox dinormalkan. Centang langkah
+dan blok eksekusi boleh berubah; teks Section 1–5 tidak. `execute` dan `review` menolak rencana yang
+sidiknya berbeda (`plan_lock.py verify`). Revisi sesudah approval: `plan_lock.py unlock --reason` → revisi →
+approval ulang (`lock`); blok eksekusi dipertahankan. Rencana format lama (tanpa `Plan-Hash`) perlu
+disetujui ulang. Nama yang sudah dipakai ditawarkan sebagai `<task>-v2`.
 
 ## Git
 
@@ -100,11 +125,14 @@ verifikasinya. Jangan masukkan keduanya ke `.gitignore`.
 quickdev sendiri tidak pernah meng-commit. Commit dan merge adalah keputusan user:
 
 - **`execute`** tidak meng-commit dan tidak merge. Perubahan sengaja dibiarkan uncommitted untuk `review`.
-  Pada putaran awal, working tree harus bersih kecuali `plan_path` dan `profile_path`; commit atau stash
-  perubahan lain dulu. Rollback (`git checkout`, `reset`, `stash`, hapus berkas) hanya dengan persetujuan
+  Pada putaran awal, working tree (`git status --porcelain -uall`) harus bersih kecuali `plan/` dan profil;
+  commit atau stash perubahan lain dulu. Kerja parsial sesudah `BLOCKED` atau sesi putus tidak perlu
+  di-commit: `resume` melanjutkannya dan `review` membandingkan terhadap `Base-Commit`. Rollback (`git checkout`, `reset`, `stash`, hapus berkas) hanya dengan persetujuan
   user.
-- **`review`** read-only: hanya `git diff`, `git status`, `git log`, `git ls-files`, dan `git rev-parse`.
-  Berkas untracked ikut dinilai.
+- **`review`** read-only: hanya `git diff`, `git status`, `git log`, `git ls-files`, `git rev-parse`, dan
+  `plan_lock.py verify`/`status`. Berkas untracked ikut dinilai. Diff dihitung sejak `Base-Commit` (tree
+  kosong di repo tanpa commit), jadi hasil `execute` yang sudah di-commit tetap ter-review; `base_ref`
+  mengganti pembandingnya.
 - Urutan yang disarankan: `plan` → commit rencana `APPROVED` → `execute` → `review` → commit kode bersama
   blok penutup rencana.
 
@@ -113,14 +141,15 @@ quickdev sendiri tidak pernah meng-commit. Commit dan merge adalah keputusan use
 | Skill | Parameter | Default |
 |---|---|---|
 | `profile` | `target_path` · `mode` · `skip_baseline_exec` · `workspace_dir` (monorepo: satu profil per workspace) | `repo-profile.md` · `GENERATE` · `false` · ditanyakan |
-| `explore` | `query` (wajib) · `scope_dir` · `trace_depth` · `include_tests` | — · repo · `2` · `true` |
+| `explore` | `query` (wajib) · `scope_dir` · `trace_depth` · `include_tests` | — · repo · `2` (skala kecil: `1`) · `true` |
 | `clarify` | `skip_if_clear` · `batch_limit` · `allow_assumptions` | `true` · `3` · `false` |
-| `plan` | `task_name` · `plan_dir` · `require_test_plan` · `include_rollback` | diturunkan lalu dikonfirmasi · `plan` · `true` · `true` |
+| `plan` | `task_name` · `plan_dir` · `require_test_plan` · `include_rollback` | diturunkan lalu dikonfirmasi · `plan` · `true` (`false` bila Test profil `TIDAK_ADA`) · `true` |
 | `execute` | `plan_path` (wajib) · `auto_verify` · `strict_baseline` · `stop_on_error` · `update_plan_checklist` · `max_fix_iterations` · `review_findings` | — · `true` · `true` · `true` · `true` · `3` · kosong |
-| `review` | `plan_path` (wajib) · `scope_paths` · `strict` · `include_staged` | — · semua · `false` · `true` |
+| `review` | `plan_path` (wajib) · `scope_paths` · `strict` · `include_staged` · `base_ref` | — · semua · `false` · `true` · `Base-Commit` |
 
 `plan`, `execute`, dan `review` berhenti dan mengarahkan ke `/quickdev:profile` bila profil tidak ada.
-`explore` dan `clarify` tetap jalan dengan heuristik.
+`explore` dan `clarify` tetap jalan dengan heuristik, dan bertanya bila repo punya lebih dari satu
+`repo-profile.md`. `execute` dan `review` membaca path profil dari metadata `Profile:` rencana.
 
 ## Hidup Berdampingan
 
@@ -146,14 +175,10 @@ Bila berkas ada tetapi tidak memuat `quickdev`, skill quickdev melapor dan berta
 
 ## Keterbatasan yang Diketahui
 
-- **Kunci rencana hanya baris `Status: APPROVED`.** Baris itu ditulis model, dan `review` membandingkan diff
-  dengan isi rencana saat review. Suntingan langkah sesudah approval tidak terdeteksi. Commit rencana
-  `APPROVED` sebelum `execute` supaya perubahannya terlihat di `git diff`.
-- **Tidak ada jalur resume `execute`** sesudah `BLOCKED` atau sesi terputus di tengah eksekusi. `execute`
-  hanya menerima tree bersih (putaran awal) atau `review_findings` (remediasi). Pilihannya: rollback lalu
-  ulangi, atau revisi lewat `/quickdev:plan`.
-- **State antargate hidup di percakapan.** Hasil `explore`/`clarify`, `task_spec`, konfirmasi
-  `VERIFICATION_MANUAL_REQUIRED`, dan `review_findings` tidak ditulis ke berkas. Sesi baru harus mengulang
-  dari `plan` atau menyebut ulang konteksnya.
-- Putaran `review` ↔ `execute` belum berplafon. Perbaikan saat verifikasi belum dibatasi ke berkas rencana.
-- Pilihan `workspace_dir` monorepo tidak tersimpan lintas sesi.
+- **Kunci rencana adalah bukti audit, bukan pencegahan mutlak.** Model tetap bisa memanggil `unlock` lalu
+  `lock` sendiri. `lock` menuntut jawaban user dan `unlock` menuntut alasan; keduanya tercatat di metadata
+  (`Approval:`, `Unlock-Reason:`). Commit rencana `APPROVED` sebelum `execute` supaya riwayatnya terlihat.
+- **Temuan review lintas sesi hanya ringkasan.** `Findings-<n>` dipotong 300 karakter; rincian ada di
+  laporan terminal `review`, yang tidak menulis berkas.
+- **Independensi review bergantung sesi.** Review di sesi yang sama dengan `execute` ditandai
+  `sesi-sama=ya`; jalankan ulang `/quickdev:review` di sesi baru untuk putaran terakhir.
