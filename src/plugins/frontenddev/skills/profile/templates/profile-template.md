@@ -21,7 +21,7 @@ Berlaku untuk seluruh kolom `Bukti` dan seluruh baris berbukti di seluruh berkas
 
 | Berkas | Isi | Konsumen utama |
 |---|---|---|
-| `index.json` | `project`, `stack`, `platform`, `framework`, `source_root`, `workspace`, `commit_convention` | `hooks/detect.py`, seluruh skill (resolusi adapter) |
+| `index.json` | `project`, `stack`, `platform`, `framework`, `source_root`, `workspace`, `target_app`, `commit_convention` | `hooks/detect.py`, seluruh skill (resolusi adapter) |
 | `stack.md` | framework & versi, bahasa & compiler flags, package manager, router, state, query, styling, UI library | `contract`, `ui-design`, `ux-design`, `code-reviewer`, `review` |
 | `structure.md` | source root, path fitur, anatomi layer per direktori, shared components, definisi rute | `contract`, `plan`, `code-explorer` |
 | `surface-map.md` | permukaan runtime: path kanonik · penanda pengenal kode · bukti | `code-explorer`, `plan`, `contract`, `code-implementor` |
@@ -184,6 +184,8 @@ Nilai disalin **persis** dari konfigurasi tema, bukan dari ingatan atau dari tam
 Format baris wajib: `- <pola warisan> (<sebaran>) → <pola modern> · deteksi \`<pola grep> @ <glob>\` · bukti <file#simbol>`. Resep `deteksi` ditulis dalam **satu** span backtick yang memuat pola dan glob dipisah ` @ `; memecahnya jadi dua span membuat `validate_briefs.py` Check P tidak mengenalinya dan baris itu diam-diam tidak pernah ditegakkan. Resep `deteksi` wajib berhit minimal sekali saat baris ditulis; nol hit berarti pola sudah punah dan barisnya batal. Pada REFRESH tiap resep dijalankan ulang dan vonisnya `[MASIH HIDUP — n hit]` atau `[PUNAH — 0 hit]`; baris `PUNAH` dicabut hanya atas persetujuan user, bukan diam-diam oleh pemindaian.
 
 Gaya yang kalah dalam wawancara pola terbelah (Phase 3) masuk ke sini dengan `bukti user` menggantikan `<file#simbol>`, karena yang menjadikannya warisan adalah keputusan tim, bukan temuan pemindaian.
+
+Mode PATCH (umpan balik `reported_drift` dari `architect`) menambah baris dengan format yang sama di akhir berkas; baris lama tidak disentuh.
 
 - Query key string concat (3 fitur) → array factory `ORDER_KEYS.detail(id)` · deteksi `queryKey: ' @ src/features/**/hooks/api/*.ts` · bukti `src/features/auth/hooks/api/useLogin.ts#useLogin`
 - Fetch di efek komponen presentasi (2 fitur) → API layer via query library di Controller · deteksi `axios.get @ src/features/**/pages/*.tsx` · bukti `src/features/report/pages/ReportPage.tsx#ReportPage`

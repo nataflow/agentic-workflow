@@ -7,7 +7,7 @@ ketersediaan worktree git, dan kelengkapan berkas referensi skill.
 
 Skrip ini juga **menyelesaikan dua fakta** yang dipakai Workflow dan
 mengembalikannya di footer: `<stack-id>` hasil deteksi dan mode operasi
-(`GENERATE`, `REFRESH`, atau `MIGRATE`). Keduanya deterministik; menyerahkannya ke
+(`GENERATE`, `REFRESH`, `MIGRATE`, atau `PATCH` bila diminta eksplisit). Keduanya deterministik; menyerahkannya ke
 pembacaan model membuat repo yang sama divonis berbeda antar-sesi.
 
 Vonis `WARN` tidak menahan: repo non-git tetap dapat diprofil — hanya kolom
@@ -188,7 +188,7 @@ class PreconditionChecker:
 
     def _check_3_profile_writable(self) -> None:
         name = "Direktori profil dapat ditulis"
-        if self.profile_rel.strip("/") != DEFAULT_PROFILE_DIR:
+        if os.path.normpath(self.profile_rel) != DEFAULT_PROFILE_DIR:   # `./.claude/profile/frontenddev/` sah
             self._add(3, name, "FAIL",
                       f"`--profile-dir {self.profile_rel}` ditolak; profil {PLUGIN} hanya sah di "
                       f"`{DEFAULT_PROFILE_DIR}/`",
@@ -252,6 +252,32 @@ class PreconditionChecker:
 
     # ------------------------------------------------------------------ mode
 
+    def _resolve_patch(self) -> None:
+        """PATCH = tambah baris `drift.md` saja; sah hanya di atas profil utuh milik plugin ini,
+        berstack sama, dan tanpa perubahan menggantung di direktori profil (PATCH hanya meng-commit
+        `drift.md`). Gagal → FAIL; pemanggil mencatat umpan balik tertunda, bukan REFRESH di tempat."""
+        name = "Mode & kepemilikan profil"
+        try:
+            data = json.loads(self.index_path.read_text(encoding="utf-8"))
+            stack = data.get("stack", "") if isinstance(data, dict) else None
+            owner = data.get("plugin", "") if isinstance(data, dict) else ""
+        except (OSError, ValueError):
+            stack, owner = None, ""
+        missing = [f for f in PROFILE_FILES if not (self.profile_dir / f).is_file()]
+        dirty = subprocess.run(["git", "-C", str(self.root), "status", "--porcelain", "--", self.profile_rel],
+                               capture_output=True, text=True).stdout.strip()
+        problem = ("`index.json` absen atau bukan JSON valid" if stack is None
+                   else f"`index.json` milik `{owner}`; bukan profil {PLUGIN}" if owner and owner != PLUGIN
+                   else f"{len(missing)} berkas profil hilang: {', '.join(missing[:4])}" if missing
+                   else f"stack profil `{stack}` ≠ stack terdeteksi `{self.stack}`" if stack != self.stack
+                   else f"perubahan menggantung di `{self.profile_rel}/`: " + "; ".join(dirty.splitlines()[:3])
+                   if dirty else "")
+        self.mode = "PATCH" if not problem else ("REFRESH" if self.index_path.is_file() else "GENERATE")
+        self._add(6, name, "FAIL" if problem else "PASS",
+                  problem or "`PATCH` — hanya `drift.md` yang ditambah baris",
+                  "PATCH tidak sah: profil tidak utuh, stack berubah, atau direktori profil kotor. "
+                  "Catat umpan balik tertunda; REFRESH dijalankan terpisah." if problem else "")
+
     def _resolve_mode(self) -> None:
         """Selesaikan GENERATE / REFRESH / MIGRATE dan kepemilikan profil.
 
@@ -261,6 +287,9 @@ class PreconditionChecker:
         sendiri FAIL, di lokasi lama diabaikan (GENERATE ke direktori sendiri).
         Ketidakcocokan dengan parameter `mode` jadi WARN, bukan FAIL.
         """
+        if self.mode_arg == "patch":
+            self._resolve_patch()
+            return
         name = "Mode & kepemilikan profil"
         note = ""
         if self.index_path.is_file():
@@ -341,7 +370,7 @@ class PreconditionChecker:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Profile Preconditions Checker")
-    parser.add_argument("--mode", default=None, help="auto | generate | refresh | migrate")
+    parser.add_argument("--mode", default=None, help="auto | generate | refresh | migrate | patch")
     parser.add_argument("--stack", default=None,
                         help="paksa <stack-id>; default auto (deteksi dari manifest)")
     parser.add_argument("--profile-dir", default=None, dest="profile_dir",

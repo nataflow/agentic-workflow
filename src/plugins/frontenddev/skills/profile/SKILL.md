@@ -5,25 +5,25 @@ description: Gunakan ketika .claude/profile/frontenddev/ belum ada atau perlu di
 
 ## THE IRON LAW
 
-PROFIL CODEBASE WAJIB MEMUAT `index.json` BER-FIELD STACK, SURFACE MAP, DAN INVARIANTS MUTLAK. DILARANG MENCATAT LIBRARY ATAU STACK TANPA BUKTI KONFIGURASI NYATA DI PACKAGE.JSON ATAU BERKAS CONFIG FRAMEWORK. PERINTAH TYPECHECK, LINT, DAN TEST WAJIB BENAR-BENAR DIEKSEKUSI DI TERMINAL UNTUK MENCATAT BASELINE ERROR SEBELUM KODE DIUBAH. DILARANG MENGEDIT, MEMPERBAIKI, ATAU MEMBUAT FILE KODE DI SRC SELAMA PROSES PROFILING. PROFIL HANYA SAH DITULIS KE `.claude/profile/frontenddev/` SEBAGAI `index.json` PLUS SEMBILAN BERKAS `.md`, DAN PADA MODE REFRESH DITULIS ULANG PENUH TANPA MERGE PARSIAL. RESEP SPESIFIK STACK DIBACA DARI SATU ADAPTER `stacks/<stack-id>.md`, BUKAN DARI INGATAN STACK LAIN.
+PROFIL CODEBASE WAJIB MEMUAT `index.json` BER-FIELD STACK, SURFACE MAP, DAN INVARIANTS MUTLAK. DILARANG MENCATAT LIBRARY ATAU STACK TANPA BUKTI KONFIGURASI NYATA DI PACKAGE.JSON ATAU BERKAS CONFIG FRAMEWORK. PERINTAH TYPECHECK, LINT, DAN TEST WAJIB BENAR-BENAR DIEKSEKUSI DI TERMINAL UNTUK MENCATAT BASELINE ERROR SEBELUM KODE DIUBAH. DILARANG MENGEDIT, MEMPERBAIKI, ATAU MEMBUAT FILE KODE DI SRC SELAMA PROSES PROFILING. PROFIL HANYA SAH DITULIS KE `.claude/profile/frontenddev/` SEBAGAI `index.json` PLUS SEMBILAN BERKAS `.md`, DAN PADA MODE REFRESH DITULIS ULANG PENUH TANPA MERGE PARSIAL. MODE PATCH HANYA MENAMBAH BARIS `drift.md` DARI `reported_drift`; BERKAS LAIN TIDAK DISENTUH. RESEP SPESIFIK STACK DIBACA DARI SATU ADAPTER `stacks/<stack-id>.md`, BUKAN DARI INGATAN STACK LAIN.
 
 ## Precondition [REQUIRED]
 
 1. Jalankan skrip verifikasi prasyarat: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/profile/scripts/check_preconditions.py [--mode <mode>] [--stack <stack>] [--profile-dir <dir>]`.
-2. `PASS` (6/6 checks): lanjut ke Workflow. `FAIL`: hentikan dan remediasi butir yang gagal — manifest frontend tidak terdeteksi, memuat `next`, atau React/Svelte tanpa Vite (CRA, Rollup) → repo di luar cakupan plugin, jangan buat berkas apa pun; `--profile-dir` selain `.claude/profile/frontenddev` → jalankan ulang tanpa parameter itu; `.claude/profile/frontenddev/index.json` milik plugin lain → laporkan ke user, jangan ditimpa; adapter stack hilang → pulihkan berkas plugin; direktori profil tidak dapat ditulis → periksa izin `.claude/`; berkas referensi hilang → pulihkan berkas plugin. `WARN` tidak menahan, tetapi wajib disebut ke user sebelum Phase 0 berjalan: repo non-git, monorepo multi-stack, parameter `stack` yang menimpa deteksi, dan mode yang tidak selaras dengan keadaan disk.
-3. Skrip mengembalikan dua fakta terselesaikan di baris `Terselesaikan:` — `<stack-id>` dan mode operasi (`GENERATE`/`REFRESH`/`MIGRATE`). Phase 0 dan Phase 1 memakai keduanya apa adanya; keduanya deterministik, dan menurunkannya ulang lewat pembacaan model membuat repo yang sama divonis berbeda antar-sesi.
+2. `PASS` (6/6 checks): lanjut ke Workflow. `FAIL`: hentikan dan remediasi butir yang gagal — manifest frontend tidak terdeteksi, memuat `next`, atau React/Svelte tanpa Vite (CRA, Rollup) → repo di luar cakupan plugin, jangan buat berkas apa pun; `--profile-dir` selain `.claude/profile/frontenddev` → jalankan ulang tanpa parameter itu; `.claude/profile/frontenddev/index.json` milik plugin lain → laporkan ke user, jangan ditimpa; `--mode patch` di atas profil tidak utuh, stack berubah, atau direktori profil kotor → PATCH tidak sah, jalankan REFRESH terpisah (pemanggil `architect` mencatat umpan balik tertunda, bukan me-REFRESH di tengah penutupan); adapter stack hilang → pulihkan berkas plugin; direktori profil tidak dapat ditulis → periksa izin `.claude/`; berkas referensi hilang → pulihkan berkas plugin. `WARN` tidak menahan, tetapi wajib disebut ke user sebelum Phase 0 berjalan: repo non-git, monorepo multi-stack, parameter `stack` yang menimpa deteksi, dan mode yang tidak selaras dengan keadaan disk.
+3. Skrip mengembalikan dua fakta terselesaikan di baris `Terselesaikan:` — `<stack-id>` dan mode operasi (`GENERATE`/`REFRESH`/`MIGRATE`/`PATCH`). Phase 0 dan Phase 1 memakai keduanya apa adanya; keduanya deterministik, dan menurunkannya ulang lewat pembacaan model membuat repo yang sama divonis berbeda antar-sesi.
 
 ## Parameter [REQUIRED]
 
-- `mode` — string — default `"auto"` — opsi mode profiling (`"auto"` | `"generate"` | `"refresh"` | `"migrate"`). Mode `"auto"` mendeteksi keberadaan dan kepemilikan `.claude/profile/frontenddev/index.json` serta profil lama di `.claude/profile/` secara otomatis.
+- `mode` — string — default `"auto"` — opsi mode profiling (`"auto"` | `"generate"` | `"refresh"` | `"migrate"` | `"patch"`). Mode `"auto"` mendeteksi keberadaan dan kepemilikan `.claude/profile/frontenddev/index.json` serta profil lama di `.claude/profile/` secara otomatis. `"patch"` tidak pernah dipilih `auto`: ia diminta eksplisit bersama `reported_drift` dan hanya menambah baris `drift.md` (Phase P).
 - `stack` — string — default `"auto"` — paksa `<stack-id>` bila deteksi Phase 0 ambigu; nilai sah = daftar di `stacks/_CONTRACT.md` (`react-vite`, `react-native`, `sveltekit`, `svelte-vite`).
 - `force` — boolean — default `false` — bila `true`, Phase 1 melewati konfirmasi REFRESH dan langsung menulis ulang. Dipakai `frontenddev:lead` saat merutekan lane `PROFILE` secara otomatis: rute itu berangkat tanpa user pernah meminta profiling, jadi titik henti interaktif di tengahnya menggantung tanpa pertanyaan yang user tahu asal-usulnya. `force` tidak pernah berlaku atas profil milik plugin lain atau lokasi lama `.claude/profile/`; keduanya ditolak prasyarat atau dialihkan ke MIGRATE.
-- `profile_dir` — string — default `".claude/profile/frontenddev"` — target tulis Phase 6; nilai lain ditolak.
+- `profile_dir` — string — default `".claude/profile/frontenddev"` — hanya untuk kompatibilitas; nilai lain ditolak skrip prasyarat (Check 3 `FAIL`) karena hook dan seluruh skill membaca `.claude/profile/frontenddev/`.
 - `target_app` — string — default `""` — nama package atau path sub-aplikasi monorepo (misal: `apps/web`) bila ingin memfokuskan pemindaian layer pada modul spesifik.
 - `run_tests` — boolean — default `true` — bila `true`, menjalankan test runner di terminal untuk mencatat baseline test suite aktual.
 - `strict_scan` — boolean — default `true` — bila `true`, memindai seluruh sub-direktori feature untuk memetakan competing patterns secara mendalam.
 - `interview` — boolean — default `true` — bila `false`, Phase 3 dilewati; `layer-adoption.md` dan `drift.md` diisi hasil pemindaian saja dan ditandai **belum tervalidasi user** di `manual-notes.md`. Tanda itu wajib: profil yang gaya terbelahnya diputuskan sepihak terbaca sama persis dengan profil yang gayanya benar-benar disepakati tim.
-- `reported_drift` — list — default `[]` — pola warisan yang terbukti menyesatkan saat eksekusi, diteruskan `frontenddev:architect` Phase 5 sesudah disetujui user. Tiap butir berbentuk `<file#simbol> — <pola warisan> → <pola pengganti>`. Pola semacam ini tidak pernah tertangkap sapuan statis: ia sah secara sintaks dan tetap kompilabel, dan baru terbukti salah ketika brief menyalinnya sebagai *Pola Acuan*.
+- `reported_drift` — list — default `[]` — pola warisan yang terbukti menyesatkan saat eksekusi, diteruskan `frontenddev:architect` Phase 5 (bersama `mode: "patch"`) sesudah disetujui user. Tiap butir berbentuk `<file#simbol> — <pola warisan> → <pola pengganti>`. Pola semacam ini tidak pernah tertangkap sapuan statis: ia sah secara sintaks dan tetap kompilabel, dan baru terbukti salah ketika brief menyalinnya sebagai *Pola Acuan*.
 
 ## Workflow
 
@@ -51,6 +51,19 @@ Tetapkan `<stack-id>` secara deterministik [REQUIRED]:
 2. Abaikan seluruh isi profil lama saat memindai bila REFRESH disetujui. Profil **ditulis ulang penuh** dari pemindaian segar; dilarang merge parsial. Merge parsial mempertahankan baris yang polanya sudah lenyap, dan implementor terus dilarang meniru pola yang sudah tidak ada. Satu-satunya berkas yang dipertahankan apa adanya adalah `manual-notes.md`.
 3. Laporkan perubahan stack sebagai temuan tersendiri sebelum menulis ulang bila field `stack` lama berbeda dari hasil Phase 0.
 4. Panen baris `drift.md` profil lama sebelum ditimpa, dan jalankan ulang resep `deteksi` tiap barisnya. Vonisnya disajikan ke user di Phase 3, bukan diputuskan di sini.
+
+### Phase P — PATCH `drift.md` (pengganti Phase 1–6 pada mode `PATCH`)
+
+Prasyarat `PASS` dengan mode `PATCH` berarti profil utuh, milik frontenddev, berstack sama, dan direktori profil bersih. `reported_drift` kosong → hentikan; PATCH tanpa butir tidak bermakna.
+
+1. **Normalisasi**: tiap butir wajib berbentuk `<file#simbol> — <pola warisan> → <pola pengganti>` (architect sudah mengubah `file:baris` menjadi `file#simbol`). Butir berbentuk lain ditolak dan dilaporkan.
+2. **Deduplikasi**: lewati butir yang pola warisan atau resep `deteksi`-nya sudah ada di `drift.md`; catat "dilewati (duplikat)".
+3. **Konflik**: pola pengganti tercatat sebagai pola warisan di `drift.md`, atau pola warisan tercatat sebagai gaya mayoritas di `layer-adoption.md` → hentikan PATCH tanpa menulis apa pun dan sarankan REFRESH. Itu keputusan tim, bukan penambahan baris.
+4. **Resep `deteksi`**: susun `<pola grep> @ <glob>` dalam **satu** span backtick (syarat Check P `validate_briefs.py`) lalu jalankan Grep. ≥ 1 hit → `bukti <file#simbol>`; 0 hit → `bukti user` (sama dengan Phase 3 butir 4).
+5. **Tulis**: tambahkan baris di akhir `drift.md` dengan format `templates/profile-template.md` bagian `drift.md`. Berkas lain tidak disentuh: tanpa pemindaian 18 titik, tanpa baseline, tanpa `.gitignore`.
+6. **Persetujuan**: pemanggil `frontenddev:architect` → tanpa `AskUserQuestion` (persetujuan sudah diambil di architect Phase 5 butir 2). Pemanggil lain (user meminta "tambah drift X") → sajikan baris final lalu konfirmasi sekali lewat `AskUserQuestion` sebelum menulis.
+7. **Commit**: `git add .claude/profile/frontenddev/drift.md` → `docs: patch frontenddev profile (drift +<n>)`.
+8. Lompat ke Output; Phase 2–7 tidak dijalankan.
 
 ### Phase 2 — Pemindaian 18 Titik Arsitektur Codebase
 
@@ -141,7 +154,7 @@ Tulis `<repo>/.claude/profile/frontenddev/` persis mengikuti skema, format, dan 
 - **SATU ADAPTER PER PROFIL**: Resep pemindaian diambil dari satu `stacks/<stack-id>.md`; dilarang mencampur resep stack lain, dan dilarang memprofil repo Next.js.
 - **FIELD STACK WAJIB**: Profil tanpa field `stack` valid di `index.json` membuat gate dan seluruh skill hilir gagal memuat adapter; dilarang serah terima dalam keadaan itu.
 - **PRESERVASI CATATAN MANUAL**: Pada mode REFRESH, `manual-notes.md` dilarang ditimpa atau dihapus. Berkas itu satu-satunya pengecualian tulis ulang penuh.
-- **REFRESH TULIS ULANG PENUH**: Dilarang merge parsial pada mode REFRESH; sembilan berkas selain `manual-notes.md` lahir kembali dari pemindaian segar, dan baris Drift yang resep `deteksi`-nya nol hit dicabut hanya atas persetujuan user.
+- **REFRESH TULIS ULANG PENUH**: Dilarang merge parsial pada mode REFRESH (tidak berlaku untuk PATCH, yang hanya menambah baris `drift.md` dan tidak menghapus apa pun); sembilan berkas selain `manual-notes.md` lahir kembali dari pemindaian segar, dan baris Drift yang resep `deteksi`-nya nol hit dicabut hanya atas persetujuan user.
 - **INKONSISTENSI WAJIB DIKLARIFIKASI**: Dilarang memilih sepihak saat pola terbelah tanpa mayoritas; keputusan user diambil di Phase 3. Mode `interview: false` bukan izin memutuskan — ia mewajibkan hasilnya ditandai belum tervalidasi user.
 - **REFRESH BUKAN KEPUTUSAN SKILL**: Dilarang menulis ulang profil yang sudah ada tanpa konfirmasi user, kecuali `force: true` disetel pendispatch. `force` tidak pernah berlaku atas profil milik plugin lain atau lokasi lama `.claude/profile/`. Profil memuat keputusan tim yang tidak pernah lahir dari pemindaian; menimpanya diam-diam menghapusnya tanpa jejak.
 - **ANCHOR BUKTI TANPA NOMOR BARIS**: Dilarang menulis bukti berbentuk `file:baris` di kolom `Bukti` mana pun; bentuk sahnya `<path>#<simbol>` atau `<path>` telanjang.
@@ -167,6 +180,8 @@ Tulis `<repo>/.claude/profile/frontenddev/` persis mengikuti skema, format, dan 
 ## Output [REQUIRED]
 
 Artefak `.claude/profile/frontenddev/` mengikuti skema `templates/profile-template.md` — bentuk `index.json`, urutan berkas, bentuk tabel, dan `## Tata Cara Anchor Bukti` diambil dari sana apa adanya, tidak disalin ulang ke sini.
+
+Mode PATCH → tutup satu baris: `### FRONTEND PROFILE REPORT — PATCH · drift +<n> baris · <k> dilewati (duplikat) · <m> bukti user` (ditambah alasan bila dihentikan di butir 3 Phase P).
 
 Profil utuh dan baseline terverifikasi → tutup dua baris tanpa blok: judul `### FRONTEND PROFILE REPORT — <GENERATE | REFRESH> · stack <stack-id> · <framework> <version> · index.json + 9 berkas .md` plus baris serah-terima. Selain itu, sajikan:
 
@@ -196,6 +211,7 @@ Isi profil — surface map, invariant, layer adoption — sengaja tidak disalin 
 | Konflik dependensi ekstrem | Multipaket bersaing (`jest` dan `vitest` tanpa script terdefinisi, dua library router): catat ambiguitasnya di `## Drift & Competing Patterns` dan minta konfirmasi user saat handoff. |
 | Izin tulis `.claude/` gagal | Laporkan kendala izin sebelum mencoba kembali; jangan tulis profil parsial. |
 | Profil lama tidak dapat ditimpa | REFRESH menulis ulang penuh. Laporkan berkasnya read-only dan minta user memberi izin tulis atau menghapusnya; dilarang menulis profil ke path alternatif. |
+| Prasyarat PATCH `FAIL` | Jangan menulis apa pun; laporkan alasannya. Pemanggil `architect` mencatat `Umpan balik profil tertunda — butuh REFRESH` dan melanjutkan penutupan; REFRESH dijalankan terpisah. |
 | Konfirmasi REFRESH ditolak | Batalkan tanpa mengubah profil eksisting maupun `.gitignore`. Laporkan bahwa profil lama tetap berlaku apa adanya. |
 | User tidak menjawab wawancara Phase 3 | Lanjutkan dengan hasil pemindaian, tandai `layer-adoption.md` dan `drift.md` belum tervalidasi user di `manual-notes.md`, dan sebutkan di laporan Phase 7. |
 | Repositori non-git | Lanjutkan profiling; tulis field `commit_convention` `index.json` sebagai `UNINITIALIZED (default conventional commits)` dan sebutkan bahwa baris `.gitignore` tidak dapat dipasang. |
