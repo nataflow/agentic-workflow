@@ -82,7 +82,7 @@ Uji perintah hasil Phase 2 titik 2 di terminal sebelum ditulis ke `commands.md` 
    - `OK (0 errors)` atau `OK (N passing)` — exit code 0.
    - `FAIL (<n> errors)` beserta potongan pesan error ringkas — exit code bukan 0 karena kodenya merah.
    - `UNVERIFIED_ENV_NOT_READY` — kegagalan berasal dari dependensi belum terpasang, bukan dari kode. Membedakan keduanya menentukan apakah verifikasi penutup boleh menuntut hijau: baseline yang merah karena `node_modules` kosong bukan utang kode, dan menagihnya sebagai utang menghentikan rantai yang sebenarnya sehat.
-   - `TIMEOUT / UNVERIFIED` — perintah macet lebih dari 60s; batalkan prosesnya dan lanjutkan.
+   - `TIMEOUT / UNVERIFIED` — perintah macet lebih dari 5 menit (ambang yang sama dengan verifikasi penutup `architect`); batalkan prosesnya dan lanjutkan.
 3. Perbaiki perintahnya lalu uji ulang bila gagal karena sintaks salah, bukan karena kodenya merah. Tulis `tidak terdeteksi` bila tetap salah sintaks.
 4. **Exclusion Check**: Salin sub-bagian **Cakupan yang TIDAK diperiksa** dari `## Commands` adapter ke kolom terakhir tabel baseline (misal: "Metro membuang tipe TS sebelum test Jest jalan"; "`tsc` saja tidak memeriksa `.svelte`"). Kolom itu yang mencegah `test` hijau dibaca sebagai bukti typecheck hijau.
 5. Dilarang keras memperbaiki kode sumber agar baseline hijau. Hasil eksekusi ini jadi tolok ukur verifikasi penutup di gate berikutnya.
@@ -192,7 +192,7 @@ Isi profil — surface map, invariant, layer adoption — sengaja tidak disalin 
 | Manifest memuat `next` | Hentikan; Next.js di luar cakupan plugin. Profil yang lahir memaksa gate merutekan repo yang tidak dilayani adapter mana pun. |
 | Stack ambigu di monorepo | Minta user memilih satu `<stack-id>` utama lewat `stack` dan `target_app`. |
 | Adapter `stacks/<stack-id>.md` tidak ada | Hentikan dan laporkan stack belum didukung plugin. |
-| Perintah verifikasi macet (> 60s) | Batalkan proses terminal, catat `TIMEOUT / UNVERIFIED` di baseline, lanjutkan pemindaian layer statis. |
+| Perintah verifikasi macet (> 5 menit) | Batalkan proses terminal, catat `TIMEOUT / UNVERIFIED` di baseline, lanjutkan pemindaian layer statis. |
 | Konflik dependensi ekstrem | Multipaket bersaing (`jest` dan `vitest` tanpa script terdefinisi, dua library router): catat ambiguitasnya di `## Drift & Competing Patterns` dan minta konfirmasi user saat handoff. |
 | Izin tulis `.claude/` gagal | Laporkan kendala izin sebelum mencoba kembali; jangan tulis profil parsial. |
 | Profil lama tidak dapat ditimpa | REFRESH menulis ulang penuh. Laporkan berkasnya read-only dan minta user memberi izin tulis atau menghapusnya; dilarang menulis profil ke path alternatif. |

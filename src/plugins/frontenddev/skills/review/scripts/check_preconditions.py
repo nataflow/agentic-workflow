@@ -30,6 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
     profile_dir_for,
     TASKDIR_PATTERN,
+    chain_files,
     check_adapter,
     check_plugin_files,
     check_profile,
@@ -57,7 +58,8 @@ class PreconditionChecker:
         self.root = (root or find_repo_root()).resolve()
         self.target = (target or "").lower()
         self.range = rng.strip()
-        self.path = path.strip().strip("/")
+        self.path_raw = path.strip()
+        self.path = ""
         self.taskdir_rel = normalize_taskdir(taskdir or "")
         self.write = write
         self.profile_dir = profile_dir_for(self.root, profile_dir)
@@ -65,6 +67,7 @@ class PreconditionChecker:
         self.results: List[Dict[str, Any]] = []
         self.stack = ""
         self.resolved_range = ""
+        self.chain_files: List[str] = []
 
     def _add(self, cid: int, name: str, status: str, summary: str, action: str = "") -> None:
         self.results.append({"id": cid, "name": name, "status": status,
@@ -100,10 +103,19 @@ class PreconditionChecker:
             self._add(1, name, "PASS", f"diff `{rng}`")
             return
         if self.target == "path":
-            if not self.path or not (self.root / self.path).exists():
-                self._add(1, name, "FAIL", f"path `{self.path or '(kosong)'}` tidak ada",
+            raw = self.path_raw
+            full = (Path(raw) if Path(raw).is_absolute() else self.root / raw).resolve() if raw else None
+            try:
+                rel = full.relative_to(self.root) if full else None
+            except ValueError:
+                self._add(1, name, "FAIL", f"path `{raw}` berada di luar repo `{self.root}`",
+                          "Review ad-hoc hanya menilai berkas di dalam toplevel git repo ini.")
+                return
+            if rel is None or not full.exists():
+                self._add(1, name, "FAIL", f"path `{raw or '(kosong)'}` tidak ada",
                           "Sebut direktori fitur atau berkas yang ada di repo.")
                 return
+            self.path = rel.as_posix()
             self._add(1, name, "PASS", f"path `{self.path}`")
             return
         taskdir = self.root / self.taskdir_rel
@@ -117,16 +129,26 @@ class PreconditionChecker:
             return
         sha = task_root_sha(self.root, self.taskdir_rel)
         self.resolved_range = f"{sha[:7]}..HEAD" if sha else ""
-        self._add(1, name, "PASS", f"taskdir tuntas, rentang `{self.resolved_range}`")
+        # Objek = berkas rantai (commit bersubjek `<type>(<slug>):`), sama dengan review penutup
+        # architect — bukan seluruh diff akar..HEAD yang ikut memuat kerja user dan taskdir lain.
+        self.chain_files = chain_files(self.root, self.taskdir_rel)
+        if not self.chain_files:
+            self._add(1, name, "WARN", f"taskdir tuntas, rentang `{self.resolved_range}`, nol berkas rantai",
+                      "Tidak ada kode yang dinilai; sebut ke user sebelum melanjutkan.")
+            return
+        self._add(1, name, "PASS", f"taskdir tuntas, rentang `{self.resolved_range}`, "
+                                   f"{len(self.chain_files)} berkas rantai")
 
     def format_text(self) -> str:
-        return format_report(f"review ({self.target or '-'})", self.results,
-                             {"rentang": self.resolved_range or "-", "tulis": "ya" if self.write else "tidak"})
+        resolved = {"rentang": self.resolved_range or "-", "tulis": "ya" if self.write else "tidak"}
+        if self.target == "taskdir":
+            resolved["berkas"] = "chain.py files --taskdir " + self.taskdir_rel
+        return format_report(f"review ({self.target or '-'})", self.results, resolved)
 
     def to_json(self) -> str:
         return report_json(self.results, root=str(self.root), target=self.target,
                            range=self.resolved_range, path=self.path, write=self.write,
-                           stack=self.stack)
+                           chain_files=self.chain_files, stack=self.stack)
 
 
 def main() -> None:

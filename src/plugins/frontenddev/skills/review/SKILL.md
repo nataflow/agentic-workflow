@@ -13,7 +13,7 @@ description: Gunakan ketika kode frontend di luar rantai taskdir aktif perlu din
 ## Precondition [REQUIRED]
 
 1. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/check_preconditions.py --target <diff|path|taskdir> [--range A..B] [--path <p>] [--taskdir <t>] [--write]`.
-2. `PASS`: lanjut. `FAIL`: hentikan dan remediasi — target di luar enum atau taskdir belum tuntas → taskdir aktif dinilai `frontenddev:architect`, bukan di sini; rentang/path tidak ada → perbaiki parameter; profil/adapter → `frontenddev:profile`; `--write` dengan tree kotor → laporkan ke user.
+2. `PASS`: lanjut. `FAIL`: hentikan dan remediasi — target di luar enum atau taskdir belum tuntas → taskdir aktif dinilai `frontenddev:architect`, bukan di sini; rentang/path tidak ada, atau path di luar repo (termasuk lewat symlink) → minta path di dalam repo / perbaiki parameter; profil/adapter → `frontenddev:profile`; `--write` dengan tree kotor → laporkan ke user.
 
 ## Parameter [REQUIRED]
 
@@ -26,7 +26,7 @@ description: Gunakan ketika kode frontend di luar rantai taskdir aktif perlu din
 
 ### Phase 0 — Lingkup & Acuan
 
-- Tetapkan objek: `git diff <range> --name-only`, isi `path`, atau rentang `akar..HEAD` taskdir tuntas (kecualikan `frontenddev/docs/**`, `.claude/**`).
+- Tetapkan objek: `git diff <range> --name-only`, isi `path`, atau — untuk `target: taskdir` — **berkas rantai** `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py files --taskdir <t>` (commit bersubjek `<type>(<slug>):` sejak akar, tanpa `frontenddev/docs/**` dan `.claude/**`); hunk per berkas `git diff <akar>..HEAD -- <berkas>`. Rentang ini sama dengan review penutup `agents/code-reviewer.md` Fase 0.
 - Baca `index.json` (`stack`), `layer-adoption.md`, `stack.md`, `invariants.md`, `drift.md` profil, lalu `## Review checklist` dan `## Failure signatures` adapter. `CONTRACT.md` taskdir tuntas dibaca bila `target: taskdir`.
 
 ### Phase 1 — Verifikasi Terminal (opsional)
@@ -65,7 +65,7 @@ Tutup satu baris: `REVIEW (<target>) — <PASS | WARNING | BLOCKED> · <x> P1, <
 ## Failure path
 
 1. **Rentang/path tidak resolve**: hentikan di Precondition.
-2. **Perintah verifikasi macet** (>60 detik): tandai `UNVERIFIED / TIMEOUT`, lanjutkan sembilan dimensi.
+2. **Perintah verifikasi macet** (>5 menit per perintah, ambang yang sama dengan verifikasi penutup `architect`): tandai `UNVERIFIED / TIMEOUT`, lanjutkan sembilan dimensi.
 3. **Diff >50 berkas**: nilai per direktori fitur, laporkan modular.
 4. **Nomor baris bergeser**: lokalisasi ulang lewat `Grep` sebelum mencatat bukti.
 5. **Adapter tidak ditemukan**: jalankan dimensi generik saja, tandai dimensi 6 `UNVERIFIED`, sarankan `frontenddev:profile`.
