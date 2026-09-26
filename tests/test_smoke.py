@@ -73,6 +73,8 @@ CASES = [
     ("frontenddev/skills/task/scripts/validate_task.py", ["--taskdir", FE_TD, "--json"], True, None),
     ("frontenddev/skills/ui-design/scripts/check_preconditions.py", ["--taskdir", FE_TD, "--json"], True, None),
     ("frontenddev/skills/ux-design/scripts/check_preconditions.py", ["--taskdir", FE_TD, "--json"], True, None),
+
+    ("quickdev/skills/_common/plan_lock.py", ["status", "--plan", "plan/smoke.md", "--json"], True, None),
 ]
 
 STATES = ["commit", "tanpa-commit", "detached", "bukan-git"]
