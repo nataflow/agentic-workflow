@@ -1449,7 +1449,7 @@ Pengguna diarahkan ke gerbang yang salah (B1, B10, F1–F3, F8, F9). Dua gerbang
 
 ## L1.3 [Tinggi] Hook membajak alur analyst dan quickdev; rujukan quickdev tanpa namespace
 
-- [ ] Selesai
+- [x] Selesai
 
 **Plugin:** backenddev, frontenddev (hook), quickdev, analyst · **Estimasi:** 1 hari · **Bergantung pada:** L1.2 (`gate_text.py`, `detect.opted_out`), K7, K8 · **Memblokir:** —
 
@@ -1641,6 +1641,18 @@ Lingkungan: keempat plugin terpasang dari marketplace lokal.
 - Daftar pengecualian gerbang di `backenddev/skills/tech-lead/SKILL.md` (Gerbang Masuk butir 2) dan `references/gate-scope.md` bagian 1 ikut dinaikkan dari tiga ke empat agar sama dengan butir LEWATI keempat di hook.
 - Opt-out `.claude/workflow` terdokumentasi di README frontenddev, seksi Koeksistensi keenam SKILL quickdev, `quickdev:profile` Fase 4, `gate-scope.md`, dan README analyst. backenddev dan quickdev tidak punya README; pembuatannya milik L7.
 - Checkbox **Selesai** belum dicentang: kriteria "Selesai bila" butir 1–2 menuntut verifikasi manual 1, 3, 4 di sesi nyata, yang **belum dijalankan**.
+
+**Verifikasi manual (2026-09-26, Claude Code 2.1.283):** keempat plugin dimuat dari working tree dengan `claude -p --plugin-dir src/plugins --setting-sources project,local --output-format stream-json --verbose --include-hook-events` (plugin terpasang versi lama tidak ikut). Susulan memakai `--resume <session>`. Fixture ada di scratchpad: `api` (express + `repo-profile.md`, tanpa `.claude/workflow`), `web` (React+Vite + `.claude/workflow` = `quickdev`), `billing` (express, tanpa profil apa pun).
+
+| # | Skenario | Hasil | Bukti transkrip |
+|---|---|---|---|
+| 3 | `web`: tanya blok gerbang di konteks | **Lolos** | Kedua hook SessionStart `output: ""`. Model: "tidak memuat blok `<frontenddev-lead-gate>` maupun `<backenddev-tech-lead-gate>`". Skill `quickdev:*` tidak terlihat oleh model (K7). |
+| 1a | `api`: `/quickdev:explore cari handler login` | **Lolos** | Hook backenddev menyuntik blok gerbang. Model membaca `.claude/workflow` (absen), menelusuri `src/routes/auth.js:2-6`, dan menulis "Gerbang `backenddev:tech-lead` dilewati karena kamu memanggil `/quickdev:explore` secara eksplisit". Nol pemanggilan `backenddev:*`. |
+| 1b | susulan "lanjut buat rencana" | **Lolos** | Model mencoba `Skill quickdev:plan` dan ditolak harness (`disable-model-invocation`), lalu menawarkan `/quickdev:plan …` untuk diketik user. `backenddev:plan` tidak disebut. |
+| 4 | `billing`: `/analyst:intake tiket cicilan …`, jawab peminta, lalu "1b, sekitar 30 invoice per bulan. Oh iya, lanjut tiket cicilan, tambah aturan denda …" | **Lolos** | Hook backenddev menyuntik blok gerbang di tiap giliran. Alur tetap `analyst:intake` → `analyst:elicit` (`ticket.py new`, `validate_doc.py --kind elicit` PASS, commit elisitasi). Susulan denda dicatat di log elisitasi dan diajukan sebagai pertanyaan cakupan. Nol pemanggilan `backenddev:tech-lead`. |
+| 2 | `api`: "tambahkan endpoint logout" (tanpa slash) | **Sah** | Langsung `backenddev:tech-lead` (quickdev belum pernah disebut di sesi itu). Usulan `backenddev:profile` datang dari Fase 0 tech-lead sendiri, bukan untuk memenuhi precondition quickdev. |
+
+Catatan dari verifikasi, bukan regresi: (a) di `-p` tanpa `--add-dir <plugin>`, Read ke template/references plugin ditolak harness sehingga elisitasi tertahan dengan pesan yang jelas; di sesi interaktif pengguna mendapat prompt izin. (b) Skenario 1b menunjukkan penjaga mekanis K7 bekerja: model tidak bisa melompati "tawarkan, tunggu user".
 
 ---
 
