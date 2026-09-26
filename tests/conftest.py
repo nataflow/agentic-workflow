@@ -303,8 +303,10 @@ def fe_review_md(repo: Path, **over: str) -> str:
     verification, sc_evidence, findings, done, dims (daftar 9 status), dim_names (daftar 9 nama).
     """
     base = git(repo, "log", "--diff-filter=A", "--format=%h", "--", f"{FE_MINOR_TD}/TASK.md").split()[-1]
+    # Tanggal commit akar, bukan literal: `reviewed_at` < tanggal akar = FAIL, dan akar lahir saat test jalan.
+    born = git(repo, "log", "-1", "--format=%cs", base).strip()
     f = {"taskdir": FE_MINOR_TD, "stack": "react-vite", "verdict": "WARNING", "p2": "1",
-         "reviewed_at": "2026-09-25", "h1": "# Review Findings — order-checkout",
+         "reviewed_at": born, "h1": "# Review Findings — order-checkout",
          "summary_status": "WARNING", "total": "- Total Findings: 1 (0 P1, 1 P2, 0 P3)",
          "verification": "| `test` | HIJAU | 0 |", "sc_evidence": "`src/features/order/OrderButton.test.tsx:1`",
          "findings": FE_P2_FINDING, "done": "terpenuhi",

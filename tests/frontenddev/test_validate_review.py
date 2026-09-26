@@ -111,6 +111,13 @@ def test_log_identik_pass(fe_minor_chain):
     assert rc == 0, data
 
 
+def test_reviewed_at_sebelum_commit_akar_fail(fe_minor_chain):
+    write_files(fe_minor_chain, {REVIEW: fe_review_md(fe_minor_chain, reviewed_at="2000-01-01")})
+    rc, data = validate(fe_minor_chain)
+    c = check(data, "F")
+    assert rc == 1 and any("`reviewed_at: 2000-01-01` lebih awal dari commit akar" in d for d in c["details"]), c
+
+
 def test_contoh_template_bagian_3_pass(make_repo):
     """Contoh terisi `review-template.md` bagian 3, di repo yang berkas rantai dan kontraknya cocok."""
     tmpl = (FE_SKILLS / "architect/templates/review-template.md").read_text(encoding="utf-8")
@@ -132,7 +139,9 @@ def test_contoh_template_bagian_3_pass(make_repo):
            ("pages/CheckoutPage.test.tsx", "hooks/useCheckoutPage.test.ts", "pages/CheckoutPage.tsx")}
     write_files(repo, {**src, f"{TD}/CONTRACT.md": contract})
     commit(repo, "feat(order-checkout): implement unit 01", *src, f"{TD}/CONTRACT.md")
-    write_files(repo, {REVIEW: example.replace("base: 540364c", f"base: {base}")})
+    born = git(repo, "log", "-1", "--format=%cs", base).strip()
+    example = example.replace("base: 540364c", f"base: {base}").replace("reviewed_at: 2026-09-25", f"reviewed_at: {born}")
+    write_files(repo, {REVIEW: example})
     rc, data = validate(repo)
     assert rc == 0, [c for c in data["checks"] if c["status"] == "FAIL"]
     assert data["derived_verdict"] == "WARNING"

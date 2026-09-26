@@ -117,7 +117,7 @@ p1: 0
 p2: 0
 p3: 0
 base: $BASE
-reviewed_at: 2026-09-25
+reviewed_at: $(git log -1 --format=%cs $BASE)
 ---
 
 # Review Findings — order-checkout
@@ -160,10 +160,10 @@ reviewed_at: 2026-09-25
 | 3 | API Layer | PASS |
 | 4 | State Scope & Ownership | PASS |
 | 5 | UI & 6-State Branches | PASS |
-| 6 | Platform Semantics | PASS |
+| 6 | Platform & Framework Boundary | PASS |
 | 7 | Error Handling | PASS |
 | 8 | Performance & Leaks | PASS |
-| 9 | Test Quality & Coverage | PASS |
+| 9 | Test Quality | PASS |
 EOF
 git add $T/REVIEW.md; git commit -qm "docs(order-checkout): closing review PASS"
 printf '# Order button — perbaikan label — Report\n\n## Ringkasan\n\nTombol order kini berlabel Pesan.\n\n## Perubahan\n\n- tombol order baru beserta test (src/features/order)\n' > $T/REPORT.md

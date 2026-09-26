@@ -227,7 +227,8 @@ Tiap skill punya `skills/<skill>/scripts/check_preconditions.py` yang dijalankan
 
 ## Hidup Berdampingan
 
-- **frontenddev**: profil terpisah, `.claude/profile/backenddev/` dan `.claude/profile/frontenddev/`. Di repo
+- **frontenddev**: profil terpisah; plugin lain itu memakai `.claude/profile/frontenddev/`, plugin ini
+  `.claude/profile/backenddev/`. Di repo
   fullstack kedua hook menyala dengan deteksinya masing-masing. backenddev hanya melihat `dependencies`
   server, jadi manifest frontend tidak memicunya.
 - **analyst**: tiket `READY` diserahkan dengan menempelkan isi `TICKET.md` sebagai permintaan ke
