@@ -8,7 +8,7 @@ import pytest
 
 from conftest import PLUGINS, write_files
 
-_spec = importlib.util.spec_from_file_location("detect", PLUGINS / "backenddev/hooks/detect.py")
+_spec = importlib.util.spec_from_file_location("detect", PLUGINS / "backend/hooks/detect.py")
 detect = importlib.util.module_from_spec(_spec)
 sys.modules["detect"] = detect
 _spec.loader.exec_module(detect)

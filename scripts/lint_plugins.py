@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lint statis marketplace `agentic-workflow` (read-only, stdlib saja).
+"""Lint statis marketplace `nataflow` (read-only, stdlib saja).
 
 Pemakaian:
   python3 scripts/lint_plugins.py [--root DIR] [--strict] [--json] [--ignore M3,R2] [--base REF]

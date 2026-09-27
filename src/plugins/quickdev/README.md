@@ -7,18 +7,18 @@ boleh menyentuh banyak berkas dan layer. Semua kerja berlangsung di percakapan u
 ## Kapan Dipakai
 
 - Perubahan kecil sampai menengah yang tidak butuh BRD/PRD, ledger approval, atau review subagent.
-- Stack yang tidak dilayani `backenddev`/`frontenddev`, mis. Next.js, FastAPI, Django, atau Rails.
-- Repo yang sudah memakai `backenddev`/`frontenddev`, untuk kerja yang sengaja dibuat ringan. Panggil
+- Stack yang tidak dilayani `backend`/`frontend`, mis. Next.js, FastAPI, Django, atau Rails.
+- Repo yang sudah memakai `backend`/`frontend`, untuk kerja yang sengaja dibuat ringan. Panggil
   `/quickdev:*` secara eksplisit (lihat Hidup Berdampingan).
 
 Untuk kerja berisiko (kontrak API, migrasi skema, perubahan lintas modul yang butuh jejak keputusan), pakai
-gerbang `backenddev:tech-lead` atau `frontenddev:lead`.
+gerbang `backend:tech-lead` atau `frontend:lead`.
 
 ## Instalasi
 
 ```
 /plugin marketplace add <owner>/<repo>          # atau path lokal: ./path/ke/agentic-workflow
-/plugin install quickdev@fakhrulnugroho
+/plugin install quickdev@nataflow
 ```
 
 Prasyarat: `git`, `python3` (3.9+, hanya stdlib) untuk `plan_lock.py`, dan toolchain repo sendiri untuk
@@ -72,7 +72,7 @@ menutup dengan status dan **menawarkan** langkah berikutnya, lalu menunggu user.
 (`target_path`; alternatif yang dikenali skill hilir: `.dev/profile.md`). Berisi 6 seksi dari template
 backend, frontend, atau fullstack, di bawah 10.000 karakter (`wc -m`). Section 1 mencatat `Workspace`;
 Section 5 berupa tabel baseline (Perintah, Cwd, Status, Durasi, Known issues).
-Profil ini terpisah dari `.claude/profile/<plugin>/` milik backenddev/frontenddev dan tidak bertabrakan
+Profil ini terpisah dari `.claude/profile/<plugin>/` milik backend/frontend dan tidak bertabrakan
 dengannya.
 
 Baseline (`profile` Fase 2) meminta izin lewat satu pertanyaan sebelum menjalankan apa pun, dengan opsi
@@ -153,11 +153,11 @@ quickdev sendiri tidak pernah meng-commit. Commit dan merge adalah keputusan use
 
 ## Hidup Berdampingan
 
-Hook SessionStart `backenddev` dan `frontenddev` menyuntik gerbangnya di repo yang manifestnya cocok. Teks
+Hook SessionStart `backend` dan `frontend` menyuntik gerbangnya di repo yang manifestnya cocok. Teks
 gerbang keduanya mengecualikan permintaan yang memanggil atau melanjutkan `/quickdev:*`, termasuk susulan di
 tengah skill quickdev. Setiap skill quickdev juga:
 
-- dilarang memakai `backenddev:*`/`frontenddev:*` sebagai pengganti langkahnya;
+- dilarang memakai `backend:*`/`frontend:*` sebagai pengganti langkahnya;
 - lanjut bila user memanggil `/quickdev:*` secara eksplisit walaupun blok gerbang engineer ada;
 - bertanya sekali (quickdev atau gerbang engineer) untuk permintaan baru yang belum memilih alur.
 
@@ -167,8 +167,8 @@ plugin yang boleh menggerbangi repo, dipisah spasi atau baris:
 
 | Isi `.claude/workflow` | Efek |
 |---|---|
-| `quickdev` | hook backenddev dan frontenddev diam |
-| `frontenddev quickdev` | hanya hook frontenddev yang menyala |
+| `quickdev` | hook backend dan frontend diam |
+| `frontend quickdev` | hanya hook frontend yang menyala |
 | (berkas tidak ada) | perilaku normal |
 
 Bila berkas ada tetapi tidak memuat `quickdev`, skill quickdev melapor dan bertanya dulu sebelum lanjut.

@@ -5,16 +5,16 @@ import sys
 
 import pytest
 
-from conftest import PLUGINS
+from conftest import PLUGIN_DIRS, PLUGINS
 
-GATES = {"backenddev": "backenddev:tech-lead", "frontenddev": "frontenddev:lead"}
+GATES = {"backenddev": "backend:tech-lead", "frontenddev": "frontend:lead"}
 STATES = ("ABSENT", "OK", "INVALID_JSON", "NO_STACK", "UNKNOWN_STACK", "INCOMPLETE", "OTHER_OWNER")
 
 
 def _load(plugin, name):
     key = f"_gate_test_{plugin}_{name}"
     if key not in sys.modules:
-        spec = importlib.util.spec_from_file_location(key, PLUGINS / plugin / "hooks" / f"{name}.py")
+        spec = importlib.util.spec_from_file_location(key, PLUGINS / PLUGIN_DIRS[plugin] / "hooks" / f"{name}.py")
         mod = importlib.util.module_from_spec(spec)
         sys.modules[key] = mod  # dataclass butuh modulnya terdaftar saat dimuat
         spec.loader.exec_module(mod)

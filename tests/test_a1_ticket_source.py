@@ -1,4 +1,4 @@
-"""A1 (08a) varian penuh — kontrak serah-terima `ticket_source` analyst → backenddev/frontenddev.
+"""A1 (08a) varian penuh — kontrak serah-terima `ticket_source` analyst → backend/frontend.
 
 Tiket READY di sini dibuat `analyst/skills/_common/ticket.py` sungguhan (`review` → `approve` → `ref`),
 jadi subjek commit yang dibaca `ticket_source_verdict` kedua plugin tidak bisa bergeser diam-diam dari
@@ -57,7 +57,7 @@ def fe_ticket_check(root, ticket):
     return {c["id"]: c for c in json.loads(r.stdout)["checks"]}[8]
 
 
-CHECKERS = pytest.mark.parametrize("check", [be_ticket_check, fe_ticket_check], ids=["backenddev", "frontenddev"])
+CHECKERS = pytest.mark.parametrize("check", [be_ticket_check, fe_ticket_check], ids=["backend", "frontend"])
 
 
 # --- prasyarat `task`: READY & terkunci ------------------------------------------------------
@@ -116,8 +116,8 @@ def test_tanpa_tiket_lolos(repo, check):
 
 LIBS = {name: load_module(path, f"seal_{name}") for name, path in (
     ("analyst", PLUGINS / "analyst/skills/_common/analyst_lib.py"),
-    ("backenddev", PLUGINS / "backenddev/skills/_common/precondition_lib.py"),
-    ("frontenddev", PLUGINS / "frontenddev/skills/_common/precondition_lib.py"),
+    ("backend", PLUGINS / "backend/skills/_common/precondition_lib.py"),
+    ("frontend", PLUGINS / "frontend/skills/_common/precondition_lib.py"),
 )}
 
 
@@ -198,7 +198,7 @@ ticket_source: {ticket}
 
 ## Chain
 
-- [ ] BRIEF — backenddev:plan             → brief-*.md
+- [ ] BRIEF — backend:plan             → brief-*.md
 
 ## Description
 
@@ -233,7 +233,7 @@ Tombol cicilan tampil di detail invoice (`src/features/invoice/InvoiceDetail.tsx
 {oos}
 ## Chain
 
-- [ ] BRIEF    — frontenddev:plan      → brief-*.md
+- [ ] BRIEF    — frontend:plan      → brief-*.md
 """
 
 
@@ -251,7 +251,7 @@ def fe_task_checks(root):
 VALIDATORS = pytest.mark.parametrize("td, tmpl, run, cid", [
     (BE_TD, BE_TASK, be_task_checks, "T10"),
     (FE_TD, FE_TASK, fe_task_checks, 7),
-], ids=["backenddev", "frontenddev"])
+], ids=["backend", "frontend"])
 
 
 def write_task(root, td, tmpl, sc="", oos="", ticket=TICKET):

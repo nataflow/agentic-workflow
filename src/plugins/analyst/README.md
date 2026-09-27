@@ -15,7 +15,7 @@ penomoran, keterpikulan aturan oleh acceptance criteria, kebocoran istilah tekni
 
 ```
 /plugin marketplace add <owner>/<repo>          # atau path lokal: ./path/ke/agentic-workflow
-/plugin install analyst@fakhrulnugroho
+/plugin install analyst@nataflow
 ```
 
 Prasyarat: `python3` ≥ 3.9. `git` opsional (lihat seksi Git). Lihat juga `README.md` di root repo.
@@ -39,7 +39,7 @@ kartu `PASS`/`BLOCKED` terhadap catatan elisitasi di berkas yang sama sebelum di
 ## Workflow
 
 ```
-permintaan ──► intake ──┬─► di luar wilayah (kerja teknis murni) ──► backenddev:tech-lead / frontenddev:lead
+permintaan ──► intake ──┬─► di luar wilayah (kerja teknis murni) ──► backend:tech-lead / frontend:lead
                         ├─► status tiket ──────────────────────────► jawaban, berhenti
                         │
                         └─► elicit ─► ticket.py new ─► TICKET.md (elicitation: OPEN)
@@ -50,7 +50,7 @@ permintaan ──► intake ──┬─► di luar wilayah (kerja teknis murni)
                             spec ─► kartu DRAFT di atas catatan → validate_doc → ticket-reviewer (≤2 ronde)
                                     → commit → AskUserQuestion → ticket.py approve → READY (+ commit)
                                                                    │
-                    ticket_source: <ticketdir>/TICKET.md ke ──┘ backenddev:tech-lead / frontenddev:lead
+                    ticket_source: <ticketdir>/TICKET.md ke ──┘ backend:tech-lead / frontend:lead
 ```
 
 Permintaan yang sudah lengkap tetap melewati `elicit`: fakta diisi dari permintaan asli, dikonfirmasi sekali,
@@ -132,7 +132,7 @@ eksplisit (`docs(ticket): ...`); di luar git, commit dilewati dan disebut di Out
 ## Serah Terima ke Engineer
 
 Tiket `READY` diserahkan lewat parameter `ticket_source` = path `<ticketdir>/TICKET.md` ke
-`backenddev:tech-lead` dan/atau `frontenddev:lead` (baris penutup `SPEC — READY` memuatnya). Kontraknya:
+`backend:tech-lead` dan/atau `frontend:lead` (baris penutup `SPEC — READY` memuatnya). Kontraknya:
 
 - **Syarat**: frontmatter `status: READY` dan `elicitation: CLOSED`, dan isi berkas sama dengan
   `approved_seal` — di dalam maupun di luar repo git, apa pun subjek commit-nya. Tiket lama tanpa
@@ -147,18 +147,18 @@ Tiket `READY` diserahkan lewat parameter `ticket_source` = path `<ticketdir>/TIC
 - **Keterlacakan**: tiap `TAC-{n}` dipikul minimal satu `SC-{n}` di `TASK.md` engineer, atau tercatat di
   `## Out of Scope` beralasan (mis. porsi frontend). Validator `TASK.md` kedua plugin menagihnya.
 - **Kesepakatan aturan**: aktor, kondisi, dan `TBR-{n}` yang tertulis di tiket dihitung sudah disetujui.
-  `backenddev:analyst` tidak menjadwalkan BRD hanya karena fakta itu; bila BRD tetap terbit karena fakta di
+  `backend:analyst` tidak menjadwalkan BRD hanya karena fakta itu; bila BRD tetap terbit karena fakta di
   luar tiket, `business-analysis` menyerap `TBR-{n}` tanpa menanyakannya ulang (`— Asal: TBR-{m}`).
 
-`ticket_seal` di `_common/analyst_lib.py` disalin apa adanya ke `_common/precondition_lib.py` backenddev dan
-frontenddev (`tests/test_a1_ticket_source.py` menagih ketiganya identik); mengubah segel atau subjek commit
+`ticket_seal` di `_common/analyst_lib.py` disalin apa adanya ke `_common/precondition_lib.py` backend dan
+frontend (`tests/test_a1_ticket_source.py` menagih ketiganya identik); mengubah segel atau subjek commit
 `approve`/`ref` berarti mengubah ketiganya bersamaan.
 
 Engineer menerbitkan `TASK.md` teknisnya sendiri —
 lengkap dengan `file:baris`, alat ukur teknis, dan ledger — dari tiket itu. Nama `TICKET.md` sengaja berbeda
 dari `TASK.md`: kontraknya bertolak belakang, dan keduanya tidak pernah tinggal di direktori yang sama.
 
-Hook SessionStart `backenddev`/`frontenddev` mengecualikan permintaan yang memanggil atau melanjutkan
+Hook SessionStart `backend`/`frontend` mengecualikan permintaan yang memanggil atau melanjutkan
 `analyst:*`. Panggil `/analyst:intake` untuk memulai; susulan di tengah elisitasi tetap ditangani analyst.
 Untuk repo yang hanya memakai analyst, tulis `.claude/workflow` tanpa nama plugin engineer (mis. berisi
 `analyst`) — hook kedua plugin engineer lalu diam di repo itu.
@@ -168,8 +168,8 @@ Untuk repo yang hanya memakai analyst, tulis `.claude/workflow` tanpa nama plugi
 | Kebutuhan | Pakai |
 |---|---|
 | Menulis tiket dari permintaan pengguna/stakeholder | `analyst` |
-| Kontrak teknis, BRD/PRD berjangkar kode, brief implementasi | `backenddev` |
-| Alur layar, bentuk layar, kontrak layer frontend | `frontenddev` |
+| Kontrak teknis, BRD/PRD berjangkar kode, brief implementasi | `backend` |
+| Alur layar, bentuk layar, kontrak layer frontend | `frontend` |
 | Perubahan kecil–menengah dengan satu berkas rencana (`plan/<task>.md`), tanpa taskdir | `quickdev` |
 | Refaktor, upgrade pustaka, stacktrace dari developer | gerbang engineer, bukan `analyst` |
 

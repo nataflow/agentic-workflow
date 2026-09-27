@@ -185,7 +185,7 @@ def classify(root: Path, rel: str) -> Dict[str, str]:
                                         "(reopen) atau pulihkan isinya")
     else:
         row.update(state="READY", route="selesai — serahkan path TICKET.md sebagai ticket_source ke "
-                                        "backenddev:tech-lead / frontenddev:lead")
+                                        "backend:tech-lead / frontend:lead")
     return row
 
 
@@ -398,14 +398,14 @@ def cmd_approve(root: Path, args: argparse.Namespace) -> int:
         return 1
     report = review_report(path.parent, fm)
     sealed = content_hash(text_of(path))
-    # `approved_seal` (tanpa parser YAML) dibaca penerima backenddev/frontenddev; `approved_hash`
+    # `approved_seal` (tanpa parser YAML) dibaca penerima backend/frontend; `approved_hash`
     # tetap dipakai analyst sendiri untuk DRIFT dan tiket lama.
     write_fields(path, status="READY", approved=dt.date.today().isoformat(),
                  approved_hash=sealed, approved_seal=ticket_seal(text_of(path)), approval=clean_value(args.answer))
     msg = f"APPROVE PASS: {rel}/{TICKET_FILE} READY @{sealed}"
     if is_git_repo(root) and not args.no_commit:
         # Subjek ini (dan `ref TICKET`) menandai tiket terkunci. Pembacanya: `ticket_source_verdict`
-        # di `_common/precondition_lib.py` backenddev dan frontenddev — ubah ketiganya bersamaan.
+        # di `_common/precondition_lib.py` backend dan frontend — ubah ketiganya bersamaan.
         paths = [f"{rel}/{TICKET_FILE}"] + ([f"{rel}/{REVIEW_FILE}"] if report else [])
         subject = f"docs(ticket): kunci TICKET {rel.split('-', 1)[-1]} READY"
         ok, out = git_commit(root, paths, subject)

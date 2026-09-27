@@ -1,6 +1,6 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "fakhrulnugroho",
+  "name": "nataflow",
   "description": "Plugin Claude Code untuk stack yang dipakai Fakhrul Nugroho",
   "owner": {
     "name": "Fakhrul Nugroho",
@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "analyst",
-      "description": "Skill dan subagent jembatan antara pengguna/stakeholder dan engineer: klasifikasi permintaan, elisitasi terarah dengan peminta non-engineer, dan penulisan TICKET.md non-teknis (user story, acceptance criteria, aturan bisnis) setara kartu Jira/Trello — dengan review independen dan persetujuan user. Tiket READY diserahkan ke backenddev:tech-lead / frontenddev:lead lewat parameter ticket_source",
+      "description": "Skill dan subagent jembatan antara pengguna/stakeholder dan engineer: klasifikasi permintaan, elisitasi terarah dengan peminta non-engineer, dan penulisan TICKET.md non-teknis (user story, acceptance criteria, aturan bisnis) setara kartu Jira/Trello — dengan review independen dan persetujuan user. Tiket READY diserahkan ke backend:tech-lead / frontend:lead lewat parameter ticket_source",
       "source": "./src/plugins/analyst",
       "author": {
         "name": "Fakhrul Nugroho",
@@ -17,18 +17,18 @@
       }
     },
     {
-      "name": "backenddev",
+      "name": "backend",
       "description": "Agent dan skill untuk kerja backend lintas-stack (Java Spring, Go, Node, Bun, Rust, PHP, CodeIgniter 4): profiling repo, eksplorasi, audit konvensi, review terhadap kontrak, perencanaan, orkestrasi eksekusi, implementasi, dan analisis kebutuhan",
-      "source": "./src/plugins/backenddev",
+      "source": "./src/plugins/backend",
       "author": {
         "name": "Fakhrul Nugroho",
         "email": "fakhrulnugroho15@gmail.com"
       }
     },
     {
-      "name": "frontenddev",
+      "name": "frontend",
       "description": "Skill dan subagent untuk kerja frontend lintas-stack (React Vite SPA, React Native/Expo, SvelteKit, Svelte + Vite): profil repo, penelusuran kode, perjalanan antar-layar, bentuk layar, kontrak arsitektur, perencanaan brief, eksekusi sekuensial, review independen, dan laporan — dengan ledger approval dan validator mekanis di tiap gate",
-      "source": "./src/plugins/frontenddev",
+      "source": "./src/plugins/frontend",
       "author": {
         "name": "Fakhrul Nugroho",
         "email": "fakhrulnugroho15@gmail.com"

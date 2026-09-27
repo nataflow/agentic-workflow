@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Alur ringan quickdev (repo-profile.md, plan/<task>.md, tanpa taskdir) — menyusun satu berkas rencana plan/<task>.md dari kebutuhan yang sudah jelas lalu meminta approval user. Bukan brief taskdir backenddev/frontenddev; dipanggil eksplisit lewat /quickdev:plan.
+description: Alur ringan quickdev (repo-profile.md, plan/<task>.md, tanpa taskdir) — menyusun satu berkas rencana plan/<task>.md dari kebutuhan yang sudah jelas lalu meminta approval user. Bukan brief taskdir backend/frontend; dipanggil eksplisit lewat /quickdev:plan.
 disable-model-invocation: true
 ---
 
@@ -13,17 +13,17 @@ DILARANG MEMULAI IMPLEMENTASI ATAU MENULIS KODE SUMBER SEBELUM DOKUMEN RENCANA D
 1. Status `quickdev:explore` dan `quickdev:clarify` dibaca dari percakapan (`EXPLORED`, `CLARIFIED` atau `SKIPPED`) atau dari user, lalu ditulis ke metadata `Gates:` rencana. Keduanya tidak ada di percakapan → Failure path 5; `DILEWATI` hanya atas pilihan eksplisit user.
 2. Spesifikasi kebutuhan fungsional, kontrak data API, skema payload, atau alur UI/UX telah terkunci tanpa ambiguitas yang tersisa.
 3. Direktori kerja repositori memiliki izin tulis aktif untuk membuat folder `plan/` dan berkas rencana implementasi markdown.
-4. Profil repositori pada `profile_path` tersedia sebagai panduan arsitektur dan baseline verifikasi; bila absen, hentikan dan arahkan pemanggil ke `quickdev:profile` (jangan `backenddev:profile`/`frontenddev:profile`) karena perintah baseline rencana wajib diambil dari profil.
+4. Profil repositori pada `profile_path` tersedia sebagai panduan arsitektur dan baseline verifikasi; bila absen, hentikan dan arahkan pemanggil ke `quickdev:profile` (jangan `backend:profile`/`frontend:profile`) karena perintah baseline rencana wajib diambil dari profil.
 5. `python3` (3.9+) tersedia untuk `plan_lock.py`, yang mengunci rencana saat approval.
 
 ## Koeksistensi [REQUIRED]
 
-- Skill ini bagian dari alur ringan `quickdev` (`repo-profile.md`, `plan/<task>.md`, tanpa taskdir). Setiap rujukan skill di berkas ini berarti `quickdev:*`. Dilarang memakai `backenddev:*` atau `frontenddev:*` sebagai pengganti: `backenddev:profile`/`frontenddev:profile` menulis `.claude/profile/<plugin>/`, bukan `repo-profile.md`, dan tidak memenuhi precondition skill ini.
-- Bila konteks sesi memuat blok `<backenddev-tech-lead-gate>` atau `<frontenddev-lead-gate>`:
+- Skill ini bagian dari alur ringan `quickdev` (`repo-profile.md`, `plan/<task>.md`, tanpa taskdir). Setiap rujukan skill di berkas ini berarti `quickdev:*`. Dilarang memakai `backend:*` atau `frontend:*` sebagai pengganti: `backend:profile`/`frontend:profile` menulis `.claude/profile/<plugin>/`, bukan `repo-profile.md`, dan tidak memenuhi precondition skill ini.
+- Bila konteks sesi memuat blok `<backend-tech-lead-gate>` atau `<frontend-lead-gate>`:
   - User memanggil `/quickdev:<skill>` secara eksplisit, atau melanjutkan artefak quickdev (`plan/<task>.md`, `repo-profile.md`) → lanjutkan skill ini. Blok gerbang itu mengecualikan alur plugin lain yang dipanggil eksplisit.
-  - Permintaan kerja baru tanpa pilihan alur → tanyakan sekali lewat `AskUserQuestion`: "Alur ringan quickdev (`plan/<task>.md`)" atau "Gerbang `<backenddev:tech-lead | frontenddev:lead>` (taskdir + brief)". Jangan memilih sendiri.
+  - Permintaan kerja baru tanpa pilihan alur → tanyakan sekali lewat `AskUserQuestion`: "Alur ringan quickdev (`plan/<task>.md`)" atau "Gerbang `<backend:tech-lead | frontend:lead>` (taskdir + brief)". Jangan memilih sendiri.
 - `.claude/workflow` ada dan tidak memuat kata `quickdev` → repo ini memilih alur lain; laporkan dan tanyakan dulu sebelum lanjut.
-- Penanda opt-out `.claude/workflow` (nama plugin yang boleh menggerbangi repo, dipisah spasi/baris): isi `quickdev` membuat hook SessionStart `backenddev`/`frontenddev` diam; isi `frontenddev quickdev` hanya menyalakan hook `frontenddev`.
+- Penanda opt-out `.claude/workflow` (nama plugin yang boleh menggerbangi repo, dipisah spasi/baris): isi `quickdev` membuat hook SessionStart `backend`/`frontend` diam; isi `frontend quickdev` hanya menyalakan hook `frontend`.
 
 ## Parameter [REQUIRED]
 

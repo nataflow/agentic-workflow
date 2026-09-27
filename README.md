@@ -1,26 +1,26 @@
-# agentic-workflow
+# nataflow
 
-Marketplace plugin Claude Code `fakhrulnugroho`: empat plugin untuk alur kerja rekayasa perangkat lunak,
+Marketplace plugin Claude Code `nataflow`: empat plugin untuk alur kerja rekayasa perangkat lunak,
 mulai dari tiket stakeholder sampai kode yang direview.
 
 | Plugin | Versi | Fungsi | Titik masuk |
 |---|---|---|---|
 | [`analyst`](src/plugins/analyst/README.md) | 0.3.0 | Permintaan pengguna/stakeholder menjadi `TICKET.md` non-teknis (user story, acceptance criteria, aturan bisnis) lewat elisitasi, review independen, dan persetujuan | `/analyst:intake` |
-| [`backenddev`](src/plugins/backenddev/README.md) | 0.6.0 | Kerja backend 7 stack (Java Spring, Go, Node, Bun, Rust, PHP, CodeIgniter 4): profil, TASK/BRD/PRD/brief, eksekusi, review, dan laporan | `/backenddev:tech-lead` |
-| [`frontenddev`](src/plugins/frontenddev/README.md) | 0.5.0 | Kerja frontend (React + Vite, React Native/Expo, SvelteKit, Svelte + Vite): alur layar, bentuk layar, kontrak, brief, eksekusi, review, dan laporan dengan ledger approval | `/frontenddev:lead` |
+| [`backend`](src/plugins/backend/README.md) | 0.6.0 | Kerja backend 7 stack (Java Spring, Go, Node, Bun, Rust, PHP, CodeIgniter 4): profil, TASK/BRD/PRD/brief, eksekusi, review, dan laporan | `/backend:tech-lead` |
+| [`frontend`](src/plugins/frontend/README.md) | 0.5.0 | Kerja frontend (React + Vite, React Native/Expo, SvelteKit, Svelte + Vite): alur layar, bentuk layar, kontrak, brief, eksekusi, review, dan laporan dengan ledger approval | `/frontend:lead` |
 | [`quickdev`](src/plugins/quickdev/README.md) | 0.2.0 | Alur ringan untuk stack apa pun: profil, explore, clarify, satu berkas rencana, execute, dan review, tanpa taskdir dan tanpa subagent | `/quickdev:profile`, `/quickdev:plan` |
 
-Skill internal (mis. `backenddev:plan`, `frontenddev:contract`, `analyst:spec`) tidak muncul di menu `/`.
+Skill internal (mis. `backend:plan`, `frontend:contract`, `analyst:spec`) tidak muncul di menu `/`.
 Model memanggilnya dari gerbang masing-masing.
 
 ## Instalasi
 
 ```
 /plugin marketplace add <owner>/<repo>
-/plugin install analyst@fakhrulnugroho
-/plugin install backenddev@fakhrulnugroho
-/plugin install frontenddev@fakhrulnugroho
-/plugin install quickdev@fakhrulnugroho
+/plugin install analyst@nataflow
+/plugin install backend@nataflow
+/plugin install frontend@nataflow
+/plugin install quickdev@nataflow
 ```
 
 Untuk salinan lokal: `/plugin marketplace add ./path/ke/agentic-workflow`. Marketplace direktori lokal
@@ -29,9 +29,9 @@ Marketplace git memakai `version` di `plugin.json`: pengguna hanya mendapat peru
 
 ## Prasyarat
 
-- `python3` ≥ 3.9 di `PATH` untuk hook dan skrip `analyst`, `backenddev`, dan `frontenddev`. Semua skrip
+- `python3` ≥ 3.9 di `PATH` untuk hook dan skrip `analyst`, `backend`, dan `frontend`. Semua skrip
   hanya memakai stdlib. Python 3.11+ disarankan untuk repo Rust ber-workspace (`tomllib`).
-- `git`. `backenddev` dan `frontenddev` mewajibkan repo git, sedangkan `analyst` bisa berjalan di folder
+- `git`. `backend` dan `frontend` mewajibkan repo git, sedangkan `analyst` bisa berjalan di folder
   dokumen biasa.
 - Di Windows yang hanya punya `py`/`python` tanpa `python3`, hook SessionStart tidak jalan.
 
@@ -40,19 +40,19 @@ Marketplace git memakai `version` di `plugin.json`: pengguna hanya mendapat peru
 | Situasi | Plugin |
 |---|---|
 | Peminta non-engineer atau stakeholder; kebutuhan belum jelas | `analyst` |
-| Repo backend salah satu dari 7 stack; kerja berisiko atau butuh kontrak dan jejak keputusan | `backenddev` |
-| Repo React + Vite, React Native/Expo, SvelteKit, atau Svelte + Vite | `frontenddev` |
+| Repo backend salah satu dari 7 stack; kerja berisiko atau butuh kontrak dan jejak keputusan | `backend` |
+| Repo React + Vite, React Native/Expo, SvelteKit, atau Svelte + Vite | `frontend` |
 | Perubahan kecil–menengah, stack lain (Next.js, FastAPI, …), tanpa taskdir | `quickdev` |
 
 Rantai `analyst` → engineer: tiket `READY` diserahkan dengan menempelkan isi `TICKET.md` sebagai permintaan
-ke `/backenddev:tech-lead` dan/atau `/frontenddev:lead`. Engineer lalu menerbitkan `TASK.md` teknisnya
+ke `/backend:tech-lead` dan/atau `/frontend:lead`. Engineer lalu menerbitkan `TASK.md` teknisnya
 sendiri.
 
 ## Hidup Berdampingan
 
 Keempat plugin biasanya dipasang user-wide. Yang menentukan perilaku di satu repo:
 
-- **Hook SessionStart.** Hanya `backenddev` dan `frontenddev` yang punya hook. Keduanya berbagi
+- **Hook SessionStart.** Hanya `backend` dan `frontend` yang punya hook. Keduanya berbagi
   `hooks/detect.py` yang identik byte-per-byte, dan masing-masing menyala bila profilnya ada atau
   manifest repo memuat penanda stack-nya. Di repo fullstack keduanya menyala dan menyuntik blok gerbang
   masing-masing. Di repo lain keduanya diam.
@@ -63,7 +63,7 @@ Keempat plugin biasanya dipasang user-wide. Yang menentukan perilaku di satu rep
   `/analyst:*` dan `/quickdev:*`. Skill quickdev hanya jalan bila user mengetik `/quickdev:<skill>`.
 - **Penanda `.claude/workflow`.** Berkas teks di repo pengguna berisi nama plugin yang boleh menggerbangi
   repo itu, dipisah spasi atau baris. Hook yang namanya tidak tercantum akan diam. Isi `quickdev` membuat
-  kedua hook engineer diam; isi `frontenddev quickdev` hanya menyalakan frontenddev. Bila berkas tidak ada,
+  kedua hook engineer diam; isi `frontend quickdev` hanya menyalakan frontend. Bila berkas tidak ada,
   semua hook berjalan normal.
 
 ## Pengembangan

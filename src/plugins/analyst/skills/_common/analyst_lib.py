@@ -242,7 +242,7 @@ def content_hash(text: str, part: str = "all") -> str:
     return hashlib.sha256(f"{fields}\n{norm}".encode("utf-8")).hexdigest()[:12]
 
 
-# Segel serah-terima (09 E8). Sengaja tanpa parser YAML: penerima (backenddev/frontenddev
+# Segel serah-terima (09 E8). Sengaja tanpa parser YAML: penerima (backend/frontend
 # `precondition_lib.ticket_seal`) menyalin fungsi ini apa adanya, dan `tests/test_a1_ticket_source.py`
 # menagih ketiga salinan memberi hasil sama. Mencakup body utuh (kartu + catatan elisitasi) dan
 # baris frontmatter isi (`SEAL_FIELDS`) persis seperti tertulis; field pembukuan dan `external_ref`

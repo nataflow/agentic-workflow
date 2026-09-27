@@ -17,18 +17,18 @@ DILARANG MEMBUAT ASUMSI SPESIFIKASI PADA BAGIAN YANG AMBIGU TANPA KONFIRMASI EKS
 
 ## Koeksistensi [REQUIRED]
 
-- Skill ini bagian dari alur ringan `quickdev` (`repo-profile.md`, `plan/<task>.md`, tanpa taskdir). Setiap rujukan skill di berkas ini berarti `quickdev:*`. Dilarang memakai `backenddev:*` atau `frontenddev:*` sebagai pengganti: `backenddev:profile`/`frontenddev:profile` menulis `.claude/profile/<plugin>/`, bukan `repo-profile.md`, dan tidak memenuhi precondition skill ini.
-- Bila konteks sesi memuat blok `<backenddev-tech-lead-gate>` atau `<frontenddev-lead-gate>`:
+- Skill ini bagian dari alur ringan `quickdev` (`repo-profile.md`, `plan/<task>.md`, tanpa taskdir). Setiap rujukan skill di berkas ini berarti `quickdev:*`. Dilarang memakai `backend:*` atau `frontend:*` sebagai pengganti: `backend:profile`/`frontend:profile` menulis `.claude/profile/<plugin>/`, bukan `repo-profile.md`, dan tidak memenuhi precondition skill ini.
+- Bila konteks sesi memuat blok `<backend-tech-lead-gate>` atau `<frontend-lead-gate>`:
   - User memanggil `/quickdev:<skill>` secara eksplisit, atau melanjutkan artefak quickdev (`plan/<task>.md`, `repo-profile.md`) → lanjutkan skill ini. Blok gerbang itu mengecualikan alur plugin lain yang dipanggil eksplisit.
-  - Permintaan kerja baru tanpa pilihan alur → tanyakan sekali lewat `AskUserQuestion`: "Alur ringan quickdev (`plan/<task>.md`)" atau "Gerbang `<backenddev:tech-lead | frontenddev:lead>` (taskdir + brief)". Jangan memilih sendiri.
+  - Permintaan kerja baru tanpa pilihan alur → tanyakan sekali lewat `AskUserQuestion`: "Alur ringan quickdev (`plan/<task>.md`)" atau "Gerbang `<backend:tech-lead | frontend:lead>` (taskdir + brief)". Jangan memilih sendiri.
 - `.claude/workflow` ada dan tidak memuat kata `quickdev` → repo ini memilih alur lain; laporkan dan tanyakan dulu sebelum lanjut.
-- Penanda opt-out `.claude/workflow` (nama plugin yang boleh menggerbangi repo, dipisah spasi/baris): isi `quickdev` membuat hook SessionStart `backenddev`/`frontenddev` diam; isi `frontenddev quickdev` hanya menyalakan hook `frontenddev`.
+- Penanda opt-out `.claude/workflow` (nama plugin yang boleh menggerbangi repo, dipisah spasi/baris): isi `quickdev` membuat hook SessionStart `backend`/`frontend` diam; isi `frontend quickdev` hanya menyalakan hook `frontend`.
 
 ## Parameter [REQUIRED]
 
 - `explore_summary` — string — `[REQUIRED]` — ringkasan hasil temuan dari `quickdev:explore` yang mencakup file target, simbol, dan potensi celah spesifikasi; bila pemanggil tidak mengirimnya, ambil dari laporan `quickdev:explore` terakhir di percakapan.
 - `profile_type` — string — default `"auto"` — tipe domain klarifikasi (`"backend"`, `"frontend"`, `"fullstack"`, `"auto"`). Jika `"auto"`, membaca tipe dari profil repositori atau konteks file yang dieksplorasi.
-- `profile_path` — string — default `"repo-profile.md"` — path profil hasil `quickdev:profile` (bukan `.claude/profile/` milik backenddev/frontenddev); bila tidak ditemukan, gunakan fallback `.dev/profile.md`. Bila repo memuat lebih dari satu profil (`git ls-files '*repo-profile.md'`), tanyakan workspace mana lewat `AskUserQuestion`, jangan memakai root diam-diam.
+- `profile_path` — string — default `"repo-profile.md"` — path profil hasil `quickdev:profile` (bukan `.claude/profile/` milik backend/frontend); bila tidak ditemukan, gunakan fallback `.dev/profile.md`. Bila repo memuat lebih dari satu profil (`git ls-files '*repo-profile.md'`), tanyakan workspace mana lewat `AskUserQuestion`, jangan memakai root diam-diam.
 - `skip_if_clear` — boolean — default `true` — bila `true`, melaporkan `SKIPPED` dan menawarkan `quickdev:plan` jika tidak ditemukan ambiguitas atau celah spesifikasi. `false` → meski tanpa ambiguitas, sajikan ringkasan spesifikasi terkunci sebagai **satu** `AskUserQuestion` (*Spesifikasi benar* · *Ada koreksi (sebut)*) sebelum `SKIPPED`; koreksi dipetakan seperti jawaban Fase 3.
 - `batch_limit` — integer — default `3` — batas pertanyaan per batch (maksimal 4, batas satu panggilan `AskUserQuestion`).
 - `allow_assumptions` — boolean — default `false` — bila `true`, mengizinkan penetapan asumsi teknis terukur jika user mendelegasikan keputusan secara eksplisit.

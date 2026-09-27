@@ -5,7 +5,8 @@ import pytest
 
 from conftest import PLUGINS
 
-ENGINEERS = ("backenddev", "frontenddev")
+# (direktori plugin, slug profil `.claude/profile/<slug>/`)
+ENGINEERS = (("backend", "backenddev"), ("frontend", "frontenddev"))
 # Rumah resolver dan detektor — satu-satunya tempat path profil dibentuk.
 PY_ALLOWED = {"skills/_common/precondition_lib.py", "hooks/detect.py", "hooks/gate_text.py",
               "skills/profile/scripts/migrate_profile.py"}
@@ -14,8 +15,8 @@ PY_HARDCODED = re.compile(r'"\.claude" / "profile"|\.claude/profile"')
 LEGACY_OK = re.compile(r"MIGRATE|lokasi lama|profil lama|index\.json` lama|plugin lain|migrate_profile|git log --oneline -- \.claude/profile/index\.json")
 
 
-@pytest.mark.parametrize("plugin", ENGINEERS)
-def test_no_hardcoded_profile_path_in_python(plugin):
+@pytest.mark.parametrize("plugin,slug", ENGINEERS)
+def test_no_hardcoded_profile_path_in_python(plugin, slug):
     root = PLUGINS / plugin
     bad = []
     for path in root.rglob("*.py"):
@@ -28,10 +29,10 @@ def test_no_hardcoded_profile_path_in_python(plugin):
     assert not bad, "\n".join(bad)
 
 
-@pytest.mark.parametrize("plugin", ENGINEERS)
-def test_markdown_profile_paths_namespaced(plugin):
+@pytest.mark.parametrize("plugin,slug", ENGINEERS)
+def test_markdown_profile_paths_namespaced(plugin, slug):
     root = PLUGINS / plugin
-    pattern = re.compile(r"\.claude/profile(?!/" + plugin + r")")
+    pattern = re.compile(r"\.claude/profile(?!/" + slug + r")")
     bad = []
     for path in root.rglob("*.md"):
         for no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):

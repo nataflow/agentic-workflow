@@ -51,7 +51,7 @@ def write_files(root: Path, files: Dict[str, str]) -> None:
 
 def be_profile(root: Path, stack: str, *, legacy: bool = False, source_root: str = "src",
                extra: Optional[dict] = None) -> Path:
-    """Profil backenddev lengkap di `.claude/profile/backenddev/` (atau lokasi lama)."""
+    """Profil backend lengkap di `.claude/profile/backenddev/` (atau lokasi lama)."""
     d = root / ".claude" / "profile" / ("" if legacy else "backenddev")
     d.mkdir(parents=True, exist_ok=True)
     data = {"project": "x", "stack": stack, "architecture": "layered", "root_namespace": "x",
@@ -67,7 +67,7 @@ def be_profile(root: Path, stack: str, *, legacy: bool = False, source_root: str
 
 
 def fe_profile(root: Path, stack: str, *, legacy: bool = False, extra: Optional[dict] = None) -> Path:
-    """Profil frontenddev lengkap di `.claude/profile/frontenddev/` (atau lokasi lama)."""
+    """Profil frontend lengkap di `.claude/profile/frontenddev/` (atau lokasi lama)."""
     d = root / ".claude" / "profile" / ("" if legacy else "frontenddev")
     d.mkdir(parents=True, exist_ok=True)
     data = {"project": "x", "stack": stack, "platform": "SPA", "framework": "x", "source_root": "src",
@@ -87,12 +87,16 @@ def run_script(path: Path, *args: str, cwd: Optional[Path] = None, stdin: str = 
                           text=True, cwd=str(cwd) if cwd else None, env=env, timeout=60)
 
 
+# Slug profil (`.claude/profile/<slug>/`, kunci `detect.PLUGINS`) → direktori plugin di src/plugins/.
+PLUGIN_DIRS = {"backenddev": "backend", "frontenddev": "frontend"}
+
+
 def run_hook(plugin: str, cwd: Path, *, stdin: Optional[str] = None, explain: bool = False):
     """Jalankan `hooks/detect.py`. Mengembalikan (proc, payload|None)."""
     if stdin is None:
         stdin = json.dumps({"cwd": str(cwd), "hook_event_name": "SessionStart", "source": "startup"})
     args = ["--plugin", plugin] + (["--explain"] if explain else [])
-    proc = run_script(PLUGINS / plugin / "hooks" / "detect.py", *args, stdin=stdin)
+    proc = run_script(PLUGINS / PLUGIN_DIRS.get(plugin, plugin) / "hooks" / "detect.py", *args, stdin=stdin)
     out = proc.stdout.strip()
     return proc, (json.loads(out) if out else None)
 
@@ -100,7 +104,7 @@ def run_hook(plugin: str, cwd: Path, *, stdin: Optional[str] = None, explain: bo
 def load_module(path: Path, name: str):
     """Muat satu modul skrip per path dengan nama unik, tanpa meninggalkan jejak di `sys.path`.
 
-    backenddev dan frontenddev sama-sama punya `precondition_lib` (dan `detect`). Modul yang
+    backend dan frontend sama-sama punya `precondition_lib` (dan `detect`). Modul yang
     ikut terimpor lewat direktori induk `path` dibuang dari `sys.modules` sesudahnya, supaya
     test plugin lain di sesi pytest yang sama tidak mendapat salinan plugin yang salah.
     """
@@ -131,9 +135,9 @@ def make_repo(tmp_path):
     return _make
 
 
-# --- Rantai backenddev (Langkah 2) -------------------------------------------------------------
+# --- Rantai backend (Langkah 2) -------------------------------------------------------------
 
-BE_SKILLS = PLUGINS / "backenddev" / "skills"
+BE_SKILLS = PLUGINS / "backend" / "skills"
 TD = "backenddev/docs/2609240900-order-fix"
 
 
@@ -178,7 +182,7 @@ def be_checks(repo: Path, skill_script: str, *args: str) -> Dict[int, dict]:
 
 @pytest.fixture
 def chain_repo(make_repo):
-    """Repo ber-profil backenddev (stack go), `{TD}/TASK.md` ter-commit di `main`; HEAD di branch kerja `fix/order-fix`."""
+    """Repo ber-profil backend (stack go), `{TD}/TASK.md` ter-commit di `main`; HEAD di branch kerja `fix/order-fix`."""
     root = make_repo({
         ".gitignore": ".explore/\n",
         f"{TD}/TASK.md": ("---\nchain: BRIEF\nrisk: MINOR\nstatus: ACTIVE\n---\n# Order fix\n"
@@ -194,15 +198,15 @@ def chain_repo(make_repo):
     return root
 
 
-# --- Rantai frontenddev (Langkah 4) ------------------------------------------------------------
+# --- Rantai frontend (Langkah 4) ------------------------------------------------------------
 
-FE_SKILLS = PLUGINS / "frontenddev" / "skills"
-FE_FIX = REPO / "tests" / "frontenddev" / "fixtures"
+FE_SKILLS = PLUGINS / "frontend" / "skills"
+FE_FIX = REPO / "tests" / "frontend" / "fixtures"
 FE_TD = "frontenddev/docs/2609241200-orders-lacak"
 
 
 def fe_run(repo: Path, skill_script: str, *args: str) -> subprocess.CompletedProcess:
-    """Jalankan `frontenddev/skills/<skill_script>` dengan cwd = repo; stdout+stderr digabung di `.out`."""
+    """Jalankan `frontend/skills/<skill_script>` dengan cwd = repo; stdout+stderr digabung di `.out`."""
     proc = run_script(FE_SKILLS / skill_script, *args, cwd=repo)
     proc.out = proc.stdout + proc.stderr
     return proc
@@ -228,7 +232,7 @@ def fe_brief(repo: Path, nn: str, status: str = "READY", step: str = "Tambah tom
 
 @pytest.fixture
 def fe_chain_repo(make_repo):
-    """Repo FAST_FORWARD frontenddev: akar `TASK.md` terkunci di `main`, `CONTRACT.md` DRAFT tertulis (belum di-commit)."""
+    """Repo FAST_FORWARD frontend: akar `TASK.md` terkunci di `main`, `CONTRACT.md` DRAFT tertulis (belum di-commit)."""
     root = make_repo({
         ".gitignore": ".explore/\n",
         f"{FE_TD}/TASK.md": (FE_FIX / "task_fast_forward.md").read_text(encoding="utf-8"),
@@ -291,7 +295,7 @@ FE_MINOR_TD = "frontenddev/docs/2609231200-order-checkout"
 
 @pytest.fixture
 def fe_minor_chain(tmp_path):
-    """Rantai HOTFIX_MINOR frontenddev: `closing review PASS` ter-commit, `REPORT.md` tertulis belum di-commit."""
+    """Rantai HOTFIX_MINOR frontend: `closing review PASS` ter-commit, `REPORT.md` tertulis belum di-commit."""
     root = tmp_path / "repo"
     proc = subprocess.run(["bash", str(FE_FIX / "minor_chain_reviewed.sh"), str(root), str(FE_SKILLS)],
                           capture_output=True, text=True, env={**os.environ, **GIT_ENV})

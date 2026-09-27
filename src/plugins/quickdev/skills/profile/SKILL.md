@@ -1,6 +1,6 @@
 ---
 name: profile
-description: Alur ringan quickdev (repo-profile.md, plan/<task>.md, tanpa taskdir) — dipanggil eksplisit lewat /quickdev:profile ketika repo belum punya repo-profile.md atau profilnya perlu diperbarui — pemindaian stack, layer, dan baseline verifikasi. Bukan untuk .claude/profile/ milik backenddev/frontenddev.
+description: Alur ringan quickdev (repo-profile.md, plan/<task>.md, tanpa taskdir) — dipanggil eksplisit lewat /quickdev:profile ketika repo belum punya repo-profile.md atau profilnya perlu diperbarui — pemindaian stack, layer, dan baseline verifikasi. Bukan untuk .claude/profile/ milik backend/frontend.
 disable-model-invocation: true
 ---
 
@@ -17,12 +17,12 @@ DILARANG MEMBUAT ASUMSI STACK ATAU PERINTAH BASELINE TANPA BUKTI KONFIGURASI NYA
 
 ## Koeksistensi [REQUIRED]
 
-- Skill ini bagian dari alur ringan `quickdev` (`repo-profile.md`, `plan/<task>.md`, tanpa taskdir). Setiap rujukan skill di berkas ini berarti `quickdev:*`. Dilarang memakai `backenddev:*` atau `frontenddev:*` sebagai pengganti: `backenddev:profile`/`frontenddev:profile` menulis `.claude/profile/<plugin>/`, bukan `repo-profile.md`, dan tidak memenuhi precondition skill ini.
-- Bila konteks sesi memuat blok `<backenddev-tech-lead-gate>` atau `<frontenddev-lead-gate>`:
+- Skill ini bagian dari alur ringan `quickdev` (`repo-profile.md`, `plan/<task>.md`, tanpa taskdir). Setiap rujukan skill di berkas ini berarti `quickdev:*`. Dilarang memakai `backend:*` atau `frontend:*` sebagai pengganti: `backend:profile`/`frontend:profile` menulis `.claude/profile/<plugin>/`, bukan `repo-profile.md`, dan tidak memenuhi precondition skill ini.
+- Bila konteks sesi memuat blok `<backend-tech-lead-gate>` atau `<frontend-lead-gate>`:
   - User memanggil `/quickdev:<skill>` secara eksplisit, atau melanjutkan artefak quickdev (`plan/<task>.md`, `repo-profile.md`) → lanjutkan skill ini. Blok gerbang itu mengecualikan alur plugin lain yang dipanggil eksplisit.
-  - Permintaan kerja baru tanpa pilihan alur → tanyakan sekali lewat `AskUserQuestion`: "Alur ringan quickdev (`plan/<task>.md`)" atau "Gerbang `<backenddev:tech-lead | frontenddev:lead>` (taskdir + brief)". Jangan memilih sendiri.
+  - Permintaan kerja baru tanpa pilihan alur → tanyakan sekali lewat `AskUserQuestion`: "Alur ringan quickdev (`plan/<task>.md`)" atau "Gerbang `<backend:tech-lead | frontend:lead>` (taskdir + brief)". Jangan memilih sendiri.
 - `.claude/workflow` ada dan tidak memuat kata `quickdev` → repo ini memilih alur lain; laporkan dan tanyakan dulu sebelum lanjut.
-- Penanda opt-out `.claude/workflow` (nama plugin yang boleh menggerbangi repo, dipisah spasi/baris): isi `quickdev` membuat hook SessionStart `backenddev`/`frontenddev` diam; isi `frontenddev quickdev` hanya menyalakan hook `frontenddev`.
+- Penanda opt-out `.claude/workflow` (nama plugin yang boleh menggerbangi repo, dipisah spasi/baris): isi `quickdev` membuat hook SessionStart `backend`/`frontend` diam; isi `frontend quickdev` hanya menyalakan hook `frontend`.
 
 ## Parameter [REQUIRED]
 
@@ -113,7 +113,7 @@ DILARANG MEMBUAT ASUMSI STACK ATAU PERINTAH BASELINE TANPA BUKTI KONFIGURASI NYA
    - Pastikan seluruh 6 section header hadir dan perintah baseline terbukti valid.
    - Pastikan ukuran berkas memenuhi batas kuota (< 10.000 karakter).
 2. Set status terminal `PROFILED` dan laporkan ringkasan metadata profil ke user.
-3. Bila konteks sesi memuat blok `<backenddev-tech-lead-gate>` atau `<frontenddev-lead-gate>` (atau `python3 <plugin>/hooks/detect.py --explain` menunjukkan hook engineer aktif), tawarkan penulisan penanda opt-out `.claude/workflow` berisi `quickdev` (ditambah nama plugin engineer yang tetap boleh menggerbangi repo, bila ada) agar hook engineer diam di repo ini. Tulis berkas itu hanya dengan persetujuan user.
+3. Bila konteks sesi memuat blok `<backend-tech-lead-gate>` atau `<frontend-lead-gate>` (atau `python3 <plugin>/hooks/detect.py --explain` menunjukkan hook engineer aktif), tawarkan penulisan penanda opt-out `.claude/workflow` berisi `quickdev` (ditambah nama plugin engineer yang tetap boleh menggerbangi repo, bila ada) agar hook engineer diam di repo ini. Tulis berkas itu hanya dengan persetujuan user.
 4. Tawarkan `quickdev:explore`; tunggu user.
 
 ## Guardrails

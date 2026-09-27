@@ -45,7 +45,7 @@ Permintaan yang jelas menyambung ticketdir terbuka (topik, peminta, atau jawaban
 | Kebutuhan, masalah, atau keluhan dari sisi pengguna/bisnis | lanjut Phase 3 |
 | Mengubah tiket yang sudah `READY` ("tambah aturan di tiket cicilan") | `analyst:spec` pada ticketdir itu dengan `change_request` = permintaan; spec yang membuka ulang |
 | Menanyakan status atau daftar tiket | jawab dari `ticket.py state --ready`, selesai |
-| Kerja teknis murni — refaktor, upgrade pustaka, stacktrace/log dari developer, pertanyaan letak kode | di luar wilayah analyst: sebut `backenddev:tech-lead` atau `frontenddev:lead`, selesai |
+| Kerja teknis murni — refaktor, upgrade pustaka, stacktrace/log dari developer, pertanyaan letak kode | di luar wilayah analyst: sebut `backend:tech-lead` atau `frontend:lead`, selesai |
 
 Laporan bug dari **pengguna** ("tombol bayar tidak bisa diklik") tetap wilayah analyst; stacktrace yang ditempel **developer** tidak.
 
@@ -77,7 +77,7 @@ Jalankan `ticket.py state --ready` dan bandingkan judul tiap baris dengan tujuan
 
 - **NOL BERKAS DI GATE**: intake tidak menjalankan `ticket.py new`, tidak menulis `TICKET.md`.
 - **NOL KODE**: dilarang `Read`/`Grep`/`Glob` atas kode repo untuk "memastikan" permintaan. Fakta tentang sistem datang dari peminta, dan yang tidak diketahui peminta menjadi pertanyaan elisitasi.
-- **GERBANG ENGINEER TIDAK BERLAKU**: blok `<backenddev-tech-lead-gate>`/`<frontenddev-lead-gate>` di konteks tidak berlaku untuk alur analyst yang dipanggil eksplisit; blok itu sendiri mengecualikan `/analyst:*` dan susulan di tengah elisitasi.
+- **GERBANG ENGINEER TIDAK BERLAKU**: blok `<backend-tech-lead-gate>`/`<frontend-lead-gate>` di konteks tidak berlaku untuk alur analyst yang dipanggil eksplisit; blok itu sendiri mengecualikan `/analyst:*` dan susulan di tengah elisitasi.
 - **PERMINTAAN VERBATIM**: `request` diteruskan tanpa parafrase; elisitasi mengutipnya sebagai `### Permintaan Asli` di `TICKET.md`.
 - **PERTANYAAN HEMAT**: maksimal satu `AskUserQuestion` per phase; pertanyaan isi (aturan, angka, aktor) milik `elicit`.
 - **RATIONALIZATION PREVENTION**:
@@ -88,7 +88,7 @@ Jalankan `ticket.py state --ready` dan bandingkan judul tiap baris dengan tujuan
 
 ## Output [REQUIRED]
 
-Serah terima bersih → tutup satu baris: `INTAKE — <BARU | LANJUT | UBAH> · <type> · <slug atau ticketdir> · next analyst:<elicit | spec>`. Di luar wilayah → `INTAKE — DI LUAR WILAYAH · next <backenddev:tech-lead | frontenddev:lead>`. Selain itu, atau bila ada antrian tiket, sajikan blok berikut dan hapus baris bernilai `—`:
+Serah terima bersih → tutup satu baris: `INTAKE — <BARU | LANJUT | UBAH> · <type> · <slug atau ticketdir> · next analyst:<elicit | spec>`. Di luar wilayah → `INTAKE — DI LUAR WILAYAH · next <backend:tech-lead | frontend:lead>`. Selain itu, atau bila ada antrian tiket, sajikan blok berikut dan hapus baris bernilai `—`:
 
 ```markdown
 ### INTAKE — <TERTAHAN | DILANJUTKAN DENGAN ANTRIAN>

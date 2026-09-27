@@ -1,4 +1,4 @@
-"""Hook SessionStart `backenddev`/`frontenddev` (`hooks/detect.py`) — tabel kasus L1.1–L1.3.
+"""Hook SessionStart `backend`/`frontend` (`hooks/detect.py`) — tabel kasus L1.1–L1.3.
 
 ID kasus mengikuti `issues/01-profil-hook-koeksistensi.md` (B*, F* dari L1.2;
 A* tata letak profil per plugin L1.1; Q* opt-out `.claude/workflow` L1.3).
@@ -8,7 +8,7 @@ import json
 
 import pytest
 
-from conftest import PLUGINS, be_profile, fe_profile, git, run_hook, run_script, write_files
+from conftest import PLUGIN_DIRS, PLUGINS, be_profile, fe_profile, git, run_hook, run_script, write_files
 
 VITE = {"devDependencies": {"vite": "^6"}}
 REACT_VITE = json.dumps({"dependencies": {"react": "^19", "react-dom": "^19"}, **VITE})
@@ -124,7 +124,7 @@ CASES = {
     "A6": ("a6", _a6, None, None, None, {"stack": "react-vite", "source": "package.json"}),
     "Q1": ("q1", lambda r: _files(r, {"package.json": EXPRESS, "repo-profile.md": "# p\n", ".claude/workflow": "quickdev\n"}),
         None, None, None, None),
-    "Q2": ("q2", lambda r: _files(r, {"package.json": REACT_VITE, ".claude/workflow": "frontenddev\nquickdev\n"}),
+    "Q2": ("q2", lambda r: _files(r, {"package.json": REACT_VITE, ".claude/workflow": "frontend\nquickdev\n"}),
         None, None, None, {"stack": "react-vite"}),
 }
 
@@ -171,17 +171,17 @@ def test_case(make_repo, case_id):
 
 
 def test_detect_py_identik():
-    assert filecmp.cmp(PLUGINS / "backenddev/hooks/detect.py", PLUGINS / "frontenddev/hooks/detect.py",
+    assert filecmp.cmp(PLUGINS / "backend/hooks/detect.py", PLUGINS / "frontend/hooks/detect.py",
                        shallow=False)
 
 
 def test_migrate_profile_identik():
-    assert filecmp.cmp(PLUGINS / "backenddev/skills/profile/scripts/migrate_profile.py",
-                       PLUGINS / "frontenddev/skills/profile/scripts/migrate_profile.py", shallow=False)
+    assert filecmp.cmp(PLUGINS / "backend/skills/profile/scripts/migrate_profile.py",
+                       PLUGINS / "frontend/skills/profile/scripts/migrate_profile.py", shallow=False)
 
 
-FE_PROFILE_SCRIPT = PLUGINS / "frontenddev/skills/profile/scripts/check_preconditions.py"
-BE_PROFILE_SCRIPT = PLUGINS / "backenddev/skills/profile/scripts/check_preconditions.py"
+FE_PROFILE_SCRIPT = PLUGINS / "frontend/skills/profile/scripts/check_preconditions.py"
+BE_PROFILE_SCRIPT = PLUGINS / "backend/skills/profile/scripts/check_preconditions.py"
 
 
 @pytest.mark.parametrize("case_id", [c for c in CASES if c[0] in "BF"])
@@ -230,7 +230,7 @@ def test_non_git_dir_uses_cwd(make_repo):
 
 @pytest.mark.parametrize("plugin", ["backenddev", "frontenddev"])
 def test_malformed_stdin_is_silent(plugin, tmp_path):
-    proc = run_script(PLUGINS / plugin / "hooks/detect.py", "--plugin", plugin, stdin="not json", cwd=tmp_path)
+    proc = run_script(PLUGINS / PLUGIN_DIRS[plugin] / "hooks/detect.py", "--plugin", plugin, stdin="not json", cwd=tmp_path)
     assert proc.returncode == 0 and proc.stdout == ""
 
 
@@ -279,8 +279,9 @@ def test_legacy_foreign_profile_ignored(make_repo):
 
 # --------------------------------------------------------------- L1.3 (opt-out)
 
-@pytest.mark.parametrize("content,expect_fe", [("quickdev", False), ("frontenddev quickdev", True)],
-                         ids=["quickdev", "frontenddev-quickdev"])
+@pytest.mark.parametrize("content,expect_fe", [("quickdev", False), ("frontend quickdev", True),
+                                               ("frontenddev quickdev", True)],
+                         ids=["quickdev", "frontend-quickdev", "nama-lama-frontenddev"])
 def test_opt_out_workflow_file(make_repo, content, expect_fe):
     root = make_repo({"package.json": REACT_VITE, "apps/api/package.json": EXPRESS,
                       ".claude/workflow": content + "\n"})

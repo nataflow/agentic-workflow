@@ -9,7 +9,7 @@ import json
 from conftest import PLUGINS, run_script, write_files
 
 BAD = b"\xff\xfe\x80 rusak\n"
-FE_STATE = PLUGINS / "frontenddev/skills/lead/scripts/taskdir_state.py"
+FE_STATE = PLUGINS / "frontend/skills/lead/scripts/taskdir_state.py"
 TICKET = PLUGINS / "analyst/skills/_common/ticket.py"
 
 
@@ -52,19 +52,19 @@ def test_validator_menyebut_berkas_rusak(make_repo):
     td = "frontenddev/docs/2609260000-x"
     repo = make_repo({f"{td}/TASK.md": "---\nstatus: ACTIVE\n---\n# x\n"})
     (repo / td / "FLOW.md").write_bytes(BAD)
-    proc = run_script(PLUGINS / "frontenddev/skills/_common/validate_doc.py",
+    proc = run_script(PLUGINS / "frontend/skills/_common/validate_doc.py",
                       "--kind", "flow", "--taskdir", td, "--json", cwd=repo)
     assert proc.returncode == 1
     detail = json.dumps(json.loads(proc.stdout), ensure_ascii=False)
     assert "FLOW.md" in detail and "bukan UTF-8" in detail
 
 
-def test_backenddev_validate_doc_json_tetap_json(make_repo):
+def test_backend_validate_doc_json_tetap_json(make_repo):
     td = "backenddev/docs/2609260000-x"
     repo = make_repo()
     write_files(repo, {f"{td}/.keep": ""})
     (repo / td / "TASK.md").write_bytes(BAD)
-    proc = run_script(PLUGINS / "backenddev/skills/_common/validate_doc.py",
+    proc = run_script(PLUGINS / "backend/skills/_common/validate_doc.py",
                       "--kind", "task", "--taskdir", td, "--json", cwd=repo)
     data = json.loads(proc.stdout)
     assert data["status"] == "ERROR" and "bukan UTF-8" in data["error"]
