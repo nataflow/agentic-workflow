@@ -96,7 +96,7 @@ Pembeli dapat membuka layar lacak pengiriman dari detail pesanan dan melihat sta
 ## Success Criteria
 
 - [ ] **SC-1**: rute `/orders/:id/tracking` terdaftar dan dapat dibuka dari tombol *Lacak* di detail pesanan — verifikasi: test `OrderDetail.test.tsx` menavigasi ke rute itu hijau
-- [ ] **SC-2**: layar tracking menampilkan status kurir terakhir beserta timestamp-nya — verifikasi: QA manual: buka `/orders/<id>/tracking` untuk pesanan terkirim, amati baris status teratas dan jamnya
+- [ ] **SC-2**: layar tracking menampilkan status kurir terakhir beserta timestamp-nya — verifikasi: QA manual: buka `/orders/:id/tracking` untuk pesanan terkirim, amati baris status teratas dan jamnya
 - [ ] **SC-3**: kegagalan memuat status menampilkan banner error dengan tombol *Coba Lagi* — verifikasi: test `TrackingScreen.test.tsx` kasus error hijau
 
 ## Out of Scope

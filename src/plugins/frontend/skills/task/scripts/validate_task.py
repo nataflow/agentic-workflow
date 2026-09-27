@@ -25,8 +25,10 @@ CHAIN_PY = Path(__file__).resolve().parents[2] / "_common" / "chain.py"
 from precondition_lib import (  # noqa: E402
     UNDECODABLE_ACTION,
     undecodable,
+    FrontmatterError,
     expected_rows,
     find_repo_root,
+    inside_root,
     fenced_mask,
     format_report,
     lane_sections_problem,
@@ -43,7 +45,10 @@ from precondition_lib import cli  # noqa: E402
 
 HEADINGS = ("## Description", "## Success Criteria", "## Out of Scope", "## Chain")
 SC_LINE = re.compile(r"^- \[[ xX]\] \*\*SC-(\d+)\*\*:(.*)$")
-MEASURE = re.compile(r"— verifikasi:\s*(test|diff|typecheck|lint|build|qa\s+manual\s*:)", re.IGNORECASE)
+# Alat ukur beserta objeknya (12 J38): `— verifikasi: test` saja tidak menunjuk apa pun yang dapat dijalankan.
+MEASURE = re.compile(r"— verifikasi:\s*(?:(?:tests?|diff|typecheck|lint|build)\b\s*\S|qa\s+manual\s*:\s*\S)",
+                     re.IGNORECASE)
+SC_TOKEN = re.compile(r"\bSC-\d+\b")
 FORBIDDEN_MEASURE = re.compile(r"review manual|dinilai layak|terlihat bagus", re.IGNORECASE)
 DOWNSTREAM_DOCS = re.compile(r"\b(FLOW|UI|CONTRACT)\.md\b")
 FILE_REF = re.compile(r"`([\w@./+-]+\.[A-Za-z0-9]+):(\d+)(?:-\d+)?`")
@@ -70,7 +75,12 @@ class TaskValidator:
                       "Tulis TASK.md lebih dulu (Phase 4 butir 2).")
             return False
         text = self.path.read_text(encoding="utf-8")
-        self.fm, self.body = split_frontmatter(text)
+        try:
+            self.fm, self.body = split_frontmatter(text, strict=True)
+        except FrontmatterError as exc:            # pagar tak lengkap, kunci ganda (12 J31)
+            self._add(1, "Struktur & frontmatter", False, f"frontmatter: {exc}",
+                      "Tulis frontmatter persis bagian 1 template; tiap kunci tepat sekali.")
+            return False
         self.sections = self._split_sections()
         self._check_1_structure()
         self._check_2_numbering()
@@ -96,6 +106,16 @@ class TaskValidator:
     def _sc_lines(self) -> List[re.Match]:
         lines = self.sections.get("## Success Criteria", [])
         return [m for m in (SC_LINE.match(l.strip()) for l in lines) if m]
+
+    def _sc_malformed(self) -> List[str]:
+        """Baris `## Success Criteria` yang menyebut `SC-{n}` tetapi tidak berpola butir SC (12 J25).
+
+        Pembaca hilir (`validate_doc`, `validate_briefs`, `validate_review`) hanya mengenal pola itu; baris
+        lain hilang diam-diam dari rantai.
+        """
+        lines = self.sections.get("## Success Criteria", [])
+        return [l.strip() for l, fenced in zip(lines, fenced_mask(lines))
+                if not fenced and SC_TOKEN.search(l) and not SC_LINE.match(l.strip())]
 
     def _check_1_structure(self) -> None:
         errors = []
@@ -129,6 +149,10 @@ class TaskValidator:
             errors.append(f"{active} SC aktif, sah 1–{MAX_ACTIVE_SC}")
         if dropped and not self.amend:
             errors.append(f"SC gugur {dropped} hanya sah pada amandemen akar (`--amend`)")
+        malformed = self._sc_malformed()
+        if malformed:
+            errors.append("baris SC tak berpola `- [ ] **SC-{n}**: …` (hilang dari rantai): "
+                          + " | ".join(m[:60] for m in malformed[:3]))
         summary = "; ".join(errors) or (f"SC {nums}" + (f" ({active} aktif, gugur: {', '.join(dropped)})"
                                                          if dropped else ""))
         self._add(2, "Penomoran SC-{n}", not errors, summary if nums else "nol butir SC",
@@ -154,6 +178,9 @@ class TaskValidator:
         dangling = []
         for path, line in refs:
             f = self.root / path
+            if not inside_root(self.root, path):
+                dangling.append(f"{path}:{line} (di luar root repo)")
+                continue
             if not f.is_file():
                 dangling.append(f"{path}:{line} (berkas tidak ada)")
                 continue

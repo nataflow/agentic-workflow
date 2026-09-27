@@ -6,13 +6,14 @@ Berkas audit adalah `finding_source` taskdir perbaikan: ID temuannya dikutip
 tinggal di `templates/audit-template.md` bagian 2; skrip ini menegakkannya.
 
 - `--path <berkas>` — bentuk: frontmatter `AUDIT_REVIEW`, ID `P{n}-{m}` berurutan
-  per severity, hitungan `p1/p2/p3` = jumlah temuan, `verdict` turunan, tiap
-  temuan ber-`> Status:` sah dan berjangkar `file:baris`. Dijalankan `review`
-  sebelum commit `docs(review): audit <slug>`.
-- `--only-status-changed` — tambahan: diff berkas terhadap `HEAD` hanya boleh
-  mengubah baris `> Status:`. Dijalankan `architect` Phase 4 sebelum
-  `finding_source` ikut di-stage — penyuntingan penutup tidak boleh menyentuh
-  temuan lain tanpa jejak.
+  per severity, hitungan `p1/p2/p3` = jumlah temuan, `verdict` turunan, `## Summary`
+  menyalin verdict dan hitungan, tiap temuan ber-judul, ber-`> Status:` sah, dan
+  berjangkar `file:baris`; heading yang tampak temuan tetapi tak terurai adalah cacat
+  (12 J30). Dijalankan `review` sebelum commit `docs(review): audit <slug>`.
+- `--only-status-changed` — tambahan: berkas ter-commit di dalam root repo, dan diff
+  terhadap `HEAD` hanya boleh mengubah baris `> Status:` (12 J37). Dijalankan
+  `architect` Phase 4 sebelum `finding_source` ikut di-stage — penyuntingan penutup
+  tidak boleh menyentuh temuan lain tanpa jejak.
 
 Exit 0 = PASS, 1 = FAIL. Zero external dependencies (Python Standard Library only).
 """
@@ -24,7 +25,7 @@ from pathlib import Path
 from typing import Dict, List
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
-from precondition_lib import find_repo_root, git_ok, split_frontmatter  # noqa: E402
+from precondition_lib import find_repo_root, git_ok, inside_root, section_lines, split_frontmatter  # noqa: E402
 from precondition_lib import cli  # noqa: E402
 
 HEADING = re.compile(r"^### \[P(?P<sev>[123])-(?P<n>\d+)\]\s+\S")
@@ -32,6 +33,8 @@ DATE = r"\d{4}-\d{2}-\d{2}"
 STATUS = re.compile(rf"^> Status: (?:PLANNED|FIXED {DATE} — lihat \S+|DEFERRED {DATE} — \S.*"
                     rf"|DROPPED {DATE} — \S.*|OBSOLETE {DATE})\s*$")
 LOCATION = re.compile(r"^- \*\*Location\*\*: `[^`]+:\d+(?:-\d+)?`")
+# Heading yang tampak temuan (`###[P1-1]`, `### [p1-1]`, `### [P1-1]` tanpa judul) — wajib terurai `HEADING`.
+LOOSE_HEADING = re.compile(r"^#{1,6}\s*\[?\s*[pP]\s*\d+\s*-\s*\d+")
 
 
 def check_shape(text: str) -> List[str]:
@@ -51,6 +54,9 @@ def check_shape(text: str) -> List[str]:
     findings: List[Dict] = []
     for line in body.splitlines():
         m = HEADING.match(line)
+        if not m and LOOSE_HEADING.match(line):
+            problems.append(f"heading temuan tak terurai (wajib `### [P<n>-<m>] <judul>`): {line.strip()[:80]}")
+            continue
         if m:
             findings.append({"sev": m.group("sev"), "n": int(m.group("n")), "id": line[5:line.index("]")],
                              "status": [], "location": False})
@@ -78,10 +84,29 @@ def check_shape(text: str) -> List[str]:
         verdict = str(fm.get("verdict", "")).strip()
         if verdict != derived:
             problems.append(f"`verdict: {verdict or '(kosong)'}` ≠ turunan hitungan (`{derived}`)")
+        problems += summary_problems(body, derived, [len([f for f in findings if f["sev"] == s]) for s in "123"])
     return problems
 
 
+def summary_problems(body: str, derived: str, n: List[int]) -> List[str]:
+    """`## Summary` menyalin verdict turunan dan hitungan temuan badan (12 J30)."""
+    lines = [l.strip() for l in section_lines(body, "## Summary")]
+    status = [l.split(":", 1)[1].strip() for l in lines if l.startswith("- Overall Status:")]
+    total = [l for l in lines if l.startswith("- Total Findings:")]
+    want = f"- Total Findings: {sum(n)} ({n[0]} P1, {n[1]} P2, {n[2]} P3)"
+    p = []
+    if status != [derived]:
+        p.append(f"`## Summary` `Overall Status: {', '.join(status) or '(absen)'}` ≠ verdict turunan `{derived}`")
+    if total != [want]:
+        p.append(f"`## Summary` baris Total Findings wajib `{want}`")
+    return p
+
+
 def check_only_status(root: Path, rel: str) -> List[str]:
+    tracked, _ = git_ok(root, "cat-file", "-e", f"HEAD:{rel}")
+    if not tracked:
+        return [f"`{rel}` belum ter-commit di HEAD — tanpa pembanding, suntingan apa pun lolos; commit "
+                "berkas audit (`docs(review): audit <slug>`) sebelum dipakai `finding_source`"]
     ok, out = git_ok(root, "diff", "-U0", "HEAD", "--", rel)
     if not ok:
         return [f"`git diff HEAD -- {rel}` gagal: {out.strip()[-200:]}"]
@@ -110,7 +135,14 @@ def main() -> None:
         sys.exit(1)
     problems = check_shape(text)
     if args.only_status_changed:
-        problems += check_only_status(root, str(path.resolve().relative_to(root)))
+        try:
+            rel = path.resolve().relative_to(root.resolve()).as_posix()
+        except ValueError:
+            rel = ""
+        if not rel or not inside_root(root, rel):
+            problems.append(f"`{args.path}` di luar root repo `{root}` — `finding_source` wajib berkas repo ini")
+        else:
+            problems += check_only_status(root, rel)
     if problems:
         print(f"AUDIT VALIDATION: [FAIL] {args.path} ({len(problems)} cacat)")
         print("\n".join(f"- {p}" for p in problems))

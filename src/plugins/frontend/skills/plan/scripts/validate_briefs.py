@@ -39,7 +39,12 @@ from precondition_lib import (  # noqa: E402
     profile_dir_for,
     TASKDIR_PATTERN,
     FrontmatterError,
+    ac_rows,
+    inside_root,
+    normalize_taskdir,
+    section_lines,
     split_frontmatter,
+    table_cells,
     sc_ids,
     success_criteria,
     find_placeholders,
@@ -115,9 +120,11 @@ DRIFT_ROW = re.compile(
     r"`(?P<pola2>[^`]+?)`\s*@\s*`(?P<glob2>[^`]+?)`"      # dua span: `pola` @ `glob`
 )
 
-ACTION_ROW = re.compile(
-    r"^\|\s*(CREATE|MODIFY)\s*\|\s*`?([^`|]+?)`?\s*\|\s*(?:`?([^`|]*?)`?\s*\|)?"
-)
+# Check V — operator shell di perintah yang bukan salinan persis perintah profil (12 J14): `verification`
+# dijalankan `run_verification.py` lewat shell, jadi `pnpm test || true` bukan argumen path/pola.
+SHELL_META = re.compile(r"[;&|$`<>\n\r]")
+EMPTY_ANCHOR = {"", "-", "—", "–"}
+CARRIER_STATUS = ("READY", "DONE")
 
 
 def parse_frontmatter(text: str) -> Tuple[Dict[str, Any], str]:
@@ -126,27 +133,17 @@ def parse_frontmatter(text: str) -> Tuple[Dict[str, Any], str]:
 
 
 def read_section(text: str, heading: str) -> str:
-    """Ambil badan satu heading markdown sampai heading setingkat berikutnya."""
-    level = len(heading) - len(heading.lstrip("#"))
-    lines = text.splitlines()
-    out: List[str] = []
-    capturing = False
-    for line in lines:
-        if line.strip() == heading.strip():
-            capturing = True
-            continue
-        if capturing:
-            stripped = line.lstrip("#")
-            hashes = len(line) - len(stripped)
-            if line.startswith("#") and 0 < hashes <= level:
-                break
-            out.append(line)
-    return "\n".join(out)
+    """Ambil badan satu heading markdown sampai heading setingkat berikutnya.
+
+    Pemotong seksi bersama `precondition_lib.section_lines`: heading di dalam blok kode ``` atau ~~~
+    bukan heading (12 J40).
+    """
+    return "\n".join(section_lines(text, heading))
 
 
 def strip_code_fences(text: str) -> str:
-    """Buang blok kode berpagar; contoh kode bukan instruksi menjalankan sesuatu."""
-    return re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+    """Buang blok kode berpagar ``` atau ~~~; contoh kode bukan instruksi menjalankan sesuatu."""
+    return re.sub(r"(```|~~~).*?\1", "", text, flags=re.DOTALL)
 
 
 class BriefValidator:
@@ -160,7 +157,7 @@ class BriefValidator:
         profile_dir: Optional[str] = None,
     ):
         self.root = (root or self._find_repo_root()).resolve()
-        self.taskdir_rel = taskdir.strip("/").replace("./", "")
+        self.taskdir_rel = normalize_taskdir(taskdir)
         self.taskdir = (self.root / self.taskdir_rel).resolve()
         self.brief_filter = brief_filter
         self.contract_mode = contract_mode
@@ -266,6 +263,14 @@ class BriefValidator:
         value = brief["fm"].get("files_touched", [])
         return [v for v in value if isinstance(v, str)] if isinstance(value, list) else []
 
+    def carriers(self) -> List[Dict[str, Any]]:
+        """Brief yang sah memikul SC/AC/berkas kontrak: `READY` atau `DONE` (12 J24).
+
+        Brief `BLOCKED` sudah di-rollback dan tidak pernah naik lagi; janjinya dipikul remedinya, atau
+        belum dipikul siapa pun — selaras Check O.
+        """
+        return [b for b in self.briefs if b["status"] in CARRIER_STATUS]
+
     def _check_s_struct(self) -> None:
         """Berlaku atas **seluruh** brief, termasuk yang terkunci: brief `DONE` tanpa seksi atau
         tanpa field bukanlah unit yang pernah dieksekusi, melainkan status yang diketik."""
@@ -284,6 +289,9 @@ class BriefValidator:
                     f"{b['name']}: status `{b['status']}` di luar "
                     f"{sorted(VALID_STATUS)}"
                 )
+            unit = str(b["fm"].get("unit", "")).strip()
+            if "unit" in b["fm"] and not (unit.isdigit() and int(unit) == int(b["nn"])):
+                problems.append(f"{b['name']}: `unit: {unit or '(kosong)'}` ≠ nomor nama berkas `{b['nn']}` (12 J32)")
             pos = -1
             for heading in REQUIRED_SECTIONS:
                 idx = b["body"].find("\n" + heading)
@@ -485,14 +493,19 @@ class BriefValidator:
             self._add(cid, name, "PASS", "seksi 2–5 bebas placeholder")
 
     def _action_table(self, brief: Dict[str, Any]) -> Dict[str, Tuple[str, str]]:
-        """Baca tabel aksi seksi 3 menjadi {path: (aksi, anchor)}."""
+        """Baca tabel aksi seksi 3 menjadi {path: (aksi, anchor)}.
+
+        Sel Anchor dibaca utuh (12 J33): `` `A`, `B` `` dan `` `A` (ekspor default) `` adalah Anchor.
+        """
         section = read_section(brief["body"], REQUIRED_SECTIONS[2])
         actions: Dict[str, Tuple[str, str]] = {}
         for line in section.splitlines():
-            m = ACTION_ROW.match(line.strip())
-            if m:
-                anchor = (m.group(3) or "").strip()
-                actions[m.group(2).strip()] = (m.group(1).strip(), anchor)
+            cells = table_cells(line)
+            if len(cells) < 2 or cells[0] not in ("CREATE", "MODIFY"):
+                continue
+            path = cells[1].strip().strip("`").strip()
+            if path:
+                actions[path] = (cells[0], cells[2].strip() if len(cells) > 2 else "")
         return actions
 
     def _check_r_repo_state(self) -> None:
@@ -512,14 +525,24 @@ class BriefValidator:
                 )
                 continue
             upstream_created = {
-                p for o in self.briefs if o["nn"] < b["nn"] and o["status"] != "BLOCKED"
+                p: o["nn"] for o in self.briefs if o["nn"] < b["nn"] and o["status"] != "BLOCKED"
                 for p, (a, _) in self._action_table(o).items() if a == "CREATE"
             }
             for f in files:
+                if not inside_root(self.root, f):
+                    problems.append(f"{b['name']}: `{f}` di luar root repo (path absolut atau `..`) — "
+                                    "rantai hanya menyentuh berkas repo ini")
+                    continue
                 if f not in actions:
                     problems.append(f"{b['name']}: `{f}` tidak punya baris aksi di seksi 3")
                     continue
                 act, anchor = actions[f]
+                if act == "CREATE" and f in upstream_created:
+                    problems.append(
+                        f"{b['name']}: `{f}` ditandai CREATE tetapi sudah di-CREATE brief hulu "
+                        f"`{upstream_created[f]}` — unit ini wajib MODIFY ber-Anchor"
+                    )
+                    continue
                 exists = (self.root / f).exists() or (act == "MODIFY" and f in upstream_created)
                 if act == "CREATE" and exists:
                     problems.append(
@@ -530,7 +553,7 @@ class BriefValidator:
                         problems.append(
                             f"{b['name']}: `{f}` ditandai MODIFY tetapi belum ada di disk"
                         )
-                    if not anchor or anchor in {"-", "—", "–"}:
+                    if anchor.strip("` ") in EMPTY_ANCHOR:
                         problems.append(
                             f"{b['name']}: `{f}` ditandai MODIFY tanpa kolom `Anchor` — "
                             "batas scope berhenti di nama berkas dan simbol lain di "
@@ -615,7 +638,15 @@ class BriefValidator:
                 problems.append(f"{b['name']}: `verification` kosong")
             for cmd in cmds:
                 norm = " ".join(cmd.split())
-                if not any(norm == c or norm.startswith(c + " ") for c in allowed_cmds):
+                if norm in allowed_cmds:
+                    continue
+                if SHELL_META.search(cmd):
+                    problems.append(
+                        f"{b['name']}: perintah `{cmd}` membawa operator shell (`;` `&` `|` `$` backtick `<` `>`) — "
+                        "perintah dijalankan lewat shell; operator hanya sah bila perintah sama persis "
+                        "dengan perintah profil (12 J14)"
+                    )
+                elif not any(norm.startswith(c + " ") for c in allowed_cmds):
                     problems.append(
                         f"{b['name']}: perintah `{cmd}` bukan perintah `commands.md` profil atau "
                         "`## Commands` adapter (boleh ditambah argumen path/pola di belakangnya)"
@@ -743,11 +774,12 @@ class BriefValidator:
                       "Tulis daftar berkas kontrak sebagai butir ber-backtick di seksi itu.")
             return
         union: Set[str] = set()
-        for b in self.briefs:
+        for b in self.carriers():
             union.update(self._files(b))
         stray = sorted(f for f in union if f not in declared and not TEST_FILE.search(f))
         unclaimed = sorted(declared - union)
-        problems: List[str] = []
+        problems: List[str] = [f"`{f}` di `Files Touched` kontrak di luar root repo (path absolut atau `..`)"
+                               for f in sorted(declared) if not inside_root(self.root, f)]
         if stray:
             problems.append(
                 "berkas di `files_touched` tetapi di luar Files Touched kontrak: "
@@ -755,8 +787,8 @@ class BriefValidator:
             )
         if unclaimed:
             problems.append(
-                "berkas dijanjikan kontrak tetapi tidak diklaim brief mana pun: "
-                + ", ".join(unclaimed)
+                "berkas dijanjikan kontrak tetapi tidak diklaim brief `READY`/`DONE` mana pun "
+                "(brief `BLOCKED` bukan pemikul): " + ", ".join(unclaimed)
             )
         if problems:
             self._add(cid, name, "FAIL", f"{len(problems)} ketidakcocokan cakupan",
@@ -795,31 +827,23 @@ class BriefValidator:
             self._add(cid, name, "FAIL", "`CONTRACT.md` tidak ada di taskdir",
                       "Jalankan `frontend:contract` lebih dulu.")
             return
-        section = read_section(contract.read_text(encoding="utf-8"),
-                               "## 5. Acceptance Criteria")
-        declared: List[str] = []
-        auto: Set[str] = set()
-        for line in section.splitlines():
-            m = re.match(r"^\|\s*`?(AC-\d+)`?\s*\|(.*)$", line.strip())
-            if not m:
-                continue
-            declared.append(m.group(1))
-            if "test otomatis" in m.group(2).lower():
-                auto.add(m.group(1))
+        rows, parse_problems = ac_rows(contract.read_text(encoding="utf-8"))
+        declared: List[str] = [ac for ac, _ in rows]
+        auto: Set[str] = {ac for ac, cells in rows if len(cells) > 1 and "test otomatis" in cells[1].lower()}
         if not declared:
             self._add(cid, name, "FAIL",
                       "`# Execution ## 5. Acceptance Criteria` kosong atau tidak terbaca",
                       "Tulis tabel `AC-{n} | Skenario | Cara verifikasi | Sumber` di seksi itu.")
             return
         expected = [f"AC-{i}" for i in range(1, len(declared) + 1)]
-        problems: List[str] = []
+        problems: List[str] = list(parse_problems)
         if declared != expected:
             problems.append(
                 f"penomoran AC {declared} bukan seri berurutan dari `AC-1` "
                 f"(diharapkan {expected})"
             )
         claims: Dict[str, List[str]] = {}
-        for b in self.briefs:
+        for b in self.carriers():
             covers = b["fm"].get("covers", [])
             covers = [str(c).strip() for c in covers] if isinstance(covers, list) else []
             for c in covers:
@@ -832,8 +856,8 @@ class BriefValidator:
         for ac in declared:
             if ac not in claims:
                 problems.append(
-                    f"`{ac}` tidak diklaim `covers:` brief mana pun — kriteria itu "
-                    "tidak akan pernah dikerjakan"
+                    f"`{ac}` tidak diklaim `covers:` brief `READY`/`DONE` mana pun — kriteria itu "
+                    "tidak akan pernah dikerjakan (brief `BLOCKED` bukan pemikul)"
                 )
                 continue
             if ac in auto:
@@ -924,7 +948,7 @@ class BriefValidator:
             return
         claims: Dict[str, List[str]] = {}
         problems: List[str] = []
-        for b in self.briefs:
+        for b in self.carriers():
             value = b["fm"].get("fulfills", [])
             value = [str(v).strip() for v in value] if isinstance(value, list) else []
             if not value and not b["locked"]:
@@ -941,13 +965,53 @@ class BriefValidator:
             problems.append(f"brief unit {owners} mengklaim `{ghost}` yang tidak ada (atau sudah gugur) di `TASK.md`")
         for s_id in sc:
             if s_id not in claims:
-                problems.append(f"`{s_id}` tidak dipikul brief mana pun — janji akar tidak akan dikerjakan")
+                problems.append(f"`{s_id}` tidak dipikul brief `READY`/`DONE` mana pun — janji akar tidak akan "
+                                "dikerjakan (brief `BLOCKED` bukan pemikul; remedinya yang memikul)")
         if problems:
             self._add(cid, name, "FAIL", f"{len(problems)} cacat keterpikulan",
                       "Isi `fulfills:` tiap brief dengan `SC-{n}` yang dipikulnya; SC tanpa pemikul "
                       "ditambahkan unitnya, rujukan hantu dihapus.", problems)
         else:
             self._add(cid, name, "PASS", f"{len(sc)} SC seluruhnya dipikul brief")
+
+    def _git(self, *args: str) -> str:
+        try:
+            return subprocess.check_output(["git", "-C", str(self.root), *args], stderr=subprocess.DEVNULL,
+                                           universal_newlines=True)
+        except Exception:
+            return ""
+
+    def _first_blocked(self, brief: Dict[str, Any]) -> str:
+        """Sha commit tertua yang menulis brief ini berstatus `BLOCKED`, atau kosong bila belum ter-commit.
+
+        Dibaca dari isi riwayat, bukan dari subjek `unit <NN> BLOCKED` yang dapat diketik (12 J27).
+        """
+        rel = f"{self.taskdir_rel}/{brief['name']}"
+        for sha in self._git("log", "--reverse", "--format=%H", "--", rel).split():
+            status = split_frontmatter(self._git("show", f"{sha}:{rel}"))[0].get("status", "")
+            if isinstance(status, str) and status.strip() == "BLOCKED":
+                return sha
+        return ""
+
+    def _born_after(self, brief: Dict[str, Any], sha: str) -> bool:
+        """Brief lahir sesudah commit `sha`: belum ter-commit, atau commit penambahannya bukan leluhur `sha`."""
+        added = self._git("log", "--diff-filter=A", "--format=%H", "--",
+                          f"{self.taskdir_rel}/{brief['name']}").split()
+        if not added:
+            return True
+        return subprocess.run(["git", "-C", str(self.root), "merge-base", "--is-ancestor", added[-1], sha],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0
+
+    def _contract_reentries(self, since: str) -> int:
+        """Re-entry kontrak sesudah `since`: reopen yang membuka CONTRACT, atau eskalasi dari HOTFIX_MINOR yang
+        menambah hop CONTRACT (rute resmi remedi ketiga lane MINOR). Tanpa `since` → nol."""
+        if not since:
+            return 0
+        slug = re.escape(self.taskdir_rel.rsplit("/", 1)[-1].split("-", 1)[-1])
+        log = self._git("log", f"{since}..HEAD", "--format=%s", "--", f"{self.taskdir_rel}/TASK.md")
+        return sum(1 for l in log.splitlines()
+                   if re.match(rf"^docs\({slug}\): reopen [A-Z ]*\bCONTRACT\b", l)
+                   or re.match(rf"^docs\({slug}\): eskalasi lane HOTFIX_MINOR → ", l))
 
     def _check_m_remedies(self) -> None:
         """`remedies: "NN"` menunjuk brief `BLOCKED` bernomor lebih kecil; plafon 2 remedi per unit asal.
@@ -956,7 +1020,12 @@ class BriefValidator:
         tiga kali membuktikan cacatnya ada di kontrak, bukan di brief, dan brief
         keempat hanya menambah satu commit `BLOCKED` lagi. Plafon bertambah satu per
         re-entry kontrak: `reopen … CONTRACT`, atau eskalasi dari `HOTFIX_MINOR`
-        (satu-satunya eskalasi yang menambah hop CONTRACT).
+        (satu-satunya eskalasi yang menambah hop CONTRACT) — hanya yang terjadi sesudah
+        commit `BLOCKED` pertama rantai remedi itu (12 J27): reopen dini tidak menambah plafon.
+
+        Brief `READY` yang lahir sesudah sebuah brief `BLOCKED` dan menyentuh berkasnya, selagi
+        brief itu belum ter-remedi, wajib mendeklarasikan `remedies` — remedi yang tak dideklarasikan
+        tidak terhitung plafon. Brief batch asli (lahir sebelum `BLOCKED`) tidak ditagih.
         """
         cid, name = "M", "Remedi & plafon per unit asal"
         by_nn = {b["nn"]: b for b in self.briefs}
@@ -978,29 +1047,34 @@ class BriefValidator:
                                 "bukan `BLOCKED`")
                 continue
             origin_of[b["nn"]] = origin_of.get(target, target)
+        remedied = {str(b["fm"].get("remedies", "") or "").strip() for b in self.briefs}
+        blocked_at = {b["nn"]: self._first_blocked(b) for b in self.briefs if b["status"] == "BLOCKED"}
+        for b in self.briefs:
+            if b["status"] != "READY" or str(b["fm"].get("remedies", "") or "").strip():
+                continue
+            for x in self.briefs:
+                shared = sorted(set(self._files(b)) & set(self._files(x)))
+                if x["status"] != "BLOCKED" or x["nn"] >= b["nn"] or x["nn"] in remedied or not shared:
+                    continue
+                if blocked_at[x["nn"]] and self._born_after(b, blocked_at[x["nn"]]):
+                    problems.append(f"{b['name']}: menyentuh berkas brief `BLOCKED` {x['nn']} yang belum ter-remedi "
+                                    f"({', '.join(shared)}) tanpa `remedies: \"{x['nn']}\"` — remedi tak "
+                                    "dideklarasikan lolos dari plafon")
         counts: Dict[str, int] = {}
         for origin in origin_of.values():
             counts[origin] = counts.get(origin, 0) + 1
-        slug = self.taskdir_rel.rsplit("/", 1)[-1].split("-", 1)[-1]
-        try:
-            log = subprocess.check_output(["git", "-C", str(self.root), "log", "--format=%s", "--",
-                                           f"{self.taskdir_rel}/TASK.md"], stderr=subprocess.DEVNULL,
-                                          universal_newlines=True)
-        except Exception:
-            log = ""
-        # Re-entry kontrak: reopen yang membuka CONTRACT, atau eskalasi dari HOTFIX_MINOR yang
-        # menambah hop CONTRACT (rute resmi remedi ketiga lane MINOR).
-        contract_reentries = sum(1 for l in log.splitlines()
-                                 if re.match(rf"^docs\({re.escape(slug)}\): reopen [A-Z ]*\bCONTRACT\b", l)
-                                 or re.match(rf"^docs\({re.escape(slug)}\): eskalasi lane HOTFIX_MINOR → ", l))
         for origin, n in sorted(counts.items()):
+            members = [origin] + [nn for nn, o in origin_of.items() if o == origin]
+            reentries = max([self._contract_reentries(blocked_at.get(m, "")) for m in members] or [0])
             # Remedi ketiga dan seterusnya sah hanya sesudah kontrak dibuka ulang (satu per re-entry).
-            if n > 2 + contract_reentries:
-                problems.append(f"unit asal `{origin}` punya {n} brief remedi — plafon 2; eskalasi ke "
-                                "Gate Contract (`chain.py reopen --row CONTRACT`) alih-alih remedi ketiga")
+            if n > 2 + reentries:
+                problems.append(f"unit asal `{origin}` punya {n} brief remedi — plafon {2 + reentries} "
+                                f"(2 + {reentries} re-entry kontrak sesudah unit itu BLOCKED); eskalasi ke "
+                                "Gate Contract (`chain.py reopen --row CONTRACT`) alih-alih remedi berikutnya")
         if problems:
             self._add(cid, name, "FAIL", f"{len(problems)} cacat remedi",
-                      "Perbaiki `remedies`; remedi ketiga atas unit yang sama dilarang.", problems)
+                      "Deklarasikan `remedies` pada brief yang mengambil alih unit `BLOCKED`; remedi ketiga atas "
+                      "unit yang sama dilarang tanpa re-entry kontrak sesudah unit itu BLOCKED.", problems)
         elif counts:
             self._add(cid, name, "PASS", f"{sum(counts.values())} remedi atas {len(counts)} unit asal")
         else:

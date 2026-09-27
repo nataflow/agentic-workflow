@@ -58,7 +58,7 @@ Brief implementasi atomik untuk subagent `code-implementor`; satu-satunya acuan 
 - [ ] (verifikasi penutup) <perintah dari commands.md profil> — <ambang relatif baseline>
 ````
 
-Field opsional `remedies: "<NN>"` disisipkan sesudah `depends_on` **hanya** pada brief remedi yang mengambil alih unit `BLOCKED` `<NN>` (Check M). Brief perbaikan atas unit `DONE` (temuan `REVIEW.md`, verifikasi penutup merah) tidak membawanya.
+Field opsional `remedies: "<NN>"` disisipkan sesudah `depends_on` **hanya** pada brief remedi yang mengambil alih unit `BLOCKED` `<NN>` (Check M). Brief perbaikan atas unit `DONE` (temuan `REVIEW.md`, verifikasi penutup merah) tidak membawanya. Brief baru yang menyentuh berkas unit `BLOCKED` yang belum ter-remedi **wajib** membawanya — remedi yang tak dideklarasikan tetap remedi.
 
 ---
 
@@ -68,21 +68,22 @@ Field opsional `remedies: "<NN>"` disisipkan sesudah `depends_on` **hanya** pada
 
 | Check | Predikat |
 |---|---|
-| **S** Struktur | atas seluruh brief, termasuk `DONE`/`BLOCKED`: 12 field frontmatter bagian 1 lengkap; `depends_on`, `fulfills`, `covers`, `files_touched`, `verification` berbentuk list; `status` `READY`/`DONE`/`BLOCKED`; lima seksi `##` persis urutan |
+| **S** Struktur | atas seluruh brief, termasuk `DONE`/`BLOCKED`: 12 field frontmatter bagian 1 lengkap; `depends_on`, `fulfills`, `covers`, `files_touched`, `verification` berbentuk list; `status` `READY`/`DONE`/`BLOCKED`; `unit` = `NN` nama berkas; lima seksi `##` persis urutan |
 | **N** Seri | `unit` berurutan `01..N`; `total_units` brief `READY` seragam dan sama dengan jumlah seluruh brief — brief `DONE`/`BLOCKED` mempertahankan nilainya |
 | **D** DAG | `depends_on` hanya ke nomor lebih kecil, asiklik, minimal satu akar |
 | **L** Kuota | 1–5 berkas non-test per brief |
 | **T** Co-location | berkas di `services/`, `view-model/`, `hooks/api/`, `controllers/` berpasangan test bernama `<stem>.` + akhiran (`order.service.test.ts` untuk `order.service.ts`) di brief yang sama |
 | **F** Tanpa verifikasi per unit | seksi 4 tanpa instruksi menjalankan terminal; butir terminal seksi 5 bertanda `(verifikasi penutup)` |
 | **B** Placeholder | seksi 2–5 tanpa `TBD`/`TODO`/slot `<...>` di luar blok kode |
-| **R** Aksi vs disk | tabel seksi 3 = `files_touched`; `CREATE` belum ada; `MODIFY` sudah ada di disk atau di-`CREATE` brief hulu bernomor lebih kecil, dan ber-`Anchor` |
-| **V** Verifikasi | tiap perintah `verification` sama dengan, atau diawali, perintah utuh `commands.md` profil atau `## Commands` adapter (argumen path/pola boleh menyusul); repo Svelte tidak memakai `tsc` tanpa `svelte-check` |
+| **R** Aksi vs disk | tabel seksi 3 = `files_touched`; path relatif di dalam root repo (tanpa `..`/absolut); `CREATE` belum ada di disk dan belum di-`CREATE` brief hulu non-`BLOCKED`; `MODIFY` sudah ada di disk atau di-`CREATE` brief hulu bernomor lebih kecil, dan ber-`Anchor` (sel utuh, boleh beberapa simbol) |
+| **V** Verifikasi | tiap perintah `verification` sama dengan, atau diawali, perintah utuh `commands.md` profil atau `## Commands` adapter (argumen path/pola boleh menyusul); operator shell (`;`, `&&`, `\|\|`, `$(…)`, `>`) hanya sah bila perintahnya sama persis dengan perintah profil; repo Svelte tidak memakai `tsc` tanpa `svelte-check` |
 | **K** Penamaan | nama berkas konsisten dengan `stack` (tanpa `.svelte` di React, tanpa `use*.ts`/`.tsx` di Svelte) |
 | **O** Tumpang tindih | berkas yang disentuh dua unit hanya bila keduanya terhubung `depends_on` |
-| **E** Cakupan kontrak | union `files_touched` = `CONTRACT.md § Execution ## 1. Files Touched` (lane non-MINOR) |
-| **C** Acceptance Criteria | tiap `AC-{n}` diklaim `covers` minimal satu brief; nol hantu; AC `test otomatis` punya berkas test yang menyebut nomornya |
+| **E** Cakupan kontrak | union `files_touched` brief `READY`/`DONE` = `CONTRACT.md § Execution ## 1. Files Touched` (lane non-MINOR) |
+| **C** Acceptance Criteria | tiap `AC-{n}` diklaim `covers` minimal satu brief `READY`/`DONE`; nol hantu; AC `test otomatis` punya berkas test yang menyebut nomornya |
 | **P** Drift | seksi 3–4 tidak memuat pola warisan yang tercatat `drift.md` profil |
-| **G** Fulfills | tiap `SC-{n}` `TASK.md` dipikul minimal satu brief lewat `fulfills`; nol hantu; brief aktif tanpa `fulfills` adalah perluasan lingkup |
+| **G** Fulfills | tiap `SC-{n}` `TASK.md` dipikul minimal satu brief `READY`/`DONE` lewat `fulfills` (brief `BLOCKED` bukan pemikul — remedinya yang memikul); nol hantu; brief aktif tanpa `fulfills` adalah perluasan lingkup |
+| **M** Remedi | `remedies` menunjuk brief `BLOCKED` bernomor lebih kecil; plafon 2 remedi per unit asal, +1 per re-entry kontrak **sesudah** unit itu `BLOCKED`; brief baru yang menyentuh berkas unit `BLOCKED` belum ter-remedi wajib ber-`remedies` |
 
 **Semantik** — dinilai `doc-reviewer` (D1–D4, maks 2 ronde) lalu self-test penulis:
 

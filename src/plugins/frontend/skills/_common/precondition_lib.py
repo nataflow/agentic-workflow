@@ -37,7 +37,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
 
 KNOWN_STACKS = ("react-vite", "react-native", "sveltekit", "svelte-vite")
 TASKDIR_PATTERN = re.compile(r"^frontenddev/docs/\d{10}-[a-z0-9-]+$")
@@ -392,9 +392,13 @@ def split_frontmatter(text: str, strict: bool = False) -> Tuple[Dict[str, Any], 
 
     Mendukung skalar, list inline `[a, b]`, `[]`/`{}` kosong, list blok `- x`,
     dan komentar `#`. `strict=True` melempar `FrontmatterError` bila pagar `---`
-    tidak lengkap — dipakai validator, yang harus memvonis berkas rusak sebagai
-    rusak, bukan sebagai berkas tanpa field. BOM (U+FEFF) di awal berkas dibuang
-    lebih dulu: pagar `---` sesudah BOM tetap pagar.
+    tidak lengkap atau kunci muncul lebih dari sekali — dipakai validator, yang
+    harus memvonis berkas rusak sebagai rusak, bukan sebagai berkas tanpa field.
+    BOM (U+FEFF) di awal berkas dibuang lebih dulu: pagar `---` sesudah BOM tetap pagar.
+
+    Kunci ganda (12 J31, keputusan 05-3): mode toleran tidak memilih salah satu nilai, melainkan
+    mengisi kunci itu dengan `DUPLICATE_KEY` — nilai yang tidak pernah sah di field mana pun, sehingga
+    pembaca status/lane/list gagal tertutup tanpa crash.
     """
     text = text.lstrip(BOM)
     if not text.startswith("---"):
@@ -408,6 +412,7 @@ def split_frontmatter(text: str, strict: bool = False) -> Tuple[Dict[str, Any], 
         return {}, text
     head, body = text[3:end], text[end + 4:]
     data: Dict[str, Any] = {}
+    duplicated: Set[str] = set()
     current: Optional[str] = None
     for raw in head.splitlines():
         line = raw.rstrip()
@@ -422,6 +427,13 @@ def split_frontmatter(text: str, strict: bool = False) -> Tuple[Dict[str, Any], 
             continue
         key, _, value = line.partition(":")
         key, value = key.strip(), value.strip()
+        if key in data or key in duplicated:
+            if strict:
+                raise FrontmatterError(f"kunci frontmatter `{key}` muncul lebih dari sekali")
+            duplicated.add(key)
+            data[key] = DUPLICATE_KEY
+            current = None
+            continue
         if value == "":
             data[key] = []
             current = key
@@ -436,6 +448,9 @@ def split_frontmatter(text: str, strict: bool = False) -> Tuple[Dict[str, Any], 
             data[key] = value.strip('"').strip("'")
             current = None
     return data, body
+
+
+DUPLICATE_KEY = "(kunci frontmatter ganda)"
 
 
 def parse_frontmatter(text: str) -> Dict[str, Any]:
@@ -472,7 +487,8 @@ def read_status(path: Path, field: str = "status") -> str:
 
     Berkas non-UTF-8 → `NOT_UTF8`, bukan kosong: nilai itu tidak pernah sama dengan status sah
     mana pun, sehingga pemanggil gagal tertutup dengan pesan yang menyebut sebabnya, alih-alih
-    memperlakukan berkas rusak sebagai berkas absen.
+    memperlakukan berkas rusak sebagai berkas absen. Kunci ganda → `DUPLICATE_KEY` (12 J31), dengan
+    alasan yang sama.
     """
     try:
         fm = parse_frontmatter(path.read_text(encoding="utf-8"))
@@ -522,15 +538,30 @@ def set_frontmatter_field(text: str, key: str, value: str) -> str:
     return bom + "---" + head + text[end:]
 
 
+# Pagar untuk pemotong seksi: berindentasi bebas (blok kode di dalam butir list tetap blok kode), ``` dan
+# ~~~, panjang dihormati seperti `fenced_mask` (12 J40).
+_SECTION_FENCE = re.compile(r"^\s*(`{3,}|~{3,})")
+
+
 def section_lines(body: str, heading: str) -> List[str]:
-    """Badan satu heading (`## X`) sampai heading setingkat atau lebih tinggi berikutnya."""
+    """Badan satu heading (`## X`) sampai heading setingkat atau lebih tinggi berikutnya.
+
+    Heading di dalam blok kode berpagar ``` atau ~~~ bukan heading (12 J40).
+    """
     level = len(heading) - len(heading.lstrip("#"))
     out: List[str] = []
     capturing = False
-    in_fence = False
+    fence = ""
     for line in body.splitlines():
-        if line.strip().startswith("```"):
-            in_fence = not in_fence
+        m = _SECTION_FENCE.match(line)
+        if m and not fence:
+            fence = m.group(1)
+            in_fence = True
+        elif m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) \
+                and not line.strip()[len(m.group(1)):].strip():
+            fence, in_fence = "", True               # baris pagar penutup masih bagian blok
+        else:
+            in_fence = bool(fence)
         if not in_fence and line.strip() == heading.strip():
             capturing = True
             continue
@@ -541,6 +572,79 @@ def section_lines(body: str, heading: str) -> List[str]:
                     break
             out.append(line)
     return out
+
+
+_ESCAPED_PIPE = "\x00"
+
+
+def table_cells(line: str) -> List[str]:
+    r"""Sel satu baris tabel markdown; `\|` adalah pipa di dalam sel, bukan pemisah (12 J26).
+
+    Pipa pembuka dan penutup opsional (GFM). Kosong bila baris bukan baris tabel.
+    """
+    s = line.strip()
+    if "|" not in s.replace("\\|", ""):
+        return []
+    s = s.replace("\\|", _ESCAPED_PIPE)
+    if s.startswith("|"):
+        s = s[1:]
+    if s.endswith("|"):
+        s = s[:-1]
+    return [c.strip().replace(_ESCAPED_PIPE, "|") for c in s.split("|")]
+
+
+def is_table_rule(cells: List[str]) -> bool:
+    """Baris pemisah header `|---|:--:|`."""
+    return bool(cells) and all(c and set(c) <= set("-: ") for c in cells)
+
+
+AC_ID = re.compile(r"^`?(AC-\d+)`?$")
+AC_TOKEN = re.compile(r"\bAC-\d+\b")
+AC_SECTION = "## 5. Acceptance Criteria"
+
+
+def ac_rows(body: str) -> Tuple[List[Tuple[str, List[str]]], List[str]]:
+    """Satu pengurai tabel Acceptance Criteria `CONTRACT.md` untuk `validate_doc`, `validate_briefs`, dan
+    `validate_review` (12 J28) → `([(AC-n, [Skenario, Cara verifikasi, Sumber, ...])], masalah)`.
+
+    Baris ber-`AC-n` di kolom pertama dengan kurang dari empat sel tetap dikembalikan (penomoran tetap
+    dinilai) dan dicatat sebagai masalah; baris tabel yang menyebut `AC-n` di luar kolom pertama tidak
+    terurai — keduanya masalah, bukan baris yang dilewati diam-diam.
+    """
+    rows: List[Tuple[str, List[str]]] = []
+    problems: List[str] = []
+    for line in section_lines(body, AC_SECTION):
+        cells = table_cells(line)
+        if not cells or is_table_rule(cells):
+            continue
+        m = AC_ID.match(cells[0])
+        if not m:
+            if AC_TOKEN.search(line):
+                problems.append(f"baris AC tak terurai (kolom pertama bukan `AC-{{n}}`): {line.strip()[:80]}")
+            continue
+        rows.append((m.group(1), cells[1:]))
+        if len(cells) < 4:
+            problems.append(f"`{m.group(1)}`: baris {len(cells)} sel, wajib 4 (`AC-{{n}} | Skenario | "
+                            "Cara verifikasi | Sumber`)")
+    return rows, problems
+
+
+def inside_root(root: Path, rel: str) -> bool:
+    """`rel` path relatif yang tetap di dalam `root` sesudah di-resolve (12 J29).
+
+    Path absolut, segmen `..`, atau tautan simbolik yang keluar root ditolak: rantai hanya menyentuh
+    dan hanya membuktikan dengan berkas repo ini.
+    """
+    rel = rel.strip()
+    if not rel or rel.startswith(("/", "\\")) or re.match(r"^[A-Za-z]:", rel):
+        return False
+    if ".." in re.split(r"[\\/]", rel):
+        return False
+    try:
+        (Path(root) / rel).resolve().relative_to(Path(root).resolve())
+    except (ValueError, OSError, RuntimeError):
+        return False
+    return True
 
 
 # ---------------------------------------------------------------- tiket analyst (`ticket_source`)
@@ -910,13 +1014,17 @@ def replace_chain_row(task_text: str, row: str, new_line: str) -> str:
 
 
 def strip_status_line(text: str) -> str:
-    """Isi dokumen tanpa baris `status:` frontmatter — basis uji keutuhan konten."""
+    """Isi dokumen tanpa baris `status:` frontmatter **pertama** — basis uji keutuhan konten.
+
+    Hanya yang pertama (12 J31): baris `status:` kedua yang disisipkan sesudah approval adalah
+    perubahan konten, bukan transisi status.
+    """
     if not text.startswith("---"):
         return text
     end = text.find("\n---", 3)
     if end == -1:
         return text
-    head = re.sub(r"^status:.*\n?", "", text[3:end], flags=re.MULTILINE)
+    head = re.sub(r"^status:.*\n?", "", text[3:end], count=1, flags=re.MULTILINE)
     return "---" + head + text[end:]
 
 

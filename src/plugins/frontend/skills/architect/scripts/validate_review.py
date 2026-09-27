@@ -45,10 +45,13 @@ from precondition_lib import (  # noqa: E402
     UNDECODABLE_ACTION,
     undecodable,
     FrontmatterError,
+    GitError,
+    ac_rows,
     chain_files,
     find_repo_root,
     git,
     is_manual,
+    is_table_rule,
     normalize_taskdir,
     outside_fences,
     profile_dir_for,
@@ -56,6 +59,7 @@ from precondition_lib import (  # noqa: E402
     section_lines,
     split_frontmatter,
     success_criteria,
+    table_cells,
     task_root_sha,
     taskdir_slug,
 )
@@ -64,11 +68,15 @@ from precondition_lib import cli  # noqa: E402
 HEADINGS = ["## Summary", "## Verifikasi Penutup", "## Cakupan Success Criteria",
             "## Cakupan Acceptance Criteria", "## Temuan", "## Done Criteria DITUNDA",
             "## Umpan balik profil", "## 9 Dimensi"]
-ROW = re.compile(r"^\|\s*`?((?:SC|AC)-\d+)`?\s*\|\s*([^|]+?)\s*\|\s*(.*?)\s*\|\s*$")
+ROW_ID = re.compile(r"^`?((?:SC|AC)-\d+)`?$")
+ID_TOKEN = re.compile(r"\b(?:SC|AC)-\d+\b")
 FINDING = re.compile(r"^### \[(P[123])-(\d+)\]")
+# Heading yang tampak temuan tetapi tak terurai `FINDING` (`###[P1-1]`, `### [p1-1]`) — 12 J26.
+LOOSE_FINDING = re.compile(r"^#{1,6}\s*\[?\s*[pP]\s*\d+\s*-\s*\d+")
+TEST_FILE = re.compile(r"\.(test|spec)\.[A-Za-z0-9]+$")
+EMPTY_CELLS = {"", "-", "—", "–"}
 SC_VERDICTS = ("terbukti", "belum terbukti", "PERLU VERIFIKASI MANUAL")
 AC_VERDICTS = ("terbukti", "belum terbukti", "QA manual")
-AC_ROW = re.compile(r"^\|\s*`?(AC-\d+)`?\s*\|")
 DIMENSIONS = ["Layer Boundaries", "Data Flow & DTO", "API Layer", "State Scope & Ownership",
               "UI & 6-State Branches", "Platform & Framework Boundary", "Error Handling", "Performance & Leaks",
               "Test Quality"]
@@ -92,6 +100,8 @@ class ReviewValidator:
         self.table: Dict[str, Tuple[str, str]] = {}
         self.dims: Dict[int, str] = {}
         self.finding_dims: List[Tuple[str, List[int]]] = []
+        self.dups: List[str] = []
+        self.unparsed: List[str] = []
 
     def _add(self, cid: str, name: str, problems: List[str], ok: str, action: str,
              status: str = "") -> None:
@@ -100,15 +110,25 @@ class ReviewValidator:
                              "details": problems, "action": action if problems else ""})
 
     def rows(self, heading: str) -> Dict[str, List[str]]:
+        """`{SC-n|AC-n: [vonis, bukti]}`; sel dipecah dengan menghormati `\\|` (12 J26).
+
+        Baris yang menyebut `SC-n`/`AC-n` tetapi tak terurai (kolom pertama bukan ID, kurang dari tiga
+        sel) dicatat di `self.unparsed`, bukan dilewati — vonis yang hilang tidak boleh menurunkan verdict.
+        """
         out: Dict[str, List[str]] = {}
-        self.dups = getattr(self, "dups", [])
         for line in section_lines(self.body, heading):
-            m = ROW.match(line.strip())
-            if m:
-                if m.group(1) in out:
-                    self.dups.append(m.group(1))
-                    continue
-                out[m.group(1)] = [m.group(2).strip(), m.group(3).strip()]
+            cells = table_cells(line)
+            if not cells or is_table_rule(cells):
+                continue
+            m = ROW_ID.match(cells[0])
+            if not m or len(cells) < 3:
+                if ID_TOKEN.search(line):
+                    self.unparsed.append(f"baris tak terurai di `{heading}`: {line.strip()[:80]}")
+                continue
+            if m.group(1) in out:
+                self.dups.append(m.group(1))
+                continue
+            out[m.group(1)] = [cells[1], " | ".join(cells[2:])]
         return out
 
     def run(self) -> bool:
@@ -193,16 +213,31 @@ class ReviewValidator:
             p.append(f"`## 9 Dimensi` memuat dimensi {sorted(self.dims)}, wajib 1–9")
         self._add("S", "Struktur", p, "8 heading + 9 dimensi", "Salin heading dan nama dimensi persis template.")
 
-    def _evidence_problem(self, evidence: str) -> str:
-        """Kosong bila bukti memuat `path:baris` berkas rantai yang ada, atau perintah HIJAU di Verifikasi Penutup."""
+    def _evidence_problem(self, evidence: str, test_only: bool = False) -> str:
+        """Kosong bila bukti memuat `path:baris` berkas rantai yang ada, atau perintah HIJAU di Verifikasi Penutup.
+
+        `test_only` (AC `test otomatis`, 12 J41): hanya `path:baris` berkas test rantai yang sah. Berkas biner
+        bukan bukti baris (12 J36) — ditolak dengan pesan yang menyebutnya, bukan dengan vonis "bukan UTF-8".
+        """
         files = set(chain_files(self.root, self.taskdir_rel))
+        binary = []
         for path, line in PATH_LINE.findall(evidence):
             f = self.root / path
-            if path in files and f.is_file() and 1 <= int(line) <= len(f.read_text(encoding="utf-8").splitlines()):
+            if path not in files or not f.is_file() or (test_only and not TEST_FILE.search(path)):
+                continue
+            try:
+                count = len(f.read_bytes().decode("utf-8").splitlines())
+            except UnicodeDecodeError:
+                binary.append(path)
+                continue
+            if 1 <= int(line) <= count:
                 return ""
-        if any(f"`{cmd}`" in evidence for cmd in self.green):
+        if not test_only and any(f"`{cmd}`" in evidence for cmd in self.green):
             return ""
-        return "butuh `path:baris` berkas rantai yang ada, atau perintah yang HIJAU di `## Verifikasi Penutup`"
+        why = ("butuh `path:baris` berkas test rantai (`*.test.*`/`*.spec.*`) yang ada — AC `test otomatis`"
+               if test_only else
+               "butuh `path:baris` berkas rantai yang ada, atau perintah yang HIJAU di `## Verifikasi Penutup`")
+        return why + (f"; `{'`, `'.join(binary)}` bukan berkas teks" if binary else "")
 
     def _check_sc(self) -> bool:
         sc = success_criteria(self.taskdir / "TASK.md")
@@ -226,6 +261,7 @@ class ReviewValidator:
         ghosts = sorted(set(k for k in rows if k.startswith("SC-")) - set(sc))
         p += [f"`{g}` tidak ada di TASK.md" for g in ghosts]
         p += [f"`{d}` divonis lebih dari sekali — satu baris per SC" for d in self.dups if d.startswith("SC-")]
+        p += [u for u in self.unparsed if "Success Criteria" in u]
         if not sc:
             p.append("`TASK.md` tanpa butir SC terbaca")
         self._add("SC", "Cakupan Success Criteria", p, f"{len(sc)} SC divonis",
@@ -241,22 +277,29 @@ class ReviewValidator:
                       "Kosongkan tabel AC pada lane MINOR.")
             return False
         _, cbody = split_frontmatter(contract.read_text(encoding="utf-8"))
-        acs = [m.group(1) for m in (AC_ROW.match(l.strip()) for l in
-                                    section_lines(cbody, "## 5. Acceptance Criteria")) if m]
-        p, open_ = [], False
+        contract_rows, parse_problems = ac_rows(cbody)
+        acs = [ac for ac, _ in contract_rows]
+        auto = {ac for ac, cells in contract_rows if len(cells) > 1 and "test otomatis" in cells[1].lower()}
+        p, open_ = [f"CONTRACT.md: {x}" for x in parse_problems], False
         for ac in acs:
             if ac not in rows:
                 p.append(f"`{ac}` tanpa baris vonis")
                 continue
-            verdict = rows[ac][0]
+            verdict, evidence = rows[ac]
             if verdict not in AC_VERDICTS:
                 p.append(f"`{ac}` vonis `{verdict}` di luar {AC_VERDICTS}")
+            if verdict == "terbukti":                   # 12 J41: AC terbukti menuntut bukti seperti SC
+                why = self._evidence_problem(evidence, test_only=ac in auto)
+                if why:
+                    p.append(f"`{ac}` terbukti tanpa bukti sah: {why}")
             if verdict == "belum terbukti":
                 open_ = True
         p += [f"`{g}` tidak ada di CONTRACT.md" for g in sorted(set(k for k in rows if k.startswith("AC-")) - set(acs))]
         p += [f"`{d}` divonis lebih dari sekali — satu baris per AC" for d in self.dups if d.startswith("AC-")]
+        p += [u for u in self.unparsed if "Acceptance Criteria" in u]
         self._add("AC", "Cakupan Acceptance Criteria", p, f"{len(acs)} AC divonis",
-                  "Satu baris per AC-{n} CONTRACT.md.")
+                  "Satu baris per AC-{n} CONTRACT.md; `terbukti` menunjuk `path:baris` berkas rantai atau perintah "
+                  "HIJAU — AC `test otomatis` hanya berkas test rantai.")
         return open_
 
     def _check_findings(self) -> Dict[str, int]:
@@ -266,6 +309,8 @@ class ReviewValidator:
         for i, line in enumerate(lines):
             m = FINDING.match(line.strip())
             if not m:
+                if LOOSE_FINDING.match(line.strip()):
+                    p.append(f"heading temuan tak terurai (wajib `### [P<1-3>-<n>] <judul>`): {line.strip()[:80]}")
                 continue
             fid = f"{m.group(1)}-{m.group(2)}"
             found[m.group(1)].append(int(m.group(2)))
@@ -309,8 +354,13 @@ class ReviewValidator:
     def _check_done(self) -> bool:
         p, blocked = [], False
         for line in section_lines(self.body, "## Done Criteria DITUNDA"):
-            cells = [c.strip() for c in line.strip().strip("|").split("|")]
-            if len(cells) != 4 or not cells[0].startswith("brief-"):
+            cells = table_cells(line)                  # `\|` di sel bukan pemisah (12 J26)
+            if not cells or is_table_rule(cells) or cells[0].lower() == "brief" or set(cells) <= EMPTY_CELLS:
+                continue
+            cells[0] = cells[0].strip("`")
+            if len(cells) != 4 or not re.match(r"^brief-\d{2}\b", cells[0]):
+                p.append(f"baris Done Criteria tak terurai (wajib `brief-<NN> | butir | vonis | bukti`): "
+                         f"{line.strip()[:80]}")
                 continue
             if cells[2] not in DONE_VERDICTS:
                 p.append(f"{cells[0]} `{cells[1]}` vonis `{cells[2]}` di luar {DONE_VERDICTS}")
@@ -328,11 +378,12 @@ class ReviewValidator:
         """
         rows, p, red = 0, [], False
         for line in section_lines(self.body, "## Verifikasi Penutup"):
-            raw = line.strip()
-            if not raw.startswith("|") or set(raw.replace("|", "").strip()) <= set("-: "):
+            cells = table_cells(line)                  # `\|` di sel bukan pemisah (12 J26)
+            if not cells or is_table_rule(cells) or cells[0].lower() == "perintah":
                 continue
-            cells = [c.strip() for c in raw.strip("|").split("|")]
-            if len(cells) < 3 or cells[0].lower() == "perintah":
+            if len(cells) < 3:                         # 12 J39: baris pendek bukan baris yang dilewati
+                p.append(f"baris tak terurai (wajib `perintah | hasil | galat baru`): {line.strip()[:80]}")
+                red = True
                 continue
             rows += 1
             result, new = cells[1].upper(), cells[2]
@@ -380,8 +431,15 @@ class ReviewValidator:
         source = task_fm.get("finding_source")
         if isinstance(source, str) and source.strip() not in ("", "-"):
             allowed.add(PurePosixPath(source.strip().strip("\"'")).as_posix())
+        try:
+            status = self._status_all()
+        except GitError as exc:                   # 12 J17: tree tak terbaca tidak pernah bersih
+            self._add("TREE", name, [f"`git status` gagal: {exc}"], "",
+                      "Pulihkan repo (mis. index rusak) lalu jalankan ulang validator; tree yang tak terbaca "
+                      "tidak pernah dianggap bersih.")
+            return
         stray = []
-        for line in strip_explore_scratch(git(self.root, "status", "--porcelain", "-uall")).splitlines():
+        for line in strip_explore_scratch(status).splitlines():
             path = line[3:].split(" -> ")[-1].strip().strip('"')
             if path not in allowed:
                 stray.append(path)
@@ -389,6 +447,17 @@ class ReviewValidator:
                   "hanya REVIEW.md / finding_source",
                   "Reviewer memutasi repo di luar batasnya: pulihkan berkas itu (`git restore -- <path>`), "
                   "buang REVIEW.md ini, dan dispatch ulang reviewer.")
+
+    def _status_all(self) -> str:
+        """`git status --porcelain -uall`; `GitError` bila git gagal (pola `precondition_lib.git_status`, 12 J17)."""
+        try:
+            proc = subprocess.run(["git", "-C", str(self.root), "status", "--porcelain", "-uall"],
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, timeout=60)
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise GitError(str(exc)) from exc
+        if proc.returncode != 0:
+            raise GitError((proc.stderr.strip().splitlines() or [f"exit {proc.returncode}"])[-1])
+        return proc.stdout
 
     def _check_log(self) -> None:
         name = "Verifikasi vs log mesin"

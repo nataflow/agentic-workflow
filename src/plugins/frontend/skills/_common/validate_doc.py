@@ -32,8 +32,11 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from precondition_lib import (  # noqa: E402
+    TASKDIR_PATTERN,
     FrontmatterError,
+    ac_rows,
     find_repo_root,
+    inside_root,
     is_manual_cell,
     normalize_taskdir,
     outside_fences,
@@ -93,9 +96,8 @@ SPECS: Dict[str, Dict[str, Any]] = {
 DD_ROW = re.compile(r"^\|\s*`?(DD-\d+)`?\s*\|")
 ST_HEAD = re.compile(r"^###\s+(ST-\d+)\.\s")
 ST_TITLE = re.compile(r"^###\s+(ST-\d+)\.\s+(.*)$")
-AC_ROW = re.compile(r"^\|\s*`?(AC-\d+)`?\s*\|(.*)\|\s*$")
 TOKEN = re.compile(r"\b(SC|DD|ST)-\d+\b")
-FILES_ROW = re.compile(r"^\s*[-*]\s+`(CREATE|MODIFY)`\s+`[^`<>]+`")
+FILES_ROW = re.compile(r"^\s*[-*]\s+`(CREATE|MODIFY)`\s+`([^`<>]+)`")
 # Enam cabang wajib per layar (ui-design Phase 4). Jenis sebuah ST = kata kunci
 # yang muncul PALING AWAL di judulnya ("State Error saat Loading" = error).
 STATE_KINDS = (
@@ -161,6 +163,11 @@ class DocValidator:
                              "details": problems, "action": action if problems else ""})
 
     def run(self) -> bool:
+        if not TASKDIR_PATTERN.match(self.taskdir_rel):
+            self._add("S", "Taskdir", [f"taskdir `{self.taskdir_rel}` tidak berpola "
+                                       "`frontenddev/docs/<YYMMDDhhmm>-<slug>`"], "",
+                      "Jalankan validator atas taskdir rantai yang sah (12 J40).")
+            return False
         if not self.path.is_file():
             self._add("S", "Berkas ada", [f"`{self.path.relative_to(self.root)}` tidak ada"], "",
                       "Tulis dokumen dari templat skill pemiliknya lebih dulu.")
@@ -288,18 +295,14 @@ class DocValidator:
 
     def _check_contract(self) -> None:
         # Files Touched
-        files = [l for l in section_lines(self.body, "## 1. Files Touched") if FILES_ROW.match(l)]
-        self._add("E", "Files Touched", [] if files else ["`# Execution ## 1. Files Touched` kosong atau "
-                                                          "tidak berpola `- \\`CREATE|MODIFY\\` \\`<path>\\``"],
-                  f"{len(files)} berkas", "Tulis satu butir per berkas: `- `CREATE` `path``.")
+        matches = (FILES_ROW.match(l) for l in section_lines(self.body, "## 1. Files Touched"))
+        files = [m.group(2).strip() for m in matches if m]
+        outside = [f"`{f}` di luar root repo (path absolut atau `..`)" for f in files if not inside_root(self.root, f)]
+        self._add("E", "Files Touched", outside if files else ["`# Execution ## 1. Files Touched` kosong atau "
+                                                               "tidak berpola `- \\`CREATE|MODIFY\\` \\`<path>\\``"],
+                  f"{len(files)} berkas", "Tulis satu butir per berkas relatif root repo: `- `CREATE` `path``.")
         # Acceptance Criteria
-        rows = []
-        for line in section_lines(self.body, "## 5. Acceptance Criteria"):
-            m = AC_ROW.match(line.strip())
-            if m:
-                cells = [c.strip() for c in m.group(2).split("|")]
-                rows.append((m.group(1), cells))
-        problems: List[str] = []
+        rows, problems = ac_rows(self.body)
         ids = [r[0] for r in rows]
         if not ids:
             problems.append("tabel `AC-{n} | Skenario | Cara verifikasi | Sumber` kosong")
@@ -321,8 +324,7 @@ class DocValidator:
         borne: Set[str] = set()
         for ac, cells in rows:
             if len(cells) < 3:
-                problems.append(f"`{ac}`: baris kurang kolom (wajib Skenario | Cara verifikasi | Sumber)")
-                continue
+                continue                                  # sudah dicatat `ac_rows`
             how, source = cells[1].lower(), cells[-1]
             if "test otomatis" not in how and not is_manual_cell(cells[1]):
                 problems.append(f"`{ac}`: Cara verifikasi bukan `test otomatis` atau `QA manual: <langkah>`")

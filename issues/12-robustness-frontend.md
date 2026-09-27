@@ -4,7 +4,7 @@ Sumber: review robustness plugin `frontend` 2026-09-27 (lima penelusur paralel: 
 prasyarat & verifikasi, validator dokumen, orkestrasi & prosa). Tiap temuan Tinggi/Sedang direproduksi di ruang
 kerja sementara sebelum masuk berkas ini. Basis kode: commit `b293564` (suite 615 test hijau).
 
-**Status (2026-09-27):** peta blast radius selesai; tahap 1–2 selesai, rilis menyusul.
+**Status (2026-09-27):** peta blast radius selesai; tahap 1–3 selesai, rilis menyusul.
 
 ## Tujuan
 
@@ -166,25 +166,25 @@ atau pola sama di plugin lain. **Test tersentuh** = test yang ada dan harus teta
 
 ## Tahap 3 — Validator dokumen
 
-- [ ] **J24 [Tinggi]** Brief `BLOCKED` dihitung pemikul SC/AC/berkas kontrak (Check G/C/E) → remedi yang tidak membawa AC lolos approve.
-- [ ] **J25 [Tinggi]** Baris SC salah format (`- [ ] SC-2:` tanpa `**`) hilang diam-diam dari task, doc, dan briefs.
-- [ ] **J26 [Tinggi]** Verdict `REVIEW.md` turun karena format (`###[P1-1]`, `[p1-1]`, `\|` di sel, backtick di kolom Brief).
-- [ ] **J14 [Sedang]** Check V menerima `pnpm test || true`.
-- [ ] **J27 [Sedang]** Plafon remedi Check M dijebol lewat `remedies` yang dihilangkan atau `reopen CONTRACT` sebelum unit berjalan.
-- [ ] **J28 [Sedang]** Baris AC tanpa pipa penutup tidak terlihat `validate_doc`.
-- [ ] **J29 [Sedang]** Path `../` / absolut diterima di `files_touched` dan bukti.
-- [ ] **J30 [Sedang]** `validate_audit` mengabaikan temuan tanpa judul; `## Summary` tidak dicocokkan.
-- [ ] **J31 [Sedang]** Kunci frontmatter ganda diterima diam-diam (05-3 hanya di be); `strip_status_line` membuang semua baris `status:`.
-- [ ] **J32 [Sedang]** `CREATE` ganda antar brief lolos; `unit` tidak dicocokkan dengan nama berkas.
-- [ ] **J33 [Rendah]** Anchor berisi dua simbol dianggap kosong.
-- [ ] **J34 [Rendah]** Contoh terisi `task-template.md` gagal di validatornya sendiri.
-- [ ] **J35 [Rendah]** `validate_report.py` memakai regex placeholder sendiri (`< 300 ms … > 0` FAIL).
-- [ ] **J36 [Rendah]** Bukti REVIEW yang menunjuk berkas biner memberi pesan "simpan ulang sebagai UTF-8".
-- [ ] **J37 [Rendah]** `validate_audit --only-status-changed` crash untuk path di luar root; berkas untracked PASS.
-- [ ] **J38 [Rendah]** Alat ukur `— verifikasi: test` tanpa objek lolos.
-- [ ] **J39 [Rendah]** Baris Verifikasi Penutup < 3 sel dilewati, tidak dihitung merah.
-- [ ] **J40 [Rendah]** Normalisasi `./` lama di `validate_briefs`; `validate_doc` tanpa `TASKDIR_PATTERN`; `section_lines`/`read_section` tidak mengenal pagar `~~~`.
-- [ ] **J41 [Rendah]** Bukti AC tidak ditagih (README berkata sebaliknya); AC `test otomatis` dengan berkas test yang belum ada tidak pernah ditagih ulang.
+- [x] **J24 [Tinggi]** Brief `BLOCKED` dihitung pemikul SC/AC/berkas kontrak (Check G/C/E) → remedi yang tidak membawa AC lolos approve.
+- [x] **J25 [Tinggi]** Baris SC salah format (`- [ ] SC-2:` tanpa `**`) hilang diam-diam dari task, doc, dan briefs.
+- [x] **J26 [Tinggi]** Verdict `REVIEW.md` turun karena format (`###[P1-1]`, `[p1-1]`, `\|` di sel, backtick di kolom Brief).
+- [x] **J14 [Sedang]** Check V menerima `pnpm test || true`.
+- [x] **J27 [Sedang]** Plafon remedi Check M dijebol lewat `remedies` yang dihilangkan atau `reopen CONTRACT` sebelum unit berjalan.
+- [x] **J28 [Sedang]** Baris AC tanpa pipa penutup tidak terlihat `validate_doc`.
+- [x] **J29 [Sedang]** Path `../` / absolut diterima di `files_touched` dan bukti.
+- [x] **J30 [Sedang]** `validate_audit` mengabaikan temuan tanpa judul; `## Summary` tidak dicocokkan.
+- [x] **J31 [Sedang]** Kunci frontmatter ganda diterima diam-diam (05-3 hanya di be); `strip_status_line` membuang semua baris `status:`.
+- [x] **J32 [Sedang]** `CREATE` ganda antar brief lolos; `unit` tidak dicocokkan dengan nama berkas.
+- [x] **J33 [Rendah]** Anchor berisi dua simbol dianggap kosong.
+- [x] **J34 [Rendah]** Contoh terisi `task-template.md` gagal di validatornya sendiri.
+- [x] **J35 [Rendah]** `validate_report.py` memakai regex placeholder sendiri (`< 300 ms … > 0` FAIL).
+- [x] **J36 [Rendah]** Bukti REVIEW yang menunjuk berkas biner memberi pesan "simpan ulang sebagai UTF-8".
+- [x] **J37 [Rendah]** `validate_audit --only-status-changed` crash untuk path di luar root; berkas untracked PASS.
+- [x] **J38 [Rendah]** Alat ukur `— verifikasi: test` tanpa objek lolos.
+- [x] **J39 [Rendah]** Baris Verifikasi Penutup < 3 sel dilewati, tidak dihitung merah.
+- [x] **J40 [Rendah]** Normalisasi `./` lama di `validate_briefs`; `validate_doc` tanpa `TASKDIR_PATTERN`; `section_lines`/`read_section` tidak mengenal pagar `~~~`.
+- [x] **J41 [Rendah]** Bukti AC tidak ditagih (README berkata sebaliknya); AC `test otomatis` dengan berkas test yang belum ada tidak pernah ditagih ulang.
 
 ## Tahap 4 — Ledger & state
 

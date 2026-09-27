@@ -29,6 +29,7 @@ from precondition_lib import (  # noqa: E402
     chain_files,
     find_repo_root,
     fenced_mask,
+    find_placeholders,
     format_report,
     is_manual,
     normalize_taskdir,
@@ -44,7 +45,8 @@ REVIEW_SC_ROW = re.compile(r"^\|\s*`?(SC-\d+)`?\s*\|\s*([^|]+?)\s*\|")
 SC_LINE = re.compile(r"^- \[[ xX]\] \*\*(SC-\d+)\*\*:(.*)$")
 INLINE_CODE = re.compile(r"`[^`\n]*`")
 SENTENCE_END = re.compile(r"[.!?](?=\s|$)")
-PLACEHOLDER = re.compile(r"\{\{|<!--|<[^<>\n]+>")
+# `{{`/komentar HTML di sini; slot `<…>`/`TBD` lewat `find_placeholders` bersama (12 J35).
+TEMPLATE_MARK = re.compile(r"\{\{|<!--")
 EMPTY_NOTE = re.compile(r"^(-|n/?a|tidak ada|nihil)\.?$", re.IGNORECASE)
 TRIVIAL = re.compile(r"^(selesai|done|beres|ok|oke|sudah|tuntas)\.?$", re.IGNORECASE)
 OPEN_FINDING = re.compile(r"^### \[(P[123]-\d+)\]")
@@ -211,7 +213,11 @@ class ReportValidator:
                   "tiap temuan REVIEW.md ber-`> Status: PLANNED|DEFERRED` dengan ID-nya (`P2-1 — …`).")
 
     def _check_6_placeholder(self) -> None:
-        hits = sorted(set(PLACEHOLDER.findall(INLINE_CODE.sub("", self.text))))
+        """Satu pendeteksi dengan `validate_doc`/`validate_briefs`/`validate_task` (12 J35): operator
+        perbandingan dan JSX bukan slot, slot berkosakata di dalam backtick tetap slot."""
+        lines = outside_fences(self.text.splitlines())
+        hits = sorted({h for line in lines for h in find_placeholders(line)}
+                      | set(TEMPLATE_MARK.findall(INLINE_CODE.sub("", "\n".join(lines)))))
         self._add(6, "Nol placeholder", not hits, "sisa: " + ", ".join(hits[:5]) if hits else "lolos",
                   "Isi seluruh slot template dan hapus komentar.")
 

@@ -32,7 +32,7 @@ Ditagih `validate_report.py`; `FAIL` menahan commit:
 - **Ringkasan** — tepat satu kalimat hasil aktual, minimal 5 kata (kode inline dihitung satu kata); `Selesai.`/`Done.`/`Beres.` ditolak.
 - **Perubahan** — 1–7 butir, masing-masing menyebut perubahan perilaku (minimal 3 kata) dan ditutup kurung berisi berkas atau direktori modul yang muncul di berkas rantai (`SKILL.md` Phase 2); direktori tingkat atas tanpa `/` (mis. `src`) terlalu lebar dan ditolak. Tiap berkas rantai wajib tercakup satu butir, langsung atau lewat direktori induknya. Rujukan di dalam kurung dipisah koma; kurung penutup yang dibaca adalah kurung seimbang terakhir di ujung baris, sehingga route group (`app/(tabs)/index.tsx`, `src/routes/(app)/+page.svelte`) dan nama berkas non-ASCII ditulis apa adanya.
 - **Catatan** — hanya dari tiga sumber: tiap `SC-{n}` yang `REVIEW.md` vonis `PERLU VERIFIKASI MANUAL` (wajib hadir, ditagih skrip), temuan `REVIEW.md` yang belum dituntaskan (tiap `### [Px-n]` ber-`> Status: PLANNED|DEFERRED` wajib disebut ID-nya, ditagih skrip), dan penyimpangan di `## Triase` `report-<NN>.md`. Ketiganya kosong → hapus heading beserta isinya; dilarang diisi `-`, `N/A`, atau kalimat penyangkalan.
-- **Nol placeholder** — tidak ada `<...>`, `{{`, atau komentar HTML tersisa.
+- **Nol placeholder** — tidak ada slot `<...>`, `TBD`/`TODO`, `{{`, atau komentar HTML tersisa. Pendeteksinya sama dengan validator gate lain: JSX (`<Skeleton />`), generik TS, dan operator perbandingan (`< 300 ms`) bukan slot.
 
 ______________________________________________________________________
 
@@ -50,6 +50,6 @@ Pembeli kini dapat membuka layar lacak pengiriman dari detail pesanan dan meliha
 - Test navigasi dan kasus error layar tracking ditambahkan (src/features/orders/OrderDetail.test.tsx, src/features/tracking/TrackingScreen.test.tsx)
 
 ## Catatan
-- SC-2 — PERLU VERIFIKASI MANUAL: buka `/orders/<id>/tracking` untuk pesanan terkirim, amati baris status teratas dan jamnya
+- SC-2 — PERLU VERIFIKASI MANUAL: buka `/orders/:id/tracking` untuk pesanan terkirim, amati baris status teratas dan jamnya
 - REVIEW.md P3-1: skeleton tracking memakai spacing literal `12px` di src/features/tracking/TrackingScreen.tsx:40; tidak diperbaiki di rantai ini
 ````
