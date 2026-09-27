@@ -61,10 +61,10 @@ menutup dengan status dan **menawarkan** langkah berikutnya, lalu menunggu user.
 | Keadaan rencana | Mode |
 |---|---|
 | belum ada blok `## Execution Status`, nol `[x]` | `awal` — tree harus bersih selain `plan/` dan profil |
-| blok `IN_PROGRESS`/`BLOCKED`, atau ada `[x]` tanpa blok | `resume` — kerja parsial uncommitted diizinkan |
+| blok `IN_PROGRESS`/`BLOCKED`, atau ada `[x]` tanpa blok, atau blok terminal dengan langkah `[ ]` baru (rencana direvisi sesudah selesai) | `resume` — kerja parsial uncommitted diizinkan |
 | blok `COMPLETED` + `review_findings` | `remediasi` — plafon 2 putaran |
-| blok `VERIFICATION_MANUAL_REQUIRED` | `manual` — mencatat konfirmasi user |
-| blok `COMPLETED` tanpa temuan | `selesai` — tawarkan `review` |
+| blok `VERIFICATION_MANUAL_REQUIRED`, semua langkah `[x]` | `manual` — mencatat konfirmasi user |
+| blok `COMPLETED`, semua langkah `[x]`, tanpa temuan | `selesai` — tawarkan `review` |
 
 ## Artefak
 

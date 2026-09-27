@@ -99,33 +99,36 @@ Titik asal (frame plugin terdalam), dikelompokkan:
 berkas absen tidak memperlakukan berkas rusak sebagai absen.
 
 ## E2 [Tinggi] quickdev: revisi rencana sesudah COMPLETED buntu
-- [ ] Selesai
+- [x] Selesai — `revised` di `cmd_start`; remediasi ditolak selama langkah revisi terbuka; tabel mode execute & README
 
 `review` Fase 5 → *Revisi rencana* → `unlock` → langkah baru → `lock` → `start` menghasilkan `mode=selesai`
 (`plan_lock.py:166`), dan `close` ditolak karena status bukan IN_PROGRESS. **Perbaikan:** `COMPLETED*` dengan
 langkah `[ ]` tersisa → `mode=resume` dan blok kembali ke `IN_PROGRESS`; `Base-Commit` tetap.
 
 ## E3 [Tinggi] quickdev: rencana tanpa `## 1.` → sidik kosong
-- [ ] Selesai
+- [x] Selesai — `body_problem()` di `lock` dan `verify`
 
 `body_start = len(lines)` (`plan_lock.py:63`), sidik = sha256 string kosong, Section 1–5 bebas diubah.
-**Perbaikan:** `lock` dan `verify` menagih heading `## 1.` sampai `## 5.` dan wilayah sidik tidak kosong.
+**Perbaikan:** `lock` dan `verify` menagih heading `## 1.` dan wilayah sidik yang tidak kosong. **Koreksi rencana:**
+`## 2.`–`## 5.` tidak ikut ditagih. Rencana nyata dan fixture test boleh tanpa seksi 2/5, dan lubangnya hanya
+`## 1.` yang absen.
 
 ## E4 [Sedang] quickdev: `Remediation-Round` rusak → traceback; tulis tidak atomik
-- [ ] Selesai
+- [x] Selesai — `remediation_round()`; `save()` lewat `tempfile` + `os.replace`; `--json` tetap JSON
 
 `int()` di `:153,:230`. **Perbaikan:** nilai non-angka → FAIL rapi; `save()` menulis ke berkas sementara lalu
 `os.replace`.
 
 ## E5 [Sedang] quickdev: blok status bisa dipalsukan; `confirm` tanpa `verify`; `lock` menimpa `Profile`
-- [ ] Selesai
+- [x] Selesai — `status` memuat `consistent`/`inconsistency` (ditagih review precondition 1). Batas: blok palsu
+  yang meniru semua field `close` tetap lolos; yang tertutup adalah blok yang tidak cocok dengan checklist.
 
 Blok `## Execution Status` tulisan tangan ber-`COMPLETED` dengan langkah 0/1 lolos `status`. **Perbaikan:**
 `status --json` memuat `consistent` (COMPLETED ⇒ semua langkah `[x]`; review precondition 1 menagihnya);
 `confirm` memanggil `verify`; `lock` tanpa `--profile` mempertahankan `Profile:` yang ada.
 
 ## E6 [Sedang] quickdev: Known issues diringkas → regresi palsu *(belum diverifikasi di sesi nyata)*
-- [ ] Selesai
+- [x] Selesai — butir baru `execute/SKILL.md` Fase 3 butir 2
 
 Profil memotong Known issues ke 10 baris; execute hanya mengenali galat bawaan lewat kolom itu.
 **Perbaikan:** sel ringkasan (`<n> issue — contoh: …`) diperlakukan seperti baseline tanpa pembanding: galat di

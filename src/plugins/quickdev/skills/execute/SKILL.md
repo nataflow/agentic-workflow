@@ -47,10 +47,10 @@ DILARANG MEMULAI EKSEKUSI JIKA DOKUMEN RENCANA IMPLEMENTASI BELUM BERSTATUS APPR
    |---|---|---|
    | `verify` FAIL | — | hentikan, ke `quickdev:plan` (Failure path 1) |
    | tanpa blok, nol `[x]` | `awal` | predikat tree bersih Precondition 2; `Base-Commit` = HEAD atau `none` (repo tanpa commit) |
-   | blok `IN_PROGRESS`/`BLOCKED`, atau tanpa blok tetapi ada `[x]` | `resume` | butir 2 di bawah; `Base-Note` menandai base yang diisi sesudah sesi putus |
+   | blok `IN_PROGRESS`/`BLOCKED`, atau tanpa blok tetapi ada `[x]`, atau blok `COMPLETED`/`VERIFICATION_MANUAL_REQUIRED` dengan langkah `[ ]` baru (`resume (rencana direvisi sesudah selesai)`) | `resume` | butir 2 di bawah; `Base-Note` menandai base yang diisi sesudah sesi putus; `Base-Commit` rencana yang direvisi tetap, sehingga review berikutnya menilai seluruh hasil sejak base itu |
    | blok `COMPLETED` + `--findings` | `remediasi` | butir 5 di bawah; plafon 2 putaran |
-   | blok `VERIFICATION_MANUAL_REQUIRED` | `manual` | butir 3 di bawah |
-   | blok `COMPLETED`/`COMPLETED (manual)` tanpa temuan | `selesai` | tidak ada kerja; tawarkan `quickdev:review` |
+   | blok `VERIFICATION_MANUAL_REQUIRED`, semua langkah `[x]` | `manual` | butir 3 di bawah |
+   | blok `COMPLETED`/`COMPLETED (manual)`, semua langkah `[x]`, tanpa temuan | `selesai` | tidak ada kerja; tawarkan `quickdev:review` |
 
 2. Mode `resume`:
    - Pagar tree: `git status --porcelain -uall`; setiap berkas berubah wajib termasuk berkas target Section 3, `<plan_dir>/`, atau `profile_path`. Berkas lain → hentikan dan tanyakan user; jangan ikut di-review sebagai hasil eksekusi.
@@ -92,6 +92,7 @@ DILARANG MEMULAI EKSEKUSI JIKA DOKUMEN RENCANA IMPLEMENTASI BELUM BERSTATUS APPR
 2. Bandingkan per perintah dengan baris Section 5 `profile_path`:
    - `PASSED` → galat apa pun sekarang = regresi.
    - `FAILED` → galat yang penandanya ada di kolom Known issues = bawaan; galat lain = regresi.
+   - `FAILED` dengan Known issues berupa ringkasan (`<n> issue — contoh: …`) → daftar penandanya tidak lengkap, jadi galat di luar contoh tidak bisa dipastikan bawaan: galat di berkas yang disentuh rencana = regresi; galat di berkas lain = `UNVERIFIED`, dicatat di laporan beserta perintah reproduksi dari sel itu. Jumlah galat sekarang > `<n>` tanpa penjelasan dari berkas yang disentuh → laporkan ke user sebelum menutup `COMPLETED`.
    - `SKIPPED` / `TIMEOUT` / `UNVERIFIED_ENV_NOT_READY` → jalankan sekarang. Gagal karena lingkungan (modul/binari hilang) → status akhir `VERIFICATION_MANUAL_REQUIRED`, bukan `COMPLETED`. Jalan tetapi gagal → tidak ada pembanding: laporkan tiap galat di berkas yang disentuh rencana sebagai regresi, sisanya sebagai `UNVERIFIED` di laporan, lalu minta user memutuskan.
    - `TIDAK_ADA` → lewati, catat `<jenis>=TIDAK_ADA`.
    - Profil lama tanpa tabel Section 5 → status tidak diketahui, perlakukan seperti `UNVERIFIED_ENV_NOT_READY` dan sarankan `quickdev:profile mode=REFRESH`.

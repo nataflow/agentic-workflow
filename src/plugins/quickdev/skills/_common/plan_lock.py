@@ -4,11 +4,12 @@
 - `lock`    DRAFT → APPROVED: tulis `Approved-At`, `Approval`, `Plan-Hash`, `Profile`.
 - `verify`  APPROVED dan sidik Section 1–5 sekarang = `Plan-Hash` (checkbox dinormalkan).
 - `start`   vonis mode eksekusi (awal | resume | remediasi | manual | selesai); tulis blok
-            `## Execution Status` (IN_PROGRESS + Base-Commit) bila belum ada.
+            `## Execution Status` (IN_PROGRESS + Base-Commit) bila belum ada. Blok terminal
+            dengan langkah `[ ]` tersisa (rencana direvisi sesudah selesai) → `resume`.
 - `close`   tulis status terminal execute ke blok (COMPLETED | BLOCKED | VERIFICATION_MANUAL_REQUIRED);
             dari IN_PROGRESS, atau BLOCKED dari VERIFICATION_MANUAL_REQUIRED (verifikasi manual gagal).
 - `confirm` VERIFICATION_MANUAL_REQUIRED → COMPLETED (manual) dengan jawaban user apa adanya.
-- `status`  ringkasan untuk execute/review (`--json`).
+- `status`  ringkasan untuk execute/review (`--json`); `consistent` menilai blok terhadap checklist.
 - `unlock`  APPROVED → DRAFT untuk revisi atas permintaan user; blok eksekusi dipertahankan.
 
 Metadata rencana adalah baris polos `Kunci: nilai` di antara H1 dan `## 1.`. Sidik mencakup
@@ -21,7 +22,9 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import os
 import re
+import tempfile
 import subprocess
 import sys
 from pathlib import Path
@@ -108,12 +111,51 @@ class Plan:
                 self.lines[idx] = f"- {key}: {val}"
 
     def save(self) -> None:
-        self.path.write_text("\n".join(self.lines).rstrip("\n") + "\n", encoding="utf-8")
+        """Tulis atomik (berkas sementara + `os.replace`): sesi yang putus di tengah tulis tidak
+        meninggalkan rencana setengah tertulis."""
+        fd, tmp = tempfile.mkstemp(dir=str(self.path.parent), prefix=f".{self.path.name}.", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write("\n".join(self.lines).rstrip("\n") + "\n")
+            os.replace(tmp, str(self.path))
+        except BaseException:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
+            raise
 
 
 def fail(msg: str) -> int:
     print(msg)
     return 1
+
+
+def remediation_round(b: dict) -> int:
+    """`Remediation-Round` blok; nilai rusak → SystemExit rapi (field ini hanya ditulis skrip)."""
+    raw = (b.get("Remediation-Round") or "0").strip()
+    if not raw.isdigit():
+        raise SystemExit(f"FAIL: `Remediation-Round: {raw}` bukan bilangan — blok `{EXEC_H2}` disunting tangan; "
+                         f"pulihkan dari riwayat git, dilarang menebak")
+    return int(raw)
+
+
+def body_problem(p: "Plan") -> str:
+    """Wilayah sidik wajib ada: tanpa `## 1.` sidik = sha256 string kosong dan Section 1–5 bebas diubah."""
+    if p.body_start == len(p.lines):
+        return "heading `## 1.` tidak ada — sidik Section 1–5 kosong"
+    if not "\n".join(p.lines[p.body_start:p.exec_start]).strip():
+        return "Section 1–5 kosong"
+    return ""
+
+
+def inconsistency(p: "Plan") -> str:
+    """Blok eksekusi terminal wajib cocok dengan checklist; kosong bila konsisten."""
+    st, steps = p.block().get("Status", ""), p.steps()
+    if st.startswith("COMPLETED") and any(not ok for ok, _ in steps):
+        return f"blok `{st}` padahal masih ada langkah `- [ ]` — blok ditulis tangan, atau rencana direvisi " \
+               f"sesudah selesai (jalankan quickdev:execute → mode resume)"
+    if st.startswith("COMPLETED") and not p.block().get("Verification", "").strip('" '):
+        return f"blok `{st}` tanpa `Verification` — blok tidak ditulis `plan_lock.py close`"
+    return ""
 
 
 def cmd_lock(p: Plan, a) -> int:
@@ -123,8 +165,13 @@ def cmd_lock(p: Plan, a) -> int:
         return fail("LOCK FAIL: jawaban user kosong")
     if not p.steps():
         return fail("LOCK FAIL: Section 3 tanpa langkah checkbox `- [ ]`")
+    problem = body_problem(p)
+    if problem:
+        return fail(f"LOCK FAIL: {problem}")
+    # `--profile` absen → pertahankan `Profile:` yang ditulis plan Fase 2, bukan menimpanya dengan default.
+    profile = a.profile or p.meta().get("Profile") or "repo-profile.md"
     p.set_meta(Status="APPROVED", Approved_At=now(), Approval=quote(a.answer), Plan_Hash=p.digest(),
-               Profile=a.profile)
+               Profile=profile)
     p.save()
     print(f"LOCK PASS: {p.path} APPROVED @{p.digest()[7:19]}")
     return 0
@@ -134,6 +181,9 @@ def cmd_verify(p: Plan, a) -> int:
     m = p.meta()
     if m.get("Status") != "APPROVED":
         return fail(f"VERIFY FAIL: Status `{m.get('Status', '-')}` bukan APPROVED — selesaikan approval di quickdev:plan")
+    problem = body_problem(p)
+    if problem:
+        return fail(f"VERIFY FAIL: {problem} — `unlock`, lengkapi rencana, lalu approval ulang di quickdev:plan")
     if not m.get("Plan-Hash", "").startswith("sha256:"):
         return fail("VERIFY FAIL: rencana APPROVED tanpa `Plan-Hash` (format lama atau ditulis tangan) — "
                     "`unlock` lalu minta user menyetujui ulang di quickdev:plan (`lock`)")
@@ -150,10 +200,14 @@ def cmd_start(p: Plan, a) -> int:
     b, steps = p.block(), p.steps()
     done = sum(1 for ok, _ in steps if ok)
     st = b.get("Status", "")
-    rnd = int(b.get("Remediation-Round", "0") or 0)
+    rnd = remediation_round(b)
+    revised = (st.startswith("COMPLETED") or st == "VERIFICATION_MANUAL_REQUIRED") and done < len(steps)
     if a.findings:
         if not st.startswith("COMPLETED"):
             return fail(f"START FAIL: remediasi menuntut Status COMPLETED, tercatat `{st or '-'}`")
+        if revised:
+            return fail("START FAIL: rencana punya langkah `- [ ]` baru sesudah selesai — jalankan tanpa "
+                        "`--findings` (mode resume) lebih dulu")
         if rnd >= REMEDIATION_CAP:
             return fail(f"START FAIL: plafon {REMEDIATION_CAP} putaran remediasi habis — serahkan temuan ke user")
         if not (a.findings_text or "").strip():
@@ -161,11 +215,13 @@ def cmd_start(p: Plan, a) -> int:
         mode = "remediasi"
         p.set_block(Status="IN_PROGRESS", Remediation_Round=str(rnd + 1), Timestamp=now(),
                     **{f"Findings_{rnd + 1}": quote(a.findings_text)})
-    elif st == "VERIFICATION_MANUAL_REQUIRED":
+    elif st == "VERIFICATION_MANUAL_REQUIRED" and not revised:
         mode = "manual"
-    elif st.startswith("COMPLETED"):
+    elif st.startswith("COMPLETED") and not revised:
         mode = "selesai"
-    elif st in ("IN_PROGRESS", "BLOCKED") or done:
+    elif st in ("IN_PROGRESS", "BLOCKED") or done or revised:
+        # `revised`: review → "Revisi rencana" → unlock → langkah baru → lock. Kerja lama tetap di
+        # Base-Commit yang sama, jadi review berikutnya menilai seluruh hasil sejak base itu.
         mode = "resume"
         if not b.get("Base-Commit"):
             p.set_block(Base_Commit=head_commit(p.path.parent), Base_Note="tidak tercatat sebelum sesi putus")
@@ -176,7 +232,8 @@ def cmd_start(p: Plan, a) -> int:
                     Timestamp=now())
     p.save()
     nxt = next((t for ok, t in steps if not ok), "-")
-    print(f"START PASS: mode={mode} · langkah {done}/{len(steps)} · berikutnya: {nxt} · "
+    print(f"START PASS: mode={mode}{' (rencana direvisi sesudah selesai)' if revised else ''} · "
+          f"langkah {done}/{len(steps)} · berikutnya: {nxt} · "
           f"base={p.block().get('Base-Commit', '-')[:12]}")
     return 0
 
@@ -200,6 +257,10 @@ def cmd_close(p: Plan, a) -> int:
 
 
 def cmd_confirm(p: Plan, a) -> int:
+    if cmd_verify(p, a):
+        return 1
+    if any(not ok for ok, _ in p.steps()):
+        return fail("CONFIRM FAIL: masih ada langkah `- [ ]` — jalankan quickdev:execute (mode resume) dulu")
     if p.block().get("Status") != "VERIFICATION_MANUAL_REQUIRED":
         return fail("CONFIRM FAIL: blok bukan VERIFICATION_MANUAL_REQUIRED")
     if not a.answer.strip():
@@ -227,11 +288,13 @@ def cmd_status(p: Plan, a) -> int:
            "profile": m.get("Profile", "-"), "gates": m.get("Gates", "-"),
            "steps_done": sum(ok for ok, _ in steps), "steps_total": len(steps),
            "next_step": next((t for ok, t in steps if not ok), "-"),
-           "remediation_round": int(b.get("Remediation-Round", "0") or 0),
-           "remediation_cap": REMEDIATION_CAP, "execution": b}
+           "remediation_round": remediation_round(b),
+           "remediation_cap": REMEDIATION_CAP, "consistent": not inconsistency(p),
+           "inconsistency": inconsistency(p) or "-", "execution": b}
     print(json.dumps(out, ensure_ascii=False, indent=2) if a.json else
           f"STATUS: {out['status']} · hash {'ok' if out['hash_ok'] else 'DRIFT'} · langkah "
-          f"{out['steps_done']}/{out['steps_total']} · eksekusi {b.get('Status', '-')} · base {b.get('Base-Commit', '-')}")
+          f"{out['steps_done']}/{out['steps_total']} · eksekusi {b.get('Status', '-')} · base {b.get('Base-Commit', '-')}"
+          + ("" if out["consistent"] else f" · TIDAK KONSISTEN: {out['inconsistency']}"))
     return 0
 
 
@@ -244,7 +307,7 @@ def main() -> None:
         if name in ("lock", "confirm"):
             s.add_argument("--answer", required=True)
         if name == "lock":
-            s.add_argument("--profile", default="repo-profile.md")
+            s.add_argument("--profile", default=None, help="default: `Profile:` yang sudah ada, lalu repo-profile.md")
         if name == "start":
             s.add_argument("--findings", action="store_true", help="putaran remediasi dari review CHANGES_REQUIRED")
             s.add_argument("--findings-text", default="", help="temuan ringkas yang dicatat ke blok (Findings-<n>)")
@@ -271,7 +334,13 @@ def main() -> None:
         plan = Plan(path)
     except UnicodeDecodeError as exc:
         die(f"{path} bukan UTF-8 ({exc.reason} @ byte {exc.start}) — pulihkan dari git; jangan menebak isinya")
-    sys.exit(globals()[f"cmd_{a.cmd}"](plan, a))
+    try:
+        code = globals()[f"cmd_{a.cmd}"](plan, a)
+    except SystemExit as exc:          # FAIL rapi dari pembaca field (`remediation_round`)
+        if isinstance(exc.code, str):
+            die(exc.code[len("FAIL: "):] if exc.code.startswith("FAIL: ") else exc.code)
+        raise
+    sys.exit(code)
 
 
 if __name__ == "__main__":
