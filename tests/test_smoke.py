@@ -77,7 +77,20 @@ CASES = [
     ("quickdev/skills/_common/plan_lock.py", ["status", "--plan", "plan/smoke.md", "--json"], True, None),
 ]
 
-STATES = ["commit", "tanpa-commit", "detached", "bukan-git"]
+STATES = ["commit", "tanpa-commit", "detached", "bukan-git", "rusak"]
+
+# Keadaan `rusak` (09 E1): tiap dokumen yang dibaca skrip ada, ter-commit, dan berisi byte non-UTF-8.
+# Skrip wajib gagal dengan vonis terbaca, bukan traceback, dan `--json` tetap JSON.
+NOT_UTF8 = b"\xff\xfe\x80 bukan utf-8 \xc3\x28\n"
+CORRUPT = [f"{td}/{doc}" for td in (BE_TD, FE_TD) for doc in
+           ("TASK.md", "brief-01.md", "REVIEW.md", "REPORT.md")] + [
+    f"{BE_TD}/BRD.md", f"{BE_TD}/PRD.md", f"{BE_TD}/HALT.md", f"{BE_TD}/RCA.md",
+    f"{FE_TD}/FLOW.md", f"{FE_TD}/UI.md", f"{FE_TD}/CONTRACT.md", f"{AN_TD}/TICKET.md",
+    "frontenddev/reviews/2609250000-smoke.md", "plan/smoke.md", "repo-profile.md",
+    ".claude/profile/backenddev/index.json", ".claude/profile/backenddev/commands.md",
+    ".claude/profile/frontenddev/index.json", ".claude/profile/frontenddev/commands.md",
+    "go.mod", "package.json", "Cargo.toml", "build.gradle", ".claude/workflow",
+]
 
 
 def _repo(tmp_path: Path, state: str) -> Path:
@@ -89,6 +102,10 @@ def _repo(tmp_path: Path, state: str) -> Path:
     if state == "tanpa-commit":
         return root
     (root / "README.txt").write_text("fixture\n", encoding="utf-8")
+    if state == "rusak":
+        for rel in CORRUPT:
+            (root / rel).parent.mkdir(parents=True, exist_ok=True)
+            (root / rel).write_bytes(NOT_UTF8)
     git(root, "add", ".")
     git(root, "commit", "-q", "-m", "chore: init")
     if state == "detached":

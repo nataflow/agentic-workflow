@@ -21,7 +21,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 # Deteksi repo dan pembacaan profil tinggal di `hooks/detect.py` (identik di
 # backenddev dan frontenddev) — satu implementasi untuk hook dan skrip.
@@ -739,3 +739,20 @@ def freshness_banner(freshness: Optional[Tuple[str, str]]) -> Optional[str]:
     if freshness and freshness[0] == "BASI":
         return f"[TERDEGRADASI] profil basi — {freshness[1]}"
     return None
+
+
+def cli(main: Callable[[], Any]) -> Any:
+    """Jaring terakhir skrip ber-CLI: berkas non-UTF-8 yang lolos dari penanganan per titik baca
+    menjadi vonis FAIL terbaca (JSON bila `--json`), bukan traceback (09 E1)."""
+    try:
+        return main()
+    except UnicodeDecodeError as exc:
+        msg = (f"berkas yang dibaca skrip ini bukan UTF-8 ({exc.reason} @ byte {exc.start}) — pulihkan dari "
+               f"git atau simpan ulang sebagai UTF-8; jangan menebak isinya")
+        if "--json" in sys.argv:
+            print(json.dumps({"status": "FAIL", "error": msg, "checks": [
+                {"id": 0, "name": "Berkas terbaca", "status": "FAIL", "summary": msg, "action": ""}]},
+                ensure_ascii=False, indent=2))
+        else:
+            print(f"FAIL: {msg}")
+        return 1

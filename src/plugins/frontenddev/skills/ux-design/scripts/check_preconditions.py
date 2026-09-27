@@ -30,6 +30,7 @@ from precondition_lib import (  # noqa: E402
     normalize_taskdir,
     report_json,
 )
+from precondition_lib import cli  # noqa: E402
 
 PROFILE_REQUIRED = ("index.json", "surface-map.md")
 PLUGIN_FILES = ("references/ux-patterns.md", "templates/flow-template.md", "dispatcher/explorer.md")
@@ -89,4 +90,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

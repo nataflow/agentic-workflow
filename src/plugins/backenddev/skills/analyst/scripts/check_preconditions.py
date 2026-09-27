@@ -35,6 +35,7 @@ from precondition_lib import (  # noqa: E402
     read_text,
     to_json,
 )
+from precondition_lib import cli  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import chain_counters as _counters  # noqa: E402
@@ -359,10 +360,20 @@ class PreconditionChecker:
         """
         check_id, name = 7, "Resume Point"
         task = self.td.path / "TASK.md" if self.td.ok else None
-        if not task or not task.exists():
+        text = None
+        if task and task.exists():
+            try:
+                text = read_text(task)
+            except UnicodeDecodeError as exc:
+                self.results.append({
+                    "id": check_id, "name": name, "status": "FAIL",
+                    "summary": f"TASK.md bukan UTF-8 ({exc.reason} @ byte {exc.start})",
+                    "action": "Simpan ulang TASK.md sebagai UTF-8 (pulihkan dari git bila rusak); jangan menebak isinya.",
+                })
+                return
+        if text is None:
             summary = "TASK.md belum ada — rantai baru (Fase 1)"
         else:
-            text = read_text(task)
             ledger = re.search(r"^## Chain\s*$(.*?)(?=^## |\Z)", text, re.M | re.S)
             hops = re.findall(r"^- \[( |x|~)\] (BRD|PRD|BRIEF)\b", ledger.group(1) if ledger else "", re.M)
             top = next((h for mark, h in hops if mark in (" ", "~")), None)
@@ -372,8 +383,8 @@ class PreconditionChecker:
                 summary = "Resume: ledger tercentang penuh — butuh reentry_reason (Fase 3 butir 0)"
             else:
                 summary = "Resume: TASK.md tanpa ledger `## Chain` — laporkan ke gerbang (lane non-planning)"
-        if task and task.exists():
-            counters = _counters.parse(read_text(task))
+        if text is not None:
+            counters = _counters.parse(text)
             summary += f" · Counters: {_counters.summary(counters)}"
         self.results.append({
             "id": check_id,
@@ -413,4 +424,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

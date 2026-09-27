@@ -23,6 +23,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
+    UNDECODABLE_ACTION,
+    undecodable,
     BOM,
     chain_files,
     find_repo_root,
@@ -35,6 +37,7 @@ from precondition_lib import (  # noqa: E402
     section_lines,
     split_frontmatter,
 )
+from precondition_lib import cli  # noqa: E402
 
 REVIEW_SC_ROW = re.compile(r"^\|\s*`?(SC-\d+)`?\s*\|\s*([^|]+?)\s*\|")
 
@@ -227,10 +230,14 @@ def main() -> None:
     args = parser.parse_args()
 
     v = ReportValidator(args.taskdir, Path(args.root) if args.root else None)
-    ok = v.run_all()
+    try:
+        ok = v.run_all()
+    except UnicodeDecodeError as exc:
+        ok = False
+        v._add(1, "REPORT.md & TASK.md terbaca", False, undecodable(v.taskdir, exc), UNDECODABLE_ACTION)
     print(v.to_json() if args.json else v.format_text())
     sys.exit(0 if ok else 1)
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

@@ -79,7 +79,8 @@ dan harus disesuaikan, bukan test baru.
 ---
 
 ## E1 [Tinggi] Berkas non-UTF-8 → traceback di 31 dari 47 CLI
-- [ ] Selesai
+- [x] Selesai — titik asal ditangani per berkas; `cli()` di `precondition_lib` be/fe sebagai jaring 35 skrip;
+  `test_smoke.py` keadaan `rusak` (47 CLI) + `tests/test_e1_non_utf8.py`
 
 **Plugin:** semua · **Reproduksi:** probe `scratchpad/probe_utf8.py` (merusak satu dokumen per putaran, menjalankan
 seluruh `CASES` `test_smoke.py`).

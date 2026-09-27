@@ -37,6 +37,7 @@ from precondition_lib import (  # noqa: E402
     profile_staleness as _profile_staleness,
     to_json,
 )
+from precondition_lib import cli  # noqa: E402
 
 
 class PreconditionChecker:
@@ -458,4 +459,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

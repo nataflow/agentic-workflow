@@ -72,6 +72,7 @@ from precondition_lib import (  # noqa: E402
     verify_chain_row,
     write_keep_newline,
 )
+from precondition_lib import cli  # noqa: E402
 from review_round import Rounds  # noqa: E402
 
 PLUGIN_SKILLS = Path(__file__).resolve().parents[1]
@@ -466,4 +467,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

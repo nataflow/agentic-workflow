@@ -53,6 +53,7 @@ from brief_status import (  # noqa: E402
 from precondition_lib import (  # noqa: E402
     VALID_RISKS, find_repo_root, frontmatter_field, load_profile_index, parse_enum, read_text, resolve_taskdir,
 )
+from precondition_lib import cli  # noqa: E402
 from commit_lib import COMMIT_TYPES, commit_template, default_commit_type, render  # noqa: E402
 
 RISK_ORDER = {"MINOR": 1, "MAJOR": 2, "BREAKING": 3}
@@ -755,4 +756,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

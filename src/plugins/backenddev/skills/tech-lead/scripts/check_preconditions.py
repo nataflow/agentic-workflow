@@ -53,6 +53,7 @@ from precondition_lib import (  # noqa: E402
     LEGACY_PROFILE_DIR_REL,
     PROFILE_FILES,
 )
+from precondition_lib import cli  # noqa: E402
 
 # Selama masa transisi MIGRATE: `git mv` meninggalkan penghapusan berkas profil
 # backenddev di lokasi lama `.claude/profile/<berkas>`. Cabut di rilis berikutnya.
@@ -432,4 +433,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

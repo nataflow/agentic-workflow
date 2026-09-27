@@ -45,6 +45,7 @@ from precondition_lib import (  # noqa: E402
     find_placeholders,
     PLACEHOLDER_ACTION,
 )
+from precondition_lib import cli  # noqa: E402
 BRIEF_PATTERN = re.compile(r"^brief-(\d{2})-[a-z0-9-]+\.md$")
 
 REQUIRED_FM_FIELDS = [
@@ -1078,4 +1079,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

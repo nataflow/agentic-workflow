@@ -58,6 +58,7 @@ from precondition_lib import (  # noqa: E402
     task_lane_sections,
     verify_chain_row,
 )
+from precondition_lib import cli  # noqa: E402
 
 DOCS = "frontenddev/docs"
 TASKDIR_NAME = re.compile(r"^\d{10}-[a-z0-9-]+$")
@@ -195,4 +196,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

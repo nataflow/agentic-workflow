@@ -32,6 +32,7 @@ from precondition_lib import (  # noqa: E402
     plugin_file,
     to_json,
 )
+from precondition_lib import cli  # noqa: E402
 from brief_status import (  # noqa: E402
     BRIEF_STATUSES, CLOSED, landed_sha, read_halt, review_freshness, scan_briefs, validate_links,
 )
@@ -404,4 +405,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

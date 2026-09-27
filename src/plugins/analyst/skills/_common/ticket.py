@@ -66,15 +66,32 @@ REVIEW_FILE = "review.md"  # blok `## Ticket Review` terakhir, ditulis hanya ole
 REVIEW_VALUE = re.compile(r"^(PASS|BLOCKED) @([0-9a-f]{12})/([0-9a-f]{12})$")
 
 
+def text_of(path: Path) -> str:
+    """Isi berkas tiket; non-UTF-8 → FAIL rapi (exit 1) yang menyebut berkasnya, bukan traceback."""
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        raise SystemExit(f"FAIL: {path} bukan UTF-8 ({exc.reason} @ byte {exc.start}) — pulihkan dari git "
+                         f"(`git checkout -- <berkas>`) atau simpan ulang sebagai UTF-8; jangan menebak isinya")
+
+
+def decodes(path: Path) -> bool:
+    try:
+        path.read_text(encoding="utf-8")
+        return True
+    except UnicodeDecodeError:
+        return False
+
+
 def read(path: Path) -> Dict[str, Any]:
     if not path.is_file():
         return {}
-    fm, _ = split_frontmatter(path.read_text(encoding="utf-8"))
+    fm, _ = split_frontmatter(text_of(path))
     return fm
 
 
 def write_fields(path: Path, **fields: str) -> None:
-    text = path.read_text(encoding="utf-8")
+    text = text_of(path)
     for key, value in fields.items():
         text = set_frontmatter_field(text, key, value)
     path.write_text(text, encoding="utf-8")
@@ -101,7 +118,7 @@ def review_report(ticketdir: Path, fm: Dict[str, Any]) -> Any:
     review = str(fm.get("review", "")).strip()
     if not f.is_file() or not parse_review(review):
         return None
-    head = f.read_text(encoding="utf-8").split("\n", 1)[0]
+    head = text_of(f).split("\n", 1)[0]
     return f if f"ronde {fm.get('review_round', '-')}/{REVIEW_CAP} · {review} ·" in head else None
 
 
@@ -110,13 +127,13 @@ def review_digest(ticketdir: Path) -> str:
     f = ticketdir / TICKET_FILE
     if not f.is_file():
         return "-/-"
-    text = f.read_text(encoding="utf-8")
+    text = text_of(f)
     return f"{content_hash(text, 'card')}/{content_hash(text, 'elicit')}"
 
 
 def has_card(path: Path) -> bool:
     """Kartu sudah ditulis `spec`: ada H2 lain di atas `## Catatan Elisitasi`."""
-    _, body = split_frontmatter(path.read_text(encoding="utf-8"))
+    _, body = split_frontmatter(text_of(path))
     card, _ = split_parts(body)
     return any(l.startswith("## ") for l in card.splitlines())
 
@@ -124,7 +141,7 @@ def has_card(path: Path) -> bool:
 def title_of(path: Path) -> str:
     if not path.is_file():
         return "-"
-    _, body = split_frontmatter(path.read_text(encoding="utf-8"))
+    _, body = split_frontmatter(text_of(path))
     for line in body.splitlines():
         if line.startswith("# "):
             return line[2:].strip()
@@ -135,6 +152,9 @@ def classify(root: Path, rel: str) -> Dict[str, str]:
     """Keadaan satu ticketdir → rute berikutnya."""
     d = root / rel
     ticket = d / TICKET_FILE
+    if ticket.is_file() and not decodes(ticket):   # satu tiket rusak tidak menghentikan pemindaian `state`
+        return {"ticketdir": rel, "type": "-", "title": "-", "state": "RUSAK",
+                "route": f"{TICKET_FILE} bukan UTF-8 — pulihkan dari git atau simpan ulang sebagai UTF-8"}
     t = read(ticket)
     es, ts = t.get("elicitation", ""), t.get("status", "")
     row = {"ticketdir": rel, "type": t.get("type", "-"), "title": title_of(ticket)}
@@ -147,7 +167,7 @@ def classify(root: Path, rel: str) -> Dict[str, str]:
         row.update(state="KOSONG", route="analyst:intake → analyst:elicit menulis TICKET.md ke ticketdir ini")
     elif es not in ("OPEN", "CLOSED") or ts not in ("DRAFT", "READY"):
         row.update(state="RUSAK", route=f"status tidak sah (elicitation {es or '-'}, status {ts or '-'})")
-    elif not split_parts(split_frontmatter(ticket.read_text(encoding="utf-8"))[1])[1]:
+    elif not split_parts(split_frontmatter(text_of(ticket))[1])[1]:
         row.update(state="RUSAK", route=f"TICKET.md tanpa `## {ELICIT_H2}` — laporkan ke user")
     elif ts == "READY" and (es == "OPEN" or not has_card(ticket)):
         row.update(state="RUSAK", route="tiket READY dengan elisitasi OPEN atau tanpa kartu — `reopen` "
@@ -158,7 +178,7 @@ def classify(root: Path, rel: str) -> Dict[str, str]:
         row.update(state="SPEC", route="analyst:spec (tulis kartu tiket)")
     elif ts == "DRAFT":
         row.update(state="DRAFT", route="analyst:spec (ajukan keputusan atau revisi)")
-    elif str(t.get("approved_hash", "")) != content_hash(ticket.read_text(encoding="utf-8")):
+    elif str(t.get("approved_hash", "")) != content_hash(text_of(ticket)):
         row.update(state="DRIFT", route="TICKET READY disunting sesudah disetujui — analyst:spec REVISE "
                                         "(reopen) atau pulihkan isinya")
     else:
@@ -232,7 +252,7 @@ def cmd_check(root: Path, args: argparse.Namespace) -> int:
     if ok:
         state = classify(root, rel)
         resolved["keadaan"] = state["state"]
-        t = read(d / TICKET_FILE)
+        t = read(d / TICKET_FILE) if decodes(d / TICKET_FILE) or not (d / TICKET_FILE).is_file() else {}
         if gate == "elicit":
             allowed = ("KOSONG", "ELISITASI") + (("SPEC", "DRAFT") if args.reopen else ())
             c.add(3, "Keadaan menerima elisitasi", state["state"] in allowed, state["state"],
@@ -289,7 +309,7 @@ def cmd_review(root: Path, args: argparse.Namespace) -> int:
         return 1
     rnd = int_field(fm, "review_round")
     prev = parse_review(fm.get("review", ""))
-    if prev and prev[2] != content_hash(path.read_text(encoding="utf-8"), "elicit"):
+    if prev and prev[2] != content_hash(text_of(path), "elicit"):
         rnd = 0  # basis fakta berubah sesudah ronde terakhir → siklus ronde baru (pola revision_base)
     if rnd >= REVIEW_CAP:
         print(f"REVIEW FAIL: plafon {REVIEW_CAP} ronde per revisi habis — sajikan temuan tersisa ke user")
@@ -324,7 +344,7 @@ def cmd_revise(root: Path, args: argparse.Namespace) -> int:
         return 1
     # Plafon berlaku per basis fakta: elisitasi yang dibuka ulang dan berubah memulai siklus baru,
     # karena draft sesudahnya disusun dari fakta yang berbeda, bukan diredaksi ulang.
-    base = content_hash(path.read_text(encoding="utf-8"), "elicit")
+    base = content_hash(text_of(path), "elicit")
     rev = int_field(fm, "revision") if str(fm.get("revision_base", base)) == base else 0
     if rev >= REVISION_CAP:
         print(f"REVISE FAIL: plafon {REVISION_CAP} revisi habis — lingkup belum jelas; kembali ke analyst:elicit "
@@ -358,7 +378,7 @@ def cmd_approve(root: Path, args: argparse.Namespace) -> int:
         print("APPROVE FAIL: " + "; ".join(errors))
         return 1
     report = review_report(path.parent, fm)
-    sealed = content_hash(path.read_text(encoding="utf-8"))
+    sealed = content_hash(text_of(path))
     write_fields(path, status="READY", approved=dt.date.today().isoformat(),
                  approved_hash=sealed, approval=clean_value(args.answer))
     msg = f"APPROVE PASS: {rel}/{TICKET_FILE} READY @{sealed}"
@@ -415,7 +435,7 @@ def cmd_cancel(root: Path, args: argparse.Namespace) -> int:
         write_fields(f, status="CANCELLED", cancel_reason=clean_value(args.reason))
         print(f"CANCEL PASS: {rel} ({TICKET_FILE})")
     except ValueError as exc:
-        text = f.read_text(encoding="utf-8")
+        text = text_of(f)
         f.write_text(f"---\nstatus: CANCELLED\ncancel_reason: {clean_value(args.reason)}\n---\n\n{text}",
                      encoding="utf-8")
         print(f"CANCEL PASS: {rel} ({TICKET_FILE}: {exc} — frontmatter baru disisipkan di atas isi lama)")

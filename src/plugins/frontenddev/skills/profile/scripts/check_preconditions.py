@@ -43,6 +43,7 @@ from precondition_lib import (  # noqa: E402
     probe_writable,
     profile_owner,
 )
+from precondition_lib import cli  # noqa: E402
 
 REFERENCES = ("references/framework-matrix.md", "templates/profile-template.md",
               "references/scan-guide.md")
@@ -389,4 +390,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

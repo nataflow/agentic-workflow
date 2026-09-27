@@ -180,13 +180,13 @@ def typecheck_per_brief(profile_dir: Path, stack: str) -> Tuple[str, str]:
         m = PROFILE_TPB.search((profile_dir / "commands.md").read_text(encoding="utf-8"))
         if m:
             return m.group(1), "profil"
-    except OSError:
+    except (OSError, UnicodeDecodeError):
         pass
     try:
         m = ADAPTER_TPB.search(adapter_path(stack).read_text(encoding="utf-8")) if stack else None
         if m:
             return m.group(1), "adapter"
-    except OSError:
+    except (OSError, UnicodeDecodeError):
         pass
     return "tidak", "bawaan"
 
@@ -378,10 +378,41 @@ def parse_frontmatter(text: str) -> Dict[str, Any]:
     return split_frontmatter(text)[0]
 
 
+NOT_UTF8 = "(bukan UTF-8)"
+
+
+def undecodable(directory: Path, exc: UnicodeDecodeError) -> str:
+    """Ringkasan untuk validator yang terhenti `UnicodeDecodeError`: berkas mana di `directory` yang rusak.
+
+    Pengecualian dekode tidak membawa nama berkas; nama itu dicari ulang dengan membaca tiap
+    `*.md` di taskdir, supaya vonis menunjuk berkas yang harus dipulihkan.
+    """
+    bad = []
+    for p in sorted(directory.glob("*.md")) if directory.is_dir() else []:
+        try:
+            p.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            bad.append(f"`{p.name}`")
+        except OSError:
+            pass
+    where = ", ".join(bad) if bad else "berkas yang dibaca (profil atau dokumen lain)"
+    return f"{where} {NOT_UTF8} ({exc.reason} @ byte {exc.start})"
+
+
+UNDECODABLE_ACTION = "Simpan ulang berkasnya sebagai UTF-8 (pulihkan dari git bila rusak); jangan menebak isinya."
+
+
 def read_status(path: Path, field: str = "status") -> str:
-    """Nilai satu field frontmatter sebagai string, atau kosong."""
+    """Nilai satu field frontmatter sebagai string, atau kosong.
+
+    Berkas non-UTF-8 → `NOT_UTF8`, bukan kosong: nilai itu tidak pernah sama dengan status sah
+    mana pun, sehingga pemanggil gagal tertutup dengan pesan yang menyebut sebabnya, alih-alih
+    memperlakukan berkas rusak sebagai berkas absen.
+    """
     try:
         fm = parse_frontmatter(path.read_text(encoding="utf-8"))
+    except UnicodeDecodeError:
+        return NOT_UTF8
     except OSError:
         return ""
     value = fm.get(field, "")
@@ -557,7 +588,7 @@ def success_criteria(task_path: Path) -> Dict[str, str]:
     """
     try:
         _, body = split_frontmatter(task_path.read_text(encoding="utf-8"))
-    except OSError:
+    except (OSError, UnicodeDecodeError):
         return {}
     out: Dict[str, str] = {}
     for line in section_lines(body, "## Success Criteria"):
@@ -686,6 +717,8 @@ def task_lane_sections(task_path: Path) -> Tuple[str, List[str]]:
     """`(lane, sections)` dari frontmatter `TASK.md`."""
     try:
         fm = parse_frontmatter(task_path.read_text(encoding="utf-8"))
+    except UnicodeDecodeError:
+        return NOT_UTF8, []                       # lane tak sah → check akar FAIL, bukan crash
     except OSError:
         return "", []
     lane = fm.get("lane", "")
@@ -797,7 +830,10 @@ def doc_drift(root: Path, rel: str, sha: str) -> str:
     path = root / rel
     if not path.is_file():
         return f"`{rel}` hilang dari disk"
-    now = path.read_text(encoding="utf-8")
+    try:
+        now = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return f"`{rel}` {NOT_UTF8}"
     if strip_status_line(now) != strip_status_line(then):
         return f"`{rel}` berubah sesudah disetujui @ {sha}"
     return ""
@@ -1062,7 +1098,10 @@ def lane_tamper(root: Path, taskdir_rel: str) -> str:
         sha, _, subject = line.partition(" ")
         if subject.startswith(f"docs({slug}): eskalasi lane") or subject.startswith(f"docs({slug}): kunci TASK"):
             then = parse_frontmatter(show_at(root, sha, rel) or "")
-            now = parse_frontmatter((root / rel).read_text(encoding="utf-8"))
+            try:
+                now = parse_frontmatter((root / rel).read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError):
+                return f"`{rel}` tak terbaca atau {NOT_UTF8}"
             if (str(then.get("lane", "")).strip(), sorted(parse_sections(then.get("sections", "")))) != \
                (str(now.get("lane", "")).strip(), sorted(parse_sections(now.get("sections", "")))):
                 return "`lane`/`sections` berubah di luar commit akar atau `chain.py escalate`"
@@ -1084,7 +1123,9 @@ def _snapshot(rels: List[str], read: Callable[[str], Optional[str]]) -> str:
 
 def content_snapshot(root: Path, rels: List[str]) -> str:
     """Sidik sha1 isi berkas di disk tanpa baris `status:` — basis vonis ronde reviewer."""
-    return _snapshot(rels, lambda r: (root / r).read_text(encoding="utf-8") if (root / r).is_file() else None)
+    # errors="replace" di kedua sisi: berkas non-UTF-8 tetap bersidik deterministik, bukan crash.
+    return _snapshot(rels, lambda r: (root / r).read_text(encoding="utf-8", errors="replace")
+                     if (root / r).is_file() else None)
 
 
 def snapshot_at(root: Path, sha: str, rels: List[str]) -> str:
@@ -1095,7 +1136,7 @@ def snapshot_at(root: Path, sha: str, rels: List[str]) -> str:
         if proc.returncode != 0:
             return None
         # samakan dengan Path.read_text(): newline universal
-        return proc.stdout.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+        return proc.stdout.decode("utf-8", errors="replace").replace("\r\n", "\n").replace("\r", "\n")
     return _snapshot(rels, read)
 
 
@@ -1141,7 +1182,7 @@ def verify_chain_row(root: Path, taskdir_rel: str, entry: Dict[str, Any]) -> str
         return (f"hop `{row}` dicentang dengan approval lama {sha} padahal sudah dibuka ulang — "
                 "centang tulisan tangan; setujui ulang lewat `chain.py approve`")
     then_task = show_at(root, stamp.splitlines()[0], task_rel) or ""
-    if sc_ids(then_task) != sc_ids((root / task_rel).read_text(encoding="utf-8")):
+    if sc_ids(then_task) != sc_ids((root / task_rel).read_text(encoding="utf-8", errors="replace")):
         return f"`SC-{{n}}` TASK.md berubah sesudah hop `{row}` disetujui — hop wajib dibuka ulang"
     if row in DOC_ROWS:
         doc = CHAIN_BY_ROW[row][2]
@@ -1164,8 +1205,8 @@ def check_chain_rows(add: AddFn, cid: int, root: Path, taskdir_rel: str,
     path = root / taskdir_rel / "TASK.md"
     try:
         entries = read_chain(path.read_text(encoding="utf-8"))
-    except OSError:
-        add(cid, name, "FAIL", "`TASK.md` tidak terbaca", "Perbaiki check akar lebih dulu.")
+    except (OSError, UnicodeDecodeError):
+        add(cid, name, "FAIL", f"`TASK.md` tidak terbaca atau {NOT_UTF8}", "Perbaiki check akar lebih dulu.")
         return False
     expected = expected_rows(sections)
     present = [e["row"] for e in entries]
@@ -1364,3 +1405,20 @@ def brief_closure(taskdir: Path) -> Dict[str, Tuple[str, bool]]:
         return status[nn] == "BLOCKED" and any(closed(r, seen + (nn,)) for r in remedies.get(nn, []))
 
     return {nn: (status[nn], closed(nn)) for nn in briefs}
+
+
+def cli(main: Callable[[], Any]) -> Any:
+    """Jaring terakhir skrip ber-CLI: berkas non-UTF-8 yang lolos dari penanganan per titik baca
+    menjadi vonis FAIL terbaca (JSON bila `--json`), bukan traceback (09 E1)."""
+    try:
+        return main()
+    except UnicodeDecodeError as exc:
+        msg = (f"berkas yang dibaca skrip ini bukan UTF-8 ({exc.reason} @ byte {exc.start}) — pulihkan dari "
+               f"git atau simpan ulang sebagai UTF-8; jangan menebak isinya")
+        if "--json" in sys.argv:
+            print(json.dumps({"status": "FAIL", "error": msg, "checks": [
+                {"id": 0, "name": "Berkas terbaca", "status": "FAIL", "summary": msg, "action": ""}]},
+                ensure_ascii=False, indent=2))
+        else:
+            print(f"FAIL: {msg}")
+        return 1

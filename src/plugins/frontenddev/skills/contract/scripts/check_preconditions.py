@@ -30,6 +30,7 @@ from precondition_lib import (  # noqa: E402
     normalize_taskdir,
     report_json,
 )
+from precondition_lib import cli  # noqa: E402
 
 PROFILE_REQUIRED = ("index.json", "stack.md", "surface-map.md", "invariants.md", "layer-adoption.md")
 PLUGIN_FILES = ("references/layer-patterns.md", "templates/contract-template.md", "dispatcher/explorer.md", "dispatcher/reviewer.md")
@@ -89,4 +90,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

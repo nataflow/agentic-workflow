@@ -25,6 +25,7 @@ from typing import Dict, List
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import find_repo_root, git_ok, split_frontmatter  # noqa: E402
+from precondition_lib import cli  # noqa: E402
 
 HEADING = re.compile(r"^### \[P(?P<sev>[123])-(?P<n>\d+)\]\s+\S")
 DATE = r"\d{4}-\d{2}-\d{2}"
@@ -101,7 +102,13 @@ def main() -> None:
     if not path.is_file():
         print(f"AUDIT VALIDATION: [FAIL] `{args.path}` tidak ada")
         sys.exit(1)
-    problems = check_shape(path.read_text(encoding="utf-8"))
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        print(f"AUDIT VALIDATION: [FAIL] `{args.path}` bukan UTF-8 ({exc.reason} @ byte {exc.start}) — "
+              f"pulihkan dari git; jangan menebak isinya")
+        sys.exit(1)
+    problems = check_shape(text)
     if args.only_status_changed:
         problems += check_only_status(root, str(path.resolve().relative_to(root)))
     if problems:
@@ -112,4 +119,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

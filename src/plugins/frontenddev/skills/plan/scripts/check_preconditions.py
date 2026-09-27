@@ -56,6 +56,7 @@ from precondition_lib import (  # noqa: E402
     revisions_since_open,
     taskdir_slug,
 )
+from precondition_lib import cli  # noqa: E402
 
 MODES = ("CONTRACT", "MINOR", "REVISE", "APPEND")
 PROFILE_REQUIRED = ("index.json", "invariants.md", "surface-map.md", "commands.md", "drift.md")
@@ -249,4 +250,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

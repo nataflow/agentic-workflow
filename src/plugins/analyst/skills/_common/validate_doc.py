@@ -86,7 +86,12 @@ class DocValidator(Checker):
             self.add(0, f"{self.name} terbaca", False, f"`{self.rel}/{self.name}` tidak ada",
                      "Tulis berkasnya lebih dulu.")
             return False
-        self.text = self.path.read_text(encoding="utf-8")
+        try:
+            self.text = self.path.read_text(encoding="utf-8")
+        except UnicodeDecodeError as exc:
+            self.add(0, f"{self.name} terbaca", False, f"`{self.rel}/{self.name}` bukan UTF-8 ({exc.reason} @ byte {exc.start})",
+                     "Simpan ulang berkasnya sebagai UTF-8; jangan menebak isinya.")
+            return False
         self.fm, self.body = split_frontmatter(self.text)
         self.h2 = sections(self.body, 2)
         (self._elicit if self.kind == "elicit" else self._ticket)()

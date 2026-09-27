@@ -38,6 +38,8 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
+    UNDECODABLE_ACTION,
+    undecodable,
     FrontmatterError,
     chain_files,
     find_repo_root,
@@ -53,6 +55,7 @@ from precondition_lib import (  # noqa: E402
     task_root_sha,
     taskdir_slug,
 )
+from precondition_lib import cli  # noqa: E402
 
 HEADINGS = ["## Summary", "## Verifikasi Penutup", "## Cakupan Success Criteria",
             "## Cakupan Acceptance Criteria", "## Temuan", "## Done Criteria DITUNDA",
@@ -431,11 +434,15 @@ def main() -> None:
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
     v = ReviewValidator(args.taskdir, Path(args.root) if args.root else None, args.log)
-    ok = v.run()
+    try:
+        ok = v.run()
+    except UnicodeDecodeError as exc:
+        ok = False
+        v._add("S", "Berkas terbaca", [undecodable(v.taskdir, exc)], "", UNDECODABLE_ACTION)
     print(json.dumps({"status": "PASS" if ok else "FAIL", "derived_verdict": v.derived,
                       "checks": v.results}, indent=2) if args.json else v.format_text())
     sys.exit(0 if ok else 1)
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

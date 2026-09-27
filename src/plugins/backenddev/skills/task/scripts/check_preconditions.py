@@ -31,6 +31,7 @@ from precondition_lib import (  # noqa: E402
     ticket_source_verdict,
     to_json,
 )
+from precondition_lib import cli  # noqa: E402
 
 VALID_LANES = {
     "PRD_CONVERSION",
@@ -371,4 +372,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

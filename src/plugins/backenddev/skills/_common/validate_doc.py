@@ -34,6 +34,7 @@ from precondition_lib import (  # noqa: E402
     split_frontmatter,
     ticket_carry_problems,
 )
+from precondition_lib import cli  # noqa: E402
 
 # --- konstanta kanonik (salinan penegak; rumahnya template masing-masing) ---------------------
 
@@ -654,18 +655,24 @@ def main() -> int:
     root = Path(a.root).resolve() if a.root else find_repo_root()
     taskdir = resolve_taskdir(root, a.taskdir)
     name = {"task": "TASK.md", "brd": "BRD.md", "prd": "PRD.md"}[a.kind]
-    if not (taskdir / name).is_file():
-        msg = f"{taskdir / name} tidak ada"
+
+    def error(msg: str) -> int:
         if a.json:
             print(json.dumps({"kind": a.kind, "status": "ERROR", "error": msg, "checks": []}, ensure_ascii=False))
         else:
             print(f"DOC VALIDATION: {a.kind} [ERROR] {msg}", file=sys.stderr)
         return 2
-    v = Validator(a.kind, taskdir, root, fresh=a.fresh, finding_source=a.finding_source)
+
+    if not (taskdir / name).is_file():
+        return error(f"{taskdir / name} tidak ada")
+    try:   # dokumen ini, TASK.md, atau BRD.md yang ikut dibaca
+        v = Validator(a.kind, taskdir, root, fresh=a.fresh, finding_source=a.finding_source)
+    except UnicodeDecodeError as exc:
+        return error(f"dokumen di {taskdir} bukan UTF-8 ({exc.reason} @ byte {exc.start}) — simpan ulang sebagai UTF-8")
     v.run()
     print(v.to_json() if a.json else v.format_text())
     return 1 if v.failed else 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(cli(main))

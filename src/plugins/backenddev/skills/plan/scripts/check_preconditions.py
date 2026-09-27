@@ -39,6 +39,7 @@ from precondition_lib import (  # noqa: E402
     profile_staleness as _profile_staleness,
     to_json,
 )
+from precondition_lib import cli  # noqa: E402
 
 
 # Tiga jalur masuk yang sah. Tidak ada nilai keempat: resolusi dari artefak di disk
@@ -631,4 +632,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

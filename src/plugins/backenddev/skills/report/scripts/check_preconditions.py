@@ -32,6 +32,7 @@ from precondition_lib import (  # noqa: E402
     read_text,
     to_json,
 )
+from precondition_lib import cli  # noqa: E402
 from brief_status import CLOSED, review_freshness, scan_briefs, validate_links  # noqa: E402
 
 
@@ -351,4 +352,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

@@ -119,7 +119,7 @@ def go_requires(gomod: Path) -> Set[str]:
     """Path modul di `require` (tunggal maupun blok), tanpa `// indirect`."""
     try:
         lines = gomod.read_text(encoding="utf-8").splitlines()
-    except OSError:
+    except (OSError, UnicodeDecodeError):
         return set()
     mods: Set[str] = set()
     block = False
@@ -152,7 +152,7 @@ def cargo_deps(cargo: Path) -> Set[str]:
     """Nama crate di [dependencies], [workspace.dependencies], [target.*.dependencies]."""
     try:
         text = cargo.read_text(encoding="utf-8")
-    except OSError:
+    except (OSError, UnicodeDecodeError):
         return set()
     if tomllib is None:
         return _cargo_deps_fallback(text)
@@ -210,7 +210,7 @@ def _pom_is_spring(pom: Path) -> bool:
 def _gradle_is_spring(path: Path) -> bool:
     try:
         text = path.read_text(encoding="utf-8")
-    except OSError:
+    except (OSError, UnicodeDecodeError):
         return False
     text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
     lines = [ln.split("//", 1)[0].split("#", 1)[0] if path.suffix == ".toml" else ln.split("//", 1)[0]
@@ -272,7 +272,7 @@ def _workspace_globs(root: Path) -> List[str]:
         try:
             members = tomllib.loads(cargo.read_text(encoding="utf-8")).get("workspace", {}).get("members", [])
             globs += [m for m in members if isinstance(m, str)]
-        except (OSError, tomllib.TOMLDecodeError):
+        except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError):
             pass
     return globs
 
@@ -352,7 +352,7 @@ def read_index(path: Path) -> Tuple[Optional[dict], str]:
         raw = path.read_text(encoding="utf-8-sig")
     except FileNotFoundError:
         return None, "ABSENT"
-    except OSError:
+    except (OSError, UnicodeDecodeError):         # berkas rusak/non-UTF-8 = profil tak sah, bukan crash
         return None, "INVALID_JSON"
     try:
         data = json.loads(raw)
@@ -407,7 +407,7 @@ def read_profile(root: Path, plugin: str) -> Profile:
 def opted_out(root: Path, plugin: str) -> bool:
     try:
         words = (root / OPT_FILE).read_text(encoding="utf-8").split()
-    except OSError:
+    except (OSError, UnicodeDecodeError):
         return False
     return plugin not in words
 

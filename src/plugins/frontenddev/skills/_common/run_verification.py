@@ -135,7 +135,12 @@ def main() -> int:
                   f"galat={len(r['signatures'])}")
         return 0
 
-    baseline = json.loads(base_path.read_text(encoding="utf-8")) if base_path.exists() else {}
+    baseline = {}
+    if base_path.exists():
+        try:
+            baseline = json.loads(base_path.read_text(encoding="utf-8"))
+        except ValueError as exc:   # termasuk UnicodeDecodeError: baseline rusak = tanpa pembanding (merah)
+            print(f"PERINGATAN: baseline {base_path} rusak ({exc}) — semua galat dihitung baru")
     red = False
     for r in results:
         r["new"] = new_errors(r, baseline.get(r["name"]))

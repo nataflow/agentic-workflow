@@ -258,12 +258,20 @@ def main() -> None:
             s.add_argument("--json", action="store_true")
     a = ap.parse_args()
     path = Path(a.plan)
-    if not path.is_file():
+
+    def die(msg: str) -> None:
         if getattr(a, "json", False):
-            print(json.dumps({"status": "FAIL", "error": f"{path} tidak ada"}))
+            print(json.dumps({"status": "FAIL", "error": msg}, ensure_ascii=False))
             sys.exit(1)
-        sys.exit(f"FAIL: {path} tidak ada")
-    sys.exit(globals()[f"cmd_{a.cmd}"](Plan(path), a))
+        sys.exit(f"FAIL: {msg}")
+
+    if not path.is_file():
+        die(f"{path} tidak ada")
+    try:
+        plan = Plan(path)
+    except UnicodeDecodeError as exc:
+        die(f"{path} bukan UTF-8 ({exc.reason} @ byte {exc.start}) — pulihkan dari git; jangan menebak isinya")
+    sys.exit(globals()[f"cmd_{a.cmd}"](plan, a))
 
 
 if __name__ == "__main__":

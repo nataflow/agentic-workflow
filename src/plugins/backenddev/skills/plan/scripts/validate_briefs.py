@@ -69,6 +69,7 @@ from precondition_lib import (  # noqa: E402
     resolve_taskdir,
     split_frontmatter,
 )
+from precondition_lib import cli  # noqa: E402
 from brief_status import LOCKED as LOCKED_STATUSES  # noqa: E402
 from commit_lib import commit_template, pattern as commit_pattern  # noqa: E402
 
@@ -1859,4 +1860,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

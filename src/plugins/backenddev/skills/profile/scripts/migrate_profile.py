@@ -22,6 +22,7 @@ from typing import List, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import PLUGIN, _detect  # noqa: E402
+from precondition_lib import cli  # noqa: E402
 
 
 def _git_mv(root: Path, src: Path, dst: Path) -> bool:
@@ -105,4 +106,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

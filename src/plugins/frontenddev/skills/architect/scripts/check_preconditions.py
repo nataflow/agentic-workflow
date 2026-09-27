@@ -54,6 +54,7 @@ from precondition_lib import (  # noqa: E402
     taskdir_slug,
     typecheck_per_brief,
 )
+from precondition_lib import cli  # noqa: E402
 
 VALIDATE_BRIEFS = Path(__file__).resolve().parents[2] / "plan" / "scripts" / "validate_briefs.py"
 
@@ -363,4 +364,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

@@ -65,6 +65,7 @@ from precondition_lib import (  # noqa: E402
     BRIEF_GLOB, content_snapshot, find_repo_root, gate_targets_at, git, git_ok, normalize_taskdir,
     read_status, reopen_epoch, snapshot_at, taskdir_slug,
 )
+from precondition_lib import cli  # noqa: E402
 
 MAX_PER_CYCLE = 2
 MAX_PER_TASKDIR = 8
@@ -395,4 +396,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

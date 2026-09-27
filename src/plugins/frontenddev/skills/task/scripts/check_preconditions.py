@@ -34,6 +34,7 @@ from precondition_lib import (  # noqa: E402
     report_json,
     ticket_source_verdict,
 )
+from precondition_lib import cli  # noqa: E402
 
 PROFILE_REQUIRED = ("index.json", "surface-map.md")
 PLUGIN_FILES = ("templates/task-template.md", "scripts/validate_task.py",
@@ -149,4 +150,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

@@ -23,6 +23,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 # Path absolut dicetak apa adanya: variabel root plugin tidak tersedia di shell tool Bash.
 CHAIN_PY = Path(__file__).resolve().parents[2] / "_common" / "chain.py"
 from precondition_lib import (  # noqa: E402
+    UNDECODABLE_ACTION,
+    undecodable,
     expected_rows,
     find_repo_root,
     fenced_mask,
@@ -37,6 +39,7 @@ from precondition_lib import (  # noqa: E402
     split_frontmatter,
     ticket_carry_problems,
 )
+from precondition_lib import cli  # noqa: E402
 
 HEADINGS = ("## Description", "## Success Criteria", "## Out of Scope", "## Chain")
 SC_LINE = re.compile(r"^- \[[ xX]\] \*\*SC-(\d+)\*\*:(.*)$")
@@ -235,10 +238,14 @@ def main() -> None:
     args = parser.parse_args()
 
     v = TaskValidator(args.taskdir, Path(args.root) if args.root else None, args.amend)
-    ok = v.run_all()
+    try:
+        ok = v.run_all()
+    except UnicodeDecodeError as exc:
+        ok = False
+        v._add(1, "TASK.md terbaca", False, undecodable(v.path.parent, exc), UNDECODABLE_ACTION)
     print(v.to_json() if args.json else v.format_text())
     sys.exit(0 if ok else 1)
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

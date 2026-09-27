@@ -41,6 +41,7 @@ from precondition_lib import (  # noqa: E402
     task_root_sha,
     taskdir_slug,
 )
+from precondition_lib import cli  # noqa: E402
 
 VALIDATE_REVIEW = Path(__file__).resolve().parents[2] / "architect" / "scripts" / "validate_review.py"
 
@@ -188,4 +189,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

@@ -43,6 +43,7 @@ from precondition_lib import (  # noqa: E402
     report_json,
     task_root_sha,
 )
+from precondition_lib import cli  # noqa: E402
 
 TARGETS = ("diff", "path", "taskdir")
 PROFILE_REQUIRED = ("index.json", "stack.md", "invariants.md", "surface-map.md",
@@ -170,4 +171,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))

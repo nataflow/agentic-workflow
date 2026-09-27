@@ -45,6 +45,7 @@ from precondition_lib import (  # noqa: E402
     find_placeholders,
     PLACEHOLDER_ACTION,
 )
+from precondition_lib import cli  # noqa: E402
 
 SHA_DATE = re.compile(r"^[0-9a-f]{7,40} \(\d{4}-\d{2}-\d{2}\)$")
 
@@ -164,7 +165,13 @@ class DocValidator:
             self._add("S", "Berkas ada", [f"`{self.path.relative_to(self.root)}` tidak ada"], "",
                       "Tulis dokumen dari templat skill pemiliknya lebih dulu.")
             return False
-        text = self.path.read_text(encoding="utf-8")
+        try:
+            text = self.path.read_text(encoding="utf-8")
+        except UnicodeDecodeError as exc:
+            self._add("S", "Berkas terbaca", [f"`{self.path.relative_to(self.root)}` bukan UTF-8 "
+                                              f"({exc.reason} @ byte {exc.start})"], "",
+                      "Simpan ulang berkasnya sebagai UTF-8; jangan menebak isinya.")
+            return False
         try:
             self.fm, self.body = split_frontmatter(text, strict=True)
         except FrontmatterError as exc:
@@ -370,4 +377,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli(main))
