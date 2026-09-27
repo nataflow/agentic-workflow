@@ -54,7 +54,7 @@ from precondition_lib import (  # noqa: E402
     VALID_RISKS, find_repo_root, frontmatter_field, load_profile_index, parse_enum, read_text, resolve_taskdir,
 )
 from precondition_lib import cli  # noqa: E402
-from commit_lib import COMMIT_TYPES, commit_template, default_commit_type, render  # noqa: E402
+from commit_lib import COMMIT_TYPES, commit_template, default_commit_type, render, slot_ok  # noqa: E402
 
 RISK_ORDER = {"MINOR": 1, "MAJOR": 2, "BREAKING": 3}
 
@@ -313,9 +313,17 @@ class MatrixTool:
             ctype = str(b.get("commit_type") or "").strip()
             if ctype and ctype not in COMMIT_TYPES:
                 problems.append(f"brief {label}: `commit_type` \"{ctype}\" di luar {', '.join(COMMIT_TYPES)}")
-            if "{ticket}" in self.commit_template and not str(b.get("ticket") or spec.get("ticket") or "").strip():
+            ticket = str(b.get("ticket") or spec.get("ticket") or "").strip()
+            if "{ticket}" in self.commit_template and not ticket:
                 problems.append(f"brief {label}: `commit_template` profil memuat {{ticket}} — isi `ticket` "
                                 f"(mis. `OMS-412`) di baris ini atau di tingkat atas spec")
+            elif "{ticket}" in self.commit_template and not slot_ok("ticket", ticket):
+                problems.append(f"brief {label}: `ticket` \"{ticket}\" bukan satu token tanpa spasi "
+                                f"(mis. `OMS-412`, `#482`) — Check S akan menolak `commit_message`-nya")
+            domain = str(b.get("domain") or unit.split("-")[0]).strip()
+            if unit and "{scope}" in self.commit_template and not slot_ok("scope", domain):
+                problems.append(f"brief {label}: `domain` \"{domain}\" wajib huruf kecil/angka/`_.-` — "
+                                f"Check S akan menolak `commit_message`-nya")
 
             risk = str(b.get("risk") or "").upper()
             if risk and risk not in VALID_RISKS:
@@ -356,6 +364,15 @@ class MatrixTool:
         gone = {t for b in briefs for t in _supersedes(b)}
         gone |= {n for n, st in self.locked_briefs().items() if st == "SUPERSEDED"}
         live = [b for b in briefs if str(b.get("nn") or "") not in gone]
+        # `unit` menentukan `commit_message`; dua brief hidup ber-unit sama membuat `landed_sha` brief
+        # kedua menemukan commit brief pertama dan menandainya DONE tanpa dikerjakan (11 H6).
+        seen_unit: Dict[str, str] = {}
+        for b in live:
+            unit = str(b.get("unit") or "")
+            if unit and unit in seen_unit:
+                problems.append(f"brief {b.get('nn')}: `unit` \"{unit}\" sudah dipakai brief {seen_unit[unit]} "
+                                f"— `commit_message` keduanya sama; beri nama unit yang membedakan")
+            seen_unit.setdefault(unit, str(b.get("nn")))
         problems += self._validate_axis(live, "covers", "AC", self.ac_ids(), self.prd_text)
         # Sumbu `fulfills` hanya berlaku pada rantai tanpa PRD. Pada rantai
         # ber-PRD keterlacakan `SC-{n}` diangkut kolom `Akar` PRD, dan baris
@@ -541,6 +558,15 @@ class MatrixTool:
 
         unit = row["unit"]
         path = self.taskdir / f"brief-{nn}-{unit}.md"
+        # Nomor brief tidak pernah dipakai dua berkas (11 H7): matriks yang ditulis ulang dengan unit
+        # berganti nama meninggalkan berkas lama ber-NN sama yang ikut dieksekusi.
+        twins = [p.name for p in self.taskdir.glob(f"brief-{nn}-*.md") if p != path]
+        if twins:
+            raise SystemExit(
+                f"brief-{nn} sudah dipakai {', '.join(twins)}. Nomor brief tidak dipakai dua kali: hapus "
+                f"berkas lama lewat `git rm` bila unitnya memang berganti nama sebelum dieksekusi, atau "
+                f"beri unit ini nomor baru lewat `--write-matrix --append`."
+            )
         if path.exists() and not force:
             raise SystemExit(
                 f"{path} sudah ada. Gunakan `--force` hanya bila kerangkanya memang "

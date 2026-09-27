@@ -9,8 +9,18 @@ Scope sah = path `files_touched` frontmatter (frontend) atau baris `modify|creat
 direktori yang sama. Berkas `finding_source` frontmatter sah hanya bila diff-nya semata menambah
 baris `> Status: FIXED`. Laci `.explore/` diabaikan, hanya di `<plugin>/docs/[<taskdir>/].explore/`.
 
-PASS (exit 0): tiap berkas ada di scope. FAIL (exit 1): daftar berkas liar. Exit 2: argumen,
-brief, atau git salah. Pemeriksaan simbol (Anchor) tetap milik `symbol_map.py`.
+Scope dibaca dari brief **sebelum** unit dikerjakan (11 H3): `--commit` dari `<sha>^:<brief>`,
+`--worktree` dari `HEAD:<brief>`; brief yang belum ter-commit dibaca dari disk. Pelaksana karena itu
+tidak dapat memperluas scope dengan menyunting brief-nya sendiri. Pada `--commit`, diff brief di commit
+unit hanya boleh menyentuh baris `status:` frontmatter dan isi `## Work status`.
+
+Baris tabel `## File scope` sah hanya bila kolomnya lengkap (11 H2), aturan yang sama dengan
+`validate_briefs.py`: 4 kolom backend (`Aksi | Path | Anchor | Apa yang berubah`), 3 kolom frontend
+(`AKSI | path | Anchor`, berpasangan dengan `files_touched`).
+
+PASS (exit 0): tiap berkas ada di scope. FAIL (exit 1): daftar berkas liar, atau brief disunting di luar
+statusnya. Exit 2: argumen, brief, atau git salah, commit merge, atau commit tanpa berkas. Pemeriksaan
+simbol (Anchor) tetap milik `symbol_map.py`.
 Salinan identik di skills/_common/ backend dan frontend. Hanya pustaka standar.
 """
 import argparse
@@ -55,9 +65,17 @@ def frontmatter(text: str) -> Dict[str, object]:
     return data
 
 
-def file_scope_rows(text: str) -> List[str]:
-    """Path baris `modify|create` di `## File scope` (tabel **Folder** tidak beraksi, jadi terlewati)."""
-    m = re.search(r"^## File scope[ \t]*$", text, re.M)
+MIN_COLS_BACKEND = 4   # Aksi | Path | Anchor | Apa yang berubah
+MIN_COLS_FRONTEND = 3  # AKSI | path | Anchor — scope utamanya `files_touched`
+
+
+def file_scope_rows(text: str, min_cols: int = MIN_COLS_BACKEND) -> List[str]:
+    """Path baris `modify|create` di `## File scope` (tabel **Folder** tidak beraksi, jadi terlewati).
+
+    Baris beraksi yang kolomnya kurang dari `min_cols` tidak pernah terbaca validator plan, jadi juga
+    tidak masuk scope di sini. Heading dicocokkan tak peka huruf, sama dengan validator.
+    """
+    m = re.search(r"^## File scope[ \t]*$", text, re.M | re.I)
     if not m:
         return []
     sec = text[m.end():]
@@ -66,7 +84,7 @@ def file_scope_rows(text: str) -> List[str]:
     out = []
     for line in sec.splitlines():
         cols = [c.strip() for c in line.strip().strip("|").split("|")] if line.strip().startswith("|") else []
-        if len(cols) >= 2 and cols[0].strip("`").lower() in ("modify", "create"):
+        if len(cols) >= min_cols and cols[0].strip("`").lower() in ("modify", "create"):
             out.append(cols[1].strip("`").strip())
     return out
 
@@ -76,7 +94,7 @@ def scope_of(brief_text: str) -> Tuple[List[str], Optional[str]]:
     fm = frontmatter(brief_text)
     touched = fm.get("files_touched")
     paths = [p for p in touched if p] if isinstance(touched, list) else []
-    paths += file_scope_rows(brief_text)
+    paths += file_scope_rows(brief_text, MIN_COLS_FRONTEND if isinstance(touched, list) else MIN_COLS_BACKEND)
     fs = fm.get("finding_source")
     fs = fs if isinstance(fs, str) and fs.strip() and fs.strip() != "-" else None
     return paths, fs
@@ -110,9 +128,34 @@ def rel(root: Path, p: str) -> str:
     return full.relative_to(root).as_posix()
 
 
-def allowed_paths(root: Path, brief: Path) -> Tuple[set, Optional[str]]:
-    """Himpunan path sah (relatif root) dan `finding_source` bila ada."""
-    paths, fs = scope_of(brief.read_text(encoding="utf-8"))
+def show_text(root: Path, rev: str, path: str) -> Optional[str]:
+    """Isi `rev:path`, atau None bila berkas tidak ada di revisi itu."""
+    out = subprocess.run(["git", "show", f"{rev}:{path}"], cwd=root, capture_output=True)
+    if out.returncode != 0:
+        return None
+    return out.stdout.decode("utf-8")
+
+
+def brief_before(root: Path, brief: Path, commit: Optional[str]) -> str:
+    """Isi brief sebelum unit dikerjakan: `<sha>^` (commit), `HEAD` (worktree), atau disk bila belum ter-commit."""
+    text = show_text(root, f"{commit}^" if commit else "HEAD", rel(root, str(brief)))
+    return text if text is not None else brief.read_text(encoding="utf-8")
+
+
+_STATUS_LINE = re.compile(r"^status[ \t]*:.*$", re.M)
+_WORK_STATUS = re.compile(r"^## Work status[ \t]*$.*?(?=^## |\Z)", re.M | re.S | re.I)
+
+
+def brief_contract(text: str) -> str:
+    """Isi brief tanpa bagian yang sah disunting pelaksana: baris `status:` dan isi `## Work status`."""
+    text = text.replace("\r\n", "\n")
+    head, sep, rest = text.partition("\n---")
+    return _STATUS_LINE.sub("status:", head) + sep + _WORK_STATUS.sub("## Work status\n", rest)
+
+
+def allowed_paths(root: Path, brief: Path, commit: Optional[str] = None) -> Tuple[set, Optional[str]]:
+    """Himpunan path sah (relatif root) dan `finding_source` bila ada, dari brief sebelum unit dikerjakan."""
+    paths, fs = scope_of(brief_before(root, brief, commit))
     if not paths:
         raise ValueError("scope brief kosong atau tak terbaca (`files_touched` / `## File scope`)")
     b = rel(root, str(brief))
@@ -131,10 +174,14 @@ def only_fixed_marker(root: Path, path: str, commit: Optional[str]) -> bool:
 
 
 def changed(root: Path, commit: Optional[str]) -> List[str]:
+    """Berkas yang berubah; rename dipecah jadi hapus + tambah, path apa adanya (`-z`, tanpa kutip git)."""
     if commit:
-        return [p for p in git(root, "show", "--name-only", "--format=", commit).splitlines() if p.strip()]
-    out = git(root, "status", "--porcelain", "-uall")
-    return [ln[3:].split(" -> ")[-1].strip('"') for ln in out.splitlines() if ln.strip()]
+        if len(git(root, "rev-list", "--parents", "-n", "1", commit).split()) > 2:
+            raise RuntimeError(f"{commit[:7]} commit merge — unit brief wajib satu commit biasa")
+        out = git(root, "show", "--name-only", "--no-renames", "-z", "--format=", commit)
+        return [p for p in out.split("\0") if p.strip()]
+    out = git(root, "status", "--porcelain", "-uall", "--no-renames", "-z")
+    return [e[3:] for e in out.split("\0") if len(e) > 3]
 
 
 def main() -> int:
@@ -147,8 +194,15 @@ def main() -> int:
     try:
         root = repo_root(Path.cwd())
         brief = Path(a.brief) if Path(a.brief).is_absolute() else Path.cwd() / a.brief
-        allowed, fs = allowed_paths(root, brief)
+        allowed, fs = allowed_paths(root, brief, a.commit)
         touched = changed(root, a.commit)
+        if a.commit and not touched:
+            raise RuntimeError(f"{a.commit[:7]} tidak mengubah satu berkas pun")
+        tampered = False
+        if a.commit:
+            b_rel = rel(root, str(brief))
+            before, after = show_text(root, f"{a.commit}^", b_rel), show_text(root, a.commit, b_rel)
+            tampered = None not in (before, after) and brief_contract(before) != brief_contract(after)
         stray = []
         for p in touched:
             if p in allowed or is_scratch(p):
@@ -156,10 +210,14 @@ def main() -> int:
             if fs and p == fs and only_fixed_marker(root, p, a.commit):
                 continue
             stray.append(p)
-    except (OSError, ValueError, RuntimeError) as e:
+    except (OSError, ValueError, RuntimeError) as e:   # UnicodeDecodeError termasuk ValueError
         print(f"ERROR: {e}", file=sys.stderr)
         return 2
     where = "worktree" if a.worktree else a.commit[:7]
+    if tampered:
+        print(f"FAIL scope {where}: brief {brief.name} disunting di luar `status:` dan `## Work status` "
+              f"(scope/Anchor/langkah milik plan, bukan pelaksana)")
+        return 1
     if stray:
         print(f"FAIL scope {where}: {len(stray)} berkas di luar scope: {', '.join(stray)}")
         return 1

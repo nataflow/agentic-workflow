@@ -105,6 +105,12 @@ def validate_links(briefs: List[Dict]) -> List[str]:
     """
     by_nn = {b["nn"]: b for b in briefs}
     problems: List[str] = []
+    # Satu NN = satu berkas (11 H7); peta `by_nn` di atas dan titik masuk `FASE_3:<NN>` tidak dapat
+    # membedakan dua berkas bernomor sama.
+    for nn in sorted({b["nn"] for b in briefs}):
+        twins = [b["name"] for b in briefs if b["nn"] == nn]
+        if len(twins) > 1:
+            problems.append(f"brief-{nn} dipakai {len(twins)} berkas: {', '.join(twins)}")
     for b in briefs:
         if b["status"] == "SUPERSEDED":
             tgt = by_nn.get(b["superseded_by"][0]) if len(b["superseded_by"]) == 1 else None
@@ -181,21 +187,34 @@ def _status_at(root: Path, rev: str, brief_rel: str) -> str:
         return ""
 
 
-def done_sha(root: Path, brief_rel: str) -> str:
-    """SHA commit yang mengubah status brief menjadi `DONE`, apa pun subjeknya; kosong bila tak ada.
+def _carries_code(root: Path, sha: str) -> bool:
+    """Commit menyentuh berkas di luar dokumen rantai (`backenddev/`, `.claude/`)."""
+    return bool(git(root, "show", "--name-only", "--format=", sha, "--", ".", ":(exclude)backenddev",
+                    ":(exclude).claude").strip())
+
+
+def done_sha(root: Path, brief_rel: str, commit_message: str = "") -> str:
+    """SHA commit bukti brief `DONE` mendarat; kosong bila tak ada.
 
     Implementor meng-commit `status: DONE` bersama kode unitnya (satu commit), jadi transisi status
     di riwayat git adalah bukti mendarat yang tidak bergantung pada subjek yang diketik. `DONE` yang
     hanya ada di working tree, atau ditulis tangan lalu di-commit tanpa lewat transisi, tidak punya
     bukti ini (09 E18).
+
+    Transisi yang hanya menyentuh dokumen sah bila commit unit ber-`commit_message` brief sudah
+    mendarat lebih dulu dan membawa kode: itulah koreksi `READY → DONE` architect
+    (`lifecycle-recovery.md` bagian 3), yang memang commit brief saja (11 H5).
     """
     for sha in git(root, "log", "--format=%H", "--", brief_rel).splitlines():
         if _status_at(root, sha, brief_rel) == "DONE" and _status_at(root, f"{sha}^", brief_rel) != "DONE":
-            # Commit unit membawa kode; transisi DONE yang hanya menyentuh dokumen `backenddev/`
-            # (status ditulis tangan lalu di-commit) bukan bukti mendarat.
-            code = git(root, "show", "--name-only", "--format=", sha, "--", ".", ":(exclude)backenddev",
-                       ":(exclude).claude")
-            return sha[:7] if code.strip() else ""
+            if _carries_code(root, sha):
+                return sha[:7]
+            landed = landed_sha(root, brief_rel, commit_message)
+            if landed and _carries_code(root, landed) and \
+                    subprocess.run(["git", "merge-base", "--is-ancestor", landed, sha], cwd=root,
+                                   capture_output=True).returncode == 0:
+                return landed[:7]
+            return ""
     return ""
 
 

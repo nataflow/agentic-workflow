@@ -97,7 +97,7 @@ yang sama di plugin lain. **Test tersentuh** = test yang ada dan harus disesuaik
 ## Tahap 1 — Pagar & bukti mendarat
 
 ## H1 [Tinggi] Pagar hook ditembus ekspansi shell
-- [ ] Belum
+- [x] Selesai — `shell_tokens` di guard be/fe: `$`, backtick, CR/LF, brace expansion ditolak; operator dinilai sesudah tokenisasi
 
 `META` (`hooks/guard_bash.py:49`, sama di fe) dinilai sebelum `shlex.split`, dan `shlex` tidak mengenal ANSI-C
 quoting maupun brace expansion. Probe: `git diff $'--output=<path>'` → hook exit 0 untuk implementor dan
@@ -105,7 +105,7 @@ reviewer; bash menulis berkas di luar lease. `git diff --{out,}put=<path>` lolos
 Sebaliknya `git log -S "<T>"` dan `->` ditolak walau berada di dalam kutip. **Perbaikan:** lihat Keputusan H1.
 
 ## H2 [Tinggi] Validator dan lease membaca `## File scope` dengan aturan berbeda
-- [ ] Belum
+- [x] Selesai — `file_scope_rows(min_cols)` 4 kolom be / 3 kolom fe, heading tak peka huruf; Check S menolak baris berkolom kurang dan heading beda ejaan
 
 `validate_briefs.py:650` melewati baris ber-kolom < 4, `verify_scope.py:69` menerima ≥ 2. Probe: baris
 `| modify | internal/payment/gateway.go | Charge |` → validator PASS (Check E/N/L buta), lease memuat path itu,
@@ -113,7 +113,7 @@ hook Edit exit 0. Heading `## File Scope` dinormalkan validator tetapi peka huru
 validator PASS, `lease` FAIL "kosong". **Perbaikan:** lihat Keputusan H2.
 
 ## H3 [Tinggi] Implementor dapat memperluas scope dan Anchor brief-nya sendiri
-- [ ] Belum
+- [x] Selesai — scope dari `<sha>^:<brief>` / `HEAD:<brief>`; `brief_contract` membatasi suntingan brief ke `status:` + `## Work status`
 
 Brief ada di lease (`guard_bash.py:239`) dan `verify_scope.allowed_paths` membaca scope dari brief versi
 sesudah commit (`verify_scope.py:115`). Probe: sunting simbol di luar Anchor, lalu ubah kolom Anchor brief →
@@ -121,14 +121,14 @@ sesudah commit (`verify_scope.py:115`). Probe: sunting simbol di luar Anchor, la
 `PASS scope HEAD: 2 berkas`. **Perbaikan:** lihat Keputusan H3.
 
 ## H4 [Sedang] Rename, merge, dan path non-ASCII di `verify_scope`
-- [ ] Belum
+- [x] Selesai — `--no-renames -z`; commit merge dan commit tanpa berkas → exit 2
 
 `git show --name-only` tanpa `--no-renames` hanya menampilkan path tujuan: `git mv src/important.go src/new.go`
 (tujuan di scope) → PASS walau sumbernya di luar scope. Commit merge → `0 berkas` PASS. Tanpa `-z`, `src/café.go`
 tampil sebagai `"src/caf\303\251.go"` → FAIL palsu → HALT SCOPE. **Perbaikan:** `--no-renames -z`, merge → exit 2.
 
 ## H5 [Tinggi] Koreksi status resmi berujung jalan buntu
-- [ ] Belum
+- [x] Selesai — `done_sha(…, commit_message)` menerima koreksi bila `landed_sha` membawa kode dan mendahului transisi
 
 `done_sha` (`brief_status.py:184`) menolak transisi `DONE` yang hanya menyentuh `backenddev/`, padahal koreksi
 `READY → DONE` (`lifecycle-recovery.md:172`) memang commit brief saja. Probe: sesi 1 `KOREKSI:01:<sha>` → sesi 2
@@ -136,7 +136,7 @@ FAIL "Brief DONE tanpa commit transisi". Mengembalikan status ke `READY` memicu 
 lihat Keputusan H5.
 
 ## H6 [Tinggi] `commit_message` ganda membuat brief dilompati
-- [ ] Belum
+- [x] Selesai — Check C `commit_message` unik antar-brief hidup; `validate_spec` `unit` unik
 
 Dua brief `implement stock-index` lolos (`scaffold_brief.py:309` tidak menagih `unit` unik; Check S hanya regex).
 Sesudah brief-01 mendarat, `landed_sha` brief-02 menemukan commit yang sama → `KOREKSI:02` → brief-02 `DONE` tanpa
@@ -144,7 +144,7 @@ pernah dikerjakan. **Perbaikan:** Check C menagih `commit_message` unik (sesudah
 `validate_spec` menagih `unit` unik.
 
 ## H7 [Tinggi] NN ganda dan brief basi di luar matriks lolos lalu dieksekusi
-- [ ] Belum
+- [x] Selesai — NN ganda FAIL di Check C dan `validate_links` (architect); brief READY di luar matriks laci FAIL; `scaffold --nn` menolak NN berunit lain
 
 `by_nn` (`validate_briefs.py:1333`) menelan duplikat; `scaffold` hanya menolak path yang sama. Matriks ditulis
 ulang dengan unit 02 berganti nama → `brief-02-order-guard.md` + `brief-02-order-lock.md`, validator PASS,

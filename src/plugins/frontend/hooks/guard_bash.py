@@ -24,6 +24,7 @@ import shlex
 import subprocess
 import sys
 from pathlib import Path
+from typing import List, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "skills" / "_common"))
 try:
@@ -33,7 +34,11 @@ except Exception as e:  # berkas plugin rusak: reviewer tetap ditolak di hook(),
     IMPORT_ERROR = e
 
 REVIEWER = "frontend:code-reviewer"
-META = re.compile(r"[;&|<>`\n\r]|\$\(|\$\{")          # rantai/pengalihan/substitusi → tolak
+# `shlex` bukan bash (11 H1): ANSI-C `$'…'`, `$VAR`, dan brace expansion diperluas bash tetapi terbaca
+# literal oleh `shlex`, sehingga yang dinilai berbeda dari yang dijalankan. Kelas karakternya ditolak utuh.
+EXPANSION = re.compile(r"[$`\n\r]")
+BRACE = re.compile(r"\{[^{}]*(?:,|\.\.)[^{}]*\}")   # `{a,b}`/`{1..3}`; `HEAD@{1}` tetap lolos
+OPERATOR_CHARS = set(";&|<>()")
 READ_ONLY_GIT = {"status", "diff", "log", "show", "rev-parse", "ls-files", "merge-base", "symbolic-ref",
                  "blame", "grep"}
 BAD_FLAGS = {"--output", "--ext-diff", "--open-files-in-pager", "-O"}
@@ -48,13 +53,33 @@ def repo_root(cwd: Path) -> Path:
     return Path(out.stdout.strip()).resolve()
 
 
+def shell_tokens(cmd: str) -> Tuple[List[str], str]:
+    """(token, '') bila `cmd` satu perintah polos; ([], alasan) bila tidak.
+
+    Operator dinilai sesudah tokenisasi, sehingga `<T>` atau `->` di dalam kutip (mis. `git log -S`) tetap
+    satu argumen, sedangkan `>`/`|`/`;` di luar kutip menjadi token operator dan ditolak.
+    """
+    if EXPANSION.search(cmd):
+        return [], ("substitusi/ekspansi shell (`$`, backtick) dan baris baru dilarang; "
+                    "jalankan satu perintah polos per panggilan")
+    if BRACE.search(cmd):
+        return [], "brace expansion (`{a,b}`, `{1..3}`) dilarang; tulis tiap argumen utuh"
+    lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
+    lex.whitespace_split = True
+    lex.commenters = ""
+    tok = list(lex)
+    if any(t and set(t) <= OPERATOR_CHARS for t in tok):
+        return [], "rantai/pipe/pengalihan dilarang; jalankan satu perintah polos per panggilan"
+    if not tok:
+        return [], "perintah kosong"
+    return tok, ""
+
+
 def decide_bash(cmd: str) -> str:
     """'' bila boleh, selain itu alasan penolakan."""
-    if META.search(cmd):
-        return "rantai/pipe/pengalihan/substitusi dilarang; jalankan satu perintah polos per panggilan"
-    tok = shlex.split(cmd)
-    if not tok:
-        return "perintah kosong"
+    tok, why = shell_tokens(cmd)
+    if why:
+        return why
     if tok[0] == "git":
         sub = next((t for t in tok[1:] if not t.startswith("-")), "")
         if len(tok) > 1 and tok[1].startswith("-") and tok[1] != "--no-pager":

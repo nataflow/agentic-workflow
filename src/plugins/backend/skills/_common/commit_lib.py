@@ -20,16 +20,27 @@ _SLOT_PATTERN = {
     "type": "(?:" + "|".join(COMMIT_TYPES) + ")",
     "scope": r"[a-z0-9_.-]+",
     "subject": r"implement\s+\S.*",
-    "ticket": r"[A-Z][A-Z0-9]+-\d+",
+    # Satu token tanpa spasi: `OMS-412`, `oms-412`, `#482`, `482` (11 H12).
+    "ticket": r"#?[A-Za-z0-9][A-Za-z0-9._-]*",
 }
 
 
 def commit_template(index: Optional[Dict[str, Any]]) -> str:
-    """Template sah dari index profil, atau `DEFAULT_TEMPLATE`."""
+    """Template sah dari index profil, atau `DEFAULT_TEMPLATE`.
+
+    Tidak sah: tanpa `{subject}`, slot tak dikenal, kurawal liar di luar slot (`str.format` gagal), atau
+    baris baru (pesan commit brief satu baris, dan frontmatter brief ikut rusak).
+    """
     tpl = str((index or {}).get("commit_template") or "").strip()
-    if tpl and "{subject}" in tpl and not _UNKNOWN_SLOT.search(tpl):
+    if (tpl and "{subject}" in tpl and not _UNKNOWN_SLOT.search(tpl)
+            and not re.search(r"[{}]", _SLOT.sub("", tpl)) and not re.search(r"[\r\n]", tpl)):
         return tpl
     return DEFAULT_TEMPLATE
+
+
+def slot_ok(slot: str, value: str) -> bool:
+    """Nilai `value` diterima pola slot `slot` — dipakai scaffold sebelum merender (11 H12)."""
+    return re.fullmatch(_SLOT_PATTERN[slot], value or "") is not None
 
 
 def default_commit_type(lane: Optional[str], finding_source: Optional[str]) -> str:

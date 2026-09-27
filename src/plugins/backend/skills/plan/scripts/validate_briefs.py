@@ -647,10 +647,15 @@ class BriefValidator:
             if not stripped.startswith("|"):
                 continue
             cols = [c.strip() for c in stripped.strip("|").split("|")]
-            if len(cols) < 4 or set(cols[0]) <= set("-: "):
+            if set(cols[0]) <= set("-: "):
                 continue
             aksi = cols[0].strip("`").lower()
             if aksi not in ("modify", "create"):
+                continue
+            if len(cols) < 4:
+                # Baris beraksi berkolom kurang dilewati predikat rencana, dan `verify_scope.py`
+                # (lease) memakai aturan kolom yang sama — Check S yang menolaknya (11 H2).
+                brief.setdefault("short_rows", []).append(lineno)
                 continue
             if not in_file_table:
                 # Tabel folder tidak memuat kolom aksi; baris beraksi yang muncul
@@ -838,7 +843,8 @@ class BriefValidator:
                 if not fm.get(field):
                     problems.append(f"{b['name']}: frontmatter `{field}:` kosong atau tidak ada")
 
-            status = (fm.get("status") or "").upper()
+            # Dibandingkan persis, sama dengan architect check 3 (05-2, 11 H12).
+            status = (fm.get("status") or "").strip()
             if status and status != "READY":
                 problems.append(
                     f"{b['name']}: `status: {status}` — brief terbit `READY`; "
@@ -863,6 +869,15 @@ class BriefValidator:
             for want in REQUIRED_SECTIONS:
                 if _norm_heading(want) not in present:
                     problems.append(f"{b['name']}: seksi wajib `## {want}` tidak ada")
+                elif want not in b["section_order"]:
+                    # Pembaca lain (`verify_scope.py`, lease) mencari ejaan template persis.
+                    got = next(t for t in b["section_order"] if _norm_heading(t) == _norm_heading(want))
+                    problems.append(f"{b['name']}: heading `## {got}` wajib ditulis persis `## {want}`")
+            for lineno in b.get("short_rows", []):
+                problems.append(
+                    f"{b['name']}:{lineno}: baris `## File scope` beraksi berkolom kurang dari 4 "
+                    f"(`Aksi | Path | Anchor | Apa yang berubah`) — tidak terbaca validator maupun lease"
+                )
 
             for banned in FORBIDDEN_SECTIONS:
                 if _norm_heading(banned) in present:
@@ -1327,10 +1342,52 @@ class BriefValidator:
 
     # -- Check C -----------------------------------------------------------
 
+    def _load_matrix_rows(self) -> Optional[Set[Tuple[str, str]]]:
+        """Pasangan (NN, unit) matriks alokasi laci, atau None bila matriks tidak ada/tak terbaca."""
+        text = self._read(self.taskdir / LACI / "brief-matrix.json")
+        try:
+            data = json.loads(text) if text else None
+        except ValueError:
+            return None
+        rows = data.get("briefs") if isinstance(data, dict) else None
+        if not isinstance(rows, list):
+            return None
+        return {(str(r.get("nn")), str(r.get("unit"))) for r in rows if isinstance(r, dict)}
+
     def _check_cross_brief(self):
         cid, name = "C", "Cross-Brief Consistency"
         problems: List[str] = []
         by_nn = {b["nn"]: b for b in self.briefs if b["nn"] is not None}
+
+        # Satu NN = satu berkas (11 H7): `by_nn` di sini, di architect, dan di `scan_briefs` menelan
+        # duplikat diam-diam, lalu kedua berkas dieksekusi dengan titik masuk yang sama.
+        names_by_nn: Dict[int, List[str]] = {}
+        for b in self.briefs:
+            if b["nn"] is not None:
+                names_by_nn.setdefault(b["nn"], []).append(b["name"])
+        for nn, names in sorted(names_by_nn.items()):
+            if len(names) > 1:
+                problems.append(f"brief-{nn:02d} dipakai {len(names)} berkas: {', '.join(names)}")
+
+        # `commit_message` adalah kunci `landed_sha`: dua brief hidup bersubjek sama membuat brief kedua
+        # divonis sudah mendarat oleh commit brief pertama (11 H6).
+        by_subject: Dict[str, List[str]] = {}
+        for b in self.live_briefs:
+            subject = " ".join(str(b["frontmatter"].get("commit_message") or "").split()).casefold()
+            if subject:
+                by_subject.setdefault(subject, []).append(b["name"])
+        for subject, names in by_subject.items():
+            if len(names) > 1:
+                problems.append(f"`commit_message` sama di {', '.join(names)} — tiap brief wajib bersubjek unik")
+
+        # Brief READY yang tidak ada di matriks laci adalah sisa matriks lama (11 H7).
+        matrix = self._load_matrix_rows()
+        if matrix is not None:
+            for b in self.briefs:
+                if b["status"] == "READY" and b["nn"] is not None and \
+                        (f"{b['nn']:02d}", b["name"][len("brief-00-"):-len(".md")]) not in matrix:
+                    problems.append(f"{b['name']}: brief READY tidak ada di matriks `{LACI}/brief-matrix.json` "
+                                    f"— sisa matriks lama; hapus lewat `git rm` atau kunci ulang matriksnya")
 
         numbers = sorted(by_nn)
         for expected, actual in enumerate(numbers, start=1):

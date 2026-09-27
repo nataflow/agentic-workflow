@@ -158,7 +158,7 @@ class PreconditionChecker:
         # Brief `DONE` wajib punya commit transisi statusnya: DONE tanpa bukti di git (ditulis tangan,
         # atau belum di-commit) dulu dipercaya begitu saja, dan rantai lanjut ke brief berikutnya (09 E18).
         unproven = [b for b in briefs if b["status"] == "DONE"
-                    and not done_sha(self.root, f"{self.td.rel}/{b['name']}")]
+                    and not done_sha(self.root, f"{self.td.rel}/{b['name']}", b["commit_message"])]
         if unproven:
             names = ", ".join(b["name"] for b in unproven)
             return self._add(cid, name, "FAIL", f"Brief DONE tanpa commit transisi status di git: {names}",
