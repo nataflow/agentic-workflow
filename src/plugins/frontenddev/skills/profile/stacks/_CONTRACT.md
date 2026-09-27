@@ -130,7 +130,7 @@ intersep kembali/batal dan dirty guard, API sinkronisasi state URL, batasan plat
 atau safe area/touch target/keyboard mobile), letak design token, dan atribut aksesibilitas yang
 dipakai stack.
 
-### 7. `## Failure signatures` — konsumen: `frontenddev:architect` (`references/execution-protocol.md` bagian 8), `agents/code-reviewer.md`, `frontenddev:review`
+### 7. `## Failure signatures` — konsumen: `frontenddev:architect` (`architect/references/execution-protocol.md` bagian 8), `agents/code-reviewer.md`, `frontenddev:review`
 
 Kategori error verifikasi penutup yang khas stack ini (typecheck, lint, test, build), penyebab
 umum, dan strategi resolusi yang sah. Tabel ini yang dipakai `plan` saat menyusun brief remedi.

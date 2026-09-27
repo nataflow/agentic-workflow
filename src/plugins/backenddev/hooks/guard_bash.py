@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
-"""Pagar mekanis `backenddev:code-implementor` dan `backenddev:code-explorer` (hook PreToolUse, matcher `Bash|Edit|Write`).
+"""Pagar mekanis `backenddev:code-implementor`, `code-explorer`, dan `code-reviewer` (hook PreToolUse, matcher `Bash|Edit|Write`).
 
   guard_bash.py hook                   # input hook JSON dari stdin
   guard_bash.py lease --brief <path>   # ditulis architect sebelum dispatch implementor
   guard_bash.py lease --clear          # dihapus architect sesudah triase unit
 
-Hanya berlaku bila input hook membawa `agent_type` salah satu dari kedua agent itu — identitas
+Hanya berlaku bila input hook membawa `agent_type` salah satu dari ketiga agent itu — identitas
 subagen plugin di input hook (docs hooks, "Common input fields"). Panggilan lain (main loop,
 agent lain, plugin lain) lolos tanpa keputusan (exit 0).
 
 `code-explorer` (tanpa Bash): Edit/Write hanya pada laporan laci `.explore/*.md` di dalam repo
 (`backenddev/docs/.explore/<slug>.md` atau `<taskdir>/.explore/<slug>.md`); selain itu ditolak.
+
+`code-reviewer` (09 E19): read-only atas repo kecuali laporannya sendiri. Bash: git baca (+ `merge-base`,
+`symbolic-ref`), `ls`, dan `git add`/`git commit -m` hanya atas `<taskdir>/REVIEW.md` dan
+`backenddev/issues/README.md`; Write/Edit hanya kedua path itu. Tanpa lease: path-nya berpola tetap.
 
 Untuk implementor: fail-closed — galat internal pun menolak (exit 2), karena exit selain 2 tidak
 memblokir (docs hooks: "Any other exit code doesn't block on its own").
@@ -38,6 +42,9 @@ except Exception as e:  # berkas plugin rusak: implementor tetap ditolak di hook
 
 AGENT = "backenddev:code-implementor"
 EXPLORER = "backenddev:code-explorer"
+REVIEWER = "backenddev:code-reviewer"
+REVIEWER_FILES = re.compile(r"^(backenddev/docs/[^/]+/REVIEW\.md|backenddev/issues/README\.md)$")
+REVIEWER_READ_GIT = {"merge-base", "symbolic-ref"}
 EXPLORE_REPORT = re.compile(r"^backenddev/docs/(?:[^/]+/)?\.explore/[^/]+\.md$")
 META = re.compile(r"[;&|<>`\n\r]|\$\(|\$\{")          # rantai/pengalihan/substitusi → tolak
 READ_ONLY_GIT = {"status", "diff", "log", "show", "rev-parse", "ls-files"}
@@ -114,6 +121,8 @@ def hook() -> int:
         return 0
     if data.get("agent_type") == EXPLORER:
         return explorer_hook(data)
+    if data.get("agent_type") == REVIEWER:
+        return reviewer_hook(data)
     if data.get("agent_type") != AGENT:
         return 0
     tool = data.get("tool_name")
@@ -151,6 +160,66 @@ def explorer_hook(data: dict) -> int:
         if EXPLORE_REPORT.match(p):
             return 0
         return deny(f"{EXPLORER} hanya boleh menulis laporan `.explore/*.md`; `{p}` ditolak")
+    except Exception as e:
+        return deny(f"galat internal pagar: {e!r}")
+
+
+def decide_reviewer_bash(cmd: str, root: Path, cwd: Path) -> str:
+    """Allowlist Bash reviewer; '' bila boleh."""
+    if META.search(cmd):
+        return "rantai/pipe/pengalihan/substitusi dilarang; jalankan satu perintah polos per panggilan"
+    tok = shlex.split(cmd)
+    if not tok:
+        return "perintah kosong"
+    if tok[0] == "ls":
+        return ""
+    if tok[0] != "git" or len(tok) < 2:
+        return f"perintah di luar allowlist {REVIEWER}: `{cmd[:80]}` — dilarang build/test"
+    if tok[1] in READ_ONLY_GIT | REVIEWER_READ_GIT:
+        bad = READ_ONLY_BAD_FLAGS.intersection(t.split("=")[0] for t in tok)
+        return f"flag {sorted(bad)} dilarang" if bad else ""
+    if tok[1] == "add":
+        rest = tok[2:]
+        ps = rest[rest.index("--") + 1:] if "--" in rest else rest
+        if any(t.startswith("-") and t != "--" for t in rest) or not ps:
+            return "`git add` hanya menerima path eksplisit tanpa flag"
+        bad = []
+        for p in ps:
+            try:
+                if not REVIEWER_FILES.match(rel(root, str(cwd / p))):
+                    bad.append(p)
+            except ValueError:
+                bad.append(p)
+        return f"reviewer hanya men-stage REVIEW.md dan backenddev/issues/README.md, bukan {bad}" if bad else ""
+    if tok[1] == "commit":
+        rest = tok[2:]
+        if len(rest) == 2 and rest[0] in ("-m", "--message") and rest[1].strip():
+            return ""
+        return "hanya `git commit -m '<pesan>'` (tanpa -a/--amend/--no-verify)"
+    return f"`git {tok[1]}` dilarang untuk {REVIEWER} (read-only atas repo; dilarang reset/checkout/push/rebase)"
+
+
+def reviewer_hook(data: dict) -> int:
+    """`code-reviewer` read-only kecuali REVIEW.md + indeks issues; fail-closed seperti implementor."""
+    tool = data.get("tool_name")
+    if tool not in ("Bash", "Edit", "Write"):
+        return 0
+    try:
+        if IMPORT_ERROR is not None:
+            raise IMPORT_ERROR
+        cwd = Path(data.get("cwd") or ".").resolve()
+        root = repo_root(str(cwd))
+        ti = data["tool_input"]
+        if tool == "Bash":
+            reason = decide_reviewer_bash(ti["command"], root, cwd)
+        else:
+            try:
+                p = rel(root, str(cwd / ti["file_path"]))
+                reason = "" if REVIEWER_FILES.match(p) else \
+                    f"{REVIEWER} hanya menulis REVIEW.md dan backenddev/issues/README.md; `{p}` ditolak"
+            except ValueError:
+                reason = f"`{ti['file_path']}` di luar repo"
+        return deny(reason) if reason else 0
     except Exception as e:
         return deny(f"galat internal pagar: {e!r}")
 

@@ -191,33 +191,33 @@ PreToolUse `guard_bash.py` (Bash: git baca, `ls`, `chain.py files`; Write: `<tas
 `taskdir_state.py` `TEMUAN` vs architect `TERHENTI (REVIEW BLOCKED)` untuk keadaan yang sama.
 
 ## E18 [Tinggi] backenddev: `landed_sha` membandingkan subjek persis
-- [ ] Selesai
+- [x] Selesai — `landed_sha` via `norm_subject`; `done_sha` menagih commit transisi `DONE` yang membawa kode (fixture jalan pintas di 4 test diganti `land()`)
 
 Satu spasi berlebih → `FASE_3:01`, brief yang sudah mendarat di-dispatch ulang; brief `DONE` tanpa commit
 dipercaya. **Perbaikan:** normalisasi subjek; `DONE` tanpa commit mendarat → keadaan koreksi, bukan lanjut.
 
 ## E19 [Tinggi] backenddev: `code-reviewer` bisa `git reset --hard`
-- [ ] Selesai
+- [x] Selesai — kebijakan `code-reviewer` di `guard_bash.py`; README & agent menyebut pagarnya
 
 `guard_bash.py` hanya memagar implementor dan explorer. **Perbaikan:** kebijakan reviewer: git baca +
 `merge-base`/`symbolic-ref`, `ls`, `git add`/`git commit -m` hanya atas `<taskdir>/REVIEW.md` dan
 `backenddev/issues/README.md`; Write hanya kedua path itu.
 
 ## E20 [Sedang] backenddev: `chain_counters` — baris tak dikenal → `KeyError`; nilai bisa diturunkan tangan
-- [ ] Selesai
+- [x] Selesai — kunci tak dikenal → FAIL rapi; `--check` menilai riwayat git `TASK.md` + disk
 
 **Perbaikan:** baris tak dikenal → FAIL rapi; `--check` membandingkan dengan riwayat git `TASK.md`: kunci global tidak
 pernah turun, kunci ber-hop hanya turun di versi yang sama dengan kenaikan `reentry`.
 
 ## E21 [Sedang] backenddev: rute SYMBOL bertentangan
-- [ ] Selesai
+- [x] Selesai — SYMBOL = SCOPE di `lifecycle-recovery.md`, `gate-lifecycle.md`, pesan check 7 architect
 
 `architect/SKILL.md:89` dan `gate-lifecycle.md` (butir TERTAHAN) memperlakukan SYMBOL seperti SCOPE, sedangkan
 `lifecycle-recovery.md:146`, `gate-lifecycle.md:115`, dan pesan `architect/scripts/check_preconditions.py:371`
 menggolongkannya bersama COMPILE/STRAY. **Keputusan:** SYMBOL = SCOPE (user memutuskan terima atau reset).
 
 ## E22 [Rendah] `run_verification.py` merujuk `validate_review.py` yang tidak ada di backenddev
-- [ ] Selesai
+- [x] Selesai — docstring/komentar kedua salinan (tetap identik)
 
 ## E23 [Rendah] 6 WARN lint R1: rujukan singkat ambigu
-- [ ] Selesai
+- [x] Selesai — enam rujukan dieksplisitkan per skill; lint 0 FAIL, 0 WARN

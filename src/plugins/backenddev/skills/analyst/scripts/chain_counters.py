@@ -10,7 +10,8 @@ tanpa terdeteksi. Skrip ini satu-satunya penulis tabel `## Counters`; perubahan
 `TASK.md`-nya ikut commit pembaruan `TASK.md` berikutnya milik penulisnya.
 
     --bump <kunci>   naikkan satu; melewati plafon → FAIL exit 1, tabel tidak berubah
-    --check          cetak seluruh kunci; exit 1 bila ada yang melebihi plafon
+    --check          cetak seluruh kunci; exit 1 bila ada yang melebihi plafon, kunci tak dikenal,
+                     atau nilai yang turun di luar `--reset-hop` menurut riwayat git `TASK.md`
     --reset-hop HOP  nolkan kunci ber-hop milik HOP dan hop hilirnya — dipanggil
                      re-entry (Fase 3 butir 0) sesudah `--bump reentry` lolos, supaya
                      revisi hop yang dibuka ulang mendapat ronde reviewer baru;
@@ -24,9 +25,10 @@ Zero external dependencies (Python Standard Library only).
 
 import argparse
 import re
+import subprocess
 import sys
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 
 PLAFON = {"reentry": 2, "chain_transition": 2, "root_amendment": 2,
           "reject": 2, "oq_return": 2, "review_round": 2}
@@ -42,9 +44,61 @@ def parse(text: str) -> Dict[str, int]:
             if m.group(1) != "Kunci"}
 
 
+def unknown_keys(counters: Dict[str, int]) -> List[str]:
+    """Kunci yang tidak sah menurut `validate_key` — baris tulisan tangan atau salah ketik."""
+    bad = []
+    for k in counters:
+        try:
+            validate_key(k)
+        except ValueError:
+            bad.append(k)
+    return bad
+
+
+def history(taskdir: Path) -> List[Dict[str, int]]:
+    """Tabel `## Counters` tiap versi `TASK.md` ter-commit, tertua dulu; kosong di luar git."""
+    task = taskdir / "TASK.md"
+    try:
+        top = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=taskdir, capture_output=True,
+                             text=True)
+        if top.returncode != 0:
+            return []
+        root = Path(top.stdout.strip()).resolve()
+        rel = task.resolve().relative_to(root).as_posix()     # pathspec git relatif cwd → jalankan dari root
+        shas = subprocess.run(["git", "log", "--reverse", "--format=%H", "--", rel], cwd=root,
+                              capture_output=True, text=True).stdout.split()
+        out = []
+        for sha in shas:
+            r = subprocess.run(["git", "show", f"{sha}:{rel}"], cwd=root, capture_output=True)
+            out.append(parse(r.stdout.decode("utf-8", errors="replace")) if r.returncode == 0 else {})
+        return out
+    except (OSError, ValueError):
+        return []
+
+
+def tampered(versions: List[Dict[str, int]]) -> List[str]:
+    """Penurunan yang tidak dijelaskan `--reset-hop` antar-versi berurutan (09 E20).
+
+    Kunci global (`reentry`, `chain_transition`, `root_amendment`) tidak pernah turun. Kunci ber-hop
+    hanya boleh turun (atau hilang) di versi yang sama dengan kenaikan `reentry`: re-entry menaikkan
+    `reentry` lalu `--reset-hop`, dan keduanya ikut satu commit pembaruan `TASK.md`.
+    """
+    problems = []
+    for before, after in zip(versions, versions[1:]):
+        reentered = after.get("reentry", 0) > before.get("reentry", 0)
+        for k, v in before.items():
+            now = after.get(k, 0)
+            if now >= v:
+                continue
+            if ":" in k and reentered:
+                continue
+            problems.append(f"{k} turun {v} → {now} tanpa `--reset-hop` sesudah `--bump reentry`")
+    return problems
+
+
 def render(text: str, counters: Dict[str, int]) -> str:
     """Tulis ulang seksi `## Counters` saja; seksi lain dibiarkan byte-identik."""
-    rows = "".join(f"| {k} | {v} | {PLAFON[k.split(':')[0]]} |\n" for k, v in counters.items())
+    rows = "".join(f"| {k} | {v} | {PLAFON.get(k.split(':')[0], '?')} |\n" for k, v in counters.items())
     body = f"\n| Kunci | Nilai | Plafon |\n|---|---|---|\n{rows}\n"
     sec = _SECTION.search(text)
     if sec:
@@ -63,7 +117,7 @@ def validate_key(key: str) -> str:
 
 
 def summary(counters: Dict[str, int]) -> str:
-    return " · ".join(f"{k} {v}/{PLAFON[k.split(':')[0]]}" for k, v in counters.items()) or "—"
+    return " · ".join(f"{k} {v}/{PLAFON.get(k.split(':')[0], '?')}" for k, v in counters.items()) or "—"
 
 
 def main():
@@ -85,14 +139,26 @@ def main():
         print(f"COUNTER: [FAIL] {task} bukan UTF-8 ({exc.reason} @ byte {exc.start}) — pulihkan dari git")
         sys.exit(1)
     counters = parse(text)
+    bad = unknown_keys(counters)
 
     if args.check:
         over = [k for k, v in counters.items() if k.split(":")[0] in PLAFON and v > PLAFON[k.split(":")[0]]]
-        status = "FAIL" if over else "PASS"
+        # Versi disk sekarang ikut dinilai sebagai versi terakhir: penurunan yang belum di-commit juga tertangkap.
+        drops = tampered(history(Path(args.taskdir)) + [counters])
+        status = "FAIL" if over or bad or drops else "PASS"
         print(f"COUNTER: [{status}] {summary(counters)}")
         for k in over:
             print(f"    - {k} melebihi plafon — jalankan Failure path analyst yang sesuai")
-        sys.exit(1 if over else 0)
+        for k in bad:
+            print(f"    - kunci `{k}` tak dikenal — tabel `## Counters` hanya ditulis skrip ini; pulihkan dari git")
+        for d in drops:
+            print(f"    - {d} — tabel disunting tangan; pulihkan nilainya dari riwayat git")
+        sys.exit(1 if status == "FAIL" else 0)
+
+    if bad:
+        print(f"COUNTER: [FAIL] kunci tak dikenal di `## Counters`: {', '.join(bad)} — tabel disunting tangan; "
+              f"pulihkan dari riwayat git sebelum menulis")
+        sys.exit(1)
 
     if args.reset_hop:
         reopened = HOPS[HOPS.index(args.reset_hop):]

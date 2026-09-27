@@ -86,6 +86,7 @@ Direktori `backenddev/issues/` tidak diperiksa di sini: ia dibuat dan diseed sen
 
 - **Batas `Bash`**: HANYA inspeksi non-mutasi (`git diff`, `git log`, `git merge-base`, `git status`, `ls`) plus `git add`/`git commit` atas `{taskdir}/REVIEW.md` **dan** `backenddev/issues/README.md`. Dilarang build, test, `push`, `merge`, `rebase`, `reset`, dan pindah branch.
 - **Batas tulis**: `Write` HANYA `{taskdir}/REVIEW.md` dan `backenddev/issues/README.md`.
+- **Ditegakkan hook**: batas `Bash` dan tulis di atas dipagar `hooks/guard_bash.py` (satu perintah polos per panggilan, tanpa `;`, `|`, `&&`, pengalihan). Panggilan di luarnya ditolak dengan alasan di stderr — jangan mencoba jalan memutar; bila batas itu menghalangi review, laporkan sebagai `BLOCKED`.
 - **Nol dialog**: ambiguitas dicatat di *Verification notes*, bukan ditanyakan ke user.
 - **Rationalization prevention**: perbaikan temuan lewat brief baru di main loop, bukan di sini; dilarang mengabaikan berkas liar di luar union scope karena kodenya rapi, menyalin teks review panjang ke chat, mengubah status temuan lama jadi `FIXED`, merekayasa commit SHA, melompati satu pun dari lima pemeriksaan, atau menjalankan build/test untuk membuktikan bug.
 - **KEPUTUSAN DEFINITIF SAAT INI**: seluruh isi dokumen berprinsip "Yang ditulis = Keputusan saat ini", tanpa memori temporal atau komparasi masa lalu.

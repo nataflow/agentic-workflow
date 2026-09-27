@@ -106,8 +106,9 @@ def test_edit_write_limited_to_lease(repo):
     assert hook(repo, tool="Write", file_path="/etc/passwd").returncode == 2
 
 
-@pytest.mark.parametrize("agent", [None, "backenddev:code-reviewer", "frontenddev:code-implementor", "Explore"])
+@pytest.mark.parametrize("agent", [None, "backenddev:brief-reviewer", "frontenddev:code-implementor", "Explore"])
 def test_other_agents_pass_through(repo, agent):
+    # `backenddev:code-reviewer` sejak 09 E19 ikut dipagar (tests/backenddev/test_09_robustness.py).
     assert hook(repo, "git clean -fd", agent=agent).returncode == 0
 
 

@@ -99,7 +99,7 @@ tipe, titik masuk HTTP, rantai pemanggil lintas layer, dan akses penyimpanan.
 cakupan. `code-explorer` **bukan** konsumen langsung: ia dilarang membaca berkas adapter dan
 membaca hasil turunannya di `.claude/profile/backenddev/` saja. Resep di seksi ini tetap sampai kepadanya
 lewat satu jalur: `system-analysis` dan `plan` menyalinnya apa adanya ke slot `{resep_navigasi}`
-prompt `dispatcher/explorer.md` masing-masing, seperti `{daftar_dimensi}` Profil B. Resep yang
+prompt `<skill>/dispatcher/explorer.md` masing-masing, seperti `{daftar_dimensi}` Profil B. Resep yang
 hanya dirujuk path-nya tidak pernah dijalankan, dan jalur async tanpa resep tidak tersapu siapa pun.
 
 ### 5. `## Audit checklist` — konsumen: `backenddev:audit`, subagent `code-reviewer`

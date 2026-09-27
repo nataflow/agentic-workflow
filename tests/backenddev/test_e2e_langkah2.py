@@ -45,7 +45,9 @@ def _fixture(repo):
     """Langkah 0: 01 DONE, 02 BLOCKED (wip + report-02.md), 03 READY, ledger BRIEF [x], tanpa `.explore/`."""
     write_files(repo, {f"{TD}/TASK.md": TASK.format(ledger=LEDGER_DONE)})
     git(repo, "checkout", "-q", "-b", "fix/order")
-    brief(repo, "01", "lock", "DONE", body=_obj("SC-1"))
+    brief(repo, "01", "lock", "READY", body=_obj("SC-1"))
+    commit(repo, "docs(plan): add 1 briefs for order-fix", f"{TD}/brief-01-lock.md")
+    _implement(repo, "brief-01-lock.md", "// lock\n")
     brief(repo, "02", "endpoint", "BLOCKED", body=_obj("SC-2"))
     brief(repo, "03", "recap", "READY", body=_obj("SC-2"))
     write_files(repo, {f"{TD}/report-02.md": "# BLOCKED\nstop condition (d): berkas fiktif\n"})
@@ -127,6 +129,7 @@ def test_brief_after_review_makes_it_stale(chain_repo):
     repo = chain_repo
     _through_review(repo)
     brief(repo, "06", "audit-log", "DONE", body=_obj("— (berkas yatim)"))
+    write_files(repo, {"src/audit.go": "package order\n"})
     commit(repo, "fix(order): implement audit-log")
     c3 = be_checks(repo, ARCH, "--taskdir", TD)[3]
     assert c3["entry"] == "FASE_4" and "REVIEW.md basi" in c3["summary"]

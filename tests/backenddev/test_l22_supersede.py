@@ -1,7 +1,7 @@
 """L2.2 — brief BLOCKED ditutup `plan` lewat pengganti ber-`supersedes`; konsumen mengenal SUPERSEDED."""
 import json
 
-from conftest import TD, be_checks, be_run, brief, commit, write_files
+from conftest import TD, be_checks, be_run, brief, commit, land, write_files
 
 def _spec_path(repo):
     """Spec batch di laci `.explore/` taskdir — satu-satunya lokasi yang diterima scaffold (B11)."""
@@ -55,9 +55,11 @@ def test_blocked_before_ready_fails(chain_repo):
 
 
 def test_superseded_is_skipped_and_ready_is_start(chain_repo):
-    brief(chain_repo, "01", "lock", "DONE")
+    b01, b03 = brief(chain_repo, "01", "lock", "READY"), brief(chain_repo, "03", "recap", "READY")
+    commit(chain_repo, "docs(plan): add 2 briefs for order-fix")
+    land(chain_repo, b01)
+    land(chain_repo, b03, line="// recap\n")
     brief(chain_repo, "02", "endpoint", "SUPERSEDED", superseded_by="brief-04")
-    brief(chain_repo, "03", "recap", "DONE")
     brief(chain_repo, "04", "endpoint-fix", "READY", supersedes="brief-02")
     commit(chain_repo, "docs(plan): add 1 briefs for order-fix")
     c3 = be_checks(chain_repo, ARCH, "--taskdir", TD)[3]

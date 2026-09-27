@@ -34,7 +34,7 @@ from precondition_lib import (  # noqa: E402
 )
 from precondition_lib import cli  # noqa: E402
 from brief_status import (  # noqa: E402
-    BRIEF_STATUSES, CLOSED, landed_sha, read_halt, review_freshness, scan_briefs, validate_links,
+    BRIEF_STATUSES, CLOSED, done_sha, landed_sha, read_halt, review_freshness, scan_briefs, validate_links,
 )
 
 
@@ -155,6 +155,16 @@ class PreconditionChecker:
                              "Kembalikan ke `backenddev:tech-lead` → lane PLANNING taskdir yang sama "
                              "(`reentry_reason` = brief + sebab `report-NN.md`); `plan` menerbitkan "
                              "pengganti ber-`supersedes`.")
+        # Brief `DONE` wajib punya commit transisi statusnya: DONE tanpa bukti di git (ditulis tangan,
+        # atau belum di-commit) dulu dipercaya begitu saja, dan rantai lanjut ke brief berikutnya (09 E18).
+        unproven = [b for b in briefs if b["status"] == "DONE"
+                    and not done_sha(self.root, f"{self.td.rel}/{b['name']}")]
+        if unproven:
+            names = ", ".join(b["name"] for b in unproven)
+            return self._add(cid, name, "FAIL", f"Brief DONE tanpa commit transisi status di git: {names}",
+                             "Jalankan matriks bukti disk (`references/lifecycle-recovery.md` bagian 3): kode unit "
+                             "ada tetapi belum di-commit → commit bersama brief lewat koreksi; kode tidak ada → "
+                             "kembalikan status brief ke `READY`. Dilarang melanjutkan ke brief berikutnya.")
         start = next((b for b in briefs if b["status"] not in CLOSED), None)
         if start:
             rel = f"{self.td.rel}/{start['name']}"
@@ -369,7 +379,7 @@ class PreconditionChecker:
                 cid, name, "FAIL",
                 f"HALT.md menahan rantai di {fm.get('brief', '?')} "
                 f"(verdict {fm.get('verdict', '?')} @ {fm.get('sha', '?')})",
-                "Kembalikan ke `backenddev:tech-lead`: SCOPE → tanya user terima/reset; COMPILE/SYMBOL/STRAY → "
+                "Kembalikan ke `backenddev:tech-lead`: SCOPE/SYMBOL → tanya user terima/reset; COMPILE/STRAY → "
                 "lane PLANNING taskdir sama, `plan` menambah baris `repairs`. Architect dilarang menghapus HALT.md.")
         self._add(cid, name, "PASS", "Tidak ada HALT.md")
 

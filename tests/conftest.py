@@ -7,6 +7,7 @@ berkas yang benar-benar dikirim ke user.
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -143,6 +144,18 @@ def brief(repo: Path, nn: str, unit: str, status: str, body: str = "# Brief\n", 
     path.write_text(f"---\ntitle: {unit}\nsource: TASK.md\nrisk: MINOR\nstatus: {status}\n"
                     f'commit_message: "fix(order): implement {unit}"\n{fm}---\n{body}', encoding="utf-8")
     return path
+
+
+def land(repo: Path, brief_path: Path, code: str = "src/order.go", line: str = "// unit\n") -> str:
+    """Unit mendarat sesuai protokol implementor: `status: DONE` + kode dalam SATU commit bersubjek
+    `commit_message` brief. Brief `DONE` tanpa commit semacam ini ditolak architect (09 E18)."""
+    text = brief_path.read_text(encoding="utf-8")
+    brief_path.write_text(re.sub(r"^status: \w+$", "status: DONE", text, count=1, flags=re.M), encoding="utf-8")
+    target = repo / code
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text((target.read_text(encoding="utf-8") if target.exists() else "") + line, encoding="utf-8")
+    msg = re.search(r'^commit_message: "?(.*?)"?$', text, re.M).group(1)
+    return commit(repo, msg, code, str(brief_path.relative_to(repo)))
 
 
 def commit(repo: Path, msg: str, *paths: str) -> str:

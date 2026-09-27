@@ -64,7 +64,7 @@ pun. Untuk memulai, melanjutkan, atau memulihkan rantai, panggil `/backenddev:te
 |---|---|---|
 | `code-explorer` | Read, Grep, Glob, Write | penelusur bukti `file:line`; menulis hanya ke laci `.explore/`, dipagari hook `guard_bash.py` |
 | `code-implementor` | Read, Grep, Glob, Edit, Write, Bash | menerapkan satu brief READY, dipagari hook `guard_bash.py` |
-| `code-reviewer` | Read, Grep, Glob, Bash, Write | menilai diff merge-base terhadap kontrak gabungan brief; menulis `REVIEW.md` |
+| `code-reviewer` | Read, Grep, Glob, Bash, Write | menilai diff merge-base terhadap kontrak gabungan brief; menulis `REVIEW.md`, dipagari hook `guard_bash.py` |
 | `brd-reviewer` | Read, Grep, Glob | vonis BRD `Approved`/`Issues Found` |
 | `prd-reviewer` | Read, Grep, Glob | vonis PRD |
 | `brief-reviewer` | Read, Grep, Glob | audit helikopter seluruh brief terhadap PRD, BRD, dan TASK |
@@ -187,14 +187,17 @@ oleh skrip prasyarat, sehingga vonis hook sama dengan vonis skrip.
 - **Opt-out `.claude/workflow`**: lihat Hidup Berdampingan.
 
 **PreToolUse** (`python3 hooks/guard_bash.py hook`, matcher `Bash|Edit|Write`, timeout 10 detik) berlaku
-untuk subagent `backenddev:code-implementor` dan `backenddev:code-explorer`, dan menolak bila ragu (fail-closed). Implementor hanya
+untuk subagent `backenddev:code-implementor`, `backenddev:code-explorer`, dan `backenddev:code-reviewer`, dan menolak bila ragu (fail-closed). Implementor hanya
 boleh menjalankan git read-only (`status`, `diff`, `log`, `show`, `rev-parse`, `ls-files`),
 `git add <path>` eksplisit di dalam lease, dan `git commit -m`. Rantai perintah, pipe, pengalihan, dan
 substitusi ditolak. Edit/Write hanya boleh ke path lease. Lease ditulis `architect` sebelum dispatch
 (`guard_bash.py lease --brief <path>`) ke `<git-dir>/agentic-workflow/lease-backenddev.json`, di luar
 working tree. Isinya `## File scope` brief, berkas brief, `report-NN.md`, dan `finding_source`. Tanpa lease,
 semua Bash/Edit/Write implementor ditolak. Untuk `backenddev:code-explorer`, hook yang sama hanya
-mengizinkan Edit/Write ke laporan `backenddev/docs/[<taskdir>/].explore/*.md`.
+mengizinkan Edit/Write ke laporan `backenddev/docs/[<taskdir>/].explore/*.md`. `backenddev:code-reviewer` hanya
+boleh git read-only (ditambah `merge-base`, `symbolic-ref`), `ls`, serta `git add`/`git commit -m` dan
+Edit/Write atas `<taskdir>/REVIEW.md` dan `backenddev/issues/README.md`; `reset`, `checkout`, `push`, build,
+dan test ditolak.
 
 ## Penegakan Mekanis
 

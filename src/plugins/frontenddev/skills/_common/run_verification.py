@@ -4,8 +4,9 @@
 Mode:
   baseline  jalankan tiap perintah, simpan {taskdir}/.explore/verification-baseline.json
   closing   jalankan tiap perintah, bandingkan dengan baseline, tulis
-            {taskdir}/.explore/closing-verification.md (format tabel yang dibaca validate_review.py)
-            dan log mesin closing-verification.json di sebelahnya (`validate_review.py --log`)
+            {taskdir}/.explore/closing-verification.md (tabel yang dibaca pemeriksa penutup: frontenddev
+            `validate_review.py`, backenddev architect Fase 4)
+            dan log mesin closing-verification.json di sebelahnya (frontenddev `validate_review.py --log`)
 
 Exit: 0 = tidak ada merah baru; 1 = ada TIMEOUT atau galat baru; 2 = argumen/IO salah.
 Hanya pustaka standar.
@@ -82,7 +83,8 @@ def new_errors(res: dict, base: dict) -> int:
 
 
 def render_md(results: list, baseline: dict) -> str:
-    # Tiga kolom pertama = kontrak validate_review.py (_verification_red membaca cells[0..2]).
+    # Tiga kolom pertama = kontrak pembaca tabel (frontenddev validate_review.py `_verification_red`
+    # membaca cells[0..2]; backenddev architect Fase 4 membacanya apa adanya).
     # Perintah penuh di kolom terakhir: '|' di dalam perintah tidak menggeser tiga kolom itu.
     out = ["| Perintah | Hasil | Galat baru vs baseline | Exit | Durasi | Perintah penuh |",
            "|---|---|---|---|---|---|"]

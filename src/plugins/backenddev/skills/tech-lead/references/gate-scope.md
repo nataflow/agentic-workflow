@@ -154,7 +154,7 @@ Tiap skill menutup tugasnya dengan mengembalikan rute ke pemanggil yang berwenan
 | `report` | skill `backenddev:architect` |
 | `code-reviewer` | skill `backenddev:architect` sebagai pendispatch langsung |
 | agent `code-explorer` | Skill pendispatch yang memanggilnya lewat `dispatcher/explorer.md` miliknya sendiri: `tech-lead`, `business-analysis`, `system-analysis`, `plan`, `debug` |
-| agent `code-reviewer` | `backenddev:architect` sebagai pendispatch langsung lewat `dispatcher/reviewer.md` |
+| agent `code-reviewer` | `backenddev:architect` sebagai pendispatch langsung lewat `architect/dispatcher/reviewer.md` |
 | agent `code-implementor` | `backenddev:architect` sebagai pendispatch langsung |
 | agent `brd-reviewer`, `prd-reviewer`, `brief-reviewer` | Penulis dokumen yang mendispatchnya langsung: `business-analysis`, `system-analysis`, `plan` |
 

@@ -143,8 +143,8 @@ baseline: <sha7 merge-base> · <hijau | merah (n galat) | TERDEGRADASI (alasan)>
 <maks 40 baris: keluaran kompilator | berkas/simbol di luar scope beserta file:baris | path berkas liar>
 
 ## Rute
-COMPILE/SYMBOL/STRAY → tech-lead → PLANNING taskdir sama (reentry_reason = berkas ini) → plan: baris `repairs: "02"` + terbit ulang brief READY hilir.
-SCOPE → tech-lead tanyakan ke user: terima (cabut HALT) atau reset.
+COMPILE/STRAY → tech-lead → PLANNING taskdir sama (reentry_reason = berkas ini) → plan: baris `repairs: "02"` + terbit ulang brief READY hilir.
+SCOPE/SYMBOL → tech-lead tanyakan ke user: terima (cabut HALT) atau reset.
 ```
 
 Kunci dengan `git add {taskdir}/HALT.md && git commit -m "chore(<slug>): tahan rantai di brief-NN (<verdict>)"`.

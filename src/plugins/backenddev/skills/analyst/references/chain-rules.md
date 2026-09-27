@@ -101,7 +101,7 @@ Membuka hop **tidak menurunkan status artefaknya**: `BRD.md`/`PRD.md` `APPROVED`
 **Parameter yang dipikul setiap hop tanpa kecuali:**
 
 - `taskdir` — path taskdir aktif.
-- `chain` — nilai enum yang dimateraikan di `TASK.md`. Diteruskan **eksplisit**, tidak disimpulkan hilir. Ia menyatakan dokumen hulu mana yang memang dijadwalkan terbit, dan tanpanya ketiga reviewer dokumen tidak dapat membedakan "dokumen sah tidak ada" dari "rantai putus" — slot `Chain` di ketiga `dispatcher/reviewer.md` dihidrasi dari nilai ini.
+- `chain` — nilai enum yang dimateraikan di `TASK.md`. Diteruskan **eksplisit**, tidak disimpulkan hilir. Ia menyatakan dokumen hulu mana yang memang dijadwalkan terbit, dan tanpanya ketiga reviewer dokumen tidak dapat membedakan "dokumen sah tidak ada" dari "rantai putus" — slot `Chain` di ketiga template reviewer (`business-analysis/dispatcher/reviewer.md`, `system-analysis/dispatcher/reviewer.md`, `plan/dispatcher/reviewer.md`) dihidrasi dari nilai ini.
 - `risk` — `risk:` frontmatter `TASK.md`. `plan` memakainya sebagai plafon Check K; `system-analysis` menerimanya bernama `risk_level`.
 
 **Parameter tambahan hop `BRIEF`:** `file_scope` — `File Scope` laporan rute gerbang, diteruskan `analyst` apa adanya. Tanpanya Check E `plan` tidak punya pembanding, karena `plan` pada lane planning dipanggil `analyst` dan tidak pernah membaca laporan gerbang sendiri.

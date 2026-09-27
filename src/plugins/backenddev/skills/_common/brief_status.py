@@ -146,22 +146,56 @@ def review_freshness(root: Path, taskdir_rel: str) -> Tuple[bool, str]:
     return True, f"REVIEW.md @ {rv[:7]} menutup HEAD"
 
 
-def landed_sha(root: Path, brief_rel: str, commit_message: str) -> str:
-    """SHA commit ber-subjek persis `commit_message` brief, sesudah brief itu lahir.
+def norm_subject(subject: str) -> str:
+    """Spasi dirapatkan dan huruf disamakan: subjek diketik implementor (09 E18)."""
+    return " ".join(subject.split()).casefold()
 
-    Dibandingkan persis, bukan `--grep` regex. Rentangnya dimulai dari commit
-    yang menambahkan berkas brief, supaya unit bernama sama di taskdir lain
-    tidak ikut cocok.
+
+def landed_sha(root: Path, brief_rel: str, commit_message: str) -> str:
+    """SHA commit ber-subjek `commit_message` brief, sesudah brief itu lahir.
+
+    Dibandingkan sesudah `norm_subject` (bukan `--grep` regex): satu spasi atau huruf yang meleset
+    tidak lagi membuat unit yang sudah mendarat di-dispatch ulang. Rentangnya dimulai dari commit
+    yang menambahkan berkas brief, supaya unit bernama sama di taskdir lain tidak ikut cocok.
     """
     if not commit_message:
         return ""
     born = git(root, "log", "--diff-filter=A", "--format=%H", "--", brief_rel).splitlines()
     if not born:
         return ""
+    want = norm_subject(commit_message)
     for line in git(root, "log", "--format=%h%x09%s", f"{born[-1]}..HEAD").splitlines():
         sha, _, subj = line.partition("\t")
-        if subj == commit_message:
+        if norm_subject(subj) == want:
             return sha
+    return ""
+
+
+def _status_at(root: Path, rev: str, brief_rel: str) -> str:
+    r = subprocess.run(["git", "show", f"{rev}:{brief_rel}"], cwd=root, capture_output=True)
+    if r.returncode != 0:
+        return ""
+    try:
+        return str(split_frontmatter(r.stdout.decode("utf-8"))[0].get("status", "")).strip()
+    except (UnicodeDecodeError, FrontmatterError):
+        return ""
+
+
+def done_sha(root: Path, brief_rel: str) -> str:
+    """SHA commit yang mengubah status brief menjadi `DONE`, apa pun subjeknya; kosong bila tak ada.
+
+    Implementor meng-commit `status: DONE` bersama kode unitnya (satu commit), jadi transisi status
+    di riwayat git adalah bukti mendarat yang tidak bergantung pada subjek yang diketik. `DONE` yang
+    hanya ada di working tree, atau ditulis tangan lalu di-commit tanpa lewat transisi, tidak punya
+    bukti ini (09 E18).
+    """
+    for sha in git(root, "log", "--format=%H", "--", brief_rel).splitlines():
+        if _status_at(root, sha, brief_rel) == "DONE" and _status_at(root, f"{sha}^", brief_rel) != "DONE":
+            # Commit unit membawa kode; transisi DONE yang hanya menyentuh dokumen `backenddev/`
+            # (status ditulis tangan lalu di-commit) bukan bukti mendarat.
+            code = git(root, "show", "--name-only", "--format=", sha, "--", ".", ":(exclude)backenddev",
+                       ":(exclude).claude")
+            return sha[:7] if code.strip() else ""
     return ""
 
 

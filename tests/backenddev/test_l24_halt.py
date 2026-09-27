@@ -1,7 +1,7 @@
 """L2.4 — vonis henti architect ter-commit sebagai `HALT.md`; `plan` mencabutnya lewat baris `repairs`."""
 import json
 
-from conftest import TD, be_checks, be_run, brief, commit, write_files
+from conftest import TD, be_checks, be_run, brief, commit, land, write_files
 
 def _spec_path(repo):
     """Spec batch di laci `.explore/` taskdir — satu-satunya lokasi yang diterima scaffold (B11)."""
@@ -74,8 +74,7 @@ def test_scaffold_repairs_removes_halt(chain_repo):
 
 
 def test_halt_under_taskdir_keeps_review_fresh(chain_repo):
-    brief(chain_repo, "01", "lock", "DONE")
-    commit(chain_repo, "fix(order): implement lock")
+    land(chain_repo, brief(chain_repo, "01", "lock", "READY"))
     write_files(chain_repo, {f"{TD}/REVIEW.md": "---\nhighest: CLEAN\n---\n"})
     commit(chain_repo, "docs(order-fix): add final review report")
     write_files(chain_repo, {f"{TD}/HALT.md": HALT})
