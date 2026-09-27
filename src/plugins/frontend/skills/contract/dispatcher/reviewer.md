@@ -15,11 +15,13 @@ Review satu draft CONTRACT.md frontend.
 - Stack: `{stack}` — idiom penamaan di `{adapter_path}` seksi `## Layer taxonomy`.
 - Ronde: `{round}` dari plafon 2 per putaran (putaran baru sesudah draft `PASS` di-commit, atau sesudah `reopen`).
 - Ronde 2 saja: vonis sebelumnya `{previous_verdict}`, seksi yang berubah `{changed_sections}`.
+- Sidik: `{sidik}` — sidik konten yang kamu nilai. Salin persis sebagai baris `- Sidik: {sidik}` tepat
+  sesudah `- Ronde:` di blok balikan; balikan tanpa baris itu ditolak pendispatch.
 - Aturan Semantik: bagian 2 butir 7–13 `{contract_template}`.
 - Sudah Dijamin: `validate_doc.py` `PASS` — struktur, penomoran AC, token Sumber, dan keterpikulan
   SC/DD/ST. Dilarang menghitung ulang.
 - Larangan: read-only; dilarang menulis `status: APPROVED`, merancang ulang kontrak, atau bertanya ke user.
-- Balikan: blok `## Contract Review` sesuai definisi agent-mu, tanpa teks lain.
+- Balikan: blok `## Contract Review` sesuai definisi agent-mu ditambah baris `- Sidik:` di atas, tanpa teks lain.
 ````
 
 ### Slot Hidrasi
@@ -32,6 +34,7 @@ Review satu draft CONTRACT.md frontend.
 | `{adapter_path}` | Entri `adapter` peta **Skrip:** SKILL.md, `<stack>` dari `index.json` | **[REQUIRED]** Hasil substitusi, bukan literal |
 | `{contract_template}` | Entri `contract-template.md` peta **Skrip:** SKILL.md | **[REQUIRED]** Path absolut hasil substitusi |
 | `{round}` | Keluaran `review_round.py open --gate contract` | **[REQUIRED]** `1` atau `2` |
+| `{sidik}` | Keluaran `review_round.py open --gate contract` (`sidik <12 hex>`) | **[REQUIRED]** Disalin apa adanya dari keluaran `open` ronde ini, bukan ronde lalu |
 | `{previous_verdict}` | Blok `## Contract Review` ronde 1 | **[OPTIONAL]** Hanya ronde 2; `-` di ronde 1 |
 | `{changed_sections}` | Heading `##` yang berubah sejak ronde 1 | **[OPTIONAL]** Hanya ronde 2; `-` di ronde 1 |
 
@@ -52,7 +55,7 @@ python3 «review_round.py» open --taskdir {taskdir} --gate contract
 
 ### Penanganan Balikan
 
-Simpan balikan apa adanya ke `{taskdir}/.explore/contract-review-r<ronde>.md` (tanpa menyunting satu karakter pun), lalu catat sebelum melangkah — `record` membandingkan `Verdict:` dan hitungan `BLOCKER:` berkas itu dengan flag-nya dan menolak bila berbeda:
+Simpan balikan apa adanya ke `{taskdir}/.explore/contract-review-r<ronde>.md` (tanpa menyunting satu karakter pun), lalu catat sebelum melangkah — `record` membandingkan `Verdict:` dan hitungan `BLOCKER:` berkas itu dengan flag-nya, serta `- Sidik:` dengan sidik ronde yang terbuka, dan menolak bila berbeda:
 
 ```bash
 python3 «review_round.py» record --taskdir {taskdir} --gate contract \
@@ -68,5 +71,6 @@ python3 «review_round.py» record --taskdir {taskdir} --gate contract \
 | `Verdict: BLOCKED` | `record --verdict BLOCKED`; perbaiki tiap BLOCKER di draft, `validate_doc.py` sampai `PASS`, lalu ronde 2 menyempit bila plafon masih ada |
 | `BLOCKER [MEKANIS]` muncul | Catat vonis apa adanya (`record --verdict BLOCKED --mechanical <n>`); reviewer menghitung ulang yang sudah dijamin — periksa ulang `validate_doc.py`: `FAIL` → perbaiki sampai `PASS`; `PASS` → perlakukan temuan itu sebagai ADVISORY dan catat penyimpangannya. Lalu ronde menyempit — vonis `BLOCKED` tidak dapat disetujui tanpa ronde `PASS` sesudahnya |
 | Payload kosong, format rusak, atau error | `record --verdict DISPATCH_FAILED` (tidak dihitung plafon ronde; maksimal 2 per taskdir), ulangi maksimal sekali |
+| `record` FAIL: `- Sidik:` absen atau ≠ sidik ronde terbuka | Balikan bukan vonis atas konten ini (laporan basi atau slot salah): `record --verdict DISPATCH_FAILED`, lalu dispatch ulang dengan `{sidik}` dari keluaran `open` baru. Dilarang menyunting berkas balikan |
 
-**Subagent mengembalikan:** blok `## Contract Review` dengan `Verdict`, `Ronde`, hitungan BLOCKER, daftar BLOCKER berjangkar, dan ADVISORY.
+**Subagent mengembalikan:** blok `## Contract Review` dengan `Verdict`, `Ronde`, `Sidik`, hitungan BLOCKER, daftar BLOCKER berjangkar, dan ADVISORY.

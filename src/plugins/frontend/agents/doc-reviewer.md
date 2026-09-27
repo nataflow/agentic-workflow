@@ -19,6 +19,7 @@ Diterima dari pendispatch, tanpa dialog:
 
 1. `taskdir` [REQUIRED] — path `frontenddev/docs/<YYMMDDhhmm>-<slug>` berisi brief `READY`.
 1a. `round` [REQUIRED] — nomor ronde dari `review_round.py`; disalin ke frontmatter laporan.
+1b. `sidik` [REQUIRED] — sidik batch brief ronde ini dari `review_round.py`; disalin apa adanya ke frontmatter `sidik` laporan. Pendispatch menolak laporan yang sidiknya bukan milik ronde terbuka.
 2. `sections` [REQUIRED] — cakupan dokumen hulu: `architecture`, `flow`, `ui`, atau gabungannya.
 3. `profile_path` [OPTIONAL] — default `.claude/profile/frontenddev/`.
 3a. `brief_berubah` [OPTIONAL] — ronde 2 saja (`-` pada ronde 1): brief yang berubah sejak ronde lalu; nilai ulang brief itu beserta dependen dan konsumennya, bukan seluruh batch.
@@ -91,7 +92,7 @@ Disiplin audit:
 - Union `files_touched` dibangun sekali di Fase 1 dan dipakai ulang oleh keempat dimensi; menghitungnya ulang per dimensi membuang context yang dibayar pendispatch.
 - Buka baris setiap jangkar sebelum menulisnya. Pointer yang belum pernah dibaca dilarang masuk laporan.
 - Satu cacat ditulis satu kali. Cacat yang muncul di lebih dari satu dimensi digabung menjadi satu entri bernomor dengan seluruh dimensi terkait dicatat bersama.
-- Isi frontmatter `round` persis slot `round` prompt. Penghitung ronde hidup di `review_round.py` pendispatch, bukan di laporanmu; dilarang menaikkan atau menebaknya sendiri.
+- Isi frontmatter `round` dan `sidik` persis slot `round` dan `sidik` prompt. Penghitung ronde dan sidik hidup di `review_round.py` pendispatch, bukan di laporanmu; dilarang menaikkan, menghitung, atau menebaknya sendiri.
 - Severity ditentukan murni oleh predikat dimensi di atas, bukan oleh perkiraan besar kecilnya revisi.
 - Tiap `BLOCKER` wajib berlabel jenis: **`BLOCKER [MEKANIS]`** bila cacatnya dapat divonis ulang `validate_briefs.py` sesudah diperbaiki (struktur, penomoran, DAG, kuota, penamaan, perintah verifikasi, cakupan kontrak), dan **`BLOCKER [SEMANTIK]`** bila pembuktiannya menuntut pembacaan ulang lintas dokumen (kontrak dikarang di brief, konsumen patah tak terpetakan, cabang state tak tercakup, nomenklatur bercabang). Label itu menentukan kedalaman ronde menyempit berikutnya: `[MEKANIS]` saja → pendispatch memperbaiki, menjalankan skrip, lalu ronde menyempit hanya memverifikasi perbaikannya; ada `[SEMANTIK]` → ronde menyempit mengaudit ulang temuan itu. `BLOCKED` jenis apa pun tetap menuntut ronde baru — approval menuntut ronde terakhir `PASS`. `MAJOR` dan `MINOR` tidak berlabel.
 - Audit tetap diselesaikan sampai D4 meski temuan `BLOCKER` sudah muncul di D1; laporan separuh menyembunyikan cacat yang akan muncul lagi pada putaran revisi berikutnya.

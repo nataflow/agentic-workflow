@@ -8,24 +8,31 @@ Tabel keadaan yang dulu hidup sebagai prosa di Phase 2 kini hidup di sini.
 
 Urutan vonis (yang pertama cocok menang) — sama persis dengan `classify()`:
 
-1. `RUSAK`      — direktori tidak ada, nama di luar pola `<YYMMDDhhmm>-<slug>`, atau
-                  artefak rantai tanpa `TASK.md`.
+1. `RUSAK`      — path di luar `frontenddev/docs/<YYMMDDhhmm>-<slug>`, direktori tidak ada,
+                  nama di luar pola, atau artefak rantai tanpa `TASK.md`.
 2. `AKAR`       — taskdir kosong → `frontend:task`.
 3. `DITUTUP`    — `TASK.md` `status: ABANDONED` (`chain.py abandon`).
-4. `RUSAK`      — pasangan lane/sections tidak sah atau diubah di luar akar/eskalasi.
+4. `RUSAK`      — `status` selain `ACTIVE`/`ABANDONED` (12 J50), atau pasangan lane/sections
+                  tidak sah atau diubah di luar akar/eskalasi.
 5. `AKAR`       — `TASK.md` belum ter-commit → `frontend:task` (commit akar).
-6. `RUSAK`      — ledger `## Chain` ≠ jadwal sections.
-7. `DRIFT`      — hop `[x]` yang kontennya berubah sesudah disetujui → `chain.py reopen`.
-8. `GATE`       — hop ledger pertama yang belum `[x]` → skill pemiliknya (beserta mode `plan`).
-9. `TERHENTI`   — brief `BLOCKED` tanpa remedi → `chain.py reopen --row BRIEF` → `plan` APPEND.
-10. `EKSEKUSI`  — brief `READY` dapat berangkat → `frontend:architect`.
-11. `PENUTUP`   — seluruh brief tertutup, `REVIEW.md` absen atau basi → `architect` Phase 4.
-12. `TEMUAN`    — `REVIEW.md` `BLOCKED` → reopen BRIEF → `plan` APPEND brief perbaikan di
+6. `TUNTAS`     — `REPORT.md` ter-commit, `REVIEW.md` `PASS`/`WARNING`, dan tidak ada commit
+                  `TASK.md`/brief sesudah laporan. Dinilai **sebelum** ledger (12 J44): rantai
+                  yang sudah tuntas lalu di-squash-merge kehilangan commit approve-nya, bukan
+                  kehilangan keabsahannya.
+7. `RUSAK`      — ledger `## Chain` ≠ jadwal sections.
+8. `DRIFT`      — hop `[x]` yang kontennya berubah sesudah disetujui, atau materainya tidak sah
+                  → `chain.py reopen`.
+9. `GATE`       — hop ledger pertama yang belum `[x]` → skill pemiliknya (beserta mode `plan`).
+10. `TERHENTI`  — brief `BLOCKED` tanpa remedi → `chain.py reopen --row BRIEF` → `plan` APPEND.
+11. `EKSEKUSI`  — brief `READY` dapat berangkat → `frontend:architect`.
+12. `PENUTUP`   — seluruh brief tertutup, `REVIEW.md` absen, basi, atau ber-verdict di luar
+                  `PASS`/`WARNING`/`BLOCKED` (12 J53) → `architect` Phase 4.
+13. `TEMUAN`    — `REVIEW.md` `BLOCKED` → reopen BRIEF → `plan` APPEND brief perbaikan di
                   taskdir yang sama → review ulang.
-13. `LAPORAN`   — `REVIEW.md` `PASS`/`WARNING`, `REPORT.md` absen → `architect` Phase 5.
-14. `LAPORAN TERTUNDA` — `REPORT.md` tertulis tetapi belum ter-commit (commit report gagal)
+14. `LAPORAN`   — `REVIEW.md` `PASS`/`WARNING`, `REPORT.md` absen → `architect` Phase 5.
+15. `LAPORAN TERTUNDA` — `REPORT.md` tertulis tetapi belum ter-commit (commit report gagal)
                   → `architect` Phase 5 butir 4.
-15. `TUNTAS`    — `REPORT.md` ada dan ter-commit.
+16. `TUNTAS`    — `REPORT.md` ada dan ter-commit.
 
 Repo non-git tidak divonis per taskdir: skrip keluar `FAIL` karena akar dan
 ledger hanya dapat dibuktikan lewat riwayat commit.
@@ -44,12 +51,17 @@ from typing import Dict
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
     lane_tamper,
+    BRIEF_GLOB,
     CHAIN_BY_ROW,
     MINOR_LANE,
+    TASKDIR_PATTERN,
     brief_closure,
     expected_rows,
     find_repo_root,
+    git,
     is_git_repo,
+    last_commit,
+    normalize_taskdir,
     review_is_fresh,
     is_committed,
     lane_sections_problem,
@@ -63,12 +75,33 @@ from precondition_lib import cli  # noqa: E402
 DOCS = "frontenddev/docs"
 TASKDIR_NAME = re.compile(r"^\d{10}-[a-z0-9-]+$")
 CHAIN_ARTIFACTS = ("FLOW.md", "UI.md", "CONTRACT.md", "REVIEW-PLAN.md", "REVIEW.md", "REPORT.md")
+REVIEW_VERDICTS = ("PASS", "WARNING", "BLOCKED")
+
+
+def finished(root: Path, rel: str) -> bool:
+    """`REPORT.md` ter-commit, `REVIEW.md` `PASS`/`WARNING`, dan tidak ada commit `TASK.md`/brief sesudahnya.
+
+    Penanda tuntas dibaca dari disk dan urutan commit, bukan dari ledger: rantai yang tuntas lalu
+    di-squash-merge kehilangan commit approve-nya (12 J44). Reopen sesudah laporan menyentuh `TASK.md`,
+    jadi rantai yang dilanjutkan tetap divonis lewat ledger.
+    """
+    taskdir = root / rel
+    if not (taskdir / "REPORT.md").is_file() or not is_committed(root, f"{rel}/REPORT.md"):
+        return False
+    if read_status(taskdir / "REVIEW.md", "verdict") not in ("PASS", "WARNING"):
+        return False
+    report_sha = last_commit(root, f"{rel}/REPORT.md")
+    return not git(root, "rev-list", f"{report_sha}..HEAD", "--", f"{rel}/TASK.md", f"{rel}/{BRIEF_GLOB}").strip()
 
 
 def classify(root: Path, rel: str) -> Dict[str, str]:
     taskdir = root / rel
     task = taskdir / "TASK.md"
     out = {"taskdir": rel, "lane": "-", "state": "", "next": "", "detail": ""}
+    if not TASKDIR_PATTERN.match(rel):
+        out.update(state="RUSAK", next="laporkan ke user",
+                   detail=f"path `{rel}` di luar {DOCS}/<YYMMDDhhmm>-<slug> (huruf kecil, angka, `-`)")
+        return out
     if not taskdir.is_dir():
         out.update(state="RUSAK", next="periksa path taskdir; taskdir dibuat lead Phase 5",
                    detail="direktori tidak ada")
@@ -87,8 +120,14 @@ def classify(root: Path, rel: str) -> Dict[str, str]:
             out.update(state="AKAR", next="frontend:task (lead Phase 7), atau hapus direktori kosong bila user batal",
                        detail="taskdir kosong")
         return out
-    if read_status(task) == "ABANDONED":
+    status = read_status(task)
+    if status == "ABANDONED":
         out.update(state="DITUTUP", next="-", detail="ditutup atas keputusan user (`chain.py abandon`)")
+        return out
+    if status != "ACTIVE":
+        out.update(state="RUSAK", next="laporkan ke user; tutup lewat `chain.py abandon` bila user memutuskan berhenti",
+                   detail=f"`TASK.md` berstatus `{status or '(kosong)'}` — hanya `ACTIVE` (berjalan) atau "
+                          "`ABANDONED` (ditutup) yang sah")
         return out
     lane, sections = task_lane_sections(task)
     out["lane"] = lane or "-"
@@ -98,6 +137,9 @@ def classify(root: Path, rel: str) -> Dict[str, str]:
         return out
     if not is_committed(root, f"{rel}/TASK.md"):
         out.update(state="AKAR", next="frontend:task (commit akar)", detail="TASK.md belum ter-commit")
+        return out
+    if finished(root, rel):
+        out.update(state="TUNTAS", next="taskdir baru untuk permintaan baru", detail="REPORT.md ter-commit")
         return out
     entries = read_chain(task.read_text(encoding="utf-8"))
     if [e["row"] for e in entries] != expected_rows(sections):
@@ -146,6 +188,11 @@ def classify(root: Path, rel: str) -> Dict[str, str]:
         out.update(state="PENUTUP", next="frontend:architect (Phase 4)", detail="seluruh brief tertutup")
         return out
     verdict = read_status(review, "verdict")
+    if verdict not in REVIEW_VERDICTS:
+        out.update(state="PENUTUP", next="frontend:architect (Phase 4, review ulang)",
+                   detail=f"REVIEW.md ber-verdict `{verdict or '(kosong)'}` di luar {'/'.join(REVIEW_VERDICTS)} "
+                          "— tidak lolos `validate_review.py`; review ulang menimpanya")
+        return out
     if verdict == "BLOCKED":
         out.update(state="TEMUAN", next="chain.py reopen --row BRIEF → frontend:plan (mode APPEND, brief perbaikan)",
                    detail=f"{rel}/REVIEW.md BLOCKED — diperbaiki di taskdir yang sama, lalu review ulang")
@@ -175,7 +222,7 @@ def main() -> None:
               else f"TASKDIR STATE: [FAIL] {error}")
         sys.exit(1)
     if args.taskdir:
-        rels = [args.taskdir.strip().strip("/").replace("./", "")]
+        rels = [normalize_taskdir(args.taskdir)]        # segmen `..` dipertahankan → RUSAK (12 J53)
     else:
         base = root / DOCS
         # Nama di luar pola tetap dilaporkan (RUSAK) bila berisi berkas, bukan diabaikan diam-diam.

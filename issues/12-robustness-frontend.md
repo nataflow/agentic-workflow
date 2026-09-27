@@ -4,7 +4,7 @@ Sumber: review robustness plugin `frontend` 2026-09-27 (lima penelusur paralel: 
 prasyarat & verifikasi, validator dokumen, orkestrasi & prosa). Tiap temuan Tinggi/Sedang direproduksi di ruang
 kerja sementara sebelum masuk berkas ini. Basis kode: commit `b293564` (suite 615 test hijau).
 
-**Status (2026-09-27):** peta blast radius selesai; tahap 1–3 selesai, rilis menyusul.
+**Status (2026-09-27):** peta blast radius selesai; tahap 1–4 selesai, rilis menyusul.
 
 ## Tujuan
 
@@ -188,18 +188,18 @@ atau pola sama di plugin lain. **Test tersentuh** = test yang ada dan harus teta
 
 ## Tahap 4 — Ledger & state
 
-- [ ] **J42 [Tinggi]** Plafon ronde plan tidak dibuka ulang oleh `reopen CONTRACT` (BRIEF `[ ]` tidak ikut kaskade) → approve BRIEF mustahil (padanan H27).
-- [ ] **J43 [Tinggi]** "Amandemen akar" sesudah plafon habis tidak me-reset apa pun; `draft` ulang justru me-reset hitungan revisi.
-- [ ] **J44 [Tinggi]** Sha ledger tidak tahan rebase/clone; rantai TUNTAS yang di-squash-merge divonis DRIFT.
-- [ ] **J45 [Sedang]** `review_round record` menerima laporan reviewer ronde lama.
-- [ ] **J46 [Sedang]** Commit berbadan `Konten disetujui:/Hop:` yang diketik tangan membuat `chain verify` PASS walau validator FAIL; `--answer` bernewline menyisipkan baris materai.
-- [ ] **J47 [Sedang]** `reopen` tanpa `require_clean` menyapu suntingan yang menggantung.
-- [ ] **J48 [Sedang]** Brief `BLOCKED` dihidupkan lewat reopen → `READY` → approve → loop.
-- [ ] **J49 [Sedang]** Dua taskdir bersolug sama saling mencampur berkas rantai.
-- [ ] **J50 [Rendah]** `status: DONE` di `TASK.md` → GATE ↔ FAIL bolak-balik.
-- [ ] **J51 [Rendah]** `reopen` sesudah `abandon` berhasil; `abandon` kedua memberi pesan "commit gagal (hook/lock?)".
-- [ ] **J52 [Rendah]** `save` pertama tidak menulis `.bak` padahal pesan state rusak menyuruh memulihkan dari `.bak`.
-- [ ] **J53 [Rendah]** `taskdir_state` masih memakai `.replace("./","")`; verdict REVIEW asing jatuh ke LAPORAN.
+- [x] **J42 [Tinggi]** Plafon ronde plan tidak dibuka ulang oleh `reopen CONTRACT` (BRIEF `[ ]` tidak ikut kaskade) → approve BRIEF mustahil (padanan H27).
+- [x] **J43 [Tinggi]** "Amandemen akar" sesudah plafon habis tidak me-reset apa pun; `draft` ulang justru me-reset hitungan revisi.
+- [x] **J44 [Tinggi]** Sha ledger tidak tahan rebase/clone; rantai TUNTAS yang di-squash-merge divonis DRIFT.
+- [x] **J45 [Sedang]** `review_round record` menerima laporan reviewer ronde lama.
+- [x] **J46 [Sedang]** Commit berbadan `Konten disetujui:/Hop:` yang diketik tangan membuat `chain verify` PASS walau validator FAIL; `--answer` bernewline menyisipkan baris materai.
+- [x] **J47 [Sedang]** `reopen` tanpa `require_clean` menyapu suntingan yang menggantung.
+- [x] **J48 [Sedang]** Brief `BLOCKED` dihidupkan lewat reopen → `READY` → approve → loop.
+- [x] **J49 [Sedang]** Dua taskdir bersolug sama saling mencampur berkas rantai.
+- [x] **J50 [Rendah]** `status: DONE` di `TASK.md` → GATE ↔ FAIL bolak-balik.
+- [x] **J51 [Rendah]** `reopen` sesudah `abandon` berhasil; `abandon` kedua memberi pesan "commit gagal (hook/lock?)".
+- [x] **J52 [Rendah]** `save` pertama tidak menulis `.bak` padahal pesan state rusak menyuruh memulihkan dari `.bak`.
+- [x] **J53 [Rendah]** `taskdir_state` masih memakai `.replace("./","")`; verdict REVIEW asing jatuh ke LAPORAN.
 
 ## Tahap 5 — Orkestrasi & prosa
 

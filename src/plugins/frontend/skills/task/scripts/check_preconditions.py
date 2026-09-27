@@ -3,8 +3,8 @@
 
 Memvonis prasyarat `frontend:task` sebelum Phase 1 dibuka: bentuk taskdir,
 profil, ketiadaan `TASK.md`, keabsahan pasangan `lane`/`sections`, keberadaan
-`finding_source`, berkas template, kebersihan working tree, dan `ticket_source`
-analyst yang READY serta terkunci.
+`finding_source`, berkas template, kebersihan working tree, `ticket_source`
+analyst yang READY serta terkunci, dan slug yang belum dipakai taskdir lain.
 
 Zero external dependencies (Python Standard Library only). Satu impor
 intra-plugin: `skills/_common/precondition_lib.py`, di-bootstrap relatif
@@ -12,6 +12,7 @@ terhadap berkas ini.
 """
 
 import argparse
+import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -32,6 +33,7 @@ from precondition_lib import (  # noqa: E402
     parse_sections,
     read_status,
     report_json,
+    taskdir_slug,
     ticket_source_verdict,
 )
 from precondition_lib import cli  # noqa: E402
@@ -39,6 +41,8 @@ from precondition_lib import cli  # noqa: E402
 PROFILE_REQUIRED = ("index.json", "surface-map.md")
 PLUGIN_FILES = ("templates/task-template.md", "scripts/validate_task.py",
                 "../_common/chain.py")
+DOCS = "frontenddev/docs"
+TASKDIR_NAME = re.compile(r"^\d{10}-(?P<slug>.+)$")
 
 
 class PreconditionChecker:
@@ -63,7 +67,7 @@ class PreconditionChecker:
         })
 
     def run_all(self) -> bool:
-        """Jalankan 8 check; hanya `FAIL` yang menahan."""
+        """Jalankan 9 check; hanya `FAIL` yang menahan."""
         taskdir_ok = check_taskdir(self._add, 1, self.root, self.taskdir_rel)
         self.stack = check_profile(self._add, 2, self.profile_dir, PROFILE_REQUIRED)
         self._check_3_absent(taskdir_ok)
@@ -73,6 +77,7 @@ class PreconditionChecker:
         check_worktree(self._add, 7, self.root)
         # Ditambahkan di akhir supaya nomor check 1–7 yang sudah dirujuk tetap.
         self._add(8, "ticket_source READY & terkunci", *ticket_source_verdict(self.root, self.ticket_source))
+        self._check_9_slug(taskdir_ok)
         return not any(r["status"] == "FAIL" for r in self.results)
 
     def _check_3_absent(self, taskdir_ok: bool) -> None:
@@ -87,6 +92,26 @@ class PreconditionChecker:
                       "Akar tidak ditulis ulang; serahkan ke `frontend:lead`.")
             return
         self._add(3, name, "PASS", "akar belum ditulis")
+
+    def _check_9_slug(self, taskdir_ok: bool) -> None:
+        """Slug belum dipakai taskdir lain (12 J49): commit rantai dikenali dari `(<slug>)` di subjeknya,
+        jadi dua taskdir bersolug sama saling mencampur berkas rantai, revisi, dan re-entry."""
+        name = "Slug belum dipakai taskdir lain"
+        if not taskdir_ok:
+            self._add(9, name, "FAIL", "taskdir tidak sah", "Perbaiki Check 1 lebih dulu.")
+            return
+        slug = taskdir_slug(self.taskdir_rel)
+        own = Path(self.taskdir_rel).name
+        docs = self.root / DOCS
+        clash = sorted(p.name for p in docs.iterdir()
+                       if p.is_dir() and p.name != own and (m := TASKDIR_NAME.match(p.name))
+                       and m.group("slug") == slug) if docs.is_dir() else []
+        if clash:
+            self._add(9, name, "FAIL", f"slug `{slug}` sudah dipakai {', '.join(f'`{c}`' for c in clash)}",
+                      f"Commit rantai dikenali dari `({slug})`; slug kembar mencampur berkas rantai. Kembali ke "
+                      f"`frontend:lead` Phase 5: beri sufiks (mis. `{slug}-2`) pada taskdir baru.")
+            return
+        self._add(9, name, "PASS", f"slug `{slug}` unik")
 
     def _check_4_lane(self) -> None:
         name = "Pasangan lane & sections sah"

@@ -1098,18 +1098,27 @@ def count_subjects(root: Path, pattern: str, *paths: str) -> int:
 
 
 def revisions_since_open(root: Path, rel_paths: List[str], slug: str, label: str) -> int:
-    """Revisi berturut sejak draft/reopen terakhir: subjek `docs(<slug>): revise <label>`."""
-    out = git(root, "log", "--format=%s", "--", *rel_paths)
-    count = 0
+    """Revisi berturut sejak reopen/approve terakhir: subjek `docs(<slug>): revise <label>` (12 J43).
+
+    Hanya `draft <label>` **pertama** putaran itu yang merupakan draft; tiap `draft` sesudahnya adalah
+    revisi terselubung — dulu subjek `draft` ulang me-reset plafon. `TASK.md` taskdir ikut dibaca
+    karena commit `reopen`/`approve breakdown` hanya menyentuh `TASK.md`: tanpanya reopen hop BRIEF
+    tidak pernah menghentikan hitungan. Amandemen akar bukan batas putaran.
+    """
+    task_rel = f"{Path(rel_paths[0]).parent.as_posix()}/TASK.md" if rel_paths else ""
+    out = git(root, "log", "--format=%s", "--", *rel_paths, *([task_rel] if task_rel else []))
+    count = drafts = 0
     head = norm_subject(f"docs({slug}):")
-    revise, stops = f"{head} revise {label.casefold()}", (f"{head} draft {label.casefold()}", f"{head} reopen",
-                                                           f"{head} approve {label.casefold()}")
+    revise, draft = f"{head} revise {label.casefold()}", f"{head} draft {label.casefold()}"
+    stops = (f"{head} reopen", f"{head} approve {label.casefold()}")
     for subject in map(norm_subject, out.splitlines()):
         if subject.startswith(revise):
             count += 1
+        elif subject.startswith(draft):
+            drafts += 1
         elif subject.startswith(stops):
             break
-    return count
+    return count + max(0, drafts - 1)
 
 
 # ================================================================ 5. blok check & laporan
@@ -1431,40 +1440,146 @@ def gate_targets_at(root: Path, taskdir_rel: str, gate: str, sha: str) -> List[s
 
 
 def reopen_epoch(root: Path, taskdir_rel: str, gate: str) -> int:
-    """Jumlah commit `reopen` yang membuka hop gate ini (sebagai target atau lewat kaskade).
+    """Epoch ronde gate: commit `reopen` yang membuka hop gate ini **atau hop di atasnya**, ditambah
+    commit `eskalasi lane` (12 J42, padanan 11 H27).
 
-    Regexnya sama dengan `verify_chain_row`: kaskade memang membuka hop gate ini.
-    Angka, bukan sha, supaya tahan rebase.
+    Dokumen hulu yang berubah membatalkan vonis reviewer hilir walau hop hilir masih `[ ]` dan karena
+    itu tidak ikut kaskade — dulu `reopen CONTRACT` atas BRIEF `[ ]` meninggalkan plafon ronde plan
+    habis selamanya. Angka, bukan sha, supaya tahan rebase.
     """
     slug = re.escape(taskdir_slug(taskdir_rel))
-    return count_subjects(root, rf"^docs\({slug}\): reopen [A-Z ]*\b{GATE_ROW[gate]}\b",
-                          f"{taskdir_rel}/TASK.md")
+    rows = [spec[0] for spec in CHAIN_SPEC]
+    upto = "|".join(rows[:rows.index(GATE_ROW[gate]) + 1])
+    task_rel = f"{taskdir_rel}/TASK.md"
+    return (count_subjects(root, rf"^docs\({slug}\): reopen [A-Z ]*\b(?:{upto})\b", task_rel)
+            + count_subjects(root, rf"^docs\({slug}\): eskalasi lane ", task_rel))
+
+
+# ---------------------------------------------------------------- materai approve (12 J44, J46)
+
+APPROVE_SUBJECT = {"FLOW": "approve FLOW.md", "UI": "approve UI.md", "CONTRACT": "approve CONTRACT.md"}
+STAMP_KEYS = ("Persetujuan user", "Konten disetujui", "Sidik", "Review-Round", "Hop")
+_STAMP_LINE = re.compile(rf"^({'|'.join(re.escape(k) for k in STAMP_KEYS)}):[ \t]*(.*?)[ \t]*$", re.MULTILINE)
+_REVIEW_ROUND = re.compile(r"^(?P<gate>contract|plan) r\d+ t\d+ PASS (?P<sidik>[0-9a-f]{12})$")
+REAPPROVE = "`chain.py reopen --row {row}` lalu setujui ulang lewat gate pemiliknya"
+
+
+def approve_subject_ok(slug: str, row: str, subject: str) -> bool:
+    """Subjek persis yang ditulis `chain.py approve` untuk hop `row`."""
+    subject = subject.strip()
+    if row == "BRIEF":
+        return re.fullmatch(rf"docs\({re.escape(slug)}\): approve breakdown \(\d+ briefs\)", subject) is not None
+    return subject == f"docs({slug}): {APPROVE_SUBJECT[row]}"
+
+
+def stamp_fields(body: str) -> Tuple[Dict[str, str], List[str]]:
+    """Baris materai di badan commit approve → `(fields, kunci ganda)`; kunci ganda = materai disisipi."""
+    fields: Dict[str, str] = {}
+    dup: List[str] = []
+    for m in _STAMP_LINE.finditer(body):
+        if m.group(1) in fields:
+            dup.append(m.group(1))
+        fields[m.group(1)] = m.group(2)
+    return fields, dup
+
+
+def _log_entries(root: Path, rel: str) -> List[Tuple[str, str, str]]:
+    """`[(sha, subjek, badan)]` commit yang menyentuh `rel`, terbaru dulu."""
+    out = git(root, "log", "--format=%H%x1f%s%x1f%b%x1e", "--", rel)
+    entries = []
+    for chunk in out.split("\x1e"):
+        parts = chunk.strip("\n").split("\x1f")
+        if len(parts) == 3 and parts[0].strip():
+            entries.append((parts[0].strip(), parts[1], parts[2]))
+    return entries
+
+
+def approval_stamp(root: Path, taskdir_rel: str, row: str) -> Optional[Dict[str, Any]]:
+    """Commit `chain.py approve` terbaru hop `row` yang lebih baru daripada reopen terakhirnya, atau `None`.
+
+    Dikenali dari subjek persis + `Hop: <row>`, bukan dari sha ledger: sesudah rebase atau clone sha lama
+    tidak lagi ada, tetapi commit approve-nya tetap ada dengan subjek dan badan yang sama.
+    """
+    slug = taskdir_slug(taskdir_rel)
+    reopen = re.compile(rf"^docs\({re.escape(slug)}\): reopen [A-Z ]*\b{row}\b")
+    for sha, subject, body in _log_entries(root, f"{taskdir_rel}/TASK.md"):
+        if reopen.match(subject.strip()):
+            return None
+        if approve_subject_ok(slug, row, subject):
+            fields, dup = stamp_fields(body)
+            if fields.get("Hop") == row:
+                return {"sha": sha, "fields": fields, "dup": dup}
+    return None
+
+
+def approval_targets(root: Path, taskdir_rel: str, row: str, rev: str) -> List[str]:
+    """Berkas yang disidik materai hop `row` pada `rev`: dokumennya, atau seluruh brief + `REVIEW-PLAN.md`."""
+    if row in DOC_ROWS:
+        return [f"{taskdir_rel}/{CHAIN_BY_ROW[row][2]}"]
+    names = git(root, "ls-tree", "--name-only", rev, f"{taskdir_rel}/").splitlines()
+    return sorted(n for n in names if fnmatch.fnmatch(Path(n).name, BRIEF_GLOB) or Path(n).name == "REVIEW-PLAN.md")
+
+
+def review_required_at(root: Path, taskdir_rel: str, row: str, rev: str) -> str:
+    """Gate reviewer yang wajib `PASS` sebelum approve hop `row` pada `rev`, atau kosong.
+
+    Selaras `Chain.approve`: CONTRACT selalu; BRIEF hanya pada lane non-MINOR dengan brief `READY`.
+    """
+    if row == "CONTRACT":
+        return "contract"
+    if row != "BRIEF":
+        return ""
+    lane = str(parse_frontmatter(show_at(root, rev, f"{taskdir_rel}/TASK.md") or "").get("lane", "")).strip()
+    briefs = [n for n in approval_targets(root, taskdir_rel, row, rev) if Path(n).name != "REVIEW-PLAN.md"]
+    if lane == MINOR_LANE or not any(_status_at(root, rev, n) == "READY" for n in briefs):
+        return ""
+    return "plan"
 
 
 def verify_chain_row(root: Path, taskdir_rel: str, entry: Dict[str, Any]) -> str:
-    """Kosong bila satu baris ledger `[x]` sah: sha ada, dok APPROVED/READY, konten utuh."""
+    """Kosong bila satu baris ledger `[x]` sah: materai approve utuh, dok APPROVED/READY, konten utuh.
+
+    Jangkarnya commit approve (12 J44), bukan sha ledger: subjek persis + `Hop:`, lebih baru daripada
+    reopen terakhir hop itu; `Konten disetujui:`-nya wajib sama dengan sha ledger dan `Sidik:`-nya dengan
+    isi berkas pada commit itu, ditambah `Review-Round:` PASS atas konten yang sama untuk hop yang
+    direview (12 J46). Validator tidak dijalankan ulang: versi validator baru tidak boleh menggugurkan
+    approval lama. Materai tanpa `Sidik:` (versi lama atau diketik tangan) → FAIL, remedi reopen.
+    """
     row = entry["row"]
     if entry["mark"] != "x":
         state = "belum berangkat" if entry["mark"] == " " else f"dibuka ulang (re-entry {entry['n']})"
         return f"hop `{row}` {state}"
     sha = entry["sha"]
-    if not sha or not git(root, "cat-file", "-t", sha).strip():
-        return f"hop `{row}` bersha `{sha or '(kosong)'}` yang tidak ada di repo"
+    remedy = REAPPROVE.format(row=row)
+    stamp = approval_stamp(root, taskdir_rel, row)
+    if stamp is None:
+        return (f"hop `{row}` @ {sha or '(kosong)'} tercentang tanpa commit `chain.py approve` sesudah reopen "
+                f"terakhirnya — centang tulisan tangan, atau riwayat yang memuatnya di-squash; {remedy}")
+    anchor, fields = stamp["sha"], stamp["fields"]
+    if stamp["dup"]:
+        return (f"materai approve hop `{row}` ({anchor[:7]}) memuat baris {', '.join(stamp['dup'])} ganda — "
+                f"materai disisipi; {remedy}")
+    if not sha or fields.get("Konten disetujui") != sha:
+        return (f"hop `{row}` @ {sha or '(kosong)'} tidak dimateraikan commit approve terakhirnya "
+                f"({anchor[:7]} memateraikan `{fields.get('Konten disetujui') or '-'}`) — centang tulisan tangan; "
+                f"{remedy}")
+    sidik = fields.get("Sidik", "")
+    if not sidik:
+        return (f"materai approve hop `{row}` ({anchor[:7]}) tanpa `Sidik:` — materai versi lama atau diketik "
+                f"tangan; {remedy}")
+    if snapshot_at(root, anchor, approval_targets(root, taskdir_rel, row, anchor)) != sidik:
+        return (f"isi hop `{row}` pada commit approve {anchor[:7]} ≠ `Sidik:` materainya — riwayat ditulis ulang "
+                f"atau materai diketik tangan; {remedy}")
+    gate = review_required_at(root, taskdir_rel, row, anchor)
+    if gate:
+        m = _REVIEW_ROUND.match(fields.get("Review-Round", ""))
+        reviewed = [n for n in approval_targets(root, taskdir_rel, row, anchor) if Path(n).name != "REVIEW-PLAN.md"]
+        if not m or m.group("gate") != gate or m.group("sidik") != snapshot_at(root, anchor, reviewed)[:12]:
+            return (f"materai approve hop `{row}` ({anchor[:7]}) tanpa `Review-Round: {gate} … PASS` atas konten "
+                    f"yang sama — approval tanpa ronde reviewer; {remedy}")
     task_rel = f"{taskdir_rel}/TASK.md"
-    stamp = git(root, "log", "--format=%H", "--fixed-strings", "--all-match",
-                f"--grep=Konten disetujui: {sha}", f"--grep=Hop: {row}", "--", task_rel).strip()
-    if not stamp:
-        return (f"hop `{row}` tercentang tanpa commit `chain.py approve` yang memateraikan {sha} — "
-                "centang tulisan tangan")
-    slug = taskdir_slug(taskdir_rel)
-    reopens = [l.split(" ", 1)[0] for l in git(root, "log", "--format=%H %s", "--", task_rel).splitlines()
-               if re.match(rf"^\S+ docs\({re.escape(slug)}\): reopen [A-Z ]*\b{row}\b", l)]
-    if reopens and stamp.splitlines()[0] not in git(root, "log", "--format=%H", f"{reopens[0]}..HEAD",
-                                                     "--", task_rel).split():
-        return (f"hop `{row}` dicentang dengan approval lama {sha} padahal sudah dibuka ulang — "
-                "centang tulisan tangan; setujui ulang lewat `chain.py approve`")
-    then_task = show_at(root, stamp.splitlines()[0], task_rel) or ""
-    if sc_ids(then_task) != sc_ids((root / task_rel).read_text(encoding="utf-8", errors="replace")):
+    if sc_ids(show_at(root, anchor, task_rel) or "") != \
+            sc_ids((root / task_rel).read_text(encoding="utf-8", errors="replace")):
         return f"`SC-{{n}}` TASK.md berubah sesudah hop `{row}` disetujui — hop wajib dibuka ulang"
     if row in DOC_ROWS:
         doc = CHAIN_BY_ROW[row][2]
@@ -1472,8 +1587,37 @@ def verify_chain_row(root: Path, taskdir_rel: str, entry: Dict[str, Any]) -> str
         status = read_status(root / rel)
         if status != "APPROVED":
             return f"`{doc}` berstatus `{status or '(kosong)'}` padahal hop `{row}` tercentang"
-        return doc_drift(root, rel, sha)
-    return brief_set_drift(root, taskdir_rel, sha)
+        return doc_drift(root, rel, anchor)
+    return brief_set_drift(root, taskdir_rel, anchor)
+
+
+def locked_brief_problems(root: Path, taskdir_rel: str) -> List[str]:
+    """Brief `DONE`/`BLOCKED` saat hop BRIEF terakhir dibuka ulang wajib tetap sama status dan isinya (12 J48).
+
+    Jangkarnya commit `reopen` terakhir yang membuka BRIEF (target atau kaskade): keadaan brief saat hop
+    dibuka. Brief `BLOCKED` tidak pernah naik lagi — sisa pekerjaannya milik brief remedi.
+    """
+    slug = re.escape(taskdir_slug(taskdir_rel))
+    reopen = re.compile(rf"^docs\({slug}\): reopen [A-Z ]*\bBRIEF\b")
+    anchor = next((sha for sha, subject, _ in _log_entries(root, f"{taskdir_rel}/TASK.md")
+                   if reopen.match(subject.strip())), "")
+    if not anchor:
+        return []
+    problems = []
+    for rel in approval_targets(root, taskdir_rel, "BRIEF", anchor):
+        name = Path(rel).name
+        before = _status_at(root, anchor, rel)
+        if name == "REVIEW-PLAN.md" or before not in ("DONE", "BLOCKED"):
+            continue
+        if not (root / rel).is_file():
+            problems.append(f"`{name}` ({before}) hilang")
+            continue
+        after = read_status(root / rel)
+        if after != before:
+            problems.append(f"`{name}` {before} → {after or '(kosong)'}")
+        elif doc_drift(root, rel, anchor):
+            problems.append(f"`{name}` ({before}) disunting")
+    return problems
 
 
 def check_chain_rows(add: AddFn, cid: int, root: Path, taskdir_rel: str,

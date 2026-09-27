@@ -11,6 +11,7 @@ Audit dokumen planning satu taskdir secara helikopter view sebelum eksekusi kode
 
 - Taskdir: `{taskdir}` — `brief-*.md` aktif berstatus `READY`; brief `DONE`/`BLOCKED` terkunci dan hanya ditagih predikat cakupan.
 - Ronde: `{round}` dari plafon 2 per putaran (putaran baru sesudah draft `PASS` di-commit, atau sesudah `reopen`).
+- Sidik: `{sidik}` — sidik batch brief yang kamu nilai; salin persis ke frontmatter `sidik`.
 - Ronde menyempit: brief berubah sejak ronde lalu `{brief_berubah}`; laporan ronde lalu `{previous_report}`.
   Keduanya `-` pada ronde 1. Bila terisi, baca laporan lalu untuk tahu temuan mana yang seharusnya
   tertutup, lalu nilai ulang brief yang berubah beserta dependen dan konsumennya.
@@ -47,6 +48,7 @@ blocker: "<n>"
 major: "<n>"
 minor: "<n>"
 round: "<n>"
+sidik: "<sidik>"
 ---
 
 # Plan Review: <slug>
@@ -125,6 +127,7 @@ laporan.
 | `{taskdir}` | Parameter `taskdir` plan | **[REQUIRED]** Path taskdir aktif apa adanya, mis. `frontenddev/docs/2608251430-order-export-csv`. Tanpa slot ini subagent tidak punya muara tulis dan menghentikan dispatch |
 | `{sections}` | Frontmatter `sections` `TASK.md` (baris `Terselesaikan:` prasyarat plan) | **[REQUIRED]** Satu atau gabungan dari `architecture`, `flow`, `ui`. Nilai kosong berarti lane `HOTFIX_MINOR` — gerbang ini dilewati, bukan didispatch dengan slot kosong |
 | `{round}` | Keluaran `review_round.py open --gate plan` | **[REQUIRED]** `1` atau `2`; subagent menyalinnya ke frontmatter `round` |
+| `{sidik}` | Keluaran `review_round.py open --gate plan` (`sidik <12 hex>`) | **[REQUIRED]** Disalin apa adanya dari keluaran `open` ronde ini; subagent menyalinnya ke frontmatter `sidik` |
 | `{profile_path}` | Parameter pendispatch | **[OPTIONAL]** Default `.claude/profile/frontenddev/`. Isi slotnya dengan path default itu, bukan dibiarkan kosong |
 | `{brief_berubah}` | Daftar berkas yang direvisi sejak ronde sebelumnya | **[OPTIONAL]** Ronde 2 saja; `-` pada ronde 1. Ronde 2 tanpa slot ini mengulang seluruh dimensi dengan biaya penuh |
 | `{previous_report}` | `<taskdir>/REVIEW-PLAN.md` ronde sebelumnya | **[OPTIONAL]** Ronde 2 saja, sebagai path — bukan isinya disalin; `-` pada ronde 1 |
@@ -151,7 +154,7 @@ python3 «review_round.py» open --taskdir {taskdir} --gate plan
 
 ### Penanganan Balikan
 
-Sesudah tiap balikan, catat vonisnya — `record` menolak bila `verdict` frontmatter `REVIEW-PLAN.md` berbeda dari flag, menyimpan sidik laporannya, dan `chain.py approve --row BRIEF` menolak approval tanpa ronde terakhir `PASS` atas konten yang persis sama, atau dengan `REVIEW-PLAN.md` basi (bukan laporan ronde terakhir):
+Sesudah tiap balikan, catat vonisnya — `record` menolak bila `verdict` frontmatter `REVIEW-PLAN.md` berbeda dari flag atau `sidik`-nya bukan sidik ronde yang terbuka (laporan ronde lalu), menyimpan sidik laporannya, dan `chain.py approve --row BRIEF` menolak approval tanpa ronde terakhir `PASS` atas konten yang persis sama, atau dengan `REVIEW-PLAN.md` basi (bukan laporan ronde terakhir):
 
 ```bash
 python3 «review_round.py» record --taskdir {taskdir} --gate plan \
@@ -164,6 +167,7 @@ python3 «review_round.py» record --taskdir {taskdir} --gate plan \
 | `Verdict: BLOCKED`, seluruh `BLOCKER` `[MEKANIS]` | `record --verdict BLOCKED`; perbaiki brief sampai `validate_briefs.py` `PASS`, lalu ronde menyempit atas konten final |
 | `Verdict: BLOCKED`, ada `BLOCKER [SEMANTIK]` | `record --verdict BLOCKED`; rutekan tiap temuan ke pemilik pada `Rute Revisi` (brief → `plan` sendiri; DTO/layer → `chain.py reopen --row CONTRACT` lewat `frontend:lead`), lalu ronde menyempit bila plafon masih ada |
 | `Reason: Gate Breakdown belum tuntas` / `Dokumen hulu hilang` / `Frontmatter brief malformed` | Cacat dokumen, bukan cacat audit: `record --verdict DISPATCH_FAILED`, perbaiki dokumennya, lalu `open` ulang |
+| `record` FAIL: `sidik` frontmatter absen atau ≠ sidik ronde terbuka | `REVIEW-PLAN.md` bukan laporan ronde ini: `record --verdict DISPATCH_FAILED`, lalu dispatch ulang dengan `{sidik}` dari keluaran `open` baru. Dilarang menyunting `REVIEW-PLAN.md` sendiri |
 | `{taskdir}/REVIEW-PLAN.md` tidak ada, payload kosong, atau error | Kegagalan dispatch: periksa disk dulu; `record --verdict DISPATCH_FAILED` (tidak dihitung plafon ronde; maksimal 2 per taskdir) lalu ulangi maksimal sekali. Dilarang menulis `REVIEW-PLAN.md` sendiri |
 
 **Subagent mengembalikan:** payload `## Plan Review` 300–700 token dengan `Verdict`, hitungan dokumen, hitungan temuan per severity, path laporan, dan `Rute Revisi`.

@@ -249,27 +249,42 @@ def fe_chain_repo(make_repo):
     return root
 
 
-def fe_evidence(repo: Path, n, verdict: str = "PASS", mechanical: int = 0, semantic: int = 0) -> str:
-    """Balikan `contract-reviewer` ronde `n` di laci `.explore/` (bukti `record --evidence`)."""
+def fe_open_sidik(repo: Path, gate: str = "contract") -> str:
+    """Sidik ronde yang sedang terbuka di state `review_round.py` (yang dicetak `open`), atau kosong."""
+    state = repo / FE_TD / ".explore" / f"{gate}-review-state.json"
+    try:
+        return json.loads(state.read_text(encoding="utf-8"))["rounds"][-1]["snapshot"][:12]
+    except (OSError, ValueError, KeyError, IndexError):
+        return ""
+
+
+def fe_evidence(repo: Path, n, verdict: str = "PASS", mechanical: int = 0, semantic: int = 0,
+                sidik: Optional[str] = None) -> str:
+    """Balikan `contract-reviewer` ronde `n` di laci `.explore/` (bukti `record --evidence`).
+
+    `- Sidik:` digemakan reviewer dari slot `{sidik}` (12 J45); default: sidik ronde yang terbuka.
+    """
     rel = f"{FE_TD}/.explore/contract-review-r{n}.md"
-    write_files(repo, {rel: f"## Contract Review\n- Verdict: {verdict}\n- Ronde: {n}\n"
+    sidik = fe_open_sidik(repo) if sidik is None else sidik
+    write_files(repo, {rel: f"## Contract Review\n- Verdict: {verdict}\n- Ronde: {n}\n- Sidik: {sidik}\n"
                             f"- BLOCKER: {mechanical} [MEKANIS] · {semantic} [SEMANTIK]\n"})
     return rel
 
 
 def fe_round(repo: Path, verdict: str = "PASS", gate: str = "contract", mechanical: int = 0,
              semantic: int = 0) -> None:
-    """Satu ronde reviewer lengkap: `open` → laporan/bukti → `record`."""
+    """Satu ronde reviewer lengkap: `open` → laporan/bukti (bergema sidik ronde) → `record`."""
     rr = ("_common/review_round.py",)
     opened = fe_run(repo, *rr, "open", "--taskdir", FE_TD, "--gate", gate)
     assert opened.returncode == 0, opened.out
     n = opened.out.split("ronde ")[1].split("/")[0]
+    sidik = re.search(r"sidik ([0-9a-f]{12})", opened.out).group(1)
     extra = ["--mechanical", str(mechanical), "--semantic", str(semantic)]
     if gate == "plan":
         write_files(repo, {f"{FE_TD}/REVIEW-PLAN.md":
-                           f'---\nverdict: {verdict}\nround: "{n}"\n---\n\n# Plan Review\n'})
+                           f'---\nverdict: {verdict}\nround: "{n}"\nsidik: "{sidik}"\n---\n\n# Plan Review\n'})
     else:
-        extra += ["--evidence", fe_evidence(repo, n, verdict, mechanical, semantic)]
+        extra += ["--evidence", fe_evidence(repo, n, verdict, mechanical, semantic, sidik)]
     r = fe_run(repo, *rr, "record", "--taskdir", FE_TD, "--gate", gate, "--verdict", verdict, *extra)
     assert r.returncode == 0, r.out
 

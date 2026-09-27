@@ -9,13 +9,16 @@ Skrip ini menyimpan state ronde di laci `<taskdir>/.explore/<gate>-review-state.
 Subperintah:
 
 - `open`   — dipanggil **sebelum** dispatch reviewer. Mencatat ronde baru beserta
-             sidik konten berkas yang akan direview, epoch reopen, dan `HEAD`. `FAIL`
+             sidik konten berkas yang akan direview, epoch reopen, dan `HEAD`, lalu
+             mencetak `sidik <12 hex>` untuk slot `{sidik}` prompt reviewer. `FAIL`
              (exit 1) bila plafon putaran (2) atau plafon taskdir (8) habis —
              dispatch dilarang berangkat.
 - `record` — dipanggil sesudah balikan reviewer. Mencatat verdict ronde terakhir
              beserta hitungan `BLOCKER [MEKANIS]`/`[SEMANTIK]`. Gate contract menuntut
              `--evidence` (balikan `contract-reviewer` apa adanya); gate plan menuntut
-             `REVIEW-PLAN.md` ber-`verdict` sama.
+             `REVIEW-PLAN.md` ber-`verdict` sama. Laporan wajib menggemakan sidik ronde
+             yang terbuka (`- Sidik:` / frontmatter `sidik:`, 12 J45) — laporan ronde
+             lama atas konten lain ditolak.
 - `commit` — satu-satunya jalur commit draft `CONTRACT.md` / batch brief pada lane
              non-MINOR: ditolak kecuali ronde terakhir `PASS` atas konten disk dan epoch
              sekarang. Commit-nya membawa trailer `Review-Round: <gate> r<n> t<total>
@@ -31,9 +34,10 @@ yang **sudah diajukan** — kontennya pernah di-commit sesudah ronde itu dibuka
 dua ronde. Commit draft yang belum pernah `PASS` tidak membuka putaran baru,
 apa pun subjeknya.
 
-**Epoch** adalah jumlah commit `reopen` yang membuka hop gate ini (`CONTRACT` untuk
-gate contract, `BRIEF` untuk gate plan), sebagai target atau kaskade. Reopen
-membuka putaran baru dan membatalkan vonis ronde sebelumnya.
+**Epoch** adalah jumlah commit `reopen` yang membuka hop gate ini **atau hop di
+atasnya** (`FLOW`/`UI`/`CONTRACT` untuk gate contract, semua hop untuk gate plan),
+ditambah commit `eskalasi lane` (12 J42). Dokumen hulu yang berubah membuka putaran
+baru dan membatalkan vonis ronde sebelumnya, walau hop gate ini masih `[ ]`.
 
 `chain.py approve` membaca state ini lewat `Rounds.ready()`: approval `CONTRACT`
 dan `BRIEF` hanya sah bila ronde terakhir ber-verdict `PASS`, sidik kontennya
@@ -43,7 +47,7 @@ suntingan atau `reopen` sesudah reviewer lolos membatalkan vonisnya. Commit
 
 **Batas yang dinyatakan apa adanya**: state di `.explore/` tidak di-commit.
 Berkas rusak atau berbentuk salah → `FAIL` (pulihkan dari `.bak`, salinan sebelum
-tulis terakhir). Berkas hilang → hitungan dari nol, **kecuali** trailer
+tulis terakhir; tulis pertama menyalin state barunya, 12 J52). Berkas hilang → hitungan dari nol, **kecuali** trailer
 `Review-Round` di git mencatat ronde: maka `FAIL` sampai `rebuild`. Ronde yang
 belum pernah ikut commit tidak dapat dibuktikan sesudah lacinya dihapus.
 
@@ -77,6 +81,10 @@ SUBJECTS = {"contract": ("draft CONTRACT.md", "revise CONTRACT.md"),
             "plan": ("draft breakdown (", "revise breakdown", "draft breakdown append (",
                      "plan review ronde ")}
 REVIEW_LINE = re.compile(r"^-\s*Verdict:\s*(PASS|BLOCKED)\s*$", re.MULTILINE)
+SIDIK_LINE = re.compile(r"^-\s*Sidik:\s*`?([0-9a-f]{12,40})`?\s*$", re.MULTILINE)
+SIDIK_LEN = 12
+CAP_ROUTE = ("hentikan gate; `frontend:lead` bertanya lewat `AskUserQuestion`: rumuskan ulang di taskdir baru "
+             "(`chain.py abandon` taskdir ini) atau hentikan")
 BLOCKER_LINE = re.compile(r"^-\s*BLOCKER:\s*(\d+)\s*\[MEKANIS\]\s*·\s*(\d+)\s*\[SEMANTIK\]\s*$", re.MULTILINE)
 
 
@@ -127,11 +135,15 @@ class Rounds:
 
     def save(self, state: Dict[str, Any]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        if self.path.exists():
-            shutil.copy2(self.path, self.path.with_name(self.path.name + ".bak"))
+        bak = self.path.with_name(self.path.name + ".bak")
+        first = not self.path.exists()
+        if not first:
+            shutil.copy2(self.path, bak)
         tmp = self.path.with_name(self.path.name + ".tmp")
         tmp.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
         os.replace(tmp, self.path)
+        if first:                  # 12 J52: pesan "pulihkan dari .bak" wajib benar sejak tulis pertama
+            shutil.copy2(self.path, bak)
 
     def epoch(self) -> int:
         return reopen_epoch(self.root, self.taskdir_rel, self.gate)
@@ -206,11 +218,12 @@ class Rounds:
             raise SystemExit(f"REVIEW ROUND OPEN: [FAIL] plafon {MAX_PER_CYCLE} ronde per putaran habis "
                              "(putaran sejak draft terakhir yang lolos `PASS` dan di-commit, epoch "
                              f"reopen {self.epoch()}). Dilarang mendispatch ronde ketiga: sajikan BLOCKER "
-                             "yang tersisa ke user dan rutekan ke gate pemilik untuk rancang ulang. "
-                             "(Commit ronde `PASS` yang hilang karena rebase/amend tidak lagi dihitung "
-                             "sebagai sudah diajukan.)")
+                             f"yang tersisa ke user, lalu {CAP_ROUTE}. Putaran baru hanya dibuka reopen hop "
+                             "ini atau hop di atasnya, atau eskalasi lane. (Commit ronde `PASS` yang hilang "
+                             "karena rebase/amend tidak lagi dihitung sebagai sudah diajukan.)")
         if c["taskdir"] >= MAX_PER_TASKDIR:
-            raise SystemExit(f"REVIEW ROUND OPEN: [FAIL] plafon {MAX_PER_TASKDIR} ronde per taskdir habis.")
+            raise SystemExit(f"REVIEW ROUND OPEN: [FAIL] plafon {MAX_PER_TASKDIR} ronde per taskdir habis — "
+                             f"{CAP_ROUTE}.")
         entry = {"round": c["cycle"] + 1, "epoch": self.epoch(),
                  "head": git(self.root, "rev-parse", "HEAD").strip(),
                  "snapshot": content_snapshot(self.root, targets), "opened": _now(),
@@ -219,7 +232,8 @@ class Rounds:
         state["rounds"] = rounds
         self.save(state)
         return (f"REVIEW ROUND OPEN: [PASS] {self.gate} ronde {entry['round']}/{MAX_PER_CYCLE} "
-                f"(taskdir {c['taskdir'] + 1}/{MAX_PER_TASKDIR}) atas {len(targets)} berkas")
+                f"(taskdir {c['taskdir'] + 1}/{MAX_PER_TASKDIR}) atas {len(targets)} berkas — "
+                f"sidik {entry['snapshot'][:SIDIK_LEN]} (slot `{{sidik}}` prompt reviewer)")
 
     def record(self, verdict: str, mechanical: int, semantic: int, evidence: str = "") -> str:
         state = self.load()
@@ -250,8 +264,12 @@ class Rounds:
             if written != verdict:
                 raise SystemExit(f"REVIEW ROUND RECORD: [FAIL] `{report}` ber-`verdict: {written or '(kosong)'}`, "
                                  f"bukan `{verdict}` — catat vonis laporan apa adanya.")
+            self.check_sidik(read_status(self.root / report, "sidik").strip("`"), rounds[-1], report,
+                             "frontmatter `sidik:`")
         else:
             report = self.check_evidence(evidence, verdict, mechanical, semantic, rounds[-1]["round"])
+            m = SIDIK_LINE.search((self.root / report).read_text(encoding="utf-8"))
+            self.check_sidik(m.group(1) if m else "", rounds[-1], report, "baris `- Sidik:`")
         rounds[-1].update({"verdict": verdict, "mechanical": mechanical, "semantic": semantic,
                            "recorded": _now(),
                            "report": content_snapshot(self.root, [report]) if report else ""})
@@ -266,6 +284,22 @@ class Rounds:
                ("perbaiki lalu buka ronde menyempit" if c["cycle"] < MAX_PER_CYCLE
                 else "plafon habis — sajikan BLOCKER ke user"))
         return f"REVIEW ROUND RECORD: {self.gate} ronde {rounds[-1]['round']} {verdict} — {nxt}"
+
+    def check_sidik(self, written: str, opened: Dict[str, Any], report: str, where: str) -> None:
+        """Laporan reviewer wajib menggemakan sidik ronde yang terbuka (12 J45, padanan analyst E9).
+
+        Tanpa ini laporan ronde lama — atas konten yang sudah berubah — dapat dicatat sebagai vonis ronde
+        baru tanpa satu dispatch pun.
+        """
+        want = str(opened.get("snapshot", ""))[:SIDIK_LEN]
+        if not written:
+            raise SystemExit(f"REVIEW ROUND RECORD: [FAIL] `{report}` tanpa {where} — reviewer wajib menggemakan "
+                             f"sidik ronde ini (`{want}`, keluaran `open`); laporan tanpa sidik tidak dapat "
+                             "dibuktikan milik ronde ini. Catat `DISPATCH_FAILED` lalu dispatch ulang.")
+        if written[:SIDIK_LEN] != want:
+            raise SystemExit(f"REVIEW ROUND RECORD: [FAIL] `{report}` ber-Sidik `{written[:SIDIK_LEN]}` ≠ sidik "
+                             f"ronde terbuka `{want}` — laporan basi dari ronde lain, atau reviewer menilai konten "
+                             "lain. Catat `DISPATCH_FAILED` lalu dispatch ulang atas konten ini.")
 
     def check_evidence(self, evidence: str, verdict: str, mechanical: int, semantic: int, n: int) -> str:
         """Gate contract: balikan `contract-reviewer` tersimpan dan cocok dengan flag `record`."""
