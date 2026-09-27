@@ -149,6 +149,12 @@ def _migration_declined(body: str) -> bool:
 MAX_STEPS = 5
 MAX_CODE_FILES = 4
 
+# DDL konkret = pernyataan, bukan kata: "update skema" di prosa bukan DDL (11 H8).
+DDL_STATEMENT = re.compile(
+    r"\b(?:CREATE|ALTER|DROP)\s+(?:UNIQUE\s+)?(?:TABLE|INDEX|VIEW|COLUMN|TYPE|SEQUENCE|SCHEMA|CONSTRAINT"
+    r"|TRIGGER|FUNCTION|EXTENSION|MATERIALIZED\s+VIEW)\b|\bINSERT\s+INTO\b|\bUPDATE\s+[\w.\"`]+\s+SET\b",
+    re.IGNORECASE)
+
 # Pola DDL destruktif yang memaksa `risk: BREAKING`.
 DESTRUCTIVE_DDL = [
     (r"\bDROP\s+TABLE\b", "DROP TABLE"),
@@ -254,6 +260,10 @@ ORM_SCHEMA_TOKEN = re.compile(
 ORM_SCHEMA_PROFILE_MARKERS = ("ddl-auto", "hbm2ddl", "synchronize: true", "automigrate", "auto_migrate")
 
 
+class ReviewStateError(Exception):
+    """State ronde self-review tak dapat dipercaya atau materai melampaui plafon."""
+
+
 class BriefValidator:
     def __init__(
         self,
@@ -335,10 +345,25 @@ class BriefValidator:
         text = self._read(self._state_path())
         data: Dict[str, Any] = {}
         if text:
+            # State rusak dulu dibaca `{}` — plafon ter-reset diam-diam (11 H9). Kini FAIL terbaca: hitungan
+            # yang sah dipulihkan dari trailer commit, bukan dari berkas yang tidak dapat dipercaya.
             try:
                 data = json.loads(text)
-            except Exception:
-                data = {}
+            except ValueError as exc:
+                raise ReviewStateError(f"{self._state_path()} bukan JSON sah ({exc})")
+            if not isinstance(data, dict):
+                raise ReviewStateError(f"{self._state_path()} bukan objek JSON")
+            gens = data.get("generations", {})
+            if not isinstance(gens, dict) or not all(isinstance(g, dict) for g in gens.values()) or \
+                    not isinstance(data.get("open"), (dict, type(None))):
+                raise ReviewStateError(f"{self._state_path()} berbentuk salah (`generations`/`open`)")
+            try:
+                int(data.get("total_rounds") or 0)
+                int(data.get("rounds") or 0)
+                for g in gens.values():
+                    int(g.get("rounds") or 0)
+            except (TypeError, ValueError):
+                raise ReviewStateError(f"{self._state_path()} memuat hitungan ronde bukan bilangan")
         # Migrasi bentuk lama (`{"rounds": n, "history": [...]}`) ke bentuk
         # bergenerasi, supaya taskdir yang sudah berjalan tidak kehilangan
         # hitungannya dan tidak pula mendapat jatah gratis.
@@ -380,7 +405,9 @@ class BriefValidator:
     def _write_state(self, data: Dict[str, Any]):
         path = self._state_path()
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        tmp = path.with_name(path.name + ".tmp")          # atomik: sesi yang putus tidak meninggalkan JSON terpotong
+        tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        os.replace(tmp, path)
 
     def read_round_state(self) -> Dict[str, Any]:
         """Ringkas state ronde untuk generasi batch yang aktif sekarang."""
@@ -423,8 +450,13 @@ class BriefValidator:
         bucket = data["generations"].setdefault(gen, {"rounds": 0, "history": []})
         opened = data.get("open") or {}
         # Ronde yang tidak pernah dibuka tetap dimateraikan — snapshot-nya
-        # diambil sekarang sebagai jalan terakhir, dan penyimpangannya dicatat.
+        # diambil sekarang sebagai jalan terakhir, dan penyimpangannya dicatat —
+        # tetapi tidak melewati plafon: jalan pintas itu dulu mencatat ronde 3/2 (11 H9).
         snapshot = opened.get("snapshot") if opened.get("generation") == gen else None
+        if snapshot is None:
+            left, why = self.rounds_left()
+            if left <= 0:
+                raise ReviewStateError(f"ronde tidak pernah dibuka dan plafon habis — {why}")
         bucket["rounds"] = int(bucket["rounds"]) + 1
         bucket["history"].append({
             "round": bucket["rounds"],
@@ -1064,13 +1096,36 @@ class BriefValidator:
 
         return "fail", "berkas target tidak ada di disk maupun laci .explore"
 
+    def _creators(self) -> Dict[str, List[Dict[str, Any]]]:
+        """Path → brief hidup yang meng-`create`-nya (urut NN)."""
+        out: Dict[str, List[Dict[str, Any]]] = {}
+        for b in sorted(self.live_briefs, key=lambda x: x["nn"] or 0):
+            for row in b["file_rows"]:
+                if row["aksi"] == "create":
+                    out.setdefault(row["path"], []).append(b)
+        return out
+
     def _check_anchor(self):
         cid, name = "N", "Resolusi Anchor"
         problems: List[str] = []
         warnings: List[str] = []
+        creators = self._creators()
         for b in self.plan_briefs:
             steps_text = self._section_text(b, "Steps")
             for row in b["file_rows"]:
+                # Berkas yang di-`create` brief hidup bernomor lebih kecil sah di-`modify` di sini
+                # (slicing bagian 3B), walau belum ada di disk (11 H10): anchornya dicari di brief pembuat.
+                maker = next((m for m in creators.get(row["path"], [])
+                              if m["nn"] is not None and b["nn"] is not None and m["nn"] < b["nn"]), None)
+                if row["aksi"] == "modify" and maker and not (self.root / row["path"]).exists():
+                    tokens = self._anchor_tokens(row["anchor"])
+                    made = self._section_text(maker, "Steps") + "\n" + self._section_text(maker, "Interfaces")
+                    if not tokens or not any(re.search(rf"\b{re.escape(t)}\b", made) for t in tokens):
+                        problems.append(
+                            f"{b['name']}:{row['lineno']}: anchor `{row['anchor']}` pada `{row['path']}` "
+                            f"tidak disebut `## Steps`/`## Interfaces` {maker['name']} yang membuat berkas itu"
+                        )
+                    continue
                 if row["aksi"] == "create":
                     # Berkas yang diciptakan brief ini tidak boleh sudah ada.
                     if (self.root / row["path"]).exists():
@@ -1251,12 +1306,15 @@ class BriefValidator:
                 )
 
             # Satu predikat derivasi yang dapat divonis mekanis: DDL destruktif
-            # menuntut BREAKING. Sisa tabel predikat tetap milik reviewer.
-            migration = self._section_text(b, "Migration")
-            for pattern, label in DESTRUCTIVE_DDL:
-                if re.search(pattern, migration, re.IGNORECASE) and value != "BREAKING":
+            # menuntut BREAKING. Sisa tabel predikat tetap milik reviewer. DDL yang
+            # hanya muncul di snippet `## Steps` sama destruktifnya (11 H8).
+            for section in ("Migration", "Steps"):
+                text = self._section_text(b, section)
+                hit = next((label for pattern, label in DESTRUCTIVE_DDL
+                            if re.search(pattern, text, re.IGNORECASE)), None)
+                if hit and value != "BREAKING":
                     problems.append(
-                        f"{b['name']}: `## Migration` memuat {label} (migrasi destruktif) "
+                        f"{b['name']}: `## {section}` memuat {hit} (migrasi destruktif) "
                         f"tetapi `risk: {value}` — predikat menuntut BREAKING"
                     )
                     break
@@ -1357,6 +1415,7 @@ class BriefValidator:
     def _check_cross_brief(self):
         cid, name = "C", "Cross-Brief Consistency"
         problems: List[str] = []
+        overlap: List[str] = []
         by_nn = {b["nn"]: b for b in self.briefs if b["nn"] is not None}
 
         # Satu NN = satu berkas (11 H7): `by_nn` di sini, di architect, dan di `scan_briefs` menelan
@@ -1450,6 +1509,22 @@ class BriefValidator:
                         f"`Produces` brief-{ref}"
                     )
 
+        # Satu berkas diciptakan satu brief (11 H10); anchor yang sama pada berkas yang sama di dua brief
+        # READY menandakan titik sisip tumpang tindih (slicing bagian 3B) — WARN, karena anchor setingkat
+        # kelas sah dipakai berurutan.
+        for path, makers in self._creators().items():
+            if len(makers) > 1:
+                problems.append(f"`{path}` di-`create` {len(makers)} brief: {', '.join(m['name'] for m in makers)}")
+        seen_anchor: Dict[Tuple[str, str], str] = {}
+        for b in self.briefs:
+            if b["status"] != "READY":
+                continue
+            for row in b["file_rows"]:
+                for tok in self._anchor_tokens(row["anchor"]) if row["aksi"] == "modify" else []:
+                    other = seen_anchor.setdefault((row["path"], tok), b["name"])
+                    if other != b["name"]:
+                        overlap.append(f"`{row['path']}` anchor `{tok}` dipakai {other} dan {b['name']}")
+
         # Tautan penggantian dua arah, dan brief READY tidak mengonsumsi brief
         # yang sudah digantikan — kontraknya pindah ke pengganti.
         for b in self.briefs:
@@ -1476,7 +1551,8 @@ class BriefValidator:
                       "DAG linear satu arah, signature Consumes/Produces selaras",
                       "Pecah baris `Consumes` multi-sumber jadi satu baris per brief sumber; samakan "
                       "signature `Produces` pendahulu dengan `Consumes` penerusnya, "
-                      "atau ubah nomor urut brief agar alurnya kembali linear.")
+                      "atau ubah nomor urut brief agar alurnya kembali linear.",
+                      overlap)
 
     # -- Check G -----------------------------------------------------------
 
@@ -1699,8 +1775,9 @@ class BriefValidator:
                 problems.append(
                     f"{b['name']}: `## Migration` tidak memuat urutan deploy sebagai langkah bernomor"
                 )
-            if not re.search(r"\b(CREATE|ALTER|DROP|INSERT|UPDATE)\b", body, re.IGNORECASE):
-                problems.append(f"{b['name']}: `## Migration` tidak memuat DDL konkret")
+            if not DDL_STATEMENT.search(body):
+                problems.append(f"{b['name']}: `## Migration` tidak memuat DDL konkret "
+                                f"(pernyataan `CREATE|ALTER|DROP <objek>`, `INSERT INTO`, `UPDATE <tabel> SET`)")
 
             rr = self._section_text(b, "Risk & rollback").lower()
             if not any(k in rr for k in ("rollback", "kembalikan skema", "revert", "turunkan skema")):
@@ -1851,69 +1928,82 @@ def main():
         sys.exit(1)
 
     if args.review_state or args.record_round or args.open_round:
-        # `changed` dihitung **sebelum** ronde dibuka atau dimateraikan: keduanya
-        # menulis state, dan menghitung sesudahnya membandingkan snapshot dengan
-        # dirinya sendiri.
-        changed = validator.changed_since_last_round()
-
-        if args.open_round:
-            left, why = validator.rounds_left()
-            if left <= 0:
-                print(f"REVIEW STATE: [FAIL] ronde tidak dapat dibuka — {why}")
-                sys.exit(1)
-            opened = validator.open_round()
-            print(f"REVIEW STATE: ronde {opened['round']} dibuka "
-                  f"(generasi {opened['generation']}, {len(opened['snapshot'])} brief tersnapshot)")
-            print(f"    brief berubah sejak ronde terakhir: "
-                  f"{', '.join(changed) if changed else '(tidak ada)'}")
-            print("    Berangkatkan dispatch sekarang, lalu tutup dengan `--record-round`.")
-            sys.exit(0)
-
-        if args.record_round:
-            state = validator.record_round(args.record_round, changed)
-        else:
-            state = validator.read_round_state()
-
-        used = int(state["rounds"])
-        left, why = validator.rounds_left()
-        changed = validator.changed_since_last_round()
-        payload = {
-            "generation": state["generation"],
-            "rounds_used": used,
-            "rounds_remaining": left,
-            "max_rounds": MAX_ROUNDS,
-            "total_rounds": state["total_rounds"],
-            "max_rounds_taskdir": MAX_ROUNDS_TASKDIR,
-            "open_round": state["open"],
-            "changed_briefs": changed,
-            "history": [{k: v for k, v in h.items() if k != "snapshot"}
-                        for h in state["history"]],
-            "trailer": f"{TRAILER_KEY}: gen={state['generation']} rounds={used} total={state['total_rounds']}",
-        }
-        if args.json:
-            print(json.dumps(payload, indent=2, ensure_ascii=False))
-        else:
-            print(f"REVIEW STATE: generasi batch {state['generation']} — "
-                  f"ronde terpakai {used}/{MAX_ROUNDS} (sisa {left}) · "
-                  f"taskdir {state['total_rounds']}/{MAX_ROUNDS_TASKDIR}")
-            for h in state["history"]:
-                tail = "" if h.get("snapshot_at_dispatch", True) else "  [snapshot menyusul]"
-                print(f"    ronde {h['round']}: {h['verdict']}{tail}")
-            if state["open"]:
-                print(f"    * ronde {state['open']['round']} masih terbuka — "
-                      f"tutup dengan `--record-round \"<verdict>\"`.")
-            print(f"    brief berubah sejak ronde terakhir: "
-                  f"{', '.join(changed) if changed else '(tidak ada)'}")
-            print(f"    trailer commit agregat: {payload['trailer']}")
-            if left == 0:
-                print(f"    * {why}. Serahkan brief apa adanya dengan status self-review "
-                      f"tidak tuntas; dilarang membuka ronde baru sekalipun `plan` "
-                      f"dipanggil ulang atas generasi batch yang sama.")
-        sys.exit(0)
+        try:
+            review_state_cli(validator, args)
+        except ReviewStateError as exc:
+            if args.json:
+                print(json.dumps({"status": "FAIL", "error": str(exc)}, indent=2, ensure_ascii=False))
+            else:
+                print(f"REVIEW STATE: [FAIL] {exc} — pulihkan dari trailer `{TRAILER_KEY}` commit agregat "
+                      f"atau minta keputusan user; dilarang menghapus berkas state demi jatah ronde baru")
+            sys.exit(1)
 
     ok = validator.run_all()
     print(validator.to_json() if args.json else validator.format_text())
     sys.exit(0 if ok else 1)
+
+
+def review_state_cli(validator: "BriefValidator", args: argparse.Namespace) -> None:
+    """Mode `--review-state`/`--open-round`/`--record-round`; selalu keluar lewat `sys.exit`."""
+    # `changed` dihitung **sebelum** ronde dibuka atau dimateraikan: keduanya
+    # menulis state, dan menghitung sesudahnya membandingkan snapshot dengan
+    # dirinya sendiri.
+    changed = validator.changed_since_last_round()
+
+    if args.open_round:
+        left, why = validator.rounds_left()
+        if left <= 0:
+            print(f"REVIEW STATE: [FAIL] ronde tidak dapat dibuka — {why}")
+            sys.exit(1)
+        opened = validator.open_round()
+        print(f"REVIEW STATE: ronde {opened['round']} dibuka "
+              f"(generasi {opened['generation']}, {len(opened['snapshot'])} brief tersnapshot)")
+        print(f"    brief berubah sejak ronde terakhir: "
+              f"{', '.join(changed) if changed else '(tidak ada)'}")
+        print("    Berangkatkan dispatch sekarang, lalu tutup dengan `--record-round`.")
+        sys.exit(0)
+
+    if args.record_round:
+        state = validator.record_round(args.record_round, changed)
+    else:
+        state = validator.read_round_state()
+
+    used = int(state["rounds"])
+    left, why = validator.rounds_left()
+    changed = validator.changed_since_last_round()
+    payload = {
+        "generation": state["generation"],
+        "rounds_used": used,
+        "rounds_remaining": left,
+        "max_rounds": MAX_ROUNDS,
+        "total_rounds": state["total_rounds"],
+        "max_rounds_taskdir": MAX_ROUNDS_TASKDIR,
+        "open_round": state["open"],
+        "changed_briefs": changed,
+        "history": [{k: v for k, v in h.items() if k != "snapshot"}
+                    for h in state["history"]],
+        "trailer": f"{TRAILER_KEY}: gen={state['generation']} rounds={used} total={state['total_rounds']}",
+    }
+    if args.json:
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+    else:
+        print(f"REVIEW STATE: generasi batch {state['generation']} — "
+              f"ronde terpakai {used}/{MAX_ROUNDS} (sisa {left}) · "
+              f"taskdir {state['total_rounds']}/{MAX_ROUNDS_TASKDIR}")
+        for h in state["history"]:
+            tail = "" if h.get("snapshot_at_dispatch", True) else "  [snapshot menyusul]"
+            print(f"    ronde {h['round']}: {h['verdict']}{tail}")
+        if state["open"]:
+            print(f"    * ronde {state['open']['round']} masih terbuka — "
+                  f"tutup dengan `--record-round \"<verdict>\"`.")
+        print(f"    brief berubah sejak ronde terakhir: "
+              f"{', '.join(changed) if changed else '(tidak ada)'}")
+        print(f"    trailer commit agregat: {payload['trailer']}")
+        if left == 0:
+            print(f"    * {why}. Serahkan brief apa adanya dengan status self-review "
+                  f"tidak tuntas; dilarang membuka ronde baru sekalipun `plan` "
+                  f"dipanggil ulang atas generasi batch yang sama.")
+    sys.exit(0)
 
 
 if __name__ == "__main__":

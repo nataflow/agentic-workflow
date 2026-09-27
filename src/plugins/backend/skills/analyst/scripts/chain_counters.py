@@ -159,6 +159,15 @@ def main():
         print(f"COUNTER: [FAIL] kunci tak dikenal di `## Counters`: {', '.join(bad)} — tabel disunting tangan; "
               f"pulihkan dari riwayat git sebelum menulis")
         sys.exit(1)
+    # Menulis di atas nilai yang diturunkan tangan menghapus jejak penurunannya dari versi berikutnya;
+    # `--check` saja tidak cukup karena tidak ada fase yang memanggilnya (11 H13, regresi 09 E20).
+    drops = tampered(history(Path(args.taskdir)) + [counters])
+    if drops:
+        print("COUNTER: [FAIL] tabel `## Counters` disunting tangan — pulihkan nilainya dari riwayat git "
+              "sebelum menulis:")
+        for d in drops:
+            print(f"    - {d}")
+        sys.exit(1)
 
     if args.reset_hop:
         reopened = HOPS[HOPS.index(args.reset_hop):]

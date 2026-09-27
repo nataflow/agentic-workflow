@@ -226,3 +226,156 @@ def test_h7_scaffold_menolak_nn_yang_dipakai_unit_lain(chain_repo):
         {"nn": "01", "unit": "order-lock", "title": "t", "risk": "MINOR"}]})})
     r = be_run(chain_repo, SCAFFOLD, "--taskdir", TD, "--nn", "01")
     assert r.returncode != 0 and "brief-01 sudah dipakai brief-01-order-guard.md" in r.stdout + r.stderr, r.stdout
+
+
+# --- Tahap 2 -----------------------------------------------------------------------------------
+
+def sections(**over):
+    """Badan brief sepuluh seksi; `over` menimpa isi seksi (kunci = judul tanpa spasi/&)."""
+    base = {"Objective": "Covers: —\nFulfills: SC-1", "Interfaces": "- Produces: —",
+            "File scope": "| Aksi | Path | Anchor | Apa yang berubah |\n|---|---|---|---|\n"
+                          "| modify | `src/order.go` | `Submit` | x |",
+            "Out of scope": "tidak ada", "Steps": "1. Ubah `Submit`.", "Migration": "tidak perlu",
+            "Mirrored paths": "tidak ada", "Risk & rollback": "revert commit", "Work status": "| P1-1 | PLANNED | — |",
+            "Analysis trace": "—"}
+    base.update({k.replace("_", " "): v for k, v in over.items()})
+    return "# Brief\n" + "".join(f"## {k}\n{v}\n\n" for k, v in base.items())
+
+
+@pytest.mark.regression("H8")
+def test_h8_ddl_destruktif_di_steps_menuntut_breaking(chain_repo):
+    brief(chain_repo, "01", "lock", "READY", body=sections(Steps="1. Jalankan `ALTER TABLE stock DROP COLUMN qty` di `Submit`."))
+    k = checks(chain_repo, VALIDATE, "--taskdir", TD, "--brief", "01")["K"]
+    assert k["status"] == "FAIL" and any("`## Steps` memuat DROP COLUMN" in d for d in k["details"]), k
+
+
+@pytest.mark.regression("H8")
+def test_h8_kata_update_di_prosa_bukan_ddl(chain_repo):
+    body = sections(File_scope="| Aksi | Path | Anchor | Apa yang berubah |\n|---|---|---|---|\n"
+                               "| create | `db/migrations/0001_x.up.sql` | — | x |",
+                    Migration="Sesuai langkah 2; update skema stok.\n1. Deploy aplikasi.")
+    brief(chain_repo, "01", "lock", "READY", body=body)
+    j = checks(chain_repo, VALIDATE, "--taskdir", TD)["J"]
+    assert any("tidak memuat DDL konkret" in d for d in j["details"]), j
+
+
+@pytest.mark.regression("H9")
+@pytest.mark.parametrize("state", ["{", "[]", '{"generations": [], "open": null}', '{"total_rounds": "dua"}'])
+def test_h9_state_ronde_rusak_fail_terbaca(chain_repo, state):
+    brief(chain_repo, "01", "lock", "READY")
+    write_files(chain_repo, {f"{TD}/.explore/brief-review-state.json": state})
+    r = be_run(chain_repo, VALIDATE, "--taskdir", TD, "--review-state")
+    assert r.returncode == 1 and "REVIEW STATE: [FAIL]" in r.stdout and "Traceback" not in r.stderr, (r.stdout, r.stderr)
+
+
+@pytest.mark.regression("H9")
+def test_h9_record_tanpa_open_tidak_melewati_plafon(chain_repo):
+    brief(chain_repo, "01", "lock", "READY")
+    for verdict in ("Issues Found", "Issues Found"):
+        assert be_run(chain_repo, VALIDATE, "--taskdir", TD, "--open-round").returncode == 0
+        assert be_run(chain_repo, VALIDATE, "--taskdir", TD, "--record-round", verdict).returncode == 0
+    r = be_run(chain_repo, VALIDATE, "--taskdir", TD, "--record-round", "Approved")
+    assert r.returncode == 1 and "plafon habis" in r.stdout, r.stdout
+
+
+@pytest.mark.regression("H10")
+def test_h10_modify_berkas_buatan_brief_sebelumnya_sah(chain_repo):
+    brief(chain_repo, "01", "thing", "READY", body=sections(
+        File_scope="| Aksi | Path | Anchor | Apa yang berubah |\n|---|---|---|---|\n| create | `src/thing.go` | — | x |",
+        Steps="1. Buat `NewThing` di `src/thing.go`."))
+    brief(chain_repo, "02", "wire", "READY", body=sections(
+        File_scope="| Aksi | Path | Anchor | Apa yang berubah |\n|---|---|---|---|\n| modify | `src/thing.go` | `NewThing` | x |",
+        Steps="1. Panggil `NewThing` dari handler."))
+    n = checks(chain_repo, VALIDATE, "--taskdir", TD)["N"]
+    assert not any("src/thing.go" in d for d in n["details"]), n
+
+
+@pytest.mark.regression("H10")
+def test_h10_create_ganda_gagal_check_c(chain_repo):
+    scope = "| Aksi | Path | Anchor | Apa yang berubah |\n|---|---|---|---|\n| create | `src/thing.go` | — | x |"
+    brief(chain_repo, "01", "thing", "READY", body=sections(File_scope=scope))
+    brief(chain_repo, "02", "thing-lagi", "READY", body=sections(File_scope=scope))
+    c = checks(chain_repo, VALIDATE, "--taskdir", TD)["C"]
+    assert any("`src/thing.go` di-`create` 2 brief" in d for d in c["details"]), c
+
+
+SYMBOL_MAP = PLUGINS / "backend/skills/architect/scripts/symbol_map.py"
+JAVA = ("package a;\n\npublic class S {\n    public void submit() {\n        save();\n    }\n\n"
+        "    public void cancel() {\n        drop();\n    }\n}\n")
+
+
+@pytest.mark.regression("H11")
+def test_h11_method_lain_yang_dihapus_di_hunk_campuran_tertangkap(make_repo):
+    repo = make_repo({"src/S.java": JAVA})
+    commit(repo, "base")
+    write_files(repo, {"src/S.java": JAVA.replace("public void cancel() {\n        drop();",
+                                                 "public void abort() {\n        stop();")})
+    sha = commit(repo, "edit")
+    r = run_script(SYMBOL_MAP, "--root", str(repo), "--sha", sha, "--path", "src/S.java", "--anchor", "abort")
+    out = json.loads(r.stdout)
+    assert r.returncode == 1 and "cancel" in {o["symbol"] for o in out["outside_anchor"]}, out
+
+
+@pytest.mark.regression("H11")
+def test_h11_berkas_latin1_tidak_crash_berkode_1(make_repo):
+    repo = make_repo()
+    (repo / "src").mkdir()
+    (repo / "src/S.java").write_bytes(JAVA.replace("save();", "save(); // caf\xe9").encode("latin-1"))
+    commit(repo, "base")
+    (repo / "src/S.java").write_bytes(JAVA.replace("save();", "save(); // d\xe9j\xe0").encode("latin-1"))
+    sha = commit(repo, "edit")
+    r = run_script(SYMBOL_MAP, "--root", str(repo), "--sha", sha, "--path", "src/S.java", "--anchor", "submit")
+    assert r.returncode == 0 and json.loads(r.stdout)["status"] == "PASS", (r.stdout, r.stderr)
+
+
+@pytest.mark.regression("H12")
+def test_h12_status_huruf_kecil_gagal_check_s(chain_repo):
+    brief(chain_repo, "01", "lock", "ready")
+    s = checks(chain_repo, VALIDATE, "--taskdir", TD, "--brief", "01")["S"]
+    assert any("`status: ready`" in d for d in s["details"]), s
+
+
+def _profile_template(repo, tpl):
+    idx = repo / ".claude/profile/backenddev/index.json"
+    data = json.loads(idx.read_text())
+    data["commit_template"] = tpl
+    idx.write_text(json.dumps(data))
+
+
+@pytest.mark.regression("H12")
+def test_h12_ticket_github_dirender_dan_lolos_check_s(chain_repo):
+    _profile_template(chain_repo, "{ticket}: {subject}")
+    spec = chain_repo / TD / ".explore/brief-spec.json"
+    write_files(chain_repo, {str(spec.relative_to(chain_repo)): json.dumps({"ticket": "#482", "briefs": [
+        {"nn": "01", "unit": "lock", "title": "t", "risk": "MINOR", "fulfills": ["SC-1", "SC-2"]}]})})
+    assert be_run(chain_repo, SCAFFOLD, "--taskdir", TD, "--write-matrix", "--spec", str(spec)).returncode == 0
+    assert be_run(chain_repo, SCAFFOLD, "--taskdir", TD, "--nn", "01").returncode == 0
+    s = checks(chain_repo, VALIDATE, "--taskdir", TD, "--brief", "01")["S"]
+    assert not any("commit_message" in d for d in s["details"]), s
+
+
+@pytest.mark.regression("H12")
+def test_h12_domain_tak_sah_ditolak_sebelum_dirender(chain_repo):
+    spec = chain_repo / TD / ".explore/brief-spec.json"
+    write_files(chain_repo, {str(spec.relative_to(chain_repo)): json.dumps({"briefs": [
+        {"nn": "01", "unit": "lock", "title": "t", "risk": "MINOR", "domain": "Order Stock",
+         "fulfills": ["SC-1", "SC-2"]}]})})
+    r = be_run(chain_repo, SCAFFOLD, "--taskdir", TD, "--write-matrix", "--spec", str(spec))
+    assert r.returncode == 1 and "`domain` \"Order Stock\"" in r.stdout, r.stdout
+
+
+COUNTERS = "analyst/scripts/chain_counters.py"
+ANALYST = "analyst/scripts/check_preconditions.py"
+
+
+@pytest.mark.regression("H13")
+def test_h13_bump_menolak_tabel_yang_diturunkan_tangan(chain_repo):
+    task = chain_repo / TD / "TASK.md"
+    for _ in range(2):
+        assert be_run(chain_repo, COUNTERS, "--taskdir", TD, "--bump", "reject:PRD").returncode == 0
+    commit(chain_repo, "docs(order-fix): counters", f"{TD}/TASK.md")
+    task.write_text(task.read_text().replace("| reject:PRD | 2 |", "| reject:PRD | 0 |"))
+    r = be_run(chain_repo, COUNTERS, "--taskdir", TD, "--bump", "reject:PRD")
+    assert r.returncode == 1 and "disunting tangan" in r.stdout, r.stdout
+    c7 = checks(chain_repo, ANALYST, "--taskdir", TD, "--risk", "MINOR", "--chain", "BRIEF")[7]
+    assert c7["status"] == "FAIL" and "reject:PRD turun 2 → 0" in c7["summary"], c7

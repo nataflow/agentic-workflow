@@ -139,10 +139,12 @@ def enclosing(blks: List[Dict], line: int) -> Optional[Dict]:
 
 
 def _git(root: Path, *args: str) -> str:
-    r = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True)
+    # Bytes lalu `errors="replace"`: berkas Latin-1 dulu melempar UnicodeDecodeError berkode keluar 1 — kode
+    # yang sama dengan vonis `outside_anchor` (11 H11). Kurawal dan identifier ASCII tidak terpengaruh.
+    r = subprocess.run(["git", *args], cwd=root, capture_output=True)
     if r.returncode != 0:
-        raise Degraded(f"git {' '.join(args[:2])} gagal: {r.stderr.strip()}")
-    return r.stdout
+        raise Degraded(f"git {' '.join(args[:2])} gagal: {r.stderr.decode('utf-8', 'replace').strip()}")
+    return r.stdout.decode("utf-8", "replace")
 
 
 def changed(root: Path, sha: str, path: str) -> List[Dict]:
@@ -155,16 +157,26 @@ def changed(root: Path, sha: str, path: str) -> List[Dict]:
     for m in re.finditer(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", diff, re.M):
         a, b = int(m.group(1)), int(m.group(2) if m.group(2) is not None else 1)
         c, d = int(m.group(3)), int(m.group(4) if m.group(4) is not None else 1)
-        side, first, count = ("new", c, d) if d > 0 else ("old", a, b)
-        if sides[side] is None:
-            rev = f"{sha}:{path}" if side == "new" else f"{sha}^:{path}"
-            sides[side] = blocks(_git(root, "show", rev), ext)
-        for line in range(first, first + count):
-            blk = enclosing(sides[side], line)
-            result.append({"side": side, "line": line,
-                           "symbol": blk["symbol"] if blk else None,
-                           "kind": blk["kind"] if blk else "top",
-                           "decl_line": blk["start"] if blk else None})
+        # Hunk campuran (hapus + tambah) dipetakan di kedua sisi: baris yang dihapus dari method lain
+        # dulu hilang dari peta karena hanya sisi baru yang dibaca (11 H11). Baris lama yang simbolnya
+        # sudah tercatat sisi baru hunk ini (ubah di tempat) tidak diulang.
+        seen_new: set = set()
+        for side, first, count in (("new", c, d), ("old", a, b)):
+            if count <= 0:
+                continue
+            if sides[side] is None:
+                rev = f"{sha}:{path}" if side == "new" else f"{sha}^:{path}"
+                sides[side] = blocks(_git(root, "show", rev), ext)
+            for line in range(first, first + count):
+                blk = enclosing(sides[side], line)
+                symbol = blk["symbol"] if blk else None
+                if side == "new":
+                    seen_new.add(symbol)
+                elif symbol in seen_new:
+                    continue
+                result.append({"side": side, "line": line, "symbol": symbol,
+                               "kind": blk["kind"] if blk else "top",
+                               "decl_line": blk["start"] if blk else None})
     return result
 
 
@@ -178,7 +190,7 @@ def main():
 
     try:
         lines = changed(Path(args.root), args.sha, args.path)
-    except Degraded as exc:
+    except Exception as exc:   # noqa: BLE001 — exit 1 berarti `outside_anchor`; galat apa pun wajib exit 2
         print(json.dumps({"status": "DEGRADED", "path": args.path, "reason": str(exc),
                           "fallback": "git -c core.attributesFile=<tmp> show -U0 (hunk header ber-driver)"},
                          ensure_ascii=False))

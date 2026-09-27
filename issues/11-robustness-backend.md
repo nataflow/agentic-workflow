@@ -155,7 +155,7 @@ dipakai berkas ber-unit lain.
 ## Tahap 2 — Validator plan & skrip rantai
 
 ## H8 [Sedang] DDL destruktif lolos Check K/J
-- [ ] Belum
+- [x] Selesai — Check K menyapu `## Migration` + `## Steps`; Check J menagih `DDL_STATEMENT` (pernyataan, bukan kata)
 
 Check K hanya membaca `## Migration` (`validate_briefs.py:1240`); Check J menerima kata prosa "update" sebagai
 DDL (`:1645`, IGNORECASE). Probe: `ALTER TABLE stock DROP COLUMN` di `## Steps`, `risk: MINOR` → K dan J PASS.
@@ -163,7 +163,7 @@ DDL (`:1645`, IGNORECASE). Probe: `ALTER TABLE stock DROP COLUMN` di `## Steps`,
 (`CREATE|ALTER|DROP <objek>`, `INSERT INTO`, `UPDATE <t> SET`).
 
 ## H9 [Sedang] State ronde review brief rusak
-- [ ] Belum
+- [x] Selesai — `ReviewStateError`: JSON rusak/berbentuk salah → FAIL terbaca; tulis atomik; materai tanpa ronde terbuka ditolak saat plafon habis
 
 JSON terpotong dibaca `{}` → plafon reset diam-diam; JSON sah berbentuk salah (`[]`, `null`, `"total_rounds":"dua"`)
 → traceback; `--record-round` tanpa ronde terbuka mencatat 3/2 dengan exit 0 (`validate_briefs.py:334–440`).
@@ -171,7 +171,7 @@ JSON terpotong dibaca `{}` → plafon reset diam-diam; JSON sah berbentuk salah 
 `--record-round` menagih ronde terbuka dan plafon.
 
 ## H10 [Sedang] `File scope` lintas brief tidak dimodelkan
-- [ ] Belum
+- [x] Selesai — `_creators`: `modify` atas berkas buatan brief lebih awal dicari di `## Steps`/`## Interfaces` pembuatnya; `create` ganda FAIL; anchor tumpang tindih WARN
 
 Brief-02 `modify` berkas yang di-`create` brief-01 → FAIL palsu "tidak ada di disk" (`:1071`), padahal slicing
 bagian 3B membolehkannya. Dua brief `create` path yang sama → PASS. **Perbaikan:** berkas `create` brief hidup
@@ -179,14 +179,14 @@ ber-NN lebih kecil dihitung ada (anchor dicari di `## Steps`/`## Interfaces` bri
 FAIL; anchor sama pada berkas sama di dua brief `READY` → WARN (aturan 3B ambigu untuk simbol kelas).
 
 ## H11 [Sedang] `symbol_map`: hunk campuran dan crash berkode 1
-- [ ] Belum
+- [x] Selesai — kedua sisi hunk campuran dipetakan (sisi lama hanya bila simbolnya beda); decode `replace`; galat apa pun → `DEGRADED` exit 2
 
 Hunk yang menghapus sekaligus menambah hanya dipetakan di sisi baru (`symbol_map.py:158`): hapus `Bar` + ubah `Baz`
 (anchor `Baz`) → PASS. Berkas Latin-1 → `UnicodeDecodeError`, exit 1 — sama dengan kode "outside_anchor".
 **Perbaikan:** petakan kedua sisi; decode `errors="replace"`; galat tak terduga → `DEGRADED` exit 2.
 
 ## H12 [Rendah] Check S dan `commit_template` tidak sepakat dengan scaffold
-- [ ] Belum
+- [x] Selesai — status persis di Check S; `slot_ok` untuk `domain`/`ticket` di scaffold; pola `ticket` satu token; template berkurawal liar/multi-baris jatuh ke default
 
 Check S memakai `.upper()` (`:841`), menyimpang dari 05-2: `status: ready` PASS padahal architect FAIL. Pola
 `ticket` `[A-Z][A-Z0-9]+-\d+` menolak `#482`, `482`, `oms-412` yang dirender scaffold; `domain` `Order` dirender
@@ -196,7 +196,7 @@ pola `ticket` menerima satu token tanpa spasi (`#482`, `OMS-412`, `oms-412`); `c
 liar dan baris baru.
 
 ## H13 [Sedang] `--bump` tidak menilai riwayat (regresi 09 E20)
-- [ ] Belum
+- [x] Selesai — `--bump`/`--reset-hop` menjalankan `tampered()` lebih dulu; analyst check 7 FAIL atas penurunan atau kunci tak dikenal
 
 `--check` menangkap tabel yang diturunkan tangan, tetapi tidak ada SKILL yang memanggilnya; `--bump`
 (`chain_counters.py:172`) dan analyst check 7 (`check_preconditions.py:386`) tidak. Probe: bump ke-3 FAIL → nilai

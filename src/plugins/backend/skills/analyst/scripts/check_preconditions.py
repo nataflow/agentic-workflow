@@ -352,7 +352,7 @@ class PreconditionChecker:
             })
 
     def _check_7_resume_point(self):
-        """Titik resume taskdir berakar — informatif, selalu PASS.
+        """Titik resume taskdir berakar; FAIL hanya bila `## Counters` disunting tangan.
 
         Taskdir yang sudah memuat `TASK.md` tidak memanggil `backend:task` lagi
         (prasyarat `task` check 3 menolaknya); titik masuknya dihitung di sini dari
@@ -383,15 +383,24 @@ class PreconditionChecker:
                 summary = "Resume: ledger tercentang penuh — butuh reentry_reason (Fase 3 butir 0)"
             else:
                 summary = "Resume: TASK.md tanpa ledger `## Chain` — laporkan ke gerbang (lane non-planning)"
+        status, action = "PASS", ""
         if text is not None:
             counters = _counters.parse(text)
             summary += f" · Counters: {_counters.summary(counters)}"
+            # Plafon yang diturunkan tangan membuat Failure path tidak pernah terpicu (11 H13).
+            drops = _counters.tampered(_counters.history(self.td.path) + [counters])
+            bad = _counters.unknown_keys(counters)
+            if drops or bad:
+                status = "FAIL"
+                summary += " · " + "; ".join(drops + [f"kunci tak dikenal `{k}`" for k in bad])
+                action = ("Tabel `## Counters` hanya ditulis `chain_counters.py`; pulihkan nilainya dari riwayat git "
+                          "`TASK.md`, dilarang melanjutkan rantai di atas plafon yang dikosongkan.")
         self.results.append({
             "id": check_id,
             "name": name,
-            "status": "PASS",
+            "status": status,
             "summary": summary,
-            "action": "",
+            "action": action,
         })
 
     def format_text(self) -> str:
