@@ -38,6 +38,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
+    strip_explore_scratch,
     UNDECODABLE_ACTION,
     undecodable,
     FrontmatterError,
@@ -121,6 +122,7 @@ class ReviewValidator:
         self._check_structure()
         red = self._verification_red()          # dibaca lebih dulu: perintah HIJAU dipakai bukti SC
         self._check_log()
+        self._check_tree()
         sc_blocked = self._check_sc()
         ac_open = self._check_ac()
         counts = self._check_findings()
@@ -355,6 +357,26 @@ class ReviewValidator:
                   "Salin hasil `.explore/closing-verification.md` apa adanya: perintah ber-backtick, "
                   "HIJAU|MERAH|TIMEOUT, dan jumlah galat baru.")
         return red
+
+    def _check_tree(self) -> None:
+        """Reviewer read-only atas repo: sesudah ia bekerja, yang berubah hanya `REVIEW.md` dan baris
+        status berkas temuan `frontenddev/reviews/` (09 E15). Hanya dengan `--log` (architect Phase 4,
+        sesi reviewer); pemanggil lain (`report`) dapat sah memegang draft lain → `SKIP`."""
+        name = "Tree sesudah reviewer"
+        if not self.log:
+            self.results.append({"id": "TREE", "name": name, "status": "SKIP", "summary": "tanpa --log",
+                                 "details": [], "action": ""})
+            return
+        review_rel = f"{self.taskdir_rel}/REVIEW.md"
+        stray = []
+        for line in strip_explore_scratch(git(self.root, "status", "--porcelain", "-uall")).splitlines():
+            path = line[3:].split(" -> ")[-1].strip().strip('"')
+            if path != review_rel and not (path.startswith("frontenddev/reviews/") and path.endswith(".md")):
+                stray.append(path)
+        self._add("TREE", name, [f"berubah selama review: `{p}`" for p in stray],
+                  "hanya REVIEW.md / berkas temuan",
+                  "Reviewer memutasi repo di luar batasnya: pulihkan berkas itu (`git restore -- <path>`), "
+                  "buang REVIEW.md ini, dan dispatch ulang reviewer.")
 
     def _check_log(self) -> None:
         name = "Verifikasi vs log mesin"

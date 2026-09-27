@@ -164,29 +164,29 @@ bukan saat reviewer membaca. **Perbaikan:** lihat Keputusan E9.
 READY menuntut `--force` dan meng-commit pembatalannya di repo git.
 
 ## E12 [Sedang] frontenddev: `lane_tamper` lolos tanpa commit `kunci TASK`
-- [ ] Selesai
+- [x] Selesai — pembanding cadangan = commit pertama yang menambahkan `TASK.md`; subjek dinormalkan
 
 `precondition_lib.py:1057`: tanpa commit bersubjek persis, tidak ada pembanding → `""`. **Perbaikan:** pembanding
 cadangan = commit pertama yang menambahkan `TASK.md`.
 
 ## E13 [Sedang] frontenddev: `review_is_fresh` bergantung subjek `implement unit`
-- [ ] Selesai
+- [x] Selesai — `git rev-list <REVIEW>..HEAD -- brief-*.md`; teks lead/architect/report diselaraskan
 
 ## E14 [Rendah] frontenddev: `revisions_since_open` peka typo subjek
-- [ ] Selesai
+- [x] Selesai — `norm_subject()` (spasi & huruf) di `revisions_since_open` dan `lane_tamper`
 
 ## E15 [Sedang] frontenddev: `code-reviewer` bisa memutasi repo
-- [ ] Selesai
+- [x] Selesai — hook `frontenddev/hooks/guard_bash.py` (PreToolUse, fail-closed) + check `TREE` `validate_review.py --log`
 
 Tools `Read, Grep, Glob, Bash, Write, Edit`; batasnya hanya di `agents/code-reviewer.md:83-84`. **Perbaikan:** hook
 PreToolUse `guard_bash.py` (Bash: git baca, `ls`, `chain.py files`; Write: `<taskdir>/REVIEW.md`; Edit:
 `frontenddev/reviews/*.md`), dan `validate_review.py` menagih tree bersih selain `REVIEW.md` dan finding source.
 
 ## E16 [Rendah] frontenddev: `normalize_taskdir` tidak menolak `..`
-- [ ] Selesai
+- [x] Selesai — `..` dipertahankan agar `TASKDIR_PATTERN` menolak; `Chain`/`Rounds` kini menagih pola (sebelumnya `review_round.py open` bisa menulis di luar repo)
 
 ## E17 [Rendah] frontenddev: dua pengklasifikasi state, nama berbeda
-- [ ] Selesai
+- [x] Selesai — architect `TEMUAN (REVIEW BLOCKED)`
 
 `taskdir_state.py` `TEMUAN` vs architect `TERHENTI (REVIEW BLOCKED)` untuk keadaan yang sama.
 

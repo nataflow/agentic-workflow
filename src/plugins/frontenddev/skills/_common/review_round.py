@@ -62,6 +62,7 @@ from typing import Any, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from precondition_lib import (  # noqa: E402
+    TASKDIR_PATTERN,
     BRIEF_GLOB, content_snapshot, find_repo_root, gate_targets_at, git, git_ok, normalize_taskdir,
     read_status, reopen_epoch, snapshot_at, taskdir_slug,
 )
@@ -83,6 +84,9 @@ class Rounds:
     def __init__(self, taskdir: str, gate: str, root: Optional[Path] = None):
         self.root = (root or find_repo_root()).resolve()
         self.taskdir_rel = normalize_taskdir(taskdir)
+        if not TASKDIR_PATTERN.match(self.taskdir_rel):   # state ditulis di <taskdir>/.explore/
+            raise SystemExit(f"REVIEW ROUND: [FAIL] `{self.taskdir_rel}` tidak berpola "
+                             f"frontenddev/docs/<YYMMDDhhmm>-<slug>")
         self.taskdir = self.root / self.taskdir_rel
         self.gate = gate
         self.path = self.taskdir / ".explore" / f"{gate}-review-state.json"

@@ -9,7 +9,7 @@ tercentang penuh dan kontennya utuh (termasuk batch brief dan `REVIEW-PLAN.md`
 yang disetujui), status seluruh brief, profil lengkap beserta adapter, berkas
 dispatcher/template/agent, working tree bersih, dan HEAD tidak detached. Skrip
 juga **menyelesaikan** keadaan rantai di baris `Terselesaikan:` — `fase`
-(EKSEKUSI | PENUTUP | LAPORAN | TUNTAS | TERHENTI) dan `unit_berikutnya` — sehingga
+(EKSEKUSI | PENUTUP | LAPORAN | TUNTAS | TERHENTI | TEMUAN) dan `unit_berikutnya` — sehingga
 titik mulai tidak ditebak dari membaca frontmatter satu per satu.
 
 **Ingest** (`--brief NN`) — dijalankan sebelum tiap dispatch implementor:
@@ -218,7 +218,7 @@ class PreconditionChecker:
         if not review.is_file() or not review_is_fresh(self.root, self.taskdir_rel) or not valid:
             self.phase = "PENUTUP"
         elif not report.is_file():
-            self.phase = "LAPORAN" if read_status(review, "verdict") in ("PASS", "WARNING") else "TERHENTI (REVIEW BLOCKED)"
+            self.phase = "LAPORAN" if read_status(review, "verdict") in ("PASS", "WARNING") else "TEMUAN (REVIEW BLOCKED)"
         elif not is_committed(self.root, f"{self.taskdir_rel}/REPORT.md"):
             self.phase = "LAPORAN TERTUNDA"
         else:

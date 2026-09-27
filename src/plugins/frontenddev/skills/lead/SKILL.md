@@ -45,7 +45,7 @@ Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/lead/scripts/taskdir_state.py`. T
 | `AKAR` | taskdir kosong → Phase 7 `frontenddev:task`; user batal → hapus direktori kosong itu (tidak ada yang di-commit). `TASK.md belum ter-commit` → lead menjalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/task/scripts/validate_task.py --taskdir <taskdir>`: `PASS` → commit `docs(<slug>): kunci TASK sebagai akar rantai`; `FAIL` → tanyakan user (task tidak menulis ulang akar) |
 | `GATE` | skill pemilik hop pertama yang belum `[x]` (mode `plan` disebut skrip); draft `DRAFT` tertunda → gate itu menanyakan keputusan user; batch brief ter-commit belum disetujui → `plan` menjalankan prasyarat mode REVISE lalu langsung Phase 5 tanpa menulis ulang |
 | `DRIFT` | konten hop tercentang atau `SC-{n}` TASK.md berubah sesudah disetujui → tanyakan user: `chain.py reopen --row <ROW>` atau pulihkan isi yang disetujui |
-| `EKSEKUSI` / `PENUTUP` | `frontenddev:architect`; `PENUTUP` juga untuk `REVIEW.md` basi (lebih tua daripada `implement unit` terakhir) — review ulang menimpanya |
+| `EKSEKUSI` / `PENUTUP` | `frontenddev:architect`; `PENUTUP` juga untuk `REVIEW.md` basi (ada commit yang menyentuh `brief-*.md` sesudahnya) — review ulang menimpanya |
 | `TERHENTI` | brief `BLOCKED` tanpa remedi → Phase 8 (re-entry BRIEF) → `plan` APPEND brief remedi |
 | `TEMUAN` | `REVIEW.md` `BLOCKED` → Phase 8: `chain.py reopen --row BRIEF` → `plan` APPEND brief perbaikan di taskdir yang sama → `architect` eksekusi dan review ulang |
 | `LAPORAN` | `frontenddev:architect` (Phase 5) — umpan balik profil dulu, lalu architect menyerahkan ke `report` |

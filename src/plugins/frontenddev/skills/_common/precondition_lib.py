@@ -227,7 +227,12 @@ def git_ok(root: Path, *args: str) -> Tuple[bool, str]:
 
 
 def normalize_taskdir(taskdir: str) -> str:
-    return taskdir.strip().strip("/").replace("./", "")
+    """Buang segmen kosong dan `.`; segmen `..` **dipertahankan** supaya `TASKDIR_PATTERN` menolaknya.
+
+    Versi lama (`.replace("./", "")`) merusak `../` menjadi `.`-sisa, sehingga path yang keluar repo
+    kebetulan gagal alih-alih ditolak dengan sengaja (09 E16).
+    """
+    return "/".join(p for p in taskdir.strip().split("/") if p not in ("", "."))
 
 
 def strip_explore_scratch(status_out: str) -> str:
@@ -908,6 +913,15 @@ def brief_set_drift(root: Path, taskdir_rel: str, sha: str) -> str:
     return ""
 
 
+def norm_subject(subject: str) -> str:
+    """Subjek commit untuk perbandingan: spasi dirapatkan, huruf disamakan (09 E14).
+
+    Subjek draft/revisi diketik model; salah spasi atau huruf tidak boleh membuat hitungan revisi
+    turun diam-diam. Normalisasi ini tidak melonggarkan kata kuncinya.
+    """
+    return " ".join(subject.split()).casefold()
+
+
 def count_subjects(root: Path, pattern: str, *paths: str) -> int:
     """Jumlah commit yang subjeknya cocok `pattern` (regex), opsional terbatas `paths`."""
     out = git(root, "log", "--format=%s", "--", *paths) if paths else git(root, "log", "--format=%s")
@@ -919,12 +933,13 @@ def revisions_since_open(root: Path, rel_paths: List[str], slug: str, label: str
     """Revisi berturut sejak draft/reopen terakhir: subjek `docs(<slug>): revise <label>`."""
     out = git(root, "log", "--format=%s", "--", *rel_paths)
     count = 0
-    for subject in out.splitlines():
-        if subject.startswith(f"docs({slug}): revise {label}"):
+    head = norm_subject(f"docs({slug}):")
+    revise, stops = f"{head} revise {label.casefold()}", (f"{head} draft {label.casefold()}", f"{head} reopen",
+                                                           f"{head} approve {label.casefold()}")
+    for subject in map(norm_subject, out.splitlines()):
+        if subject.startswith(revise):
             count += 1
-        elif (subject.startswith(f"docs({slug}): draft {label}")
-              or subject.startswith(f"docs({slug}): reopen")
-              or subject.startswith(f"docs({slug}): approve {label}")):
+        elif subject.startswith(stops):
             break
     return count
 
@@ -1133,21 +1148,30 @@ def check_task_root(add: AddFn, cid: int, root: Path, taskdir_rel: str) -> Tuple
 
 
 def lane_tamper(root: Path, taskdir_rel: str) -> str:
-    """Kosong bila `lane`/`sections` sekarang sama dengan yang ditulis commit akar atau eskalasi terakhir."""
+    """Kosong bila `lane`/`sections` sekarang sama dengan yang ditulis commit akar atau eskalasi terakhir.
+
+    Eskalasi ditulis `chain.py escalate` (subjeknya pasti). Commit akar diketik model: bila tidak ada
+    commit bersubjek `kunci TASK`, pembandingnya commit pertama yang menambahkan `TASK.md` — bukan
+    diloloskan tanpa pembanding (09 E12).
+    """
     rel = f"{taskdir_rel}/TASK.md"
     slug = taskdir_slug(taskdir_rel)
-    for line in git(root, "log", "--format=%H %s", "--", rel).splitlines():
-        sha, _, subject = line.partition(" ")
-        if subject.startswith(f"docs({slug}): eskalasi lane") or subject.startswith(f"docs({slug}): kunci TASK"):
-            then = parse_frontmatter(show_at(root, sha, rel) or "")
-            try:
-                now = parse_frontmatter((root / rel).read_text(encoding="utf-8"))
-            except (OSError, UnicodeDecodeError):
-                return f"`{rel}` tak terbaca atau {NOT_UTF8}"
-            if (str(then.get("lane", "")).strip(), sorted(parse_sections(then.get("sections", "")))) != \
-               (str(now.get("lane", "")).strip(), sorted(parse_sections(now.get("sections", "")))):
-                return "`lane`/`sections` berubah di luar commit akar atau `chain.py escalate`"
-            return ""
+    log = [l.partition(" ") for l in git(root, "log", "--format=%H %s", "--", rel).splitlines()]
+    root_add = git(root, "log", "--diff-filter=A", "--format=%H", "--", rel).split()
+    marks = (norm_subject(f"docs({slug}): eskalasi lane"), norm_subject(f"docs({slug}): kunci TASK"))
+    picked = next((sha for sha, _, subject in log if norm_subject(subject).startswith(marks)), None)
+    if picked is None and root_add:
+        picked = root_add[-1]
+    if picked is None:
+        return ""                                  # TASK.md belum pernah di-commit: belum ada akar
+    then = parse_frontmatter(show_at(root, picked, rel) or "")
+    try:
+        now = parse_frontmatter((root / rel).read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError):
+        return f"`{rel}` tak terbaca atau {NOT_UTF8}"
+    if (str(then.get("lane", "")).strip(), sorted(parse_sections(then.get("sections", "")))) != \
+       (str(now.get("lane", "")).strip(), sorted(parse_sections(now.get("sections", "")))):
+        return "`lane`/`sections` berubah di luar commit akar atau `chain.py escalate`"
     return ""
 
 
@@ -1377,8 +1401,10 @@ def review_is_fresh(root: Path, taskdir_rel: str) -> bool:
     review_sha = last_commit(root, rel)
     if not review_sha:
         return False
-    later = git(root, "log", f"{review_sha}..HEAD", "--format=%s", "--", f"{taskdir_rel}/{BRIEF_GLOB}")
-    return not any("implement unit" in s for s in later.splitlines())
+    # Tiap penyentuh brief sesudah REVIEW (unit DONE/BLOCKED, batch plan) membatalkan review itu;
+    # dinilai dari berkas yang disentuh, bukan dari subjek yang diketik model (09 E13).
+    later = git(root, "rev-list", f"{review_sha}..HEAD", "--", f"{taskdir_rel}/{BRIEF_GLOB}")
+    return not later.strip()
 
 
 def design_gate_checks(add: AddFn, root: Path, taskdir_rel: str, profile_dir: Path,

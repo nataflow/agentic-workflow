@@ -80,7 +80,7 @@ Katalog ini kembaran diff-scoped `skills/review/references/nine-dimensions-catal
 
 ## Kalibrasi
 
-- **Batas `Bash`**: hanya inspeksi non-mutasi — `git diff`, `git log`, `git show`, `git rev-parse`, `git status`, `ls`, `chain.py files`. Dilarang typecheck/lint/test/build, `git add`/`commit`, dan pindah branch.
+- **Batas `Bash`**: hanya inspeksi non-mutasi — `git diff`, `git log`, `git show`, `git rev-parse`, `git status`, `ls`, `chain.py files`, satu perintah polos per panggilan (tanpa `;`, `|`, `&&`, pengalihan). Dilarang typecheck/lint/test/build, `git add`/`commit`, dan pindah branch. Batas Bash, Write, dan Edit ini ditegakkan hook `hooks/guard_bash.py`: panggilan di luarnya ditolak dengan alasan di stderr — jangan mencoba jalan memutar.
 - **Batas tulis**: `Write` hanya `{taskdir}/REVIEW.md`; `Edit` hanya baris `> Status:` di `{finding_source}` — satu `Edit` per baris, dilarang menulis ulang berkas audit. Architect menolak diff `{finding_source}` yang menyentuh baris lain (`validate_audit.py --only-status-changed`).
 - **Nol dialog**: ambiguitas menjadi temuan `PLAUSIBLE` atau vonis `belum terbukti`, bukan pertanyaan.
 - **Rationalization prevention**: dilarang meloloskan berkas yatim karena kodenya rapi; dilarang menaikkan SC ke `terbukti` karena "brief-nya sudah DONE" — status brief bukan bukti perilaku; dilarang menjalankan test "sekadar memastikan"; dilarang mengutip isi `REVIEW.md` ke chat.

@@ -43,6 +43,7 @@ from typing import Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from precondition_lib import (  # noqa: E402
+    TASKDIR_PATTERN,
     BRIEF_GLOB,
     CHAIN_BY_ROW,
     DOC_ROWS,
@@ -91,6 +92,8 @@ class Chain:
     def __init__(self, taskdir: str, root: Optional[Path] = None):
         self.root = (root or find_repo_root()).resolve()
         self.taskdir_rel = normalize_taskdir(taskdir)
+        if not TASKDIR_PATTERN.match(self.taskdir_rel):
+            raise ChainError(f"`{self.taskdir_rel}` tidak berpola frontenddev/docs/<YYMMDDhhmm>-<slug>")
         self.taskdir = self.root / self.taskdir_rel
         self.task_rel = f"{self.taskdir_rel}/TASK.md"
         self.task = self.root / self.task_rel

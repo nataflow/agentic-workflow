@@ -104,6 +104,8 @@ def test_log_berbeda_dari_tabel_fail(fe_minor_chain):
 
 
 def test_log_identik_pass(fe_minor_chain):
+    # `--log` = architect Phase 4, sebelum REPORT.md ditulis (fixture memodelkan fase report).
+    (fe_minor_chain / TD / "REPORT.md").unlink()
     write_files(fe_minor_chain, {REVIEW: fe_review_md(
         fe_minor_chain, verification="| `test` | HIJAU | 0 |\n| `build` | MERAH | 0 |")})
     rc, data = validate(fe_minor_chain, "--log", log(fe_minor_chain, ("test", "HIJAU", 0, "HIJAU"),
@@ -145,3 +147,22 @@ def test_contoh_template_bagian_3_pass(make_repo):
     rc, data = validate(repo)
     assert rc == 0, [c for c in data["checks"] if c["status"] == "FAIL"]
     assert data["derived_verdict"] == "WARNING"
+
+
+@pytest.mark.regression("E15")
+def test_e15_tree_kotor_sesudah_reviewer_fail(fe_minor_chain):
+    (fe_minor_chain / TD / "REPORT.md").unlink()
+    write_files(fe_minor_chain, {REVIEW: fe_review_md(
+        fe_minor_chain, verification="| `test` | HIJAU | 0 |\n| `build` | MERAH | 0 |"),
+        "src/features/order/OrderButton.tsx": "export const X = 1\n"})
+    rc, data = validate(fe_minor_chain, "--log", log(fe_minor_chain, ("test", "HIJAU", 0, "HIJAU"),
+                                                     ("build", "MERAH", 0, "MERAH")))
+    c = check(data, "TREE")
+    assert rc == 1 and any("OrderButton.tsx" in d for d in c["details"]), c
+
+
+@pytest.mark.regression("E15")
+def test_e15_tree_tanpa_log_skip(fe_minor_chain):
+    write_files(fe_minor_chain, {REVIEW: fe_review_md(fe_minor_chain)})
+    _, data = validate(fe_minor_chain)
+    assert check(data, "TREE")["status"] == "SKIP"

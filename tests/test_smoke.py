@@ -51,6 +51,7 @@ CASES = [
     ("backenddev/skills/tech-lead/scripts/check_preconditions.py", ["--json"], True, None),
 
     ("frontenddev/hooks/detect.py", ["--plugin", "frontenddev"], "hook", HOOK_STDIN),
+    ("frontenddev/hooks/guard_bash.py", ["hook"], "hook", BASH_STDIN),
     ("frontenddev/skills/_common/chain.py", ["status", "--taskdir", FE_TD], False, None),
     ("frontenddev/skills/_common/review_round.py", ["status", "--taskdir", FE_TD, "--gate", "plan"], False, None),
     ("frontenddev/skills/_common/run_verification.py", ["closing", "--taskdir", FE_TD, "--cmd", "test=true"], False, None),
