@@ -379,3 +379,58 @@ def test_h13_bump_menolak_tabel_yang_diturunkan_tangan(chain_repo):
     assert r.returncode == 1 and "disunting tangan" in r.stdout, r.stdout
     c7 = checks(chain_repo, ANALYST, "--taskdir", TD, "--risk", "MINOR", "--chain", "BRIEF")[7]
     assert c7["status"] == "FAIL" and "reject:PRD turun 2 → 0" in c7["summary"], c7
+
+
+# --- Tahap 3: run_verification (be=fe) ---------------------------------------------------------
+
+RUNV = PLUGINS / "backend/skills/_common/run_verification.py"
+
+
+def runv(tmp_path, mode, *cmds, timeout=None):
+    args = [mode, "--taskdir", str(tmp_path / "td")] + [a for c in cmds for a in ("--cmd", c)]
+    return run_script(RUNV, *args, *(["--timeout", str(timeout)] if timeout else []), cwd=tmp_path)
+
+
+@pytest.mark.regression("H14")
+def test_h14_diagnostik_kompilator_tanpa_kata_galat_terhitung_baru(tmp_path):
+    assert runv(tmp_path, "baseline", "build=printf 'a/a.go:2:23: undefined: x\\n'; exit 1").returncode == 0
+    r = runv(tmp_path, "closing",
+             "build=printf 'a/a.go:2:23: undefined: x\\nb/b.go:5:1: undefined: brokenY\\n'; exit 1")
+    assert r.returncode == 1 and "baru=1" in r.stdout, r.stdout
+
+
+@pytest.mark.regression("H14")
+@pytest.mark.parametrize("closing,rc", [("echo alpha; exit 3", 0), ("echo beta; exit 3", 1)])
+def test_h14_merah_tanpa_tanda_dibandingkan_lewat_ekor_log(tmp_path, closing, rc):
+    assert runv(tmp_path, "baseline", "build=echo alpha; exit 3").returncode == 0
+    assert runv(tmp_path, "closing", f"build={closing}").returncode == rc
+
+
+@pytest.mark.regression("H14")
+def test_h14_perintah_tidak_ditemukan_selalu_merah(tmp_path):
+    runv(tmp_path, "baseline", "test=./mvnw-tidak-ada test")
+    r = runv(tmp_path, "closing", "test=./mvnw-tidak-ada test")
+    assert r.returncode == 1 and "exit=127" in r.stdout, r.stdout
+
+
+@pytest.mark.regression("H15")
+def test_h15_timeout_warisan_memberi_jalan_keluar(tmp_path):
+    b = runv(tmp_path, "baseline", "test=sleep 3", timeout=1)
+    assert "--timeout 3 --force" in b.stdout, b.stdout
+    r = runv(tmp_path, "closing", "test=sleep 3", timeout=1)
+    md = (tmp_path / "td/.explore/closing-verification.md").read_text()
+    assert r.returncode == 1 and "TIMEOUT warisan" in md, md
+
+
+@pytest.mark.regression("H16")
+def test_h16_nama_perintah_berisi_garis_miring_ditolak_rapi(tmp_path):
+    r = runv(tmp_path, "baseline", "a/b=true")
+    assert r.returncode == 2 and "NAMA --cmd" in r.stderr and "Traceback" not in r.stderr, r.stderr
+
+
+@pytest.mark.regression("H16")
+def test_h16_baseline_bukan_objek_dianggap_rusak(tmp_path):
+    (tmp_path / "td/.explore").mkdir(parents=True)
+    (tmp_path / "td/.explore/verification-baseline.json").write_text("[]")
+    r = runv(tmp_path, "closing", "build=true")
+    assert r.returncode == 0 and "PERINGATAN" in r.stdout and "Traceback" not in r.stderr, r.stderr

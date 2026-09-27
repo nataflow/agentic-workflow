@@ -20,9 +20,16 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Optional
 
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
-ERROR_LINE = re.compile(r"\b(error|errors|failed|failure|fatal|exception)\b|✗|✖|\bFAIL\b", re.I)
+# Kata kunci galat, atau diagnostik kompilator `berkas:baris[:kolom]: pesan` (Go, gcc, …) yang tidak memuat
+# satu pun kata kunci — `a.go:2:23: undefined: x` dulu tidak menghasilkan tanda sama sekali (11 H14).
+ERROR_LINE = re.compile(r"\b(error|errors|failed|failure|fatal|exception)\b|✗|✖|\bFAIL\b"
+                        r"|(?:^|\s)[\w./\\-]+\.\w+:\d+(?::\d+)?:\s", re.I)
+TAIL_LINES = 10                      # ekor log pengganti tanda galat saat MERAH tanpa satu tanda pun
+NOT_RUNNABLE = (126, 127)            # perintah tidak dapat dieksekusi / tidak ditemukan
+NAME = re.compile(r"^[A-Za-z0-9_-]+$")
 VOLATILE = [
     (re.compile(r":\d+:\d+\b"), ":L:C"),                        # posisi baris:kolom bergeser antar-commit
     (re.compile(r"\(\d+(\.\d+)?\s?(ms|s)\)|\b\d+(\.\d+)?\s?(ms|s)\b"), "<dur>"),
@@ -30,16 +37,23 @@ VOLATILE = [
 ]
 
 
-def signatures(text: str) -> set:
-    """Baris galat yang dinormalisasi; selisih himpunan = galat baru."""
-    sigs = set()
-    for raw in text.splitlines():
-        line = ANSI.sub("", raw).strip()
-        if not line or not ERROR_LINE.search(line):
-            continue
-        for pat, rep in VOLATILE:
-            line = pat.sub(rep, line)
-        sigs.add(line[:300])
+def _normalize(raw: str) -> str:
+    line = ANSI.sub("", raw).strip()
+    for pat, rep in VOLATILE:
+        line = pat.sub(rep, line)
+    return line[:300]
+
+
+def signatures(text: str, red: bool = False) -> set:
+    """Baris galat yang dinormalisasi; selisih himpunan = galat baru.
+
+    Perintah MERAH tanpa satu baris bertanda galat memakai ekor log ternormalisasi sebagai tandanya:
+    "tidak ada tanda" dulu terbaca "tidak ada galat baru" (11 H14).
+    """
+    sigs = {_normalize(raw) for raw in text.splitlines() if raw.strip() and ERROR_LINE.search(ANSI.sub("", raw))}
+    if red and not sigs:
+        tail = [ln for ln in (_normalize(raw) for raw in text.splitlines()) if ln][-TAIL_LINES:]
+        sigs = {f"ekor: {ln}" for ln in tail} or {"ekor: (log kosong)"}
     return sigs
 
 
@@ -62,22 +76,25 @@ def run_one(name: str, cmd: str, timeout: int, log_dir: Path, cwd: Path) -> dict
                 proc.wait()
             status = "TIMEOUT"
     text = log_path.read_text(encoding="utf-8", errors="replace")
+    status = status or ("HIJAU" if exit_code == 0 else "MERAH")
     return {
         "name": name, "cmd": cmd, "exit": exit_code,
-        "status": status or ("HIJAU" if exit_code == 0 else "MERAH"),
+        "status": status,
         "duration_s": round(time.monotonic() - start, 1),
-        "signatures": sorted(signatures(text)),
+        "signatures": sorted(signatures(text, red=status == "MERAH")),
         "tail": text.splitlines()[-40:],
         "log": str(log_path),
     }
 
 
-def new_errors(res: dict, base: dict) -> int:
+def new_errors(res: dict, base: Optional[dict]) -> int:
     if res["status"] == "HIJAU":
         return 0
     cur = set(res["signatures"])
-    if base is None or base.get("status") == "HIJAU":
-        # tidak ada baseline merah yang bisa memaafkan: merah minimal 1 galat baru
+    base = base if isinstance(base, dict) else None
+    # Tidak ada baseline merah yang bisa memaafkan, atau perintahnya tidak dapat dijalankan sama sekali
+    # (exit 126/127 = verifikasi tidak pernah terjadi, bukan merah warisan — 11 H14): minimal 1 galat baru.
+    if base is None or base.get("status") == "HIJAU" or res.get("exit") in NOT_RUNNABLE:
         return max(1, len(cur - set((base or {}).get("signatures", []))))
     return len(cur - set(base.get("signatures", [])))
 
@@ -93,6 +110,11 @@ def render_md(results: list, baseline: dict) -> str:
                    f"{'—' if r['exit'] is None else r['exit']} | {r['duration_s']}s | `{r['cmd']}` |")
     if not baseline:
         out += ["", "> Baseline absen: tiap MERAH dihitung minimal 1 galat baru."]
+    inherited = [r["name"] for r in results if r["status"] == "TIMEOUT"
+                 and isinstance(baseline.get(r["name"]), dict) and baseline[r["name"]].get("status") == "TIMEOUT"]
+    if inherited:
+        out += ["", f"> TIMEOUT warisan (baseline juga TIMEOUT): {', '.join(inherited)} — ulangi sekali dengan "
+                    f"`--timeout` 3× lipat; masih TIMEOUT → eskalasi ke user, bukan dianggap hijau."]
     for r in results:
         if r["status"] != "HIJAU":
             out += ["", f"### {r['name']} — {r['status']}", "```", *r["tail"], "```",
@@ -124,6 +146,9 @@ def main() -> int:
         pairs = [c.split("=", 1) for c in args.cmd]
         if any(len(p) != 2 or not p[0] or not p[1].strip() for p in pairs):
             raise ValueError("--cmd wajib berbentuk NAMA=PERINTAH")
+        bad = [p[0] for p in pairs if not NAME.match(p[0])]
+        if bad:   # nama menjadi nama berkas log (11 H16)
+            raise ValueError(f"NAMA --cmd hanya huruf, angka, `_`, `-`: {', '.join(bad)}")
     except (OSError, ValueError) as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 2
@@ -135,14 +160,19 @@ def main() -> int:
         for r in results:
             print(f"BASELINE {r['name']}: {r['status']} exit={r['exit']} {r['duration_s']}s "
                   f"galat={len(r['signatures'])}")
+            if r["status"] == "TIMEOUT":
+                print(f"    ukur ulang sekali: --timeout {args.timeout * 3} --force (11 H15)")
         return 0
 
     baseline = {}
     if base_path.exists():
         try:
             baseline = json.loads(base_path.read_text(encoding="utf-8"))
+            if not isinstance(baseline, dict):
+                raise ValueError("bukan objek JSON")
         except ValueError as exc:   # termasuk UnicodeDecodeError: baseline rusak = tanpa pembanding (merah)
             print(f"PERINGATAN: baseline {base_path} rusak ({exc}) — semua galat dihitung baru")
+            baseline = {}
     red = False
     for r in results:
         r["new"] = new_errors(r, baseline.get(r["name"]))
@@ -150,9 +180,12 @@ def main() -> int:
         print(f"CLOSING {r['name']}: {r['status']} exit={r['exit']} baru={r['new']} {r['duration_s']}s")
     out = Path(args.out) if args.out else explore / "closing-verification.md"
     out.write_text(render_md(results, baseline), encoding="utf-8")
+    def _base(name: str) -> dict:
+        b = baseline.get(name)
+        return b if isinstance(b, dict) else {}
     log = [{"cmd": r["name"], "full": r["cmd"], "status": r["status"], "exit": r["exit"], "new_errors": r["new"],
-            "baseline_status": (baseline.get(r["name"]) or {}).get("status"),
-            "baseline_errors": len((baseline.get(r["name"]) or {}).get("signatures", []))} for r in results]
+            "baseline_status": _base(r["name"]).get("status"),
+            "baseline_errors": len(_base(r["name"]).get("signatures", []))} for r in results]
     out.with_suffix(".json").write_text(json.dumps(log, indent=1), encoding="utf-8")
     print(f"VERDICT: {'MERAH' if red else 'HIJAU'} -> {out}")
     return 1 if red else 0

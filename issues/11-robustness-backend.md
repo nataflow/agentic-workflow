@@ -206,7 +206,7 @@ analyst check 7 FAIL atas tabel yang diturunkan tangan.
 ## Tahap 3 — Verifikasi penutup
 
 ## H14 [Tinggi] Verifikasi hijau palsu
-- [ ] Belum
+- [x] Selesai — `ERROR_LINE` mengenal `berkas:baris[:kolom]:`; MERAH tanpa tanda memakai ekor log (10 baris) sebagai tanda; exit 126/127 selalu ≥ 1 galat baru
 
 `ERROR_LINE` (`run_verification.py:25`) tidak mengenal diagnostik Go (`a.go:2:23: undefined: x`), sehingga
 MERAH→MERAH bertanda kosong memberi `baru=0` (`:82`). Probe Go nyata: baseline MERAH `galat=0`, brief menambah
@@ -214,14 +214,14 @@ MERAH→MERAH bertanda kosong memberi `baru=0` (`:82`). Probe Go nyata: baseline
 jalan. **Perbaikan:** lihat Keputusan H14.
 
 ## H15 [Sedang] `TIMEOUT` di baseline membuat penutup tak pernah bisa tutup
-- [ ] Belum
+- [x] Selesai — baseline `TIMEOUT` mencetak `--timeout` 3× `--force`; catatan `TIMEOUT warisan` di berkas hasil; architect 3a + Failure path 4 memberi satu ulangan lalu eskalasi user
 
 `TIMEOUT` → `TIMEOUT` = MERAH (`:149`), sementara architect 3a menyatakan TIMEOUT di merge-base bukan alasan
 berhenti dan SKILL tidak pernah meneruskan `--timeout`. **Perbaikan:** lihat Keputusan H15; ringkasan penutup
 menandai `TIMEOUT (baseline juga TIMEOUT)`.
 
 ## H16 [Rendah] Masukan rusak ke `run_verification` berakhir traceback
-- [ ] Belum
+- [x] Selesai — NAMA `--cmd` `[A-Za-z0-9_-]+`; baseline bukan objek (atau entri bukan objek) = baseline rusak
 
 `--cmd 'a/b=…'` → `FileNotFoundError` (nama log memuat `/`); baseline JSON berupa list → `AttributeError`.
 **Perbaikan:** nama perintah `[A-Za-z0-9_-]+`; baseline bukan objek = baseline rusak.
