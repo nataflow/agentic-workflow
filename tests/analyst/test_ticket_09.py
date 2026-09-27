@@ -70,11 +70,13 @@ def test_e10_report_path_hilang_fail_rapi(repo):
 
 
 @pytest.mark.regression("E11")
-def test_e11_new_tanpa_type_diterima(make_repo):
+@pytest.mark.regression("G9")
+def test_e11_new_menuntut_type_dan_menerima_huruf_kecil(make_repo):
+    """E11 ditinjau ulang oleh G9: `new` kini menulis `type:` ke kerangka, jadi `--type` wajib lagi."""
     root = make_repo()
-    r = tk(root, "new", "--slug", "tanpa-tipe")
-    assert r.returncode == 0 and "type=" not in r.stdout
-    r = tk(root, "new", "--slug", "bertipe", "--type", "bug")
+    r = tk(root, "new", "--slug", "tanpa-tipe", "--requester", "Rina", "--request", "Tombol bayar mati.")
+    assert r.returncode == 2 and "--type" in r.out
+    r = tk(root, "new", "--slug", "bertipe", "--type", "bug", "--requester", "Rina", "--request", "Tombol bayar mati.")
     assert r.returncode == 0 and "type=BUG" in r.stdout
 
 

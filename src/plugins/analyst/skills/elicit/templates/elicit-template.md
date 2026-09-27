@@ -8,7 +8,7 @@ Rumah kanonik **frontmatter** dan seksi `## Catatan Elisitasi` di `analyst/ticke
 
 ## 1. Template Kanonik — TICKET.md Awal
 
-`analyst:elicit` menulis berkas baru persis kerangka ini. Tipe `FEATURE` dan `IMPROVEMENT` (tujuh pilar wajib, dua opsional):
+`ticket.py new` menulis berkas baru persis kerangka ini — permintaan asli dari `--request`, `request_hash` dihitung skrip — lalu `analyst:elicit` mengisi pilarnya. `tests/analyst/test_ticket_10.py` menagih kerangka skrip sama dengan blok di bawah. Tipe `FEATURE` dan `IMPROVEMENT` (tujuh pilar wajib, dua opsional):
 
 ````markdown
 ---
@@ -17,13 +17,14 @@ elicitation: OPEN
 type: <FEATURE | IMPROVEMENT>
 priority: -
 slug: <slug ticketdir>
-requester: <nama atau peran peminta>
+requester: <"nama atau peran peminta">
 created: <YYYY-MM-DD>
 external_ref: -
 domain_terms: []
 revision: 0
 review: -
 review_round: 0
+request_hash: <sidik 12 hex permintaan asli>
 ---
 
 # <judul kerja singkat>

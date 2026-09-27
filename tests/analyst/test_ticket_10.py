@@ -336,3 +336,110 @@ def test_g8_pilar_ganda_menyembunyikan_pilar_belum_terjawab(repo):
     r = vd(repo, "elicit")
     assert r.code == 1 and "pilar ganda (isi yang pertama tertimpa): Urgensi" in r.out
 
+
+# --- G9 ------------------------------------------------------------------------------------------
+
+TEMPLATE = PLUGINS / "analyst" / "skills" / "elicit" / "templates" / "elicit-template.md"
+REQUEST = "Pelanggan korporat sering minta bayar invoice besar dicicil.\n\nTolong bikin fitur cicilan \"segera\"."
+
+
+def new(root, slug="cicilan", ticket_type="FEATURE", request=REQUEST, *extra):
+    return tk(root, "new", "--slug", slug, "--type", ticket_type, "--requester", "Rina (Head of Sales)",
+              "--request", "-", *extra, stdin=request)
+
+
+def only_ticketdir(root):
+    dirs = [p for p in (root / "analyst" / "tickets").iterdir()]
+    assert len(dirs) == 1, dirs
+    return f"analyst/tickets/{dirs[0].name}"
+
+
+@pytest.mark.regression("G9")
+@pytest.mark.parametrize("ticket_type", ["FEATURE", "IMPROVEMENT", "BUG"])
+def test_g9_new_menulis_kerangka_yang_lolos_validator(plain, ticket_type):
+    r = new(plain, "cicilan", ticket_type)
+    assert r.code == 0 and f"type={ticket_type}" in r.out
+    td = only_ticketdir(plain)
+    body = text(plain, td)
+    assert "> Pelanggan korporat sering minta bayar invoice besar dicicil.\n>\n> Tolong bikin fitur cicilan " \
+           "\"segera\"." in body
+    fm, _ = lib.split_frontmatter(body)
+    assert fm["elicitation"] == "OPEN" and fm["type"] == ticket_type and fm["request_hash"] == lib.request_digest(body)
+    assert vd(plain, "elicit", td).code == 0
+    states = {r["ticketdir"]: r["state"] for r in json.loads(tk(plain, "state", "--json").out)["ticketdirs"]}
+    assert states[td] == "ELISITASI"
+
+
+@pytest.mark.regression("G9")
+def test_g9_kerangka_skrip_sama_dengan_template(plain):
+    block = TEMPLATE.read_text(encoding="utf-8").split("\n## 1. ", 1)[1]
+    block = block.split("````markdown\n", 1)[1].split("\n````", 1)[0]
+    assert new(plain, "cicilan", "FEATURE", "Tolong bikin fitur cicilan.").code == 0
+    got = text(plain, only_ticketdir(plain)).rstrip("\n").splitlines()
+    want = block.splitlines()
+    assert len(got) == len(want), (got, want)
+    for w, g in zip(want, got):
+        if "<" in w and ">" in w and not w.startswith("|"):      # slot template: cukup awalan barisnya
+            assert g.startswith(w.split("<", 1)[0]) and g != w.split("<", 1)[0], (w, g)
+        else:
+            assert g == w, (w, g)
+
+
+@pytest.mark.regression("G9")
+def test_g9_ticketdir_kosong_dipakai_ulang(plain):
+    kosong = plain / "analyst/tickets/2609231600-cicilan"
+    kosong.mkdir(parents=True)
+    r = new(plain)
+    assert r.code == 0 and "KOSONG dipakai ulang" in r.out
+    assert only_ticketdir(plain) == "analyst/tickets/2609231600-cicilan"
+    assert (kosong / "TICKET.md").is_file()
+    r = new(plain)                                                    # kini ELISITASI: slug kembar terbuka
+    assert r.code == 1 and "masih terbuka" in r.out
+
+
+@pytest.mark.regression("G9")
+def test_g9_permintaan_asli_disunting_ditolak(plain):
+    assert new(plain).code == 0
+    td = only_ticketdir(plain)
+    p = plain / td / "TICKET.md"
+    p.write_text(p.read_text(encoding="utf-8").replace("dicicil.", "dicicil maksimal 6 kali."), encoding="utf-8")
+    r = vd(plain, "elicit", td)
+    assert r.code == 1 and "Permintaan Asli berubah sejak `ticket.py new`" in r.out
+
+
+@pytest.mark.regression("G9")
+@pytest.mark.parametrize("asli, requester, needle", [
+    ("  \n", "Rina", "--request kosong"),
+    ("Tolong bikin fitur cicilan.", " ", "--requester kosong"),
+])
+def test_g9_new_menolak_masukan_kosong_tanpa_membuat_direktori(plain, asli, requester, needle):
+    r = tk(plain, "new", "--slug", "cicilan", "--type", "FEATURE", "--requester", requester, "--request", "-",
+           stdin=asli)
+    assert r.code == 1 and needle in r.out
+    assert not (plain / "analyst").exists()
+
+
+@pytest.mark.regression("G9")
+@pytest.mark.regression("G2")
+def test_alur_penuh_new_close_review_approve_diterima_penerima(make_repo):
+    """Jalur resmi ujung ke ujung dengan kontrak baru: tiap transisi lewat skrip, penerima backend PASS."""
+    root = make_repo()
+    fixture = FIXTURE.read_text(encoding="utf-8")
+    asli = fixture.split("### Permintaan Asli\n\n> ", 1)[1].split("\n", 1)[0]
+    assert new(root, "cicilan", "FEATURE", asli).code == 0
+    td = only_ticketdir(root)
+    p = root / td / "TICKET.md"
+    notes = fixture[fixture.index("### Fakta"):]
+    p.write_text(p.read_text(encoding="utf-8").split("### Fakta", 1)[0] + notes, encoding="utf-8")
+    assert tk(root, "close", "--ticketdir", td).code == 0              # elicit Phase 5
+    assert git(root, "log", "-1", "--format=%s").strip() == "docs(ticket): elisitasi cicilan"
+    card = fixture[fixture.index("\n# "):fixture.index("## Catatan Elisitasi")]
+    body = p.read_text(encoding="utf-8")
+    head, rest = body.split("\n# ", 1)
+    p.write_text(head.replace("priority: -", "priority: HIGH") + card + rest[rest.index("## Catatan Elisitasi"):],
+                 encoding="utf-8")
+    assert vd(root, "ticket", td).code == 0 and vd(root, "elicit", td).code == 0
+    assert ticket_review(root, td, "PASS").returncode == 0
+    assert tk(root, "approve", "--ticketdir", td, "--answer", "Setujui").code == 0
+    status, summary, _ = be_lib.ticket_source_verdict(root, f"{td}/TICKET.md")
+    assert status == "PASS" and "bersegel" in summary, summary

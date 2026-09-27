@@ -40,6 +40,7 @@ from analyst_lib import (  # noqa: E402
     meaningful,
     normalize_ticketdir,
     report_json,
+    request_digest,
     scan_leaks,
     sections,
     split_frontmatter,
@@ -152,9 +153,14 @@ class DocValidator(Checker):
                  "tiap heading sekali.")
 
         request = meaningful(self.h3.get("Permintaan Asli", []))
-        self.add(3, "Permintaan asli terekam", bool(request) and all(l.startswith(">") for l in request),
-                 f"{len(request)} baris kutipan" if request else "kosong",
-                 "Kutip permintaan user apa adanya sebagai blockquote `> `.")
+        sealed = str(self.fm.get("request_hash", "-")).strip() or "-"    # `-`: tiket sebelum G9
+        drifted = sealed != "-" and sealed != request_digest(self.text)
+        ok = bool(request) and all(l.startswith(">") for l in request) and not drifted
+        self.add(3, "Permintaan asli terekam", ok,
+                 ("Permintaan Asli berubah sejak `ticket.py new` (request_hash " + sealed + ")") if drifted
+                 else f"{len(request)} baris kutipan" if request else "kosong",
+                 "Kutip permintaan user apa adanya sebagai blockquote `> `; bila sudah dimateraikan "
+                 "`ticket.py new`, pulihkan kutipan persis aslinya (git) — jawaban baru masuk log, bukan ke sini.")
 
         facts = sections("\n".join(self.h3.get("Fakta", [])), 4)
         expected = [p for p in PILLARS_REQUIRED[typ] + PILLARS_OPTIONAL[typ]]

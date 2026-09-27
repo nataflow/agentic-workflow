@@ -305,6 +305,36 @@ def meaningful(lines: List[str]) -> List[str]:
     return [l for l in lines if l.strip() and not l.strip().startswith("<!--")]
 
 
+def request_digest(text: str) -> str:
+    """Sidik 12 hex `### Permintaan Asli` — dimateraikan `ticket.py new` sebagai `request_hash`.
+
+    Elisitasi menulis ulang `TICKET.md` tiap giliran; sidik ini yang menjaga kutipan permintaan tetap
+    verbatim lintas penulisan ulang itu.
+    """
+    _, body = split_frontmatter(text)
+    notes = sections(split_parts(body)[1], 2).get(ELICIT_H2, [])
+    quote = meaningful(sections("\n".join(notes), 3).get("Permintaan Asli", []))
+    return hashlib.sha256("\n".join(l.rstrip() for l in quote).encode("utf-8")).hexdigest()[:12]
+
+
+def ticket_skeleton(ticket_type: str, slug: str, requester: str, created: str, title: str,
+                    request: str) -> str:
+    """`TICKET.md` awal persis bagian 1 `elicit-template.md`, beserta `request_hash`.
+
+    Rumah kanonik kerangkanya tetap template itu; `tests/analyst/test_ticket_10.py` menagih keduanya sama.
+    """
+    quote = "\n".join(f"> {l.rstrip()}" if l.strip() else ">" for l in request.strip("\n").splitlines())
+    pillars = "\n\n".join(f"#### {p}\n{UNANSWERED}"
+                          for p in PILLARS_REQUIRED[ticket_type] + PILLARS_OPTIONAL[ticket_type])
+    text = (f"---\nstatus: DRAFT\nelicitation: OPEN\ntype: {ticket_type}\npriority: -\nslug: {slug}\n"
+            f"requester: {clean_value(requester)}\ncreated: {created}\nexternal_ref: -\ndomain_terms: []\n"
+            f"revision: 0\nreview: -\nreview_round: 0\nrequest_hash: -\n---\n\n# {title}\n\n"
+            f"## {ELICIT_H2}\n\n### Permintaan Asli\n\n{quote}\n\n### Fakta\n\n{pillars}\n\n"
+            "### Log Tanya-Jawab\n\n| # | Tanggal | Pertanyaan | Jawaban | Sumber |\n|---|---|---|---|---|\n\n"
+            "### Pertanyaan Terbuka\n\n- Tidak ada.\n")
+    return set_frontmatter_field(text, "request_hash", request_digest(text))
+
+
 # ── Kebocoran teknis ──────────────────────────────────────────────────────────
 
 # Istilah yang bentrok dengan kosakata bisnis Indonesia sengaja tidak didaftar: `api` (kereta

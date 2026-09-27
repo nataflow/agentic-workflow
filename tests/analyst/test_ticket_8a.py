@@ -184,7 +184,7 @@ def test_a5_cancel_berkas_tanpa_frontmatter(plain):
 def test_a6_new_dan_check_dari_subdir_mencetak_root(repo):
     sub = repo / "src" / "sub"
     sub.mkdir(parents=True)
-    r = tk(repo, "new", "--slug", "sub", "--type", "FEATURE", cwd=sub)
+    r = tk(repo, "new", "--slug", "sub", "--type", "FEATURE", "--requester", "Rina", "--request", "Tolong bikin fitur cicilan.", cwd=sub)
     assert r.code == 0 and f"root={repo}" in r.out
     assert not (sub / "analyst").exists()
     assert f"root={repo}" in tk(repo, "check", "--gate", "spec", "--ticketdir", TDIR, cwd=sub).out
@@ -252,7 +252,7 @@ def test_a10_nama_tidak_sah_dan_cancel_kosong(plain):
     (plain / "analyst/tickets/draft-lama").mkdir(parents=True)
     (plain / "analyst/tickets/2609231600-kosong").mkdir()
     assert states(plain)["analyst/tickets/draft-lama"] == "NAMA_TIDAK_SAH"
-    assert tk(plain, "new", "--slug", "lama", "--type", "FEATURE").code == 0
+    assert tk(plain, "new", "--slug", "lama", "--type", "FEATURE", "--requester", "Rina", "--request", "Tolong bikin fitur cicilan.").code == 0
     r = tk(plain, "cancel", "--ticketdir", "analyst/tickets/2609231600-kosong", "--reason", "x")
     assert r.code == 0 and not (plain / "analyst/tickets/2609231600-kosong").exists()
 
@@ -288,7 +288,7 @@ def test_a11_git_error_line():
 
 @pytest.mark.regression("A12")
 def test_a12_type_huruf_kecil_diterima(plain):
-    assert tk(plain, "new", "--slug", "x", "--type", "bug").code == 0
+    assert tk(plain, "new", "--slug", "x", "--type", "bug", "--requester", "Rina", "--request", "Tolong bikin fitur cicilan.").code == 0
 
 
 @pytest.mark.regression("A12")

@@ -9,7 +9,8 @@ terakhir. `review.md` (opsional) adalah jejak blok `## Ticket Review` terakhir, 
 Satu-satunya jalan mutasi status yang punya konsekuensi di luar penulisnya:
 
 - `state`   — pindai `analyst/tickets/*/`, vonis keadaan dan rute tiap ticketdir.
-- `new`     — alokasikan `analyst/tickets/<YYMMDDhhmm>-<slug>/` (menolak slug kembar terbuka).
+- `new`     — alokasikan `analyst/tickets/<YYMMDDhhmm>-<slug>/` beserta `TICKET.md` awal (kerangka,
+              permintaan asli, `request_hash`); menolak slug kembar terbuka, memakai ulang yang `KOSONG`.
 - `check`   — prasyarat gate `elicit` / `spec` atas satu ticketdir.
 - `close`   — tutup elisitasi: `elicitation: CLOSED` + segel catatan (`elicit_hash`, `elicit_log`).
 - `review`  — catat vonis `ticket-reviewer` beserta sidik konten yang dinilainya (dan bloknya).
@@ -60,6 +61,7 @@ from analyst_lib import (  # noqa: E402
     split_frontmatter,
     split_parts,
     ticket_seal,
+    ticket_skeleton,
 )
 from validate_doc import DocValidator  # noqa: E402
 
@@ -277,25 +279,38 @@ def cmd_state(root: Path, args: argparse.Namespace) -> int:
 
 
 def cmd_new(root: Path, args: argparse.Namespace) -> int:
+    """Alokasikan ticketdir dan tulis `TICKET.md` awal sekaligus — tanpa jendela ticketdir `KOSONG`."""
     if not SLUG_RE.match(args.slug) or len(args.slug) > 40:
         print(f"NEW FAIL: slug `{args.slug}` bukan kebab-case ≤40 karakter")
         return 1
+    request = sys.stdin.read() if args.request == "-" else args.request
+    if not request.strip():
+        print("NEW FAIL: --request kosong — minta user menempelkan permintaan atau keluhan aslinya")
+        return 1
+    if not args.requester.strip():
+        print("NEW FAIL: --requester kosong — tanyakan nama atau peran peminta (analyst:intake Phase 6)")
+        return 1
+    reuse = None
     for rel in ticketdirs(root):
         r = classify(root, rel)
-        if r["state"] == "NAMA_TIDAK_SAH":
+        if r["state"] == "NAMA_TIDAK_SAH" or rel.split("-", 1)[-1] != args.slug:
             continue
-        if rel.split("-", 1)[-1] == args.slug and r["state"] not in ("DIBATALKAN", "READY"):
+        if r["state"] == "KOSONG":
+            reuse = rel            # sisa `new` lama yang gagal sebelum menulis: pakai ulang, jangan menumpuk
+        elif r["state"] not in ("DIBATALKAN", "READY"):
             print(f"NEW FAIL: slug `{args.slug}` masih terbuka di {rel} ({r['state']}) — lanjutkan itu, "
                   f"atau pilih slug lain")
             return 1
-    stamp = dt.datetime.now().strftime("%y%m%d%H%M")
-    rel = f"{TICKETS_DIR}/{stamp}-{args.slug}"
-    if (root / rel).exists():
+    rel = reuse or f"{TICKETS_DIR}/{dt.datetime.now().strftime('%y%m%d%H%M')}-{args.slug}"
+    if not reuse and (root / rel).exists():
         print(f"NEW FAIL: {rel} sudah ada (slug sama dalam menit yang sama) — tunggu satu menit atau pilih slug lain")
         return 1
-    (root / rel).mkdir(parents=True)
-    kind = f" · type={args.type} (tulis ke frontmatter `type:` di elicit)" if args.type else ""
-    print(f"NEW PASS: {rel} · root={root} · git={'ya' if is_git_repo(root) else 'tidak'}{kind}")
+    title = " ".join(args.title.split()) or args.slug.replace("-", " ").capitalize()
+    text = ticket_skeleton(args.type, args.slug, args.requester, dt.date.today().isoformat(), title, request)
+    (root / rel).mkdir(parents=True, exist_ok=True)
+    (root / rel / TICKET_FILE).write_text(text, encoding="utf-8")
+    print(f"NEW PASS: {rel} · root={root} · git={'ya' if is_git_repo(root) else 'tidak'} · type={args.type}"
+          + (" · ticketdir KOSONG dipakai ulang" if reuse else ""))
     return 0
 
 
@@ -674,8 +689,10 @@ def main() -> None:
     s.add_argument("--json", action="store_true")
     s = sub.add_parser("new")
     s.add_argument("--slug", required=True)
-    s.add_argument("--type", default="", type=str.upper, choices=TYPES + ("",),
-                   help="opsional; hanya digemakan di keluaran — `type:` ditulis elicit ke TICKET.md")
+    s.add_argument("--type", required=True, type=str.upper, choices=TYPES)
+    s.add_argument("--requester", required=True, help="nama atau peran peminta")
+    s.add_argument("--request", required=True, help="permintaan asli apa adanya, atau `-` untuk stdin")
+    s.add_argument("--title", default="", help="judul kerja H1; default dari slug")
     s = sub.add_parser("check")
     s.add_argument("--gate", required=True, choices=("elicit", "spec"))
     s.add_argument("--ticketdir", required=True)

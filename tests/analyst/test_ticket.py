@@ -125,7 +125,7 @@ def test_approve_tanpa_review_ditolak(make_repo):
 def test_new_di_luar_repo_git(make_repo):
     """E1: tanpa git, `new` tetap jalan dan melaporkan git=tidak."""
     root = make_repo(git_init=False)
-    r = ticket(root, "new", "--slug", "cicilan", "--type", "FEATURE")
+    r = ticket(root, "new", "--slug", "cicilan", "--type", "FEATURE", "--requester", "Rina", "--request", "Tolong bikin fitur cicilan.")
     assert r.returncode == 0 and "git=tidak" in r.stdout, r.stdout + r.stderr
     assert [p.name for p in (root / "analyst" / "tickets").iterdir()][0].endswith("-cicilan")
 
@@ -134,14 +134,14 @@ def test_new_di_luar_repo_git(make_repo):
 def test_new_path_berspasi_dan_unicode(make_repo, name):
     """E5."""
     root = make_repo(name=name)
-    r = ticket(root, "new", "--slug", "cicilan", "--type", "BUG")
+    r = ticket(root, "new", "--slug", "cicilan", "--type", "BUG", "--requester", "Rina", "--request", "Tolong bikin fitur cicilan.")
     assert r.returncode == 0 and "git=ya" in r.stdout, r.stdout + r.stderr
 
 
 def test_new_dari_subdirektori_menulis_di_root_git(make_repo):
     """E4."""
     root = make_repo({"src/features/.keep": ""})
-    r = ticket(root, "new", "--slug", "cicilan", "--type", "FEATURE", cwd=root / "src" / "features")
+    r = ticket(root, "new", "--slug", "cicilan", "--type", "FEATURE", "--requester", "Rina", "--request", "Tolong bikin fitur cicilan.", cwd=root / "src" / "features")
     assert r.returncode == 0, r.stdout + r.stderr
     assert (root / "analyst" / "tickets").is_dir()
     assert not (root / "src" / "features" / "analyst").exists()
