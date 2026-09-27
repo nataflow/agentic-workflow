@@ -13,7 +13,7 @@ agent lain, plugin lain) lolos tanpa keputusan (exit 0).
 (`backenddev/docs/.explore/<slug>.md` atau `<taskdir>/.explore/<slug>.md`); selain itu ditolak.
 
 `code-reviewer` (09 E19): read-only atas repo kecuali laporannya sendiri. Bash: git baca (+ `merge-base`,
-`symbolic-ref`), `ls`, dan `git add`/`git commit -m` hanya atas `<taskdir>/REVIEW.md` dan
+`symbolic-ref` bentuk baca, 12 J3), `ls`, dan `git add`/`git commit -m` hanya atas `<taskdir>/REVIEW.md` dan
 `backenddev/issues/README.md`; Write/Edit hanya kedua path itu. Tanpa lease: path-nya berpola tetap.
 
 Untuk implementor: fail-closed — galat internal pun menolak (exit 2), karena exit selain 2 tidak
@@ -72,6 +72,49 @@ def lease_path(root: Path) -> Path:
     return (gd if gd.is_absolute() else root / gd) / "nataflow" / "lease-backend.json"
 
 
+def unquoted_glob(cmd: str) -> bool:
+    """Benar bila `*`/`?`/`[` tanpa kutip atau escape muncul di kata sebelum `--` (12 J8).
+
+    Bash mengekspansinya menjadi nama berkas, dan nama berkas berawalan `-` terbaca sebagai opsi; sesudah
+    `--` hasil ekspansi tetap pathspec. `shlex` membuang kutip, jadi yang dinilai teks mentah.
+    """
+    quote, word, glob, esc = "", "", False, False
+    for ch in cmd + " ":
+        if esc:
+            word, esc = word + ch, False
+        elif quote:
+            if ch == quote:
+                quote = ""
+            elif ch == "\\" and quote == '"':
+                esc = True
+            else:
+                word += ch
+        elif ch == "\\":
+            esc = True
+        elif ch in "'\"":
+            quote = ch
+        elif ch.isspace():
+            if word == "--" and not glob:
+                return False
+            if glob:
+                return True
+            word, glob = "", False
+        else:
+            word, glob = word + ch, glob or ch in "*?["
+    return False
+
+
+def symbolic_ref_readonly(args: List[str]) -> bool:
+    """`git symbolic-ref` bentuk baca saja (12 J3): ≤ 1 positional, flag hanya dari allowlist.
+
+    Allowlist, bukan blocklist: parse-options git menerima singkatan (`--del` = `--delete`) dan gugus (`-qd`);
+    `-m <reason>` dan `--` juga di luar allowlist.
+    """
+    read_flags = {"-q", "--quiet", "--no-quiet", "--short", "--no-short", "--recurse", "--no-recurse"}
+    flags = [a for a in args if a.startswith("-")]
+    return all(f in read_flags for f in flags) and len(args) - len(flags) <= 1
+
+
 def shell_tokens(cmd: str) -> Tuple[List[str], str]:
     """(token, '') bila `cmd` satu perintah polos; ([], alasan) bila tidak.
 
@@ -83,6 +126,9 @@ def shell_tokens(cmd: str) -> Tuple[List[str], str]:
                     "jalankan satu perintah polos per panggilan")
     if BRACE.search(cmd):
         return [], "brace expansion (`{a,b}`, `{1..3}`) dilarang; tulis tiap argumen utuh"
+    if unquoted_glob(cmd):
+        return [], ("glob tanpa kutip (`*`, `?`, `[`) sebelum `--` dilarang; kutip argumennya atau taruh "
+                    "path sesudah `--`")
     lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
     lex.whitespace_split = True
     lex.commenters = ""
@@ -199,6 +245,8 @@ def decide_reviewer_bash(cmd: str, root: Path, cwd: Path) -> str:
     if tok[0] != "git" or len(tok) < 2:
         return f"perintah di luar allowlist {REVIEWER}: `{cmd[:80]}` — dilarang build/test"
     if tok[1] in READ_ONLY_GIT | REVIEWER_READ_GIT:
+        if tok[1] == "symbolic-ref" and not symbolic_ref_readonly(tok[2:]):
+            return "`git symbolic-ref` hanya bentuk baca (`[-q] [--short] <name>`) — menulis HEAD dilarang (12 J3)"
         bad = READ_ONLY_BAD_FLAGS.intersection(t.split("=")[0] for t in tok)
         return f"flag {sorted(bad)} dilarang" if bad else ""
     if tok[1] == "add":

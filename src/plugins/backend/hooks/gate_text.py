@@ -54,6 +54,9 @@ def _profile_note(v) -> str:
         return (f"`{PROFILE_DIR}index.json` TIDAK SAH: field `stack` = `{p.stack or 'kosong'}`, di luar "
                 "java-spring, go, node, bun, rust, php, php-codeigniter. Gerbang merutekan "
                 "`backend:profile` mode REFRESH sebelum rute lain.")
+    if p.state == "BAD_PLUGIN":
+        return (f"`{PROFILE_DIR}index.json` TIDAK SAH: field `plugin` = `{p.owner}`, bukan `backend`. "
+                "Gerbang merutekan `backend:profile` mode REFRESH sebelum rute lain.")
     return (f"Profil `{PROFILE_DIR}` TIDAK LENGKAP, berkas hilang: {', '.join(p.missing)}. "
             "Gerbang merutekan `backend:profile` mode REFRESH sebelum rute lain.")
 

@@ -4,7 +4,7 @@ Sumber: review robustness plugin `frontend` 2026-09-27 (lima penelusur paralel: 
 prasyarat & verifikasi, validator dokumen, orkestrasi & prosa). Tiap temuan Tinggi/Sedang direproduksi di ruang
 kerja sementara sebelum masuk berkas ini. Basis kode: commit `b293564` (suite 615 test hijau).
 
-**Status (2026-09-27):** peta blast radius selesai; eksekusi berjalan per tahap.
+**Status (2026-09-27):** peta blast radius selesai; tahap 1 selesai, rilis menyusul.
 
 ## Tujuan
 
@@ -138,15 +138,15 @@ atau pola sama di plugin lain. **Test tersentuh** = test yang ada dan harus teta
 
 ## Tahap 1 — Pagar & hook
 
-- [ ] **J1 [Tinggi]** `git grep -O<cmd>` / `--open-files=` menjalankan shell dari reviewer fe (`guard_bash.py:44,89`; `BAD_FLAGS` hanya mencocokkan `-O` persis).
-- [ ] **J2 [Tinggi]** `git --no-pager --config-env=diff.external=… diff` lolos (`guard_bash.py:84-86` hanya memeriksa `tok[1]`); `--exec-path=`, `--git-dir=`, `--work-tree=` juga.
-- [ ] **J3 [Sedang]** `git symbolic-ref HEAD refs/heads/x` dan `--delete` lolos di reviewer be dan fe.
-- [ ] **J4 [Sedang]** Tulisan implementor/explorer/doc-reviewer fe ke `.git/hooks/`, `.env.local`, atau `src/.explore/` tidak terlihat `verify_scope --worktree`; `pre-commit` yang ditulis lalu dijalankan commit architect.
-- [ ] **J5 [Sedang]** `detect.py` crash pada `"workspaces": ["."]` / `pnpm-workspace.yaml` tak terbaca → hook diam, prasyarat profile traceback (be dan fe).
-- [ ] **J6 [Rendah]** TREE meloloskan semua `frontenddev/reviews/*.md`, bukan hanya `finding_source` taskdir ini.
-- [ ] **J7 [Rendah]** `chain.py files` dicocokkan `endswith` → `python3 /tmp/x/skills/_common/chain.py files` lolos.
-- [ ] **J8 [Rendah]** Glob `*?[` sebelum `--` tidak ditolak (nama berkas bisa menjadi flag).
-- [ ] **J9 [Rendah]** `.claude/workflow` berpemisah koma dibaca sebagai satu nama; profil sendiri ber-`plugin` asing memberi teks yang saling bertentangan.
+- [x] **J1 [Tinggi]** `git grep -O<cmd>` / `--open-files=` menjalankan shell dari reviewer fe (`guard_bash.py:44,89`; `BAD_FLAGS` hanya mencocokkan `-O` persis).
+- [x] **J2 [Tinggi]** `git --no-pager --config-env=diff.external=… diff` lolos (`guard_bash.py:84-86` hanya memeriksa `tok[1]`); `--exec-path=`, `--git-dir=`, `--work-tree=` juga.
+- [x] **J3 [Sedang]** `git symbolic-ref HEAD refs/heads/x` dan `--delete` lolos di reviewer be dan fe.
+- [x] **J4 [Sedang]** Tulisan implementor/explorer/doc-reviewer fe ke `.git/hooks/`, `.env.local`, atau `src/.explore/` tidak terlihat `verify_scope --worktree`; `pre-commit` yang ditulis lalu dijalankan commit architect.
+- [x] **J5 [Sedang]** `detect.py` crash pada `"workspaces": ["."]` / `pnpm-workspace.yaml` tak terbaca → hook diam, prasyarat profile traceback (be dan fe).
+- [x] **J6 [Rendah]** TREE meloloskan semua `frontenddev/reviews/*.md`, bukan hanya `finding_source` taskdir ini.
+- [x] **J7 [Rendah]** `chain.py files` dicocokkan `endswith` → `python3 /tmp/x/skills/_common/chain.py files` lolos.
+- [x] **J8 [Rendah]** Glob `*?[` sebelum `--` tidak ditolak (nama berkas bisa menjadi flag).
+- [x] **J9 [Rendah]** `.claude/workflow` berpemisah koma dibaca sebagai satu nama; profil sendiri ber-`plugin` asing memberi teks yang saling bertentangan.
 - **J10 — BATAL** (lihat Keputusan).
 
 ## Tahap 2 — Verifikasi penutup & prasyarat

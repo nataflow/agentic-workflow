@@ -240,6 +240,9 @@ def strip_explore_scratch(status_out: str) -> str:
 
     Laci itu zona kerja, bukan artefak rantai: tidak pernah di-stage maupun
     di-commit, sehingga kehadirannya tidak boleh dihitung working tree kotor.
+    Hanya laci berjangkar (12 J4, sama dengan `verify_scope.is_scratch`):
+    `.frontenddev/` di akar repo dan `frontenddev/docs/[<taskdir>/].explore/`;
+    `src/.explore/x.ts` adalah kode biasa dan tetap terhitung kotor.
     """
     kept = []
     for line in status_out.splitlines():
@@ -249,8 +252,8 @@ def strip_explore_scratch(status_out: str) -> str:
         if " -> " in path:
             path = path.split(" -> ")[-1]
         path = path.strip().strip('"')
-        segments = path.rstrip("/").split("/")
-        if ".explore" in segments or ".frontenddev" in segments:
+        seg = path.strip("/").split("/")
+        if seg[0] == ".frontenddev" or (seg[:2] == ["frontenddev", "docs"] and ".explore" in seg[2:4]):
             continue
         kept.append(line)
     return "\n".join(kept)

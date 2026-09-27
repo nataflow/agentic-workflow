@@ -46,6 +46,9 @@ def _profile_note(v) -> str:
     if p.state in ("NO_STACK", "UNKNOWN_STACK"):
         return (f"`{PROFILE_DIR}index.json` TIDAK SAH: field `stack` = `{p.stack or 'kosong'}`, di luar "
                 f"react-vite, react-native, sveltekit, svelte-vite. {lead} mode REFRESH sebelum rute lain.")
+    if p.state == "BAD_PLUGIN":
+        return (f"`{PROFILE_DIR}index.json` TIDAK SAH: field `plugin` = `{p.owner}`, bukan `frontend`. "
+                f"{lead} mode REFRESH sebelum rute lain.")
     return (f"Profil `{PROFILE_DIR}` TIDAK LENGKAP, berkas hilang: {', '.join(p.missing)}. Berkas yang datanya "
             "nihil tetap wajib ada berisi `tidak terdeteksi`. "
             f"{lead} mode REFRESH sebelum rute lain.")

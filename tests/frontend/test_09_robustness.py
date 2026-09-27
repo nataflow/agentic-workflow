@@ -117,7 +117,8 @@ def test_e15_hooks_json_mendaftarkan_pagar():
 @pytest.mark.parametrize("cmd", [
     "git diff abc123..HEAD -- src/a.ts", "git log --oneline -5", "git status --porcelain",
     "git --no-pager show HEAD", "ls src",
-    "python3 /x/frontend/skills/_common/chain.py files --taskdir " + OTHER_TD,
+    # `chain.py` milik plugin ini, bukan sembarang path berakhiran sama (12 J7).
+    f"python3 {PLUGINS / 'frontend/skills/_common/chain.py'} files --taskdir " + OTHER_TD,
 ])
 def test_e15_reviewer_boleh_membaca(repo, cmd):
     assert hook(repo, cmd=cmd).returncode == 0

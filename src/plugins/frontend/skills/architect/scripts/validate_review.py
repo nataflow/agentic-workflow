@@ -33,7 +33,7 @@ import datetime
 import json
 import re
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
@@ -360,21 +360,30 @@ class ReviewValidator:
 
     def _check_tree(self) -> None:
         """Reviewer read-only atas repo: sesudah ia bekerja, yang berubah hanya `REVIEW.md` dan baris
-        status berkas temuan `frontenddev/reviews/` (09 E15). Hanya dengan `--log` (architect Phase 4,
+        status `finding_source` taskdir ini (09 E15, 12 J6). Hanya dengan `--log` (architect Phase 4,
         sesi reviewer); pemanggil lain (`report`) dapat sah memegang draft lain → `SKIP`."""
         name = "Tree sesudah reviewer"
         if not self.log:
             self.results.append({"id": "TREE", "name": name, "status": "SKIP", "summary": "tanpa --log",
                                  "details": [], "action": ""})
             return
-        review_rel = f"{self.taskdir_rel}/REVIEW.md"
+        # Hanya `finding_source` taskdir ini, bukan seluruh `frontenddev/reviews/` (12 J6): berkas temuan
+        # lain tidak dinilai `validate_audit.py` dan tidak ikut commit `closing review`.
+        allowed = {f"{self.taskdir_rel}/REVIEW.md"}
+        try:
+            task_fm, _ = split_frontmatter((self.taskdir / "TASK.md").read_text(encoding="utf-8"))
+        except (OSError, ValueError):                 # FrontmatterError & UnicodeDecodeError termasuk
+            task_fm = {}
+        source = task_fm.get("finding_source")
+        if isinstance(source, str) and source.strip() not in ("", "-"):
+            allowed.add(PurePosixPath(source.strip().strip("\"'")).as_posix())
         stray = []
         for line in strip_explore_scratch(git(self.root, "status", "--porcelain", "-uall")).splitlines():
             path = line[3:].split(" -> ")[-1].strip().strip('"')
-            if path != review_rel and not (path.startswith("frontenddev/reviews/") and path.endswith(".md")):
+            if path not in allowed:
                 stray.append(path)
         self._add("TREE", name, [f"berubah selama review: `{p}`" for p in stray],
-                  "hanya REVIEW.md / berkas temuan",
+                  "hanya REVIEW.md / finding_source",
                   "Reviewer memutasi repo di luar batasnya: pulihkan berkas itu (`git restore -- <path>`), "
                   "buang REVIEW.md ini, dan dispatch ulang reviewer.")
 

@@ -68,6 +68,7 @@ class Hit:
 @dataclass
 class Profile:
     state: str                  # ABSENT | OK | INVALID_JSON | NO_STACK | UNKNOWN_STACK | INCOMPLETE | OTHER_OWNER
+                                # | BAD_PLUGIN (profil sendiri ber-`plugin` bukan nama plugin, 12 J9)
     location: str = ""          # own | legacy | ""
     stack: str = ""
     owner: str = ""
@@ -245,6 +246,14 @@ def frontend_from_package(pkg: Path) -> Tuple[Optional[str], str]:
 
 # ------------------------------------------------------------------ monorepo
 
+def _read(path: Path) -> str:
+    """Isi berkas teks; tak terbaca (izin, direktori) = kosong, bukan crash (12 J5)."""
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
 def _workspace_globs(root: Path) -> List[str]:
     globs: List[str] = []
     ws = (_json(root / "package.json") or {}).get("workspaces")
@@ -255,7 +264,7 @@ def _workspace_globs(root: Path) -> List[str]:
     pnpm = root / "pnpm-workspace.yaml"
     if pnpm.is_file():
         inside = False
-        for line in pnpm.read_text(encoding="utf-8", errors="replace").splitlines():
+        for line in _read(pnpm).splitlines():
             if re.match(r"^packages\s*:", line):
                 inside = True
                 continue
@@ -266,7 +275,7 @@ def _workspace_globs(root: Path) -> List[str]:
                 inside = False
     gowork = root / "go.work"
     if gowork.is_file():
-        text = gowork.read_text(encoding="utf-8", errors="replace")
+        text = _read(gowork)
         for blk in re.findall(r"^use\s*\(([^)]*)\)", text, flags=re.M):
             globs += [ln.split("//", 1)[0].strip() for ln in blk.splitlines() if ln.strip()]
         globs += re.findall(r"^use\s+([^\s(]+)", text, flags=re.M)
@@ -286,7 +295,10 @@ def candidate_dirs(root: Path) -> List[Path]:
     out: List[Path] = []
 
     def add(d: Path) -> None:
-        if len(out) >= MAX_CANDIDATES or d in seen or not d.is_dir():
+        try:
+            if len(out) >= MAX_CANDIDATES or d in seen or not d.is_dir():
+                return
+        except OSError:
             return
         parts = d.relative_to(root).parts
         if any(p in SKIP_DIRS or p.startswith(".") for p in parts):
@@ -300,10 +312,19 @@ def candidate_dirs(root: Path) -> List[Path]:
         while pat.startswith("./"):
             pat = pat[2:]
         pat = pat.rstrip("/")
-        if pat and not pat.startswith(("!", "/", "..")):
-            for d in sorted(root.glob(pat)):
-                add(d)
-    for d in sorted(p for p in root.iterdir() if p.is_dir()):
+        if pat in ("", ".") or pat.startswith(("!", "/", "..")):   # `.` = root, sudah kandidat (12 J5)
+            continue
+        try:
+            dirs = sorted(root.glob(pat))
+        except (ValueError, OSError, NotImplementedError):          # pola tak sah / tak terbaca (12 J5)
+            continue
+        for d in dirs:
+            add(d)
+    try:
+        children = sorted(root.iterdir())
+    except OSError:
+        children = []
+    for d in children:
         add(d)
     return out
 
@@ -388,6 +409,11 @@ def _grade(d: Path, plugin: str, data: dict, location: str) -> Profile:
     stack = data.get("stack")
     stack = stack.strip() if isinstance(stack, str) else ""
     owner = canonical_plugin(data.get("plugin")) or plugin
+    if owner != plugin and location == "own" and owner not in PLUGINS:
+        # Nilai `plugin` bukan nama plugin di profil sendiri: profil tak sah (REFRESH), bukan milik
+        # plugin lain (12 J9). Nama plugin lain di sini tetap OTHER_OWNER — salah tempat, diabaikan (A6).
+        shown = owner if isinstance(owner, str) else json.dumps(owner, ensure_ascii=False)
+        return Profile("BAD_PLUGIN", location, stack, shown)
     if owner != plugin:
         return Profile("OTHER_OWNER", location, stack, owner)
     if not stack:
@@ -419,7 +445,7 @@ def read_profile(root: Path, plugin: str) -> Profile:
 
 def opted_out(root: Path, plugin: str) -> bool:
     try:
-        words = (root / OPT_FILE).read_text(encoding="utf-8").split()
+        words = re.split(r"[\s,]+", (root / OPT_FILE).read_text(encoding="utf-8"))   # spasi/baris/koma (12 J9)
     except (OSError, UnicodeDecodeError):
         return False
     return plugin not in words and PLUGIN_NAMES[plugin] not in words

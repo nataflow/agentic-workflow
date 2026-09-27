@@ -82,7 +82,7 @@ Tulis Bentuk B lebih dulu ke laci kerja — `{laci}<slug>.md` bila baris Laci te
 - **Dilarang menyalin isi berkas**: jangan salin isi profil, adapter, atau kode ke dalam prompt. Sebutkan path-nya; subagent membacanya sendiri secara terisolasi.
 - **Read-only mutlak**: dilarang menyuruh subagent merancang alur, menetapkan deep-link, atau memutuskan urutan langkah pengguna.
 - **Ambiguitas monorepo diselesaikan di hulu**: tetapkan app target di `{batas_cakupan}` — konvensi rute web dan mobile berbeda, dan subagent dilarang bertanya balik.
-- **Periksa `.frontenddev/` terabaikan git**: periksa `.gitignore` memuat baris `.frontenddev/` dan `.explore/` sebelum dispatch pertama. Belum ada — hentikan dispatch dan rutekan ke `frontend:profile` mode REFRESH, pemilik tunggal baris itu; dilarang menuliskannya sendiri karena gate ini tidak meng-commit `.gitignore`. Tanpa baris itu laporan scratch bocor ke working tree dan merusak gerbang "tree bersih" milik `code-implementor`.
+- **Periksa `.frontenddev/` terabaikan git**: periksa baris berjangkar `/.frontenddev/` dan `frontenddev/docs/**/.explore/` berlaku — exit code `git check-ignore -q .frontenddev` dan `git check-ignore -q frontenddev/docs/x/.explore/y` keduanya 0, bukan `grep` atas `.gitignore` sebelum dispatch pertama. Belum ada — hentikan dispatch dan rutekan ke `frontend:profile` mode REFRESH, pemilik tunggal baris itu; dilarang menuliskannya sendiri karena gate ini tidak meng-commit `.gitignore`. Tanpa baris itu laporan scratch bocor ke working tree dan merusak gerbang "tree bersih" milik `code-implementor`.
 - **Audit hidrasi sebelum berangkat**: batalkan dispatch bila prompt masih memuat slot `{...}` mentah atau placeholder `TBD`/`TODO`.
 
 ### Penanganan Balikan
