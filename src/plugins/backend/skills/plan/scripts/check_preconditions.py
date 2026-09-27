@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Optional
 # ini, bukan terhadap cwd — skrip dipanggil dengan path absolut dari mana saja.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
+    approval_verdict,
     TASKDIR_ACTION,
     VALID_RISKS,
     check_taskdir,
@@ -238,11 +239,24 @@ class PreconditionChecker:
                 })
                 return
 
+            bound, why = approval_verdict(self.root, prd_file, "PRD")
+            if not bound:
+                self.results.append({
+                    "id": check_id,
+                    "name": name,
+                    "status": "FAIL",
+                    "summary": f"PRD.md APPROVED tidak terikat commit approval: {why}",
+                    "action": "Kembalikan ke `backend:analyst`: `APPROVED` sah hanya lewat commit "
+                              "`docs(spec): approve PRD <slug>` sesudah persetujuan user; PRD yang berubah "
+                              "sesudahnya wajib melewati gerbang dokumen lagi."
+                })
+                return
+
             self.results.append({
                 "id": check_id,
                 "name": name,
                 "status": "PASS",
-                "summary": "Dokumen hulu PRD.md berstatus APPROVED terverifikasi",
+                "summary": f"Dokumen hulu PRD.md berstatus APPROVED terverifikasi ({why})",
                 "action": ""
             })
             return

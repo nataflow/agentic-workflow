@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional
 # relatif terhadap berkas ini, bukan terhadap cwd.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
+    check_base_branch,
     TASKDIR_ACTION,
     GitError,
     check_taskdir,
@@ -322,11 +323,32 @@ class PreconditionChecker:
                 })
                 return
 
+            # Akar rantai di-commit di branch kerja taskdir ini (11 H20): HEAD di base atau detached
+            # mendaratkannya di base/entah di mana, dan HEAD di branch rantai lain menyembunyikannya
+            # dari branch kerja yang dicabangkan gerbang sesudahnya.
+            base = (load_profile_index(self.root, required=()).data or {}).get("base_branch")
+            ok, detail = check_base_branch(self.root, base if isinstance(base, str) else None)
+            slug = self.td.rel.rsplit("/", 1)[-1].split("-", 1)[-1] if self.td.rel else ""
+            head = subprocess.run(["git", "symbolic-ref", "-q", "--short", "HEAD"], cwd=self.root,
+                                  capture_output=True, text=True).stdout.strip()
+            if ok and slug and slug not in head:
+                ok, detail = False, f"HEAD di branch '{head}', bukan branch kerja taskdir ini (memuat `{slug}`)"
+            if not ok:
+                self.results.append({
+                    "id": check_id,
+                    "name": name,
+                    "status": "FAIL",
+                    "summary": detail,
+                    "action": "Kembalikan ke `backend:tech-lead`: isolasi branch kerja taskdir (Fase 3 butir 2) "
+                              "berangkat sebelum akar ditulis; dilarang meng-commit TASK.md di base atau branch lain.",
+                })
+                return
+
             self.results.append({
                 "id": check_id,
                 "name": name,
                 "status": "PASS",
-                "summary": "Working tree bersih di luar taskdir (siap untuk commit isolasi)",
+                "summary": f"Working tree bersih di luar taskdir · {detail}",
                 "action": "",
             })
         except GitError as e:

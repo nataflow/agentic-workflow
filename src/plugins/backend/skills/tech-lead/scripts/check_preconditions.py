@@ -150,19 +150,20 @@ class PreconditionChecker:
         check_id = 2
         name = "Git Worktree & HEAD State"
         try:
-            inside = subprocess.check_output(
-                ["git", "rev-parse", "--is-inside-work-tree"],
-                cwd=self.root,
-                stderr=subprocess.DEVNULL,
-                universal_newlines=True
-            ).strip()
-            if inside != "true":
+            probe = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], cwd=self.root,
+                                   capture_output=True, text=True)
+            if probe.returncode != 0 or probe.stdout.strip() != "true":
+                # Dubious ownership menolak semua perintah git; dulu terbaca "HEAD detached" (11 H25).
+                dubious = "dubious ownership" in probe.stderr
                 self.results.append({
                     "id": check_id,
                     "name": name,
                     "status": "FAIL",
-                    "summary": "Bukan repositori git yang valid",
-                    "action": "Inisialisasi repositori git atau buka direktori kerja yang valid."
+                    "summary": ("git menolak repositori ini (dubious ownership)" if dubious
+                                else "Bukan repositori git yang valid"),
+                    "action": (f"Tambahkan `git config --global --add safe.directory {self.root}` bila repo ini "
+                               f"memang dipercaya." if dubious else
+                               "Inisialisasi repositori git atau buka direktori kerja yang valid.")
                 })
                 return
 
@@ -195,12 +196,12 @@ class PreconditionChecker:
                 "summary": f"Git repo valid (HEAD di branch '{branch_out}')",
                 "action": ""
             })
-        except subprocess.CalledProcessError:
+        except (subprocess.CalledProcessError, OSError):     # OSError: git tak ada di PATH / --root hilang (11 H21)
             self.results.append({
                 "id": check_id,
                 "name": name,
                 "status": "FAIL",
-                "summary": "Gagal membaca status git (HEAD detached atau repositori rusak)",
+                "summary": "Gagal membaca status git (git tidak terpasang, --root tidak ada, atau repositori rusak)",
                 "action": "Pastikan HEAD terhubung ke branch aktif dan direktori memiliki .git sah."
             })
 

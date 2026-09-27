@@ -1,7 +1,7 @@
 """Prasyarat `task` backend: taskdir (L5.2), chain (L5.4), dirty -z (L5.5)."""
 import pytest
 
-from conftest import be_checks, be_profile, commit, write_files
+from conftest import be_checks, be_profile, commit, git, write_files
 
 TD = "backenddev/docs/2601011200-refund"
 TK = "task/scripts/check_preconditions.py"
@@ -10,8 +10,10 @@ TK = "task/scripts/check_preconditions.py"
 @pytest.fixture
 def repo(make_repo):
     root = make_repo({f"{TD}/.keep": "", "src/a.go": "package a\n"})
+    git(root, "checkout", "-q", "-b", "main")
     be_profile(root, "go")
     commit(root, "init")
+    git(root, "checkout", "-q", "-b", "feat/refund")    # 11 H20: akar ditulis di branch kerja taskdir
     return root
 
 

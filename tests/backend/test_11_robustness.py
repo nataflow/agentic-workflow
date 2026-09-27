@@ -434,3 +434,163 @@ def test_h16_baseline_bukan_objek_dianggap_rusak(tmp_path):
     (tmp_path / "td/.explore/verification-baseline.json").write_text("[]")
     r = runv(tmp_path, "closing", "build=true")
     assert r.returncode == 0 and "PERINGATAN" in r.stdout and "Traceback" not in r.stderr, r.stderr
+
+
+# --- Tahap 4: prasyarat & gerbang dokumen ------------------------------------------------------
+
+import os          # noqa: E402
+import subprocess  # noqa: E402
+import sys         # noqa: E402
+
+from conftest import be_profile, load_module  # noqa: E402
+
+SA = "system-analysis/scripts/check_preconditions.py"
+BA = "business-analysis/scripts/check_preconditions.py"
+PLAN_PRE = "plan/scripts/check_preconditions.py"
+TASK_PRE = "task/scripts/check_preconditions.py"
+TECH = "tech-lead/scripts/check_preconditions.py"
+TD2 = "backenddev/docs/2601011200-refund"
+
+
+@pytest.fixture
+def spec_repo(make_repo):
+    """Taskdir `refund` ber-TASK `chain: BRD_PRD_BRIEF` di branch kerja `feat/refund`."""
+    root = make_repo({f"{TD2}/TASK.md": "---\nchain: BRD_PRD_BRIEF\nrisk: MAJOR\n---\n# T\n", "src/a.go": "package a\n"})
+    git(root, "checkout", "-q", "-b", "main")
+    be_profile(root, "go")
+    commit(root, "init")
+    git(root, "checkout", "-q", "-b", "feat/refund")
+    return root
+
+
+def sa_c(repo, *extra):
+    return checks(repo, SA, "--root", str(repo), "--taskdir", TD2, "--risk-level", "MAJOR", *extra)
+
+
+BRD_OK = "---\ntitle: Refund\nrequester: ops\nstatus: APPROVED\n---\n# BRD\n\n## Business rules\n- **BR-1**: x.\n"
+
+
+@pytest.mark.regression("H17")
+def test_h17_brd_approved_tanpa_commit_approve_ditolak(spec_repo):
+    write_files(spec_repo, {f"{TD2}/BRD.md": BRD_OK})
+    c = sa_c(spec_repo)[1]
+    assert c["status"] == "FAIL" and "belum ter-commit" in c["summary"], c
+    commit(spec_repo, "docs(spec): draft BRD refund", f"{TD2}/BRD.md")      # APPROVED di commit draft
+    c = sa_c(spec_repo)[1]
+    assert c["status"] == "FAIL" and "tidak terikat persetujuan user" in c["summary"], c
+
+
+@pytest.mark.regression("H17")
+def test_h17_brd_disunting_sesudah_approve_ditolak(spec_repo):
+    write_files(spec_repo, {f"{TD2}/BRD.md": BRD_OK})
+    commit(spec_repo, "docs(spec): approve BRD refund", f"{TD2}/BRD.md")
+    assert sa_c(spec_repo)[1]["status"] == "PASS"
+    write_files(spec_repo, {f"{TD2}/BRD.md": BRD_OK.replace("x.", "berubah sesudah approval.")})
+    c = sa_c(spec_repo)[1]
+    assert c["status"] == "FAIL" and "berubah sesudah commit terakhirnya" in c["summary"], c
+
+
+@pytest.mark.regression("H17")
+def test_h17_prd_approved_tanpa_commit_approve_ditolak_plan(spec_repo):
+    write_files(spec_repo, {f"{TD2}/PRD.md": "---\ntitle: R\nsource_brd: x\nstatus: APPROVED\n---\n# PRD\n"})
+    commit(spec_repo, "docs(spec): draft PRD refund", f"{TD2}/PRD.md")
+    c = checks(spec_repo, PLAN_PRE, "--root", str(spec_repo), "--taskdir", TD2, "--entry-mode", "PRD",
+               "--chain", "BRD_PRD_BRIEF")[3]
+    assert c["status"] == "FAIL" and "tidak terikat" in c["summary"], c
+
+
+@pytest.mark.regression("H18")
+def test_h18_parameter_chain_tidak_boleh_melompati_ledger(spec_repo):
+    c = sa_c(spec_repo, "--chain", "PRD_BRIEF")[1]
+    assert c["status"] == "FAIL" and "berbeda dari parameter PRD_BRIEF" in c["summary"], c
+
+
+@pytest.mark.regression("H18")
+def test_h18_kunci_chain_ganda_tetap_dilaporkan_walau_parameter_diisi(spec_repo):
+    write_files(spec_repo, {f"{TD2}/TASK.md": "---\nchain: BRD_PRD_BRIEF\nchain: PRD_BRIEF\n---\n# T\n"})
+    assert sa_c(spec_repo, "--chain", "BRD_PRD_BRIEF")[1]["status"] == "FAIL"
+    ba = checks(spec_repo, BA, "--root", str(spec_repo), "--taskdir", TD2, "--chain", "BRD_PRD_BRIEF")[7]
+    assert ba["status"] == "FAIL", ba
+
+
+@pytest.mark.regression("H19")
+def test_h19_perubahan_ter_stage_di_luar_taskdir_ditolak(spec_repo):
+    write_files(spec_repo, {"src/a.go": "package a // staged\n"})
+    git(spec_repo, "add", "src/a.go")
+    assert "src/a.go" in sa_c(spec_repo)[6]["summary"]
+    ba = checks(spec_repo, BA, "--root", str(spec_repo), "--taskdir", TD2, "--chain", "BRD_PRD_BRIEF")[5]
+    assert ba["status"] == "FAIL" and "src/a.go" in ba["summary"], ba
+
+
+@pytest.mark.regression("H20")
+@pytest.mark.parametrize("branch", ["main", "feat/other-chain"])
+def test_h20_akar_tidak_di_commit_di_luar_branch_taskdir(spec_repo, branch):
+    git(spec_repo, "checkout", "-q", "-B", branch)
+    c = checks(spec_repo, TASK_PRE, "--root", str(spec_repo), "--taskdir", TD2, "--lane", "PRD_CONVERSION",
+               "--chain", "PRD_BRIEF")[5]
+    assert c["status"] == "FAIL", c
+
+
+@pytest.mark.regression("H21")
+def test_h21_root_tidak_ada_json_fail(tmp_path):
+    r = be_run(tmp_path, TECH, "--root", str(tmp_path / "tidak-ada"), "--json")
+    assert json.loads(r.stdout)["status"] == "FAIL" and "Traceback" not in r.stderr, r.stderr
+
+
+@pytest.mark.regression("H21")
+def test_h21_git_tidak_di_path_json_fail(spec_repo, tmp_path):
+    env = {**os.environ, "PATH": str(tmp_path)}
+    r = subprocess.run([sys.executable, str(PLUGINS / "backend/skills" / TECH), "--read-only", "--json"],
+                       cwd=spec_repo, capture_output=True, text=True, env=env, timeout=60)
+    assert r.stdout.strip() and json.loads(r.stdout)["status"] == "FAIL" and "Traceback" not in r.stderr, r.stderr
+
+
+@pytest.mark.regression("H22")
+def test_h22_index_bertipe_salah_fail_terbaca(spec_repo):
+    idx = spec_repo / ".claude/profile/backenddev/index.json"
+    data = json.loads(idx.read_text())
+    data["source_root"] = ["src"]
+    idx.write_text(json.dumps(data))
+    r = be_run(spec_repo, TECH, "--root", str(spec_repo), "--read-only", "--json")
+    c1 = {c["id"]: c for c in json.loads(r.stdout)["checks"]}[1]
+    assert "Traceback" not in r.stderr and "wajib string" in c1["summary"], (c1, r.stderr)
+
+
+@pytest.mark.regression("H23")
+def test_h23_source_brd_tidak_ada_padahal_brd_ada_gagal_p1(spec_repo):
+    write_files(spec_repo, {f"{TD2}/BRD.md": BRD_OK,
+                            f"{TD2}/PRD.md": "---\ntitle: R\nsource_brd: tidak ada\nstatus: DRAFT\n---\n# PRD\n"})
+    r = be_run(spec_repo, "_common/validate_doc.py", "--kind", "prd", "--taskdir", TD2, "--root", str(spec_repo), "--json")
+    p1 = {c["id"]: c for c in json.loads(r.stdout)["checks"]}["P1"]
+    assert p1["status"] == "FAIL", p1
+
+
+@pytest.mark.regression("H24")
+def test_h24_migrasi_terputus_dapat_dilanjutkan(make_repo, monkeypatch):
+    root = make_repo()
+    be_profile(root, "go", legacy=True)
+    commit(root, "profil lama")
+    mp = load_module(PLUGINS / "backend/skills/profile/scripts/migrate_profile.py", "mp_h24")
+    calls = {"n": 0}
+
+    def putus(*_a, **_k):
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise KeyboardInterrupt
+        return False
+    monkeypatch.setattr(mp, "_git_mv", putus)
+    with pytest.raises(KeyboardInterrupt):
+        mp.migrate(root)
+    assert (root / ".claude/profile/index.json").is_file()        # index.json belum dipindah
+    monkeypatch.undo()
+    moved, _ = mp.migrate(root)
+    assert "index.json" in moved and (root / ".claude/profile/backenddev/index.json").is_file()
+
+
+@pytest.mark.regression("H25")
+def test_h25_set_frontmatter_menimpa_kunci_berspasi(tmp_path):
+    bs = load_module(PLUGINS / "backend/skills/_common/brief_status.py", "bs_h25")
+    f = tmp_path / "brief-01-x.md"
+    f.write_text("--- \nstatus : READY\ntitle: x\n---\nbody\n")
+    bs.set_frontmatter(f, status="SUPERSEDED")
+    assert bs.read_frontmatter(f) == {"status": "SUPERSEDED", "title": "x"}

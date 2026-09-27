@@ -23,6 +23,7 @@ def plan(repo, *args, td=TD):
 def test_prd_approved_kalimat_status_draft(repo):
     write_files(repo, {f"{TD}/PRD.md": "---\ntitle: Refund\nsource_brd: x\nstatus: APPROVED\n---\n# PRD\n\n"
                                         "## Business rules\n- Order dengan status: DRAFT ditolak.\n"})
+    commit(repo, "docs(spec): approve PRD refund", f"{TD}/PRD.md")      # 11 H17
     assert plan(repo, "--entry-mode", "PRD", "--chain", "BRD_PRD_BRIEF")[3]["status"] == "PASS"
 
 

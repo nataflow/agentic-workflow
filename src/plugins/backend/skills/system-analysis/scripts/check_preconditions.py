@@ -21,6 +21,9 @@ from typing import Any, Dict, List, Optional
 # ini, bukan terhadap cwd — skrip dipanggil dengan path absolut dari mana saja.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
+    dirty_paths,
+    is_under,
+    approval_verdict,
     TASKDIR_ACTION,
     check_taskdir,
     declared_chain,
@@ -66,8 +69,9 @@ class PreconditionChecker:
         return declared_chain(self.td.path)[0] if self.td.ok else None
 
     def _chain_error(self) -> str:
-        """Galat chain dari parameter, lalu dari frontmatter TASK.md."""
-        if self.chain_err or self.chain_arg:
+        """Galat chain dari parameter, lalu dari frontmatter TASK.md — yang terakhir tetap dilaporkan walau
+        `--chain` diisi: kunci `chain` ganda atau rusak berarti ledger akarnya sendiri tidak dapat dipercaya."""
+        if self.chain_err:
             return self.chain_err
         return declared_chain(self.td.path)[1] if self.td.ok else ""
 
@@ -117,6 +121,15 @@ class PreconditionChecker:
                  "chain: TASK.md lewat `backend:analyst`; nilai asing berarti salah rute.")
             return
 
+        declared = declared_chain(self.td.path)[0]
+        if self.chain_arg and declared and declared != self.chain_arg:
+            fail(
+                f"TASK.md memateraikan chain {declared}, berbeda dari parameter {self.chain_arg}",
+                "Perubahan chain hanya sah lewat eskalasi Fase 5 `analyst`; laporkan penyimpangan ini ke skill itu. "
+                "Dilarang melompati hop yang tercantum di ledger akar.",
+            )
+            return
+
         chain = self._effective_chain()
         if chain not in ("BRD_PRD_BRIEF", "PRD_BRIEF"):
             fail(
@@ -162,7 +175,17 @@ class PreconditionChecker:
             )
             return
 
-        ok("Chain BRD_PRD_BRIEF terikat BRD.md berstatus APPROVED")
+        bound, why = approval_verdict(self.root, brd_file, "BRD")
+        if not bound:
+            fail(
+                f"BRD.md APPROVED tidak terikat commit approval: {why}",
+                "Kembalikan ke `backend:analyst`: `APPROVED` sah hanya lewat commit `docs(spec): approve BRD <slug>` "
+                "sesudah persetujuan user (chain-rules bagian 4 butir 5); BRD yang berubah sesudahnya wajib "
+                "melewati gerbang dokumen lagi.",
+            )
+            return
+
+        ok(f"Chain BRD_PRD_BRIEF terikat BRD.md berstatus APPROVED ({why})")
 
     def _check_2_profile(self):
         check_id = 2
@@ -304,11 +327,28 @@ class PreconditionChecker:
                 })
                 return
 
+            # Commit draft menyapu apa pun yang sudah di-stage (11 H19): perubahan di luar taskdir
+            # ikut mendarat di bawah subjek `docs(spec): draft PRD`.
+            dirty_outside = [q for q in dirty_paths(self.root)
+                             if not (self.td.ok and self.td.rel and is_under(q, self.td.rel))]
+            if dirty_outside:
+                sample = ", ".join(dirty_outside[:3]) + (f" (+{len(dirty_outside) - 3} lainnya)"
+                                                         if len(dirty_outside) > 3 else "")
+                self.results.append({
+                    "id": check_id,
+                    "name": name,
+                    "status": "FAIL",
+                    "summary": f"Working tree kotor di luar taskdir ({sample})",
+                    "action": "Commit, stash, atau bersihkan perubahan di luar taskdir sebelum draft PRD ditulis; "
+                              "commit draft menyapu seluruh index.",
+                })
+                return
+
             self.results.append({
                 "id": check_id,
                 "name": name,
                 "status": "PASS",
-                "summary": "Repositori git valid untuk commit draft PRD",
+                "summary": "Repositori git valid dan bersih di luar taskdir untuk commit draft PRD",
                 "action": ""
             })
         except Exception as e:

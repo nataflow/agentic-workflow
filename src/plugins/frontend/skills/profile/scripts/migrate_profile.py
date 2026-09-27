@@ -55,16 +55,19 @@ def migrate(root: Path, plugin: str = PLUGIN) -> Tuple[List[str], List[str]]:
         raise MigrateError(f".claude/profile/{plugin}/index.json sudah ada; lokasi baru tidak ditimpa")
     target.mkdir(parents=True, exist_ok=True)
     moved: List[str] = []
-    for name in _detect.PROFILE_FILES[plugin]:
+    # `index.json` dipindah terakhir (11 H24): selama ia masih di lokasi lama, migrasi yang terputus di
+    # tengah dapat dijalankan ulang dan melanjutkan berkas yang tersisa.
+    names = [n for n in _detect.PROFILE_FILES[plugin] if n != "index.json"] + ["index.json"]
+    for name in names:
         src = legacy / name
         if not src.is_file():
             continue
+        if name == "index.json":
+            data["plugin"] = plugin
+            src.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         if not _git_mv(root, src, target / name):  # berkas belum ter-track
             src.rename(target / name)
         moved.append(name)
-    data["plugin"] = plugin
-    (target / "index.json").write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",
-                                       encoding="utf-8")
     leftovers = sorted(p.name for p in legacy.iterdir() if p.is_file())
     return moved, leftovers
 
@@ -96,7 +99,7 @@ def main() -> None:
         sys.exit(1)
     history = "git log --oneline -- .claude/profile/index.json"
     if args.json:
-        print(json.dumps({"plugin": PLUGIN, "target": f".claude/profile/{PLUGIN}",
+        print(json.dumps({"plugin": PLUGIN, "status": "PASS", "target": f".claude/profile/{PLUGIN}",
                           "moved": moved, "leftovers": leftovers, "history": history}, indent=2))
         return
     print(f"MIGRATE OK: {len(moved)} berkas dipindah ke .claude/profile/{PLUGIN}/: {', '.join(moved)}")

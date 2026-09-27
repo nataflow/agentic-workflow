@@ -21,6 +21,8 @@ from typing import Any, Dict, List, Optional
 # ini, bukan terhadap cwd — skrip dipanggil dengan path absolut dari mana saja.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
+    dirty_paths,
+    is_under,
     TASKDIR_ACTION,
     check_taskdir,
     declared_chain,
@@ -212,11 +214,28 @@ class PreconditionChecker:
                 })
                 return
 
+            # Commit draft menyapu apa pun yang sudah di-stage (11 H19): perubahan di luar taskdir
+            # ikut mendarat di bawah subjek `docs(spec): draft BRD`.
+            dirty_outside = [q for q in dirty_paths(self.root)
+                             if not (self.td.ok and self.td.rel and is_under(q, self.td.rel))]
+            if dirty_outside:
+                sample = ", ".join(dirty_outside[:3]) + (f" (+{len(dirty_outside) - 3} lainnya)"
+                                                         if len(dirty_outside) > 3 else "")
+                self.results.append({
+                    "id": check_id,
+                    "name": name,
+                    "status": "FAIL",
+                    "summary": f"Working tree kotor di luar taskdir ({sample})",
+                    "action": "Commit, stash, atau bersihkan perubahan di luar taskdir sebelum draft BRD ditulis; "
+                              "commit draft menyapu seluruh index.",
+                })
+                return
+
             self.results.append({
                 "id": check_id,
                 "name": name,
                 "status": "PASS",
-                "summary": "Repositori git valid untuk commit draft BRD",
+                "summary": "Repositori git valid dan bersih di luar taskdir untuk commit draft BRD",
                 "action": ""
             })
         except Exception as e:
@@ -280,7 +299,7 @@ class PreconditionChecker:
             })
 
         declared, declared_err = self._task_chain()
-        chain_err = self.chain_err or (declared_err if not self.chain_arg else "")
+        chain_err = self.chain_err or declared_err      # frontmatter rusak tetap dilaporkan walau --chain diisi (11 H18)
         if chain_err:
             fail(chain_err, 'Gunakan enum kanonik `analyst/references/chain-rules.md` bagian 1.3 (huruf besar-kecil dan kutip dinormalkan; tanda hubung tidak). Nilai asing di TASK.md berarti salah rute: laporkan ke `backend:analyst`.')
             return

@@ -229,14 +229,14 @@ menandai `TIMEOUT (baseline juga TIMEOUT)`.
 ## Tahap 4 — Prasyarat & gerbang dokumen
 
 ## H17 [Tinggi] Approval BRD/PRD tidak terikat isi
-- [ ] Belum
+- [x] Selesai — `approval_verdict` (ter-track, bersih, commit terakhir `docs(spec): approve <BRD|PRD> <slug>`) ditagih check 1 `system-analysis` dan check 3 `plan` jalur `PRD`
 
 Check 1 `system-analysis` (`check_preconditions.py:151`) dan check 3 `plan` (`:221–246`) hanya membaca
 `status: APPROVED`. Probe: BRD APPROVED ditulis tangan tanpa commit (`?? BRD.md`), atau BR disunting sesudah commit
 approve → PASS. **Perbaikan:** lihat Keputusan H17.
 
 ## H18 [Sedang] `--chain` system-analysis menimpa chain `TASK.md` tanpa dibandingkan
-- [ ] Belum
+- [x] Selesai — system-analysis menolak `--chain` yang berbeda dari `TASK.md`; galat frontmatter `chain` dilaporkan walau parameter diisi (juga business-analysis)
 
 `TASK.md` `chain: BRD_PRD_BRIEF`, BRD belum ada, `--chain PRD_BRIEF` → PASS 8/8, hop BRD terlewati
 (`check_preconditions.py:58–72`). Kunci `chain` ganda diabaikan selama `--chain` diisi. business-analysis sudah
@@ -244,14 +244,14 @@ menolak ketidakcocokan ini di check 7. **Perbaikan:** tagih kesamaan parameter d
 frontmatter tetap dilaporkan.
 
 ## H19 [Sedang] business-analysis dan system-analysis tidak menjaga tree kotor
-- [ ] Belum
+- [x] Selesai — `dirty_paths()` di luar taskdir → FAIL di check 5 business-analysis dan check 6 system-analysis
 
 `business-analysis/SKILL.md:112` menjanjikan "Tree kotor: bersihkan", tetapi check 5 hanya `rev-parse`. Probe:
 `M  src/order.go` ter-stage → PASS 8/8, commit `docs(spec): draft BRD` ikut membawa `src/order.go`.
 **Perbaikan:** `dirty_paths()` di luar taskdir → FAIL, seperti check 5 `task`.
 
 ## H20 [Sedang] Akar `DEFECT_RCA` di-commit sebelum branch diisolasi
-- [ ] Belum
+- [~] Skrip selesai — prasyarat `task` menagih `check_base_branch` + nama branch memuat slug taskdir; urutan Fase 3 tech-lead menyusul di Tahap 5
 
 `tech-lead/SKILL.md` Fase 3 memanggil `task` (commit `TASK.md`) di butir 1, baru mencabangkan branch di butir 2.
 Probe: HEAD di `feat/other-chain` → akar mendarat di branch lain; HEAD di base → akar mendarat di base.
@@ -259,34 +259,34 @@ Probe: HEAD di `feat/other-chain` → akar mendarat di branch lain; HEAD di base
 (`check_base_branch`).
 
 ## H21 [Sedang] Crash tanpa JSON saat `--root` tidak ada atau git tidak ada di PATH
-- [ ] Belum
+- [x] Selesai — `cli()` menangkap `OSError` jadi FAIL terbaca; tech-lead check 2 menangkap `OSError`
 
 tech-lead hanya menangkap `CalledProcessError` (`:152–158`); `cli()` hanya `UnicodeDecodeError`. Probe:
 `--root /nonexistent --json` → rc=1, stdout kosong, `FileNotFoundError`. **Perbaikan:** `cli()` menangkap
 `OSError` sebagai FAIL terbaca; tech-lead menangkap `OSError` di check 2.
 
 ## H22 [Sedang] `index.json` bertipe salah → traceback
-- [ ] Belum
+- [x] Selesai — kunci wajib `index.json` bertipe string, selain itu `incomplete` terbaca
 
 `load_profile_index` (`precondition_lib.py:687`) hanya menagih `str(v)` tidak kosong: `"source_root": ["src"]`
 lolos lalu `TypeError`/`AttributeError` di lima skrip. **Perbaikan:** kunci wajib bertipe string.
 
 ## H23 [Sedang] `validate_doc` PRD melewati cakupan BR/EC dari teks bebas
-- [ ] Belum
+- [x] Selesai — `source_brd` "tidak ada" padahal `BRD.md` ada → P1/P2 FAIL
 
 `no_brd` diturunkan dari "tidak ada" di `source_brd` (`validate_doc.py:470`), termasuk slot template yang belum
 diisi. Probe: `BRD.md` ada, BR-3 tak tercakup → PASS 10/10. **Perbaikan:** keberadaan `BRD.md` yang memutuskan;
 `source_brd` "tidak ada" padahal `BRD.md` ada → FAIL.
 
 ## H24 [Rendah] `migrate_profile.py` tidak dapat dilanjutkan bila terputus
-- [ ] Belum
+- [x] Selesai — `index.json` dipindah terakhir; JSON sukses `"status": "PASS"` (salinan fe identik)
 
 `index.json` dipindah paling awal (`PROFILE_FILES[0]`); terputus sesudahnya → ulang = "tidak ada profil lama",
 prasyarat memilih REFRESH, `anti-patterns.md` lama terabaikan. JSON sukses tanpa kunci `status`.
 **Perbaikan:** `index.json` dipindah terakhir; JSON sukses `"status": "PASS"`.
 
 ## H25 [Rendah] `set_frontmatter` tidak sepakat dengan `split_frontmatter`
-- [ ] Belum
+- [x] Selesai — `set_frontmatter` memakai `^key[ \t]*:` dan pagar pembuka berspasi; tech-lead check 2 membedakan dubious ownership
 
 `status : BLOCKED` (spasi sebelum titik dua) terbaca `split_frontmatter` tetapi tidak ditimpa `set_frontmatter`
 → kunci ganda → brief `UNKNOWN`; pagar `--- ` (spasi di ujung) → `ValueError`. Dubious ownership git dilaporkan

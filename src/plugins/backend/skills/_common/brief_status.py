@@ -31,7 +31,7 @@ HALT_FILE = "HALT.md"
 HALT_VERDICTS = ("COMPILE", "SCOPE", "SYMBOL", "STRAY")
 
 # Hanya blok `---` pertama; BOM dan CRLF diterima.
-_FM = re.compile(r"^(﻿?---\r?\n)(.*?)(\r?\n---[ \t]*(?:\r?\n|$))", re.S)
+_FM = re.compile(r"^(﻿?---[ \t]*\r?\n)(.*?)(\r?\n---[ \t]*(?:\r?\n|$))", re.S)
 _BRIEF_NAME = re.compile(r"^brief-(\d{2})-")
 
 
@@ -56,7 +56,9 @@ def set_frontmatter(path: Path, **fields: str) -> None:
     nl = "\r\n" if "\r\n" in m.group(1) else "\n"
     body = m.group(2)
     for key, val in fields.items():
-        pat = re.compile(rf"^{re.escape(key)}:[^\r\n]*", re.M)   # bukan `.*$`: `.` ikut memakan `\r`
+        # `key :` (spasi sebelum titik dua) terbaca `split_frontmatter`; tanpa `\s*` di sini baris itu tidak
+        # tertimpa dan kunci ganda membuat brief UNKNOWN (11 H25). Bukan `.*$`: `.` ikut memakan `\r`.
+        pat = re.compile(rf"^{re.escape(key)}[ \t]*:[^\r\n]*", re.M)
         if pat.search(body):
             body = pat.sub(lambda _m: f"{key}: {val}", body, count=1)
         else:

@@ -306,6 +306,31 @@ def check_base_branch(root: Path, base: Optional[str], require_diff: bool = Fals
     return True, f"branch '{head}' · merge-base {mb[:7]} terhadap '{base}'"
 
 
+def approval_verdict(root: Path, doc: Path, kind: str) -> Tuple[bool, str]:
+    """`status: APPROVED` BRD/PRD sah hanya bila terikat commit approve `analyst` (11 H17).
+
+    Syaratnya: berkas ter-track, bersih (index dan worktree), dan commit terakhir yang menyentuhnya
+    bersubjek `docs(spec): approve <BRD|PRD> <slug>` (`analyst/references/chain-rules.md` bagian 4
+    butir 5) — satu-satunya jalur tulis `APPROVED`. APPROVED tulisan tangan, atau isi yang disunting
+    sesudah approval, tidak lagi lolos hanya karena frontmatter-nya berbunyi benar.
+    """
+    try:
+        rel = Path(doc).resolve().relative_to(Path(root).resolve()).as_posix()
+    except ValueError:
+        return False, f"{Path(doc).name} di luar repo"
+    if _git_out(root, "ls-files", "--error-unmatch", "--", rel)[0] != 0:
+        return False, f"{rel} berstatus APPROVED tetapi belum ter-commit"
+    if _git_out(root, "status", "--porcelain", "--", rel)[1].strip():
+        return False, f"{rel} berubah sesudah commit terakhirnya (belum ter-commit)"
+    rc, out = _git_out(root, "log", "-1", "--format=%h%x09%s", "--", rel)
+    sha, _, subject = out.strip().partition("\t")
+    subject = " ".join(subject.split())
+    if rc != 0 or not subject.startswith(f"docs(spec): approve {kind} "):
+        return False, (f"commit terakhir {rel} bersubjek \"{subject or '—'}\", bukan "
+                       f"`docs(spec): approve {kind} <slug>` — APPROVED tidak terikat persetujuan user")
+    return True, f"{kind} APPROVED @ {sha}"
+
+
 def is_under(path: str, prefix: str) -> bool:
     """`path` sama dengan `prefix` atau berada di bawahnya, per segmen (bukan substring)."""
     a = [p for p in path.strip("/").split("/") if p not in ("", ".")]
@@ -684,6 +709,12 @@ def load_profile_index(root: Path, required: Sequence[str] = REQUIRED_INDEX_KEYS
         return ProfileIndex(None, "index.json bukan objek JSON",
                             "Perbaiki format JSON atau inisialisasi ulang via `backend:profile`.",
                             profile_dir, note, "corrupt")
+    # Kunci wajib bertipe string (11 H22): `"source_root": ["src"]` dulu lolos `str(v)` lalu crash hilir.
+    wrong = [k for k in required if k in data and data[k] is not None and not isinstance(data[k], str)]
+    if wrong:
+        return ProfileIndex(None, f"Field index.json wajib string: {', '.join(f'{k} ({type(data[k]).__name__})' for k in wrong)}",
+                            "Perbaiki tipe field lewat `backend:profile` (REFRESH); dilarang menyuntingnya tangan.",
+                            profile_dir, note, "incomplete")
     missing = [k for k in required if not str(data.get(k) or "").strip()]
     if missing:
         return ProfileIndex(None, f"Field kritis hilang/kosong di index.json: {', '.join(missing)}",
@@ -785,17 +816,20 @@ def freshness_banner(freshness: Optional[Tuple[str, str]]) -> Optional[str]:
 
 
 def cli(main: Callable[[], Any]) -> Any:
-    """Jaring terakhir skrip ber-CLI: berkas non-UTF-8 yang lolos dari penanganan per titik baca
-    menjadi vonis FAIL terbaca (JSON bila `--json`), bukan traceback (09 E1)."""
+    """Jaring terakhir skrip ber-CLI: berkas non-UTF-8 (09 E1), `--root` yang tidak ada, atau git yang tidak
+    terpasang (11 H21) menjadi vonis FAIL terbaca (JSON bila `--json`), bukan traceback berstdout kosong."""
     try:
         return main()
     except UnicodeDecodeError as exc:
-        msg = (f"berkas yang dibaca skrip ini bukan UTF-8 ({exc.reason} @ byte {exc.start}) — pulihkan dari "
-               f"git atau simpan ulang sebagai UTF-8; jangan menebak isinya")
-        if "--json" in sys.argv:
-            print(json.dumps({"status": "FAIL", "error": msg, "checks": [
-                {"id": 0, "name": "Berkas terbaca", "status": "FAIL", "summary": msg, "action": ""}]},
-                ensure_ascii=False, indent=2))
-        else:
-            print(f"FAIL: {msg}")
-        return 1
+        name, msg = "Berkas terbaca", (f"berkas yang dibaca skrip ini bukan UTF-8 ({exc.reason} @ byte {exc.start}) "
+                                       f"— pulihkan dari git atau simpan ulang sebagai UTF-8; jangan menebak isinya")
+    except OSError as exc:
+        name, msg = "Lingkungan terbaca", (f"{exc.strerror or exc} ({exc.filename or '—'}) — periksa `--root` dan "
+                                           f"pastikan `git` terpasang di PATH")
+    if "--json" in sys.argv:
+        print(json.dumps({"status": "FAIL", "error": msg, "checks": [
+            {"id": 0, "name": name, "status": "FAIL", "summary": msg, "action": ""}]},
+            ensure_ascii=False, indent=2))
+    else:
+        print(f"FAIL: {msg}")
+    return 1

@@ -480,7 +480,13 @@ class Validator:
         dasar = dasar_text()
         questions = d.section_text("Open questions")
 
-        if no_brd:
+        # Keberadaan BRD.md yang memutuskan, bukan teks bebas `source_brd` (11 H23): slot template yang belum
+        # diisi atau "tidak ada" salah ketik dulu melewati cakupan BR/EC walau BRD.md ada.
+        if no_brd and self.brd:
+            self.add("P1", "Cakupan BR-{n}", [f"`source_brd` menyatakan BRD tidak ada, padahal "
+                                              f"{self.taskdir.name}/BRD.md ada — isi `source_brd` dengan rujukannya"])
+            self.add("P2", "Cakupan EC-{n}", ["`source_brd` bertentangan dengan BRD.md di taskdir"])
+        elif no_brd:
             self.add("P1", "Cakupan BR-{n}", status="PASS", note="dilewati — BRD absen (sumbu bisnis nol)")
             self.add("P2", "Cakupan EC-{n}", status="PASS", note="dilewati — BRD absen (sumbu bisnis nol)")
         elif not self.brd:

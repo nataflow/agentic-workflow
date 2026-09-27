@@ -26,6 +26,7 @@ def brd(repo, text):
 def test_brd_approved_dengan_kalimat_status_draft_di_body(repo):
     brd(repo, "---\ntitle: Refund\nrequester: ops\nstatus: APPROVED\n---\n# BRD\n\n## Business rules\n"
               "- **BR-1**: Order dengan status: DRAFT ditolak.\n")
+    commit(repo, "docs(spec): approve BRD refund", f"{TD}/BRD.md")      # 11 H17: APPROVED terikat commit approve
     assert sa(repo)[1]["status"] == "PASS"
 
 
@@ -45,6 +46,7 @@ def test_brd_tanpa_status_frontmatter(repo):
 def test_brd_bom_crlf_approved(repo):
     (repo / TD / "BRD.md").write_bytes(
         b"\xef\xbb\xbf---\r\ntitle: R\r\nrequester: ops\r\nstatus: APPROVED\r\n---\r\n# BRD\r\n")
+    commit(repo, "docs(spec): approve BRD refund", f"{TD}/BRD.md")
     assert sa(repo)[1]["status"] == "PASS"
 
 
