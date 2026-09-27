@@ -71,10 +71,17 @@ def is_git_repo(root: Path) -> bool:
 
 
 def git_commit(root: Path, paths: List[str], message: str) -> Tuple[bool, str]:
-    """Commit hanya `paths` (staging eksplisit, `--only`), tanpa menyentuh index lain."""
+    """Commit hanya `paths` (staging eksplisit, `--only`), tanpa menyentuh index lain.
+
+    Isi yang sudah sama dengan HEAD (mis. `close` ulang tanpa perubahan, `ref` dengan kunci yang sama)
+    bukan kegagalan: `(True, "tanpa perubahan")`, tanpa commit kosong.
+    """
     try:
         subprocess.check_output(["git", "-C", str(root), "add", "--", *paths],
                                 stderr=subprocess.STDOUT, universal_newlines=True)
+        if subprocess.call(["git", "-C", str(root), "diff", "--cached", "--quiet", "--", *paths],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0:
+            return True, "tanpa perubahan"
         subprocess.check_output(["git", "-C", str(root), "commit", "-m", message, "--only", "--", *paths],
                                 stderr=subprocess.STDOUT, universal_newlines=True)
         sha = subprocess.check_output(["git", "-C", str(root), "rev-parse", "--short", "HEAD"],
@@ -215,6 +222,17 @@ def split_parts(body: str) -> Tuple[str, str]:
         elif not in_fence and line.rstrip() == f"## {ELICIT_H2}":
             return "\n".join(lines[:i]), "\n".join(lines[i:])
     return body, ""
+
+
+LOG_ROW = re.compile(r"^\|\s*(\d+)\s*\|\s*(\d{4}-\d{2}-\d{2})\s*\|(.+)\|(.+)\|(.+)\|\s*$")
+
+
+def log_rows(text: str) -> List[Tuple[str, ...]]:
+    """Baris data `### Log Tanya-Jawab` → `(nomor, tanggal, pertanyaan, jawaban, sumber)`, sudah di-strip."""
+    _, body = split_frontmatter(text)
+    notes = sections(split_parts(body)[1], 2).get(ELICIT_H2, [])
+    log = sections("\n".join(notes), 3).get("Log Tanya-Jawab", [])
+    return [tuple(g.strip() for g in m.groups()) for m in (LOG_ROW.match(l.strip()) for l in log) if m]
 
 
 # Field frontmatter yang ikut menentukan isi: mengubahnya sesudah review atau persetujuan sama

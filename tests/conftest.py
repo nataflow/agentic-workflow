@@ -391,14 +391,19 @@ def ticket_block(root: Path, ticketdir: str, verdict: str, *, sidik: Optional[st
                  cwd: Optional[Path] = None) -> str:
     """Blok `## Ticket Review` sah untuk `ticket.py review --report -`.
 
-    `sidik` default = keluaran `check --gate spec` sekarang, persis yang disalin pendispatch ke
-    prompt reviewer; berikan nilai lain untuk mensimulasikan draft yang berubah sesudah dispatch.
+    `sidik` dan `Ronde` default = keluaran `check --gate spec` sekarang (`sidik`, `ronde`), persis yang
+    dihidrasi pendispatch ke prompt reviewer; berikan `sidik` lain untuk mensimulasikan draft yang berubah
+    sesudah dispatch. `BLOCKED` membawa tepat satu BLOCKER berjangkar (G3: hitungan = butir).
     """
-    if sidik is None:
-        chk = run_script(TICKET_PY, "check", "--gate", "spec", "--ticketdir", ticketdir, "--json", cwd=cwd or root)
-        sidik = json.loads(chk.stdout).get("sidik", "-")
-    return (f"## Ticket Review\n- Verdict: {verdict}\n- Sidik: {sidik}\n- Ronde: 1\n"
-            f"- BLOCKER: 0 [MEKANIS] · 0 [SEMANTIK]\n\n**BLOCKER:**\n- —\n\n**ADVISORY:**\n- —\n")
+    chk = json.loads(run_script(TICKET_PY, "check", "--gate", "spec", "--ticketdir", ticketdir, "--json",
+                                cwd=cwd or root).stdout)
+    sidik = chk.get("sidik", "-") if sidik is None else sidik
+    ronde = chk.get("ronde", "1") if str(chk.get("ronde", "")).isdigit() else "1"
+    blockers = ("- BLOCKER: 0 [MEKANIS] · 1 [SEMANTIK]\n\n**BLOCKER:**\n- [SEMANTIK] `TICKET.md:28` (fokus #1) — "
+                "then tidak teramati — QA menebak\n" if verdict == "BLOCKED"
+                else "- BLOCKER: 0 [MEKANIS] · 0 [SEMANTIK]\n\n**BLOCKER:**\n- —\n")
+    return (f"## Ticket Review\n- Verdict: {verdict}\n- Sidik: {sidik}\n- Ronde: {ronde}\n"
+            f"{blockers}\n**ADVISORY:**\n- —\n")
 
 
 def ticket_review(root: Path, ticketdir: str, verdict: str, *, cwd: Optional[Path] = None,

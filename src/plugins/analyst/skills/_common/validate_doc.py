@@ -22,6 +22,7 @@ from typing import List
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from analyst_lib import (  # noqa: E402
     ELICIT_H2,
+    LOG_ROW,
     PILLARS_OPTIONAL,
     PILLARS_REQUIRED,
     PLACEHOLDER,
@@ -56,7 +57,6 @@ CARD_H2["IMPROVEMENT"] = CARD_H2["FEATURE"]
 NONE_LINE = "- Tidak ada."
 SKIPPED = re.compile(r"^Tidak dibahas — .+")
 ELICIT_Q = re.compile(r"^- \*\*Q-(\d+)\*\* \[(MEMBLOKIR|TIDAK MEMBLOKIR)\]: .+ — menunggu: .+$")
-LOG_ROW = re.compile(r"^\|\s*(\d+)\s*\|\s*(\d{4}-\d{2}-\d{2})\s*\|(.+)\|(.+)\|(.+)\|\s*$")
 STORY = re.compile(r"^Sebagai .+, saya ingin .+, agar .+$")
 AC_LINE = re.compile(r"^- \*\*AC-(\d+)\*\*: (.+)$")
 GWT = re.compile(r"^(given|dengan kondisi)\b.+\b(when|ketika)\b.+\b(then|maka)\b.+", re.IGNORECASE)

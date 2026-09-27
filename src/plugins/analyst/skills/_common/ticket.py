@@ -11,6 +11,7 @@ Satu-satunya jalan mutasi status yang punya konsekuensi di luar penulisnya:
 - `state`   — pindai `analyst/tickets/*/`, vonis keadaan dan rute tiap ticketdir.
 - `new`     — alokasikan `analyst/tickets/<YYMMDDhhmm>-<slug>/` (menolak slug kembar terbuka).
 - `check`   — prasyarat gate `elicit` / `spec` atas satu ticketdir.
+- `close`   — tutup elisitasi: `elicitation: CLOSED` + segel catatan (`elicit_hash`, `elicit_log`).
 - `review`  — catat vonis `ticket-reviewer` beserta sidik konten yang dinilainya (dan bloknya).
 - `revise`  — buka putaran revisi draft atas permintaan user (plafon 3 per siklus persetujuan).
 - `approve` — materai `TICKET.md` `READY` sesudah jawaban eksplisit user; commit bila repo git.
@@ -18,12 +19,13 @@ Satu-satunya jalan mutasi status yang punya konsekuensi di luar penulisnya:
 - `cancel`  — tutup ticketdir atas keputusan user.
 - `ref`     — isi `external_ref` (kunci kartu Jira/Trello) pada DRAFT maupun READY.
 
-`approve` menuntut kedua validator (`ticket`, `elicit`) `PASS`, `elicitation: CLOSED`, **dan** vonis review `PASS` atas sidik
-`<kartu>/<catatan elisitasi>` yang sama persis dengan sekarang: draft yang disunting sesudah direview,
-atau elisitasi yang dibuka dan berubah sesudahnya, tidak dapat disetujui.
+`approve` menuntut kedua validator (`ticket`, `elicit`) `PASS`, `elicitation: CLOSED`, catatan elisitasi
+sama dengan segel `close`, **dan** vonis review `PASS` atas sidik `<kartu>/<catatan elisitasi>` yang sama
+persis dengan sekarang: draft yang disunting sesudah direview, atau elisitasi yang dibuka dan berubah
+sesudahnya, tidak dapat disetujui.
 
-Kontrak exit `approve`/`ref`: 0 = tertulis dan ter-commit (atau tanpa git/`--no-commit`),
-1 = ditolak, 3 = tertulis tetapi commit gagal.
+Kontrak exit `close`/`approve`/`ref`/`cancel`: 0 = tertulis dan ter-commit (atau tanpa git/`--no-commit`;
+`ref` pada DRAFT tidak meng-commit), 1 = ditolak, 3 = tertulis tetapi commit gagal.
 
 Zero external dependencies (Python Standard Library only).
 """
@@ -51,6 +53,7 @@ from analyst_lib import (  # noqa: E402
     git_commit,
     git_error_line,
     is_git_repo,
+    log_rows,
     normalize_ticketdir,
     report_json,
     set_frontmatter_field,
@@ -65,6 +68,9 @@ REVISION_CAP = 3
 REVIEW_CAP = 2
 REVIEW_FILE = "review.md"  # blok `## Ticket Review` terakhir, ditulis hanya oleh `ticket.py review --report`
 REVIEW_VALUE = re.compile(r"^(PASS|BLOCKED) @([0-9a-f]{12})/([0-9a-f]{12})$")
+REPORT_BLOCKERS = re.compile(r"^- BLOCKER:\s*(\d+)\s*\[MEKANIS\]\s*·\s*(\d+)\s*\[SEMANTIK\]\s*$", re.MULTILINE)
+REPORT_ROUND = re.compile(r"^- Ronde:\s*(\d+)\b", re.MULTILINE)
+REOPEN_ROW = "dibuka ulang"  # kolom pertanyaan baris log pembukaan ulang elisitasi (elicit Phase 0)
 
 
 def text_of(path: Path) -> str:
@@ -130,6 +136,61 @@ def review_digest(ticketdir: Path) -> str:
         return "-/-"
     text = text_of(f)
     return f"{content_hash(text, 'card')}/{content_hash(text, 'elicit')}"
+
+
+def seal_problem(text: str) -> str:
+    """Catatan elisitasi dibanding segel `close`; string kosong = cocok.
+
+    Hanya `analyst:elicit` yang mengubah fakta, dan tiap perubahan melewati `close` lagi. Tanpa segel ini,
+    `spec` dapat menyesuaikan catatan dengan kartunya, dan satu baris kosong di catatan me-reset plafon ronde.
+    """
+    fm, _ = split_frontmatter(text)
+    sealed = str(fm.get("elicit_hash", "-")).strip() or "-"
+    current = content_hash(text, "elicit")
+    if sealed == "-":
+        return "elisitasi tanpa segel — tutup lewat `ticket.py close` (tiket lama: sekali, untuk adopsi segel)"
+    if sealed != current:
+        return (f"catatan elisitasi ({current}) berubah sesudah ditutup (segel {sealed}) — hanya analyst:elicit "
+                "yang mengubah fakta: pulihkan catatannya, atau buka ulang elisitasi (baris log `Dibuka ulang`) "
+                "lalu `ticket.py close`")
+    return ""
+
+
+def next_round(fm: Dict[str, Any], text: str) -> int:
+    """Ronde review yang akan dicatat berikutnya (1-based); basis fakta baru membuka siklus ronde baru."""
+    rnd = int_field(fm, "review_round")
+    prev = parse_review(fm.get("review", ""))
+    if prev and prev[2] != content_hash(text, "elicit"):
+        rnd = 0  # basis fakta berubah sesudah ronde terakhir → siklus ronde baru (pola revision_base)
+    return rnd + 1
+
+
+def report_problems(report: str, verdict: str, rnd: int) -> List[str]:
+    """Blok `## Ticket Review` yang isinya bertentangan dengan dirinya sendiri atau dengan ronde yang dicatat."""
+    problems = []
+    counts = REPORT_BLOCKERS.search(report)
+    if not counts:
+        return ["blok tanpa baris `- BLOCKER: <n> [MEKANIS] · <n> [SEMANTIK]`"]
+    total = int(counts.group(1)) + int(counts.group(2))
+    items: List[str] = []
+    head = re.search(r"^\*\*BLOCKER:\*\*\s*$", report, re.MULTILINE)
+    for line in (report[head.end():].splitlines() if head else []):
+        s = line.strip()
+        if s.startswith("**"):
+            break
+        if s.startswith("- ") and s not in ("- —", "- -"):
+            items.append(s)
+    if len(items) != total:
+        problems.append(f"hitungan BLOCKER {total} ≠ {len(items)} butir di bawah `**BLOCKER:**`")
+    if verdict == "PASS" and total:
+        problems.append(f"Verdict PASS dengan {total} BLOCKER — `BLOCKED` ⇔ minimal satu BLOCKER")
+    if verdict == "BLOCKED" and not total:
+        problems.append("Verdict BLOCKED tanpa satu BLOCKER pun")
+    said = REPORT_ROUND.search(report)
+    if not said or int(said.group(1)) != rnd:
+        problems.append(f"`- Ronde: {said.group(1) if said else 'tidak ada'}` ≠ ronde yang dicatat {rnd} — slot "
+                        "`{round}` dihidrasi dari `ronde` keluaran `check --gate spec`")
+    return problems
 
 
 def has_card(path: Path) -> bool:
@@ -271,10 +332,19 @@ def cmd_check(root: Path, args: argparse.Namespace) -> int:
             c.add(4, "Catatan elisitasi CLOSED & sah", vok and t.get("elicitation") == "CLOSED",
                   f"elicitation {t.get('elicitation', '-')}, validator {'PASS' if vok else 'FAIL'}",
                   "Jalankan `validate_doc.py --kind elicit` dan tutup elisitasi lewat analyst:elicit.")
+            if t.get("elicitation") == "CLOSED":
+                problem = seal_problem(text_of(d / TICKET_FILE))
+                c.add(5, "Catatan elisitasi tersegel", not problem,
+                      problem.split(" — ")[0] if problem else f"segel {t.get('elicit_hash')} cocok",
+                      problem.split(" — ", 1)[-1])
             resolved["type"] = str(t.get("type", "-"))
             if state["state"] == "DRAFT":
+                text = text_of(d / TICKET_FILE)
                 resolved["revision"] = str(t.get("revision", "0"))
                 resolved["review_round"] = str(t.get("review_round", "0"))
+                raw = str(t.get("review_round", "0")).strip()
+                nxt = next_round(t, text) if raw.isdigit() else 0
+                resolved["ronde"] = str(nxt) if 0 < nxt <= REVIEW_CAP else "habis" if nxt else "-"  # slot `{round}`
                 digest = review_digest(d)
                 resolved["sidik"] = digest          # slot `{sidik}` prompt dispatch reviewer
                 fresh = str(t.get("review", "")) == f"PASS @{digest}"
@@ -311,10 +381,7 @@ def cmd_review(root: Path, args: argparse.Namespace) -> int:
         print("REVIEW FAIL: " + ", ".join(f"validate_doc.py --kind {k} FAIL" for k in bad)
               + " — dispatch tidak sah; perbaiki draft (atau kembali ke analyst:elicit) lalu dispatch ulang")
         return 1
-    rnd = int_field(fm, "review_round")
-    prev = parse_review(fm.get("review", ""))
-    if prev and prev[2] != content_hash(text_of(path), "elicit"):
-        rnd = 0  # basis fakta berubah sesudah ronde terakhir → siklus ronde baru (pola revision_base)
+    rnd = next_round(fm, text_of(path)) - 1
     if rnd >= REVIEW_CAP:
         print(f"REVIEW FAIL: plafon {REVIEW_CAP} ronde per revisi habis — sajikan temuan tersisa ke user")
         return 1
@@ -345,6 +412,15 @@ def cmd_review(root: Path, args: argparse.Namespace) -> int:
               f"`{digest}` — draft berubah sesudah dispatch, atau prompt tanpa `{{sidik}}`; dispatch ulang "
               f"(`check --gate spec` memberi `sidik`)")
         return 1
+    sealed = seal_problem(text_of(path))
+    if sealed:
+        print(f"REVIEW FAIL: {sealed}")
+        return 1
+    problems = report_problems(report, args.verdict, rnd + 1)
+    if problems:
+        print("REVIEW FAIL: blok reviewer tidak konsisten — " + "; ".join(problems)
+              + " — dispatch ulang; dilarang menyunting blok balikan")
+        return 1
     write_fields(path, review=f"{args.verdict} @{digest}", review_round=str(rnd + 1))
     if report:
         (path.parent / REVIEW_FILE).write_text(
@@ -374,6 +450,69 @@ def cmd_revise(root: Path, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_close(root: Path, args: argparse.Namespace) -> int:
+    """Tutup elisitasi dan segel catatannya; satu-satunya penulis `elicitation: CLOSED`."""
+    path = _ticket_path(root, args)
+    rel = str(path.parent.relative_to(root))
+    if not path.is_file():
+        print(f"CLOSE FAIL: {rel}/{TICKET_FILE} tidak ada — alokasikan lewat `ticket.py new`")
+        return 1
+    text = text_of(path)
+    fm, _ = split_frontmatter(text)
+    if fm.get("status") != "DRAFT":
+        print(f"CLOSE FAIL: TICKET.md berstatus `{fm.get('status', '-')}`, bukan DRAFT — tiket READY dibuka lewat "
+              f"`reopen` (analyst:spec) lebih dulu")
+        return 1
+    sealed = str(fm.get("elicit_hash", "-")).strip() or "-"
+    notes = content_hash(text, "elicit")
+    rows = log_rows(text)
+    adopted = False
+    if fm.get("elicitation") == "CLOSED":
+        if sealed == notes:
+            print(f"CLOSE PASS: {rel}/{TICKET_FILE} sudah tertutup, segel {sealed} cocok — tidak ada yang ditulis")
+            return 0
+        if sealed != "-":
+            print(f"CLOSE FAIL: {seal_problem(text)}")
+            return 1
+        prev = parse_review(fm.get("review", ""))
+        if prev and prev[2] != notes:   # tiket lama: adopsi hanya bila catatan sama dengan yang terakhir direview
+            print("CLOSE FAIL: tiket lama tanpa segel, dan catatan elisitasi berubah sesudah review terakhir — "
+                  "buka ulang elisitasi (`elicitation: OPEN` + baris log `Dibuka ulang`) lalu `ticket.py close`")
+            return 1
+        adopted = True
+    elif fm.get("elicitation") == "OPEN":
+        if sealed not in ("-", notes):
+            since = rows[int_field(fm, "elicit_log"):]
+            if not any(r[2].lower().startswith(REOPEN_ROW) for r in since):
+                print(f"CLOSE FAIL: catatan berubah sejak segel {sealed} tanpa baris log baru `Dibuka ulang` — "
+                      "tiap pembukaan ulang elisitasi dicatat di log (elicit Phase 0) sebelum ditutup lagi")
+                return 1
+    else:
+        print(f"CLOSE FAIL: elicitation `{fm.get('elicitation', '-')}` bukan OPEN|CLOSED")
+        return 1
+    closed = set_frontmatter_field(text, "elicitation", "CLOSED")
+    path.write_text(closed, encoding="utf-8")
+    v = DocValidator("elicit", rel, root)
+    if not v.run_all():
+        path.write_text(text, encoding="utf-8")         # kembalikan apa adanya; elisitasi tetap terbuka
+        print("CLOSE FAIL: validate_doc.py --kind elicit FAIL pada CLOSED — elisitasi tetap "
+              f"{fm.get('elicitation')}\n" + format_report(f"validate {TICKET_FILE} (elicit)", v.results))
+        return 1
+    seal = content_hash(closed, "elicit")
+    write_fields(path, elicit_hash=seal, elicit_log=str(len(rows)))
+    msg = f"CLOSE PASS: {rel}/{TICKET_FILE} elicitation CLOSED · segel {seal} · {len(rows)} log" \
+          + (" · segel diadopsi (tiket lama)" if adopted else "")
+    if is_git_repo(root) and not args.no_commit:
+        paths = [f"{rel}/{TICKET_FILE}"]
+        subject = f"docs(ticket): elisitasi {rel.split('-', 1)[-1]}"
+        ok, out = git_commit(root, paths, subject)
+        if not ok:
+            return _commit_failed(msg, root, paths, out, subject)
+        msg += f" · commit {out}"
+    print(msg)
+    return 0
+
+
 def cmd_approve(root: Path, args: argparse.Namespace) -> int:
     path = _ticket_path(root, args)
     fm = read(path)
@@ -387,6 +526,8 @@ def cmd_approve(root: Path, args: argparse.Namespace) -> int:
                           + (" — catatan elisitasi rusak; kembali ke analyst:elicit" if kind == "elicit" else ""))
     if fm.get("elicitation") != "CLOSED":
         errors.append("elicitation bukan CLOSED — elisitasi dibuka ulang; tuntaskan analyst:elicit dulu")
+    elif seal_problem(text_of(path)):
+        errors.append(seal_problem(text_of(path)))
     digest = review_digest(path.parent)
     if str(fm.get("review", "")) != f"PASS @{digest}":
         errors.append(f"vonis review terakhir `{fm.get('review', '-')}` bukan `PASS @{digest}` (belum "
@@ -488,19 +629,30 @@ def cmd_cancel(root: Path, args: argparse.Namespace) -> int:
 
 
 def cmd_ref(root: Path, args: argparse.Namespace) -> int:
-    """`external_ref` di luar sidik konten: boleh diisi pada DRAFT maupun READY tanpa DRIFT."""
+    """`external_ref` di luar sidik konten: boleh diisi pada DRAFT maupun READY tanpa DRIFT.
+
+    Subjek `ref TICKET` dibaca penerima tiket lama (tanpa `approved_seal`) sebagai tanda terkunci, jadi
+    `ref` tidak pernah meng-commit isi yang belum disetujui: DRIFT ditolak, DRAFT tidak di-commit.
+    """
     path = _ticket_path(root, args)
     fm = read(path)
+    rel = str(path.parent.relative_to(root))
     if fm.get("status") not in ("DRAFT", "READY"):
         print(f"REF FAIL: TICKET.md berstatus `{fm.get('status', '-')}`, bukan DRAFT|READY")
+        return 1
+    state = classify(root, rel)
+    if state["state"] in ("DRIFT", "RUSAK"):
+        print(f"REF FAIL: {rel} {state['state']} — {state['route']}; `ref` tidak meng-commit isi yang belum disetujui")
         return 1
     if not args.ref.strip():
         print("REF FAIL: --ref kosong")
         return 1
     value = clean_value(args.ref, 120)
     write_fields(path, external_ref=value)
-    rel = str(path.parent.relative_to(root))
     msg = f"REF PASS: {rel}/{TICKET_FILE} external_ref = {value}"
+    if fm.get("status") == "DRAFT":
+        print(msg + " · DRAFT: tanpa commit — ikut commit draft berikutnya (analyst:spec Phase 4)")
+        return 0
     if is_git_repo(root) and not args.no_commit:
         paths = [f"{rel}/{TICKET_FILE}"]
         subject = f"docs(ticket): ref TICKET {rel.split('-', 1)[-1]}"
@@ -529,6 +681,9 @@ def main() -> None:
     s.add_argument("--ticketdir", required=True)
     s.add_argument("--reopen", action="store_true", help="elicit: buka ulang elisitasi CLOSED")
     s.add_argument("--json", action="store_true")
+    s = sub.add_parser("close")
+    s.add_argument("--ticketdir", required=True)
+    s.add_argument("--no-commit", action="store_true", dest="no_commit")
     s = sub.add_parser("review")
     s.add_argument("--ticketdir", required=True)
     s.add_argument("--verdict", required=True, choices=("PASS", "BLOCKED", "DISPATCH_FAILED"))
@@ -553,7 +708,7 @@ def main() -> None:
     s.add_argument("--no-commit", action="store_true", dest="no_commit")
     args = p.parse_args()
     root = (Path(args.root) if args.root else find_root()).resolve()
-    handler = {"state": cmd_state, "new": cmd_new, "check": cmd_check, "review": cmd_review,
+    handler = {"state": cmd_state, "new": cmd_new, "check": cmd_check, "close": cmd_close, "review": cmd_review,
                "revise": cmd_revise, "approve": cmd_approve, "reopen": cmd_reopen,
                "cancel": cmd_cancel, "ref": cmd_ref}[args.cmd]
     sys.exit(handler(root, args))

@@ -11,6 +11,8 @@ domain_terms: []
 revision: 0
 review: -
 review_round: 0
+elicit_hash: 349039f58360
+elicit_log: 1
 ---
 
 # Admin Finance dapat mencatat pembayaran invoice korporat secara cicilan

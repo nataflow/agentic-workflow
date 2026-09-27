@@ -134,9 +134,14 @@ def test_a3_review_report_basi_tidak_dirujuk(repo):
 
 @pytest.mark.regression("A4")
 def test_a4_ronde_reset_saat_elisitasi_berubah(repo):
+    """Sejak G2 catatan hanya berubah lewat pembukaan ulang yang tercatat di log, lalu `close`."""
     for _ in range(2):
         assert review(repo, "BLOCKED").code == 0
+    edit(repo, "elicitation: CLOSED", "elicitation: OPEN")
+    row = "| 1 | 2026-09-23 | Invoice mana yang boleh dicicil? | Di atas 50 juta | Rina |"
+    edit(repo, row, row + "\n| 2 | 2026-09-27 | Dibuka ulang | batas wilayah | analyst:spec |")
     edit(repo, "Hanya pelanggan korporat.", "Hanya pelanggan korporat di Jabodetabek.")
+    assert tk(repo, "close", "--ticketdir", TDIR, "--no-commit").code == 0
     assert "review_basi=elisitasi" in tk(repo, "check", "--gate", "spec", "--ticketdir", TDIR).out
     r = review(repo, "PASS")
     assert r.code == 0 and "ronde 1/2" in r.out
