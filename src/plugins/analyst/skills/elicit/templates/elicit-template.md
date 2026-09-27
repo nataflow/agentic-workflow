@@ -76,7 +76,7 @@ _(belum terjawab)_
 
 Tipe `BUG` memakai `#### ` pilar berikut di bawah `### Fakta`, urutan persis: `Langkah Reproduksi`, `Yang Diharapkan`, `Yang Terjadi`, `Dampak`, `Urgensi` (wajib), lalu `Lingkungan`, `Batas Cakupan` (opsional). Seksi lain identik.
 
-Kepemilikan frontmatter: `elicitation`, `type`, `slug`, `requester`, `created`, `domain_terms` ditulis `elicit`; `priority`, `external_ref`, dan H1 final ditulis `spec`; `status` (selain `DRAFT` awal), `revision`, `revision_base`, `review`, `review_round`, `approved*`, `reopen*`, `cancel_reason` ditulis **hanya** oleh `ticket.py`; `external_ref` sesudah `READY` hanya lewat `ticket.py ref`. Penulis mana pun menyalin field milik pihak lain apa adanya.
+Kepemilikan frontmatter: `type`, `slug`, `requester`, `created`, `request_hash`, dan `elicitation: OPEN` awal ditulis `ticket.py new`; `domain_terms` dan `elicitation: OPEN` saat buka ulang ditulis `elicit`; `elicitation: CLOSED`, `elicit_hash`, dan `elicit_log` ditulis **hanya** `ticket.py close`; `priority`, `external_ref`, dan H1 final ditulis `spec`; `status` (selain `DRAFT` awal), `revision`, `revision_base`, `review`, `review_round`, `approved*`, `reopen*`, `cancel_reason` ditulis **hanya** oleh `ticket.py`; `external_ref` sesudah `READY` hanya lewat `ticket.py ref`. Penulis mana pun menyalin field milik pihak lain apa adanya.
 
 ---
 
@@ -85,14 +85,14 @@ Kepemilikan frontmatter: `elicitation`, `type`, `slug`, `requester`, `created`, 
 **Mekanis** — ditagih `validate_doc.py --kind elicit`:
 
 1. **Frontmatter**: `status` `DRAFT` atau `READY` (`CANCELLED` hanya ditulis `ticket.py cancel`); `elicitation` `OPEN` atau `CLOSED`; `type` salah satu `FEATURE | IMPROVEMENT | BUG`; `slug` sama dengan slug nama ticketdir; `created` `YYYY-MM-DD`; `requester` terisi; `domain_terms` berupa list — istilah yang tampak teknis tetapi memang kosakata bisnis produk ini, dikonfirmasi peminta (mis. `[API]` untuk produk API mitra). Hanya istilah di list ini yang lolos pemindai kebocoran kartu.
-2. **Struktur**: tepat satu H1; `## Catatan Elisitasi` adalah H2 terakhir, berisi empat H3 persis urutan bagian 1.
-3. **Permintaan asli**: minimal satu baris blockquote `> `, dan hanya blockquote.
-4. **Pilar**: `####` di bawah `### Fakta` persis daftar tipe itu, berurutan. Pilar yang belum terjawab berisi literal `_(belum terjawab)_` — dilarang dikosongkan. Pilar opsional yang sengaja tidak digali berisi `Tidak dibahas — <alasan>`. `CLOSED` menuntut nol `_(belum terjawab)_`.
+2. **Struktur**: tepat satu H1; `## Catatan Elisitasi` adalah H2 terakhir, berisi empat H3 persis urutan bagian 1; tiap H2 dan H3 muncul sekali (heading ganda menimpa isi yang pertama).
+3. **Permintaan asli**: minimal satu baris blockquote `> `, dan hanya blockquote. Bila frontmatter memuat `request_hash` (ditulis `ticket.py new`), kutipannya sama persis dengan saat dimateraikan.
+4. **Pilar**: `####` di bawah `### Fakta` persis daftar tipe itu, berurutan. Pilar yang belum terjawab berisi literal `_(belum terjawab)_` — dilarang dikosongkan. Pilar opsional yang sengaja tidak digali berisi `Tidak dibahas — <alasan>`. Tiap pilar muncul sekali. `CLOSED` menuntut nol `_(belum terjawab)_`.
 5. **Log**: tabel berheader lima kolom beserta baris pemisah; baris `| n | YYYY-MM-DD | <pertanyaan> | <jawaban> | <sumber> |` bernomor urut dari 1. Nol baris sah bila permintaan asli sudah menjawab seluruh pilar.
 6. **Pertanyaan terbuka**: `- Tidak ada.`, atau baris `- **Q-{n}** [MEMBLOKIR | TIDAK MEMBLOKIR]: <pertanyaan> — menunggu: <siapa>` ber-ID unik. `CLOSED` menuntut nol `MEMBLOKIR`.
 7. **Placeholder**: nol `TBD`/`TODO`/`diisi nanti` dan nol slot `<...>` di `### Fakta` dan `### Pertanyaan Terbuka`. `### Permintaan Asli` dan `### Log Tanya-Jawab` dikecualikan — keduanya kutipan mentah yang dilarang disunting.
-8. **Asumsi**: `CLOSED` menuntut nol baris `Asumsi:` di `### Fakta` — tiap asumsi dikonfirmasi (labelnya dihapus) atau pilarnya kembali ke Phase 2.
-9. **Jejak istilah domain**: `CLOSED` menuntut tiap istilah `domain_terms` muncul di `### Permintaan Asli` atau di baris `### Log Tanya-Jawab` (baris konfirmasinya).
+8. **Asumsi**: `CLOSED` menuntut nol `Asumsi:` di `### Fakta` — di awal maupun di tengah baris, termasuk bentuk tebal — tiap asumsi dikonfirmasi (labelnya dihapus) atau pilarnya kembali ke Phase 2.
+9. **Konfirmasi istilah domain**: `CLOSED` menuntut tiap istilah `domain_terms` punya baris `### Log Tanya-Jawab` berjawaban `Ya` yang mengutip istilahnya: `| n | <tanggal> | Apakah "<istilah>" nama produk? | Ya | <peminta> |`. Kemunculan di `### Permintaan Asli` saja tidak cukup — istilah teknis yang diucapkan peminta justru dirumuskan ulang sebagai perilaku (panduan bagian 3).
 
 **Semantik** — self-test penulis sebelum `elicitation: CLOSED`, tidak dapat ditagih skrip:
 
@@ -106,7 +106,7 @@ Kepemilikan frontmatter: `elicitation`, `type`, `slug`, `requester`, `created`, 
 
 ## 3. Contoh Terisi — `cicilan-pembayaran` (tidak tersalin ke artefak)
 
-Keadaan sesudah elisitasi ditutup, sebelum `spec` menulis kartu:
+Keadaan sesudah elisitasi ditutup `ticket.py close`, sebelum `spec` menulis kartu. `request_hash` ditulis `ticket.py new`; `elicit_hash` dan `elicit_log` ditulis `close` — nilainya dihitung skrip, bukan diketik (`tests/analyst/test_ticket.py` menagih contoh ini lolos `check --gate spec`):
 
 ````markdown
 ---
@@ -122,6 +122,7 @@ domain_terms: []
 revision: 0
 review: -
 review_round: 0
+request_hash: a20e9c1ffc3c
 elicit_hash: 1b0cbb4c40c4
 elicit_log: 3
 ---

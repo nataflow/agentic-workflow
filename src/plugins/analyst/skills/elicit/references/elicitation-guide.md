@@ -41,7 +41,7 @@ Peminta kadang memakai istilah teknis yang mereka dengar dari tim. Rekam apa ada
 | "Kirim webhook ke mitra" | Kondisi Diinginkan: mitra menerima pemberitahuan otomatis saat pesanan lunas |
 | "Cache-nya basi" | Yang Terjadi: harga yang tampil masih harga lama sampai halaman dibuka ulang |
 
-Bila produk itu sendiri memang teknis (mis. layanan API untuk mitra), istilahnya kosakata bisnis: konfirmasi ke peminta, lalu catat di frontmatter `domain_terms: [API]` `TICKET.md` agar kartu yang ditulis `spec` boleh memakainya. Nama merek bercampur huruf (mis. aplikasi `myPertamina`) diperlakukan sama.
+Bila produk itu sendiri memang teknis (mis. layanan API untuk mitra), istilahnya kosakata bisnis: konfirmasi ke peminta — catat sebagai baris log `| n | <tanggal> | Apakah "API" nama produk? | Ya | <peminta> |` — lalu catat di frontmatter `domain_terms: [API]` `TICKET.md` agar kartu yang ditulis `spec` boleh memakainya. Validator menolak istilah `domain_terms` tanpa baris konfirmasi itu, sekalipun istilahnya muncul di permintaan asli. Nama merek bercampur huruf (mis. aplikasi `myPertamina`) diperlakukan sama.
 
 ## 4. Rubrik Urgensi → Prioritas
 

@@ -15,12 +15,12 @@
 | Komponen | Jenis | Peran singkat | Berkas |
 |---|---|---|---|
 | `analyst:intake` | skill (satu-satunya yang muncul di menu `/`) | Gerbang: pulihkan ticketdir, tentukan wilayah, tipe, ukuran, cek duplikat, tetapkan slug. Tidak menulis berkas apa pun | `skills/intake/SKILL.md` |
-| `analyst:elicit` | skill (`user-invocable: false`) | Tanya-jawab dengan peminta. Fakta direkam per pilar ke `## Catatan Elisitasi` setiap giliran, lalu elisitasi ditutup (`CLOSED`) | `skills/elicit/SKILL.md`, `references/elicitation-guide.md`, `templates/elicit-template.md` |
+| `analyst:elicit` | skill (`user-invocable: false`) | Tanya-jawab dengan peminta. Fakta direkam per pilar ke `## Catatan Elisitasi` setiap giliran, lalu elisitasi ditutup lewat `ticket.py close` (`CLOSED` + segel) | `skills/elicit/SKILL.md`, `references/elicitation-guide.md`, `templates/elicit-template.md` |
 | `analyst:spec` | skill (`user-invocable: false`) | Menyusun kartu di atas catatan elisitasi, dispatch reviewer, commit draft, minta persetujuan user, lalu `READY` | `skills/spec/SKILL.md`, `templates/ticket-template.md`, `dispatcher/reviewer.md` |
 | `ticket-reviewer` | agent (read-only, model `sonnet`) | Memvonis draft kartu `PASS`/`BLOCKED` secara semantik terhadap catatan elisitasi | `agents/ticket-reviewer.md` |
-| `ticket.py` | script (CLI siklus hidup) | `state`, `new`, `check --gate elicit\|spec`, `review`, `revise`, `approve`, `reopen`, `cancel`, `ref` | `skills/_common/ticket.py` |
+| `ticket.py` | script (CLI siklus hidup) | `state`, `new` (menulis `TICKET.md` awal), `check --gate elicit\|spec`, `close`, `review`, `revise`, `approve`, `reopen`, `cancel`, `ref` | `skills/_common/ticket.py` |
 | `validate_doc.py` | script (validator) | `--kind elicit` menilai catatan elisitasi. `--kind ticket` menilai kartu, termasuk pemindai kebocoran teknis | `skills/_common/validate_doc.py` |
-| `analyst_lib.py` | script (pustaka) | Mencari root, parser frontmatter, pemecah kartu/catatan, sidik `content_hash`, segel `ticket_seal`, `scan_leaks`, dan commit git | `skills/_common/analyst_lib.py` |
+| `analyst_lib.py` | script (pustaka) | Mencari root, parser frontmatter, pemecah kartu/catatan, sidik `content_hash`, `request_digest`, kerangka `ticket_skeleton`, segel `ticket_seal`, `scan_leaks`, dan commit git | `skills/_common/analyst_lib.py` |
 
 ## Alur Utama
 
@@ -39,13 +39,13 @@ flowchart TD
     CLASSIFY -->|"lebih dari satu tujuan"| QUEUE["Antrian tiket untuk intake berikutnya"]
     CLASSIFY --> SLUG["Phase 6: slug + requester"]
     SLUG --> ELICIT
-    ELICIT --> NEW["ticket.py new, TICKET.md elicitation: OPEN"]
+    ELICIT --> NEW["ticket.py new: kerangka + permintaan asli + request_hash, elicitation: OPEN"]
     NEW --> TURN["Giliran tanya-jawab, maks 3 pertanyaan. Tulis TICKET.md + validate elicit"]
     TURN -->|"menunggu pihak lain / plafon 5 giliran"| HOLD1["ELICIT TERTAHAN, commit (tertunda)"]
     TURN --> CONFIRM{"Phase 4: konfirmasi fakta"}
     CONFIRM -->|"koreksi"| TURN
     CONFIRM -->|"tunda"| HOLD1
-    CONFIRM -->|"fakta benar, nol MEMBLOKIR"| CLOSED["elicitation: CLOSED + commit"]
+    CONFIRM -->|"fakta benar, nol MEMBLOKIR"| CLOSED["ticket.py close: CLOSED + segel catatan + commit"]
     CLOSED --> SPEC
     SPEC --> DRAFT["Tulis kartu DRAFT + validate ticket"]
     DRAFT --> REVIEW["ticket-reviewer, maks 2 ronde per revisi"]
@@ -64,8 +64,8 @@ keadaan setiap ticketdir dari `ticket.py state`, bukan dari ingatan sesi. `elici
 menu. Model memanggil keduanya lewat tool Skill sesuai keadaan ticketdir. Permintaan yang sudah lengkap tetap
 melewati `elicit`: fakta diisi dari permintaan asli, dikonfirmasi sekali, lalu ditutup tanpa satu pertanyaan
 pun, sehingga `spec` dan reviewer selalu punya satu sumber kebenaran tertulis. `READY` hanya bisa ditulis
-`ticket.py approve`, dan skrip itu menagih validator, elisitasi `CLOSED`, vonis review `PASS` atas sidik
-konten terkini, serta jawaban eksplisit user.
+`ticket.py approve`, dan skrip itu menagih validator, elisitasi `CLOSED` yang catatannya sama dengan segel
+`ticket.py close`, vonis review `PASS` atas sidik konten terkini, serta jawaban eksplisit user.
 
 ## Alur per Skill
 
@@ -77,8 +77,9 @@ konten terkini, serta jawaban eksplisit user.
   direktori kerja. Tiket tinggal di `analyst/tickets/`. Git tidak wajib. Parameter: `request` (wajib, apa
   adanya), `requester`, `force_type`.
 - **Langkah**:
-  1. **Pemulihan ticketdir**: jalankan `ticket.py state`, lalu rutekan per keadaan: `KOSONG` menjalankan
-     Phase 2–3 lalu `elicit` pada direktori itu. `ELISITASI` ke `elicit`. `SPEC`/`DRAFT` ke `spec`. `DRIFT`
+  1. **Pemulihan ticketdir**: jalankan `ticket.py state`, lalu rutekan per keadaan: `KOSONG` (sisa alokasi
+     lama, permintaan aslinya tidak tersimpan) meminta permintaan asli bila perlu, menjalankan Phase 2–3,
+     lalu `elicit` dengan slug direktori itu — `ticket.py new` memakai ulang direktorinya. `ELISITASI` ke `elicit`. `SPEC`/`DRAFT` ke `spec`. `DRIFT`
      membuat intake bertanya ke user: setujui ulang lewat `spec` atau pulihkan isi. `RUSAK`/`NAMA_TIDAK_SAH`
      dilaporkan ke user. Permintaan yang jelas menyambung ticketdir terbuka dirutekan ke sana. Bila
      hubungannya tidak jelas, intake bertanya ke user lewat `AskUserQuestion`.
@@ -109,19 +110,21 @@ konten terkini, serta jawaban eksplisit user.
 - **Pemicu / kapan dipakai**: dipanggil `intake` sesudah tipe dan slug ditetapkan, untuk ticketdir berkeadaan
   `ELISITASI`/`KOSONG`, atau oleh `spec` bila fakta perlu digali ulang (`reopen_reason`).
 - **Prasyarat**:
-  - Tiket baru: `ticket.py new --slug <slug> --type <type>` harus mengembalikan
-    `NEW PASS: <ticketdir> · root=… · git=…`. Slug kembar yang masih terbuka ditolak.
+  - Tiket baru (juga ticketdir `KOSONG`): `ticket.py new --slug <slug> --type <type> --requester … --request -`
+    (permintaan asli lewat stdin) harus mengembalikan `NEW PASS: <ticketdir> · root=… · git=… · type=…`.
+    Skrip menulis `TICKET.md` awal. Slug kembar yang masih terbuka ditolak; ticketdir `KOSONG` ber-slug sama
+    dipakai ulang.
   - Ticketdir sudah ada: `ticket.py check --gate elicit --ticketdir <ticketdir>` (dengan `--reopen` bila
     dibuka ulang). Skrip memeriksa ticketdir sah, berkas template/panduan plugin ada, dan keadaan
-    `KOSONG`/`ELISITASI` (plus `SPEC`/`DRAFT` bila `--reopen`).
+    `ELISITASI` (plus `SPEC`/`DRAFT` bila `--reopen`).
 - **Langkah**:
-  0. **Alokasi atau lanjutan**. Tiket baru: tulis `TICKET.md` dari template dengan `elicitation: OPEN`,
-     permintaan asli sebagai blockquote, dan semua pilar `_(belum terjawab)_`. Lanjutan: tanyakan apakah
-     `Q-{n}` yang `menunggu:` sudah terjawab. Buka ulang: set `OPEN`, tambah baris log "Dibuka ulang", lalu
-     gali hanya pilar yang disebut alasannya.
+  0. **Alokasi atau lanjutan**. Tiket baru: `TICKET.md` sudah ditulis `ticket.py new` (`elicitation: OPEN`,
+     permintaan asli sebagai blockquote beserta `request_hash`, semua pilar `_(belum terjawab)_`). Lanjutan: tanyakan apakah
+     `Q-{n}` yang `menunggu:` sudah terjawab. Buka ulang: set `OPEN`, tambah baris log "Dibuka ulang" (wajib: `close`
+     menolak menutup ulang catatan yang berubah tanpa baris ini), lalu gali hanya pilar yang disebut alasannya.
   1. **Isi dari permintaan**: fakta tersurat ditulis langsung. Fakta tersirat ditulis sebagai `Asumsi:`.
      Istilah teknis dari peminta dirumuskan ulang sebagai perilaku. Istilah yang memang kosakata produk
-     dikonfirmasi, dicatat di log, lalu dimasukkan ke `domain_terms`.
+     dikonfirmasi, dicatat di log sebagai baris berjawaban *Ya*, lalu dimasukkan ke `domain_terms`.
   2. **Giliran tanya-jawab**: tiap giliran menyasar ≤ 3 pilar wajib, diurutkan menurut dampak. Tiap
      pertanyaan punya 2–4 opsi konkret. **Sesudah setiap giliran**: catat log, perbarui pilar, tulis
      `TICKET.md`, lalu jalankan `validate_doc.py --kind elicit`. Jawaban "tidak tahu" dicatat sebagai
@@ -130,18 +133,19 @@ konten terkini, serta jawaban eksplisit user.
   3. **Pilar opsional**: satu giliran. Pilar yang ditolak ditulis `Tidak dibahas — <alasan>`.
   4. **Konfirmasi fakta** (bukan persetujuan tiket). User memilih *Fakta sudah benar*, *Ada koreksi*, atau
      *Tunda*. Asumsi yang dikonfirmasi dihapus labelnya. Asumsi yang ditolak kembali ke Phase 2.
-  5. **Tutup & serah terima**: bila masih ada `MEMBLOKIR`, elisitasi dilarang ditutup. Selain itu set
-     `elicitation: CLOSED`, jalankan validator sampai `PASS`, lakukan self-test semantik, commit, lalu
-     panggil `spec`.
+  5. **Tutup & serah terima**: bila masih ada `MEMBLOKIR`, elisitasi dilarang ditutup. Selain itu lakukan
+     self-test semantik, lalu `ticket.py close`: skrip menulis `CLOSED` hanya bila validator `PASS`, menyegel
+     catatan (`elicit_hash`, `elicit_log`), dan meng-commit. Lalu panggil `spec`.
 - **Subagent yang didispatch**: tidak ada.
 - **Output / artefak**: `<ticketdir>/TICKET.md` berisi frontmatter dan `## Catatan Elisitasi` (Permintaan
   Asli · Fakta per pilar · Log Tanya-Jawab · Pertanyaan Terbuka). Baris penutup:
   `ELICIT — CLOSED · <ticketdir> · <n> pilar · <n> log · <n> Q tidak memblokir · <commit> — lanjut ke analyst:spec`.
   Bila belum tuntas, dipakai blok `ELICIT — TERTAHAN` dengan pertanyaan siap diteruskan.
-- **Gerbang & commit**: `validate_doc.py --kind elicit` wajib `PASS` setiap giliran untuk struktur. Saat
-  `CLOSED`, validator menagih nol pilar kosong, nol `MEMBLOKIR`, nol `Asumsi:`, dan setiap `domain_terms`
-  berjejak. Commit `docs(ticket): elisitasi <slug>`, atau `… (tertunda)` bila tertahan, dengan staging
-  path eksplisit.
+- **Gerbang & commit**: `validate_doc.py --kind elicit` wajib `PASS` setiap giliran untuk struktur (tiap
+  heading sekali, permintaan asli sama dengan `request_hash`). Saat `CLOSED`, validator menagih nol pilar
+  kosong, nol `MEMBLOKIR`, nol `Asumsi:` di mana pun dalam baris, dan setiap `domain_terms` punya baris
+  konfirmasi berjawaban *Ya*. `ticket.py close` meng-commit `docs(ticket): elisitasi <slug>`; draft tertahan
+  di-commit tangan `… (tertunda)` dengan staging path eksplisit.
 - **Lanjut ke**: `analyst:spec`. Bila tertahan, lanjutkan lewat `analyst:intake` pada sesi berikutnya.
 
 ```mermaid
@@ -158,7 +162,7 @@ flowchart TD
     E4 -->|"tunda"| T
     E4 -->|"benar"| E5{"Ada Q MEMBLOKIR?"}
     E5 -->|"ya"| T
-    E5 -->|"tidak"| C["elicitation: CLOSED, validator PASS, commit"]
+    E5 -->|"tidak"| C["ticket.py close: validator PASS, CLOSED + segel, commit"]
     C --> S["analyst:spec"]
 ```
 
@@ -170,9 +174,10 @@ flowchart TD
   1. Untuk perubahan tiket `READY`/`DRIFT`: konfirmasi ke user, lalu jalankan
      `ticket.py reopen --ticketdir … --reason …`.
   2. `ticket.py check --gate spec` memeriksa: ticketdir sah, berkas template/dispatcher ada, keadaan
-     `SPEC`/`DRAFT`, dan catatan elisitasi `CLOSED` yang lolos validator. Skrip mencetak `root`, `type`,
-     `git`, dan untuk draft juga `revision`, `review_round`, `sidik`, `review_segar`, `review_basi`,
-     `review_report`.
+     `SPEC`/`DRAFT`, catatan elisitasi `CLOSED` yang lolos validator, dan catatan sama dengan segel
+     `elicit_hash` (check 5; tiket lama tanpa segel diadopsi sekali lewat `ticket.py close`). Skrip mencetak
+     `root`, `type`, `git`, dan untuk draft juga `revision`, `review_round`, `ronde`, `sidik`,
+     `review_segar`, `review_basi`, `review_report`.
 - **Langkah**:
   0. **Orientasi**. Untuk `DRAFT` dengan `review_segar=ya`, langsung ke Phase 5. Bila `review_basi` memuat
      `elisitasi`, jalankan `ticket.py revise` lalu Phase 1. Bila `review_basi=kartu`, ke Phase 2. Bila
@@ -184,9 +189,10 @@ flowchart TD
      Terbuka beserta asumsinya.
   2. **Tulis draft**: sisipkan kartu di antara H1 dan `## Catatan Elisitasi` (catatan tidak disentuh sama
      sekali), lalu jalankan `validate_doc.py --kind ticket` sampai `PASS` dan self-test semantik.
-  3. **Review independen**: bila `review_round` sudah 2, dispatch dilarang. Selain itu hidrasi
+  3. **Review independen**: bila `ronde=habis`, dispatch dilarang. Selain itu hidrasi
      `dispatcher/reviewer.md` dan dispatch `analyst:ticket-reviewer`. Vonisnya segera dicatat lewat
-     `ticket.py review --verdict … --report -` dengan blok balikan apa adanya.
+     `ticket.py review --verdict … --report -` dengan blok balikan apa adanya. Blok yang tidak konsisten
+     (hitungan BLOCKER ≠ butir, `PASS` ber-BLOCKER, `- Ronde:` salah) ditolak dan dispatch diulang.
   4. **Commit draft**: `docs(ticket): draft TICKET <slug>` (revisi: `revise TICKET <slug>`) atas
      `TICKET.md` dan `review.md`.
   5. **Persetujuan user**: sajikan tiket beserta blok `## Ticket Review`. Pilihan: *Setujui* (hanya bila
@@ -201,10 +207,11 @@ flowchart TD
   `SPEC — READY · <ticketdir>/TICKET.md @<sidik> · <type> · <priority> · <n> AC · <n> BR · <commit> — serahkan ke engineer … ticket_source: <ticketdir>/TICKET.md`.
   Selain itu dipakai blok `SPEC — MENUNGGU KEPUTUSAN | TERTAHAN`.
 - **Gerbang & commit**: `validate_doc.py --kind ticket` harus `PASS` sebelum dispatch. Plafon review 2
-  ronde per revisi, dan ronde kembali ke 0 bila catatan elisitasi berubah. Plafon revisi 3 per basis fakta.
+  ronde per revisi, dan ronde kembali ke 0 hanya bila catatan elisitasi disegel ulang lewat `close`. Plafon revisi 3 per basis fakta.
   `approve` menulis `READY`, `approved_hash`, `approved_seal`, dan `approval`, lalu meng-commit
   `docs(ticket): kunci TICKET <slug> READY`. `external_ref` sesudah `READY` diisi lewat `ticket.py ref`
-  (commit `docs(ticket): ref TICKET <slug>`) tanpa membuka ulang tiket.
+  (commit `docs(ticket): ref TICKET <slug>`) tanpa membuka ulang tiket; `ref` menolak `DRIFT` dan tidak
+  meng-commit `DRAFT`.
 - **Lanjut ke**: engineer (`backend:tech-lead` dan/atau `frontend:lead`) dengan `ticket_source`. Bila fakta
   perlu digali ulang, kembali ke `analyst:elicit`.
 
@@ -214,12 +221,12 @@ sequenceDiagram
     participant T as ticket.py
     participant R as ticket-reviewer
     participant U as User
-    S->>T: check --gate spec (sidik, review_round)
+    S->>T: check --gate spec (segel elisitasi, sidik, ronde)
     S->>S: tulis kartu DRAFT, validate_doc --kind ticket PASS
     S->>R: prompt terhidrasi (ticketdir, type, round, sidik)
     R-->>S: blok Ticket Review (Verdict, Sidik)
     S->>T: review --verdict PASS atau BLOCKED --report -
-    T-->>S: REVIEW PASS, ronde n dari 2 (atau FAIL bila sidik beda)
+    T-->>S: REVIEW PASS, ronde n dari 2 (atau FAIL bila sidik/segel beda atau blok tidak konsisten)
     alt BLOCKED dan ronde tersisa
         S->>S: perbaiki BLOCKER, ulang dispatch ronde 2
     end
@@ -264,21 +271,22 @@ Frontmatter punya dua sumbu status dengan pemilik berbeda:
 
 | Field | Nilai | Penulis |
 |---|---|---|
-| `elicitation` | `OPEN` → `CLOSED` | `analyst:elicit` |
-| `status` | `DRAFT` → `READY` / `CANCELLED` | `ticket.py` (`approve`, `reopen`, `cancel`). `DRAFT` awal ditulis `elicit` |
+| `elicitation` | `OPEN` → `CLOSED` | `OPEN` awal: `ticket.py new`; `OPEN` saat buka ulang: `analyst:elicit`; `CLOSED`: hanya `ticket.py close` |
+| `status` | `DRAFT` → `READY` / `CANCELLED` | `ticket.py` (`approve`, `reopen`, `cancel`). `DRAFT` awal ditulis `ticket.py new` |
 | `priority`, `external_ref`, H1 final | — | `analyst:spec` (`external_ref` sesudah `READY` hanya lewat `ticket.py ref`) |
-| `type`, `slug`, `requester`, `created`, `domain_terms` | — | `analyst:elicit` |
-| `revision`, `revision_base`, `review`, `review_round`, `approved*`, `reopen*`, `cancel_reason` | pembukuan | hanya `ticket.py` |
+| `type`, `slug`, `requester`, `created` | — | `ticket.py new` |
+| `domain_terms` | — | `analyst:elicit` |
+| `request_hash`, `elicit_hash`, `elicit_log`, `revision`, `revision_base`, `review`, `review_round`, `approved*`, `reopen*`, `cancel_reason` | pembukuan | hanya `ticket.py` (`new`, `close`, dan seterusnya) |
 
 `ticket.py state` menurunkan satu keadaan per ticketdir dari kedua field tersebut plus isi berkas. Keadaan
 inilah yang dipakai intake untuk merutekan:
 
 ```mermaid
 stateDiagram-v2
-    [*] --> KOSONG: ticket.py new
-    KOSONG --> ELISITASI: elicit tulis TICKET.md (OPEN)
-    ELISITASI --> SPEC: elicit CLOSED, kartu belum ada
-    ELISITASI --> DRAFT: CLOSED lagi, kartu sudah ada
+    [*] --> ELISITASI: ticket.py new (TICKET.md OPEN)
+    KOSONG --> ELISITASI: ticket.py new memakai ulang direktori
+    ELISITASI --> SPEC: ticket.py close, kartu belum ada
+    ELISITASI --> DRAFT: ticket.py close lagi, kartu sudah ada
     SPEC --> DRAFT: spec tulis kartu
     DRAFT --> DRAFT: review / revise
     DRAFT --> ELISITASI: kembali ke elisitasi (reopen_reason)
@@ -294,7 +302,8 @@ stateDiagram-v2
     READY --> DIBATALKAN: cancel --force
 ```
 
-Dua keadaan berada di luar siklus di atas. `RUSAK` berarti berkas bukan UTF-8, status tidak sah, tidak ada
+`KOSONG` hanya tersisa dari alokasi lama (sebelum `new` menulis `TICKET.md`) atau alokasi yang gagal di tengah
+jalan. Dua keadaan lain berada di luar siklus di atas. `RUSAK` berarti berkas bukan UTF-8, status tidak sah, tidak ada
 `## Catatan Elisitasi`, atau tiket `READY` dengan elisitasi `OPEN`/tanpa kartu. `NAMA_TIDAK_SAH` berarti
 direktori tidak cocok dengan pola `<YYMMDDhhmm>-<slug>`.
 
@@ -302,6 +311,9 @@ direktori tidak cocok dengan pola `<YYMMDDhhmm>-<slug>`.
 
 - Sidik review adalah pasangan `<kartu>/<catatan elisitasi>` (masing-masing 12 hex `content_hash`).
   Suntingan di bagian mana pun membuat vonis basi.
+- `new` memateraikan `request_hash` (sidik `### Permintaan Asli`), yang ditagih validator elisitasi.
+- `close` memateraikan `elicit_hash` (sidik catatan elisitasi) dan `elicit_log` (jumlah baris log). `check
+  --gate spec`, `review`, dan `approve` menolak catatan yang berbeda dari segel ini.
 - `approve` memateraikan `approved_hash` (sidik berkas utuh) dan `approved_seal` (`ticket_seal`: body utuh
   plus `type`, `priority`, `domain_terms`, tanpa field pembukuan dan `external_ref`).
 
@@ -337,17 +349,20 @@ direktori tidak cocok dengan pola `<YYMMDDhhmm>-<slug>`.
 | `ticket.py` gagal jalan (python3 absen, izin tulis) | intake | Laporkan galat mentah. Dilarang lanjut ke elisitasi tanpa pemindaian keadaan |
 | Ticketdir `RUSAK` / `NAMA_TIDAK_SAH` | intake | Laporkan baris skrip. Perbaikan manual oleh user, `git mv` ke nama sah, atau `ticket.py cancel` atas keputusan user. Frontmatter tidak boleh ditambal dengan tangan |
 | User menolak memilih satu tujuan | intake | Rekomendasikan tujuan paling mendesak. Bila tetap menolak, keluarkan blok `INTAKE — TERTAHAN` |
-| `NEW FAIL` karena slug kembar terbuka atau direktori sudah ada di menit yang sama | elicit | Kembali ke intake Phase 1 untuk melanjutkan ticketdir itu, atau pilih slug lain |
+| `NEW FAIL` karena slug kembar terbuka, direktori sudah ada di menit yang sama, atau `--request`/`--requester` kosong | elicit | Kembali ke intake Phase 1 untuk melanjutkan ticketdir itu, atau pilih slug lain; masukan kosong ditanyakan ke user |
+| `CLOSE FAIL` (validator `FAIL` pada `CLOSED`, atau catatan berubah sejak segel tanpa baris log `Dibuka ulang`) | elicit | Berkas dikembalikan apa adanya. Perbaiki per laporan validator, atau catat pembukaan ulang yang benar-benar terjadi |
+| Check 5 `check --gate spec`: catatan elisitasi berubah sesudah ditutup | spec | Dilarang menyegel ulang dari `spec`. Pulihkan catatannya, atau `elicit` dengan `reopen_reason` yang menyebut perubahannya. Tiket lama tanpa segel diadopsi sekali lewat `ticket.py close` |
 | Peminta menjawab "terserah" / tidak tahu | elicit | Tawarkan opsi rekomendasi. Bila tetap tidak ada jawaban, catat `Q-{n}` `MEMBLOKIR` dan tahan (`TERTAHAN`) |
 | Jawaban bertentangan dengan fakta sebelumnya | elicit | Sajikan keduanya lewat `AskUserQuestion` dan tandai yang lama `(dikoreksi di #n)` |
 | `validate_doc.py` `FAIL` | elicit, spec | Perbaiki per baris `Tindakan`. Menutup elisitasi, dispatch reviewer, dan approve dilarang sebelum `PASS` |
 | Kebocoran teknis tak kunjung `PASS` karena istilahnya kosakata produk | spec | Panggil `elicit` dengan `reopen_reason = konfirmasi istilah domain: <istilah>`, lalu kembali ke Phase 0. `spec` dilarang menambah `domain_terms` |
 | Fakta elisitasi saling bertentangan saat merumuskan AC | spec | Panggil `elicit` dengan `reopen_reason` yang menyebut kedua fakta |
 | `REVIEW FAIL` karena sidik berbeda (draft berubah sesudah dispatch) | spec | Dispatch ulang dengan `{sidik}` baru. Blok balikan tidak boleh disunting |
+| `REVIEW FAIL: blok reviewer tidak konsisten` | spec | Catat `DISPATCH_FAILED` (tidak dihitung ronde) dan dispatch ulang maksimal sekali. Blok balikan tidak boleh disunting |
 | Plafon 2 ronde review habis dengan BLOCKER tersisa | spec | Tanpa opsi *Setujui*. Tawarkan *Revisi* (`ticket.py revise` membuka ronde baru) atau *Kembali ke elisitasi* |
 | Plafon 3 revisi habis | spec | Lingkup belum jelas. Tawarkan *Kembali ke elisitasi* atau `ticket.py cancel` |
 | Dispatch reviewer gagal dua kali | spec | Tiket tidak dapat di-approve. Sajikan `TERTAHAN` dan minta user mengulang sesi |
-| `APPROVE FAIL` (status bukan DRAFT, validator FAIL, elisitasi bukan CLOSED, review bukan `PASS @<sidik sekarang>`, jawaban kosong) | spec | Ikuti sebab di keluaran. Bila review basi dan ronde tersisa, jalankan ronde berikut |
-| `approve`/`ref`/`cancel` exit 3 (commit gagal karena hook, gpg, `.gitignore`) | spec / ticket.py | Isi sudah tertulis. Sajikan baris `COMMIT GAGAL`, lalu user meng-commit manual dengan perintah dan subjek persis yang dicetak. Dilarang `--no-verify` |
-| Tiket `READY` disunting (`DRIFT`) | intake, penerima engineer | Setujui ulang lewat `spec` (`reopen` → review → approve), atau pulihkan isi yang disetujui |
+| `APPROVE FAIL` (status bukan DRAFT, validator FAIL, elisitasi bukan CLOSED atau berbeda dari segelnya, review bukan `PASS @<sidik sekarang>`, jawaban kosong) | spec | Ikuti sebab di keluaran. Bila review basi dan ronde tersisa, jalankan ronde berikut |
+| `close`/`approve`/`ref`/`cancel` exit 3 (commit gagal karena hook, gpg, `.gitignore`) | spec / ticket.py | Isi sudah tertulis. Sajikan baris `COMMIT GAGAL`, lalu user meng-commit manual dengan perintah dan subjek persis yang dicetak. Dilarang `--no-verify` |
+| Tiket `READY` disunting (`DRIFT`) | intake, penerima engineer | Setujui ulang lewat `spec` (`reopen` → review → approve), atau pulihkan isi yang disetujui. `ticket.py ref` menolak tiket `DRIFT`. Bila suntingannya menyentuh catatan elisitasi, check 5 mengarahkan ke `elicit` dulu |
 | Membatalkan tiket `READY` | ticket.py | `cancel` ditolak tanpa `--force`, karena tiket mungkin sudah diserahkan ke engineer. `--force` hanya atas keputusan eksplisit user |

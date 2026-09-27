@@ -564,7 +564,7 @@ Ledger `## Chain` di `TASK.md` berjalan `- [ ]` → `- [x] … @ <sha>` (centang
   - Path tidak pernah disimpulkan dari isi `request`. Bila user menempel kartu tanpa path, gerbang menanyakannya.
   - Jalurnya: gerbang → `backend:analyst` (slot `Ticket Source`) → `backend:task`, yang memastikan tiap `TAC-{n}` dipikul `SC-{n}` atau dicatat di `## Out of Scope` (`validate_doc.py` T10). Bila sumbu bisnis tetap aktif, jalur berlanjut ke `business-analysis` dalam mode serap tiket, yang menambah `— Asal: TBR-{m}`.
   - Namespace kartu `AC-{n}`/`BR-{n}` dirujuk sebagai `TAC-{n}`/`TBR-{n}` di artefak backend supaya tidak bertabrakan dengan `AC` milik PRD dan `BR` milik BRD.
-  - Syarat tiket: frontmatter `status: READY` dan `elicitation: CLOSED`, dan commit terakhir berkas itu bersubjek `docs(ticket): kunci TICKET <slug> READY` atau `docs(ticket): ref TICKET <slug>`. Syarat ini dinilai prasyarat `task` check 7. Bila gagal, tiket dikembalikan ke `analyst:spec`.
+  - Syarat tiket: frontmatter `status: READY` dan `elicitation: CLOSED`, dan isi berkas sama dengan `approved_seal`. Tiket lama tanpa segel dinilai dari commit terakhir berkas itu, yang harus bersubjek `docs(ticket): kunci TICKET <slug> READY` atau `docs(ticket): ref TICKET <slug>`, dengan berkas bersih. Syarat ini dinilai prasyarat `task` check 7. Bila gagal, tiket dikembalikan ke `analyst:spec`.
   - Skill `backend:analyst` berbeda dari plugin `analyst`.
 - **`frontend`**: profil terpisah (`.claude/profile/frontenddev/` vs `.claude/profile/backenddev/`). Di repo fullstack, kedua hook menyala dengan deteksinya masing-masing. Deteksi backend hanya membaca `dependencies` server.
 - **`quickdev`**: permintaan `/quickdev:*` dilewati gerbang. Repo yang sepenuhnya memakai quickdev menulis `.claude/workflow`.

@@ -29,7 +29,7 @@ Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py state`. Tiap ba
 
 | Keadaan | Rute |
 |---|---|
-| `KOSONG` | direktori tanpa berkas (elisitasi gagal sebelum menulis) → jalankan Phase 2–3 atas permintaannya, lalu `analyst:elicit` dengan `ticketdir` itu beserta `type`, `request`, dan `requester` — elisitasi menulis ke direktori yang sudah ada |
+| `KOSONG` | direktori tanpa berkas (sisa alokasi yang gagal sebelum `TICKET.md` tertulis; permintaan aslinya tidak tersimpan) → minta user menempelkan permintaan aslinya bila tidak ada di pesan ini, jalankan Phase 2–3, lalu `analyst:elicit` dengan `slug` dari nama direktori beserta `type`, `request`, dan `requester` — `ticket.py new` memakai ulang direktori itu |
 | `ELISITASI` | `analyst:elicit` — lanjutkan pertanyaan terbuka |
 | `SPEC` / `DRAFT` | `analyst:spec` — tulis tiket, atau ajukan keputusan atas draft tertunda |
 | `DRIFT` | tiket `READY` disunting sesudah disetujui → tanyakan user: setujui ulang lewat `analyst:spec` (reopen), atau pulihkan isi yang disetujui |

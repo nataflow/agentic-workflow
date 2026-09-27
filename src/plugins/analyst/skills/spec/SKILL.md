@@ -7,21 +7,21 @@ user-invocable: false
 ## THE IRON LAW
 
 - Kartu `TICKET.md` disusun **hanya** dari `## Catatan Elisitasi` di berkas yang sama. Kebutuhan yang tidak ada di sana kembali ke `analyst:elicit`, tidak dikarang di sini.
-- `READY` hanya ditulis `ticket.py approve` sesudah jawaban eksplisit user di `AskUserQuestion`; skrip menolak bila validator gagal, `elicitation` tidak `CLOSED`, atau vonis `ticket-reviewer` terakhir bukan `PASS` atas sidik kartu **dan** catatan elisitasi yang sama persis dengan sekarang.
+- `READY` hanya ditulis `ticket.py approve` sesudah jawaban eksplisit user di `AskUserQuestion`; skrip menolak bila validator gagal, `elicitation` tidak `CLOSED`, catatan elisitasi berbeda dari segel `ticket.py close`, atau vonis `ticket-reviewer` terakhir bukan `PASS` atas sidik kartu **dan** catatan elisitasi yang sama persis dengan sekarang.
 - Nol isi teknis: tiket menyebut **apa** yang dilihat dan dilakukan pengguna, tidak pernah **bagaimana** sistem membangunnya.
-- Field pembukuan frontmatter (`revision`, `revision_base`, `review`, `review_round`, `approved*`, `reopen*`) dan `<ticketdir>/review.md` hanya ditulis `ticket.py`; saat menulis ulang body, nilainya disalin apa adanya.
+- Field pembukuan frontmatter (`revision`, `revision_base`, `review`, `review_round`, `approved*`, `reopen*`, `request_hash`, `elicit_hash`, `elicit_log`) dan `<ticketdir>/review.md` hanya ditulis `ticket.py`; saat menulis ulang body, nilainya disalin apa adanya.
 
 ## Precondition [REQUIRED]
 
 1. Skrip: `ticket.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py`; `validate_doc.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/validate_doc.py`; rubrik prioritas di bagian 4 `${CLAUDE_PLUGIN_ROOT}/skills/elicit/references/elicitation-guide.md`.
 2. **Perubahan tiket `READY`/`DRIFT`** (`change_request` terisi atau keadaan `DRIFT`): konfirmasi ke user lewat `AskUserQuestion` bahwa tiket dibuka ulang, lalu `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py reopen --ticketdir <ticketdir> --reason "<change_request atau DRIFT>"`.
-3. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py check --gate spec --ticketdir <ticketdir>`. `PASS` → baca baris `Terselesaikan:` (`root`, `type`, `git`, dan bila tiket sudah ada `revision`, `review_round`, `review_segar`, `review_basi`, `review_report`). `FAIL` → remediasi per `Tindakan`: elisitasi belum `CLOSED` → `analyst:elicit`.
+3. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py check --gate spec --ticketdir <ticketdir>`. `PASS` → baca baris `Terselesaikan:` (`root`, `type`, `git`, dan bila tiket sudah ada `revision`, `review_round`, `ronde`, `sidik`, `review_segar`, `review_basi`, `review_report`). `FAIL` → remediasi per `Tindakan`: elisitasi belum `CLOSED` → `analyst:elicit`; check 5 *elisitasi tanpa segel* (tiket lama) → `ticket.py close --ticketdir <ticketdir>` sekali; check 5 *catatan berubah sesudah ditutup* → dilarang menyegel ulang dari sini: pulihkan catatannya bila yang mengubah bukan elisitasi, atau `analyst:elicit` dengan `reopen_reason` yang menyebut perubahannya.
 
 ## Parameter [REQUIRED]
 
 - `ticketdir` — string — `[REQUIRED]` — ticketdir aktif.
 - `change_request` — string — default `""` — perubahan yang diminta atas tiket `READY`, apa adanya.
-- `external_ref` — string — default `"-"` — kunci atau tautan kartu Jira/Trello bila tiket ini disalin ke sana. Sesudah `READY` → `ticket.py ref --ticketdir <ticketdir> --ref <kunci>` (tanpa membuka ulang tiket); dilarang menyunting field ini dengan tangan.
+- `external_ref` — string — default `"-"` — kunci atau tautan kartu Jira/Trello bila tiket ini disalin ke sana. Sesudah `READY` → `ticket.py ref --ticketdir <ticketdir> --ref <kunci>` (tanpa membuka ulang tiket); dilarang menyunting field ini dengan tangan. `ref` menolak tiket `DRIFT`, dan pada `DRAFT` hanya menulis field tanpa commit (ikut commit draft Phase 4).
 
 ## Workflow
 
@@ -45,7 +45,7 @@ user-invocable: false
    - `BUG`: `Yang Diharapkan` sebagai `then`, dengan `Given` dari langkah reproduksi.
    Lebih dari 10 AC berarti lebih dari satu tujuan → `AskUserQuestion`: bagian mana yang tetap di tiket ini; sisanya ke `## Di Luar Cakupan` `— tiket terpisah`.
 7. **Di Luar Cakupan**: pilar `Batas Cakupan` beserta alasannya.
-8. **Pertanyaan Terbuka**: tiap `Q-{n}` `TIDAK MEMBLOKIR` yang tersisa, beserta asumsi yang dipakai AC.
+8. **Pertanyaan Terbuka**: tiap `Q-{n}` `TIDAK MEMBLOKIR` yang tersisa, dengan ID yang sama seperti di catatan, beserta asumsi yang dipakai AC. Validator menagih kedua himpunan ID sama.
 9. **`domain_terms`**: milik `analyst:elicit` — dipakai apa adanya, dilarang ditambah dari sini (Failure path 3).
 
 ### Phase 2 — Tulis Draft
@@ -56,9 +56,9 @@ user-invocable: false
 
 ### Phase 3 — Review Independen
 
-1. `review_round` sudah 2 → dilarang dispatch; lompat ke Phase 5 dengan BLOCKER tersisa (lihat `dispatcher/reviewer.md` gerbang masuk).
-2. Muat `dispatcher/reviewer.md`, hidrasi slot `ticketdir`, `type`, `round` (`review_round` + 1), dan pada ronde 2 `previous_verdict` beserta `changed_sections`; dispatch `ticket-reviewer` (`subagent_type`: `analyst:ticket-reviewer`) langsung, tanpa skill pembungkus.
-3. Catat balikan **seketika**, sebelum satu suntingan pun: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py review --ticketdir <ticketdir> --verdict <PASS|BLOCKED> --report - <<'EOF'`, lalu blok `## Ticket Review` reviewer apa adanya, lalu `EOF` (`--verdict DISPATCH_FAILED` tanpa `--report`; vonis lain tanpa blok ditolak). Skrip menyimpan sidik konten yang benar-benar dinilai reviewer dan bloknya ke `<ticketdir>/review.md`; menolak bila `- Verdict:` di blok berbeda dengan `--verdict`, bila `- Sidik:` di blok (disalin reviewer dari slot `{sidik}` prompt) berbeda dengan sidik disk, atau bila `validate_doc.py` `ticket`/`elicit` `FAIL` (dispatch tidak sah). Suntingan sesudahnya membuat vonis itu basi dan menuntut ronde berikut. Tangani per tabel `### Penanganan Balikan` template itu.
+1. `ronde=habis` (plafon 2 ronde per revisi) → dilarang dispatch; lompat ke Phase 5 dengan BLOCKER tersisa (lihat `dispatcher/reviewer.md` gerbang masuk).
+2. Muat `dispatcher/reviewer.md`, hidrasi slot `ticketdir`, `type`, `round` (`ronde` dari `check --gate spec` — sudah memperhitungkan siklus ronde baru), `sidik`, dan pada ronde 2 `previous_verdict` beserta `changed_sections`; dispatch `ticket-reviewer` (`subagent_type`: `analyst:ticket-reviewer`) langsung, tanpa skill pembungkus.
+3. Catat balikan **seketika**, sebelum satu suntingan pun: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py review --ticketdir <ticketdir> --verdict <PASS|BLOCKED> --report - <<'EOF'`, lalu blok `## Ticket Review` reviewer apa adanya, lalu `EOF` (`--verdict DISPATCH_FAILED` tanpa `--report`; vonis lain tanpa blok ditolak). Skrip menyimpan sidik konten yang benar-benar dinilai reviewer dan bloknya ke `<ticketdir>/review.md`; menolak bila `- Verdict:` di blok berbeda dengan `--verdict`, bila `- Sidik:` di blok (disalin reviewer dari slot `{sidik}` prompt) berbeda dengan sidik disk, bila catatan elisitasi berbeda dari segelnya, bila `validate_doc.py` `ticket`/`elicit` `FAIL` (dispatch tidak sah), atau bila blok tidak konsisten (`- BLOCKER:` tidak sama dengan jumlah butir di bawah `**BLOCKER:**`, `PASS` ber-BLOCKER, `BLOCKED` tanpa BLOCKER, `- Ronde:` bukan ronde yang dicatat). Suntingan sesudahnya membuat vonis itu basi dan menuntut ronde berikut. Tangani per tabel `### Penanganan Balikan` template itu.
 
 ### Phase 4 — Commit Draft
 
@@ -79,7 +79,7 @@ Repo git (`git=ya`): `git -C <root> add <ticketdir>/TICKET.md <ticketdir>/review
 - **AC TERAMATI**: `then` berupa teks layar, tombol, status, angka, atau pesan yang diterima — bukan "data tersimpan" atau "sistem memproses".
 - **NOL TEKNIS**: dilarang menyebut penyimpanan, integrasi, teknologi, struktur data, estimasi, atau pembagian backend/frontend.
 - **APPROVAL LEWAT SKRIP**: dilarang menulis `status: READY`, `approved_hash`, `approved_seal`, atau `review:` dengan tangan.
-- **CATATAN MILIK ELICIT**: dilarang menyunting `## Catatan Elisitasi`, `elicitation`, atau `domain_terms` dari skill ini; tiap perubahan fakta lewat `analyst:elicit` dengan `reopen_reason`.
+- **CATATAN MILIK ELICIT**: dilarang menyunting `## Catatan Elisitasi`, `elicitation`, atau `domain_terms`, dan dilarang menjalankan `ticket.py close` kecuali adopsi segel tiket lama (check 5 *elisitasi tanpa segel*; skrip menolaknya bila catatan berubah sesudah review terakhir), dari skill ini; tiap perubahan fakta lewat `analyst:elicit` dengan `reopen_reason`. Suntingan catatan di luar jalur itu ditolak `check`, `review`, dan `approve` lewat segel `elicit_hash`.
 - **REVIEWER LEWAT TEMPLATE**: `ticket-reviewer` hanya lewat prompt terhidrasi `dispatcher/reviewer.md`; blok vonisnya diteruskan ke user tanpa parafrase.
 - **ATOMIC COMMIT**: staging path eksplisit; dilarang `git add .`/`-A`, `--no-verify`, push.
 - **RATIONALIZATION PREVENTION**:
