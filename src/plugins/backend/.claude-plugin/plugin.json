@@ -1,7 +1,7 @@
 {
   "name": "backend",
   "description": "Agent dan skill untuk kerja backend lintas-stack (Java Spring, Go, Node, Bun, Rust, PHP, CodeIgniter 4): profiling repo, eksplorasi, audit konvensi, review terhadap kontrak, perencanaan, orkestrasi eksekusi, implementasi, dan analisis kebutuhan",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "author": {
     "name": "Fakhrul Nugroho",
     "email": "fakhrulnugroho15@gmail.com"
