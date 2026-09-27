@@ -23,8 +23,9 @@ Urutan vonis (yang pertama cocok menang) — sama persis dengan `classify()`:
 8. `DRIFT`      — hop `[x]` yang kontennya berubah sesudah disetujui, atau materainya tidak sah
                   → `chain.py reopen`.
 9. `GATE`       — hop ledger pertama yang belum `[x]` → skill pemiliknya (beserta mode `plan`).
-10. `TERHENTI`  — brief `BLOCKED` tanpa remedi → `chain.py reopen --row BRIEF` → `plan` APPEND.
-11. `EKSEKUSI`  — brief `READY` dapat berangkat → `frontend:architect`.
+10. `TERHENTI`  — brief `BLOCKED` tanpa remedi, atau brief `READY` yang tak satu pun dapat berangkat
+                  (`DAG`, 12 J58) → `chain.py reopen --row BRIEF` → `plan` APPEND.
+11. `EKSEKUSI`  — brief `READY` dapat berangkat (`runnable_briefs`) → `frontend:architect`.
 12. `PENUTUP`   — seluruh brief tertutup, `REVIEW.md` absen, basi, atau ber-verdict di luar
                   `PASS`/`WARNING`/`BLOCKED` (12 J53) → `architect` Phase 4.
 13. `TEMUAN`    — `REVIEW.md` `BLOCKED` → reopen BRIEF → `plan` APPEND brief perbaikan di
@@ -33,6 +34,10 @@ Urutan vonis (yang pertama cocok menang) — sama persis dengan `classify()`:
 15. `LAPORAN TERTUNDA` — `REPORT.md` tertulis tetapi belum ter-commit (commit report gagal)
                   → `architect` Phase 5 butir 4.
 16. `TUNTAS`    — `REPORT.md` ada dan ter-commit.
+
+`RUSAK` membawa jalan keluar per jenis di `next` (12 J58): akar ber-`TASK.md` → `chain.py abandon`
+lalu taskdir baru (atau user memulihkan `TASK.md`); nama di luar pola atau tanpa `TASK.md` — `chain.py`
+menolak keduanya — → user memindahkan direktori keluar `frontenddev/docs/` atau menghapusnya.
 
 Repo non-git tidak divonis per taskdir: skrip keluar `FAIL` karena akar dan
 ledger hanya dapat dibuktikan lewat riwayat commit.
@@ -63,6 +68,7 @@ from precondition_lib import (  # noqa: E402
     last_commit,
     normalize_taskdir,
     review_is_fresh,
+    runnable_briefs,
     is_committed,
     lane_sections_problem,
     read_chain,
@@ -76,6 +82,11 @@ DOCS = "frontenddev/docs"
 TASKDIR_NAME = re.compile(r"^\d{10}-[a-z0-9-]+$")
 CHAIN_ARTIFACTS = ("FLOW.md", "UI.md", "CONTRACT.md", "REVIEW-PLAN.md", "REVIEW.md", "REPORT.md")
 REVIEW_VERDICTS = ("PASS", "WARNING", "BLOCKED")
+# Jalan keluar RUSAK (12 J58) — keputusan user lewat `AskUserQuestion`, tidak pernah tambalan tangan.
+ROOTED_EXIT = ("laporkan ke user; `AskUserQuestion`: `chain.py abandon` lalu rumuskan ulang di taskdir baru, "
+               "atau user sendiri memulihkan `TASK.md` ke commit sahnya")
+UNROOTED_EXIT = ("laporkan ke user; bukan artefak rantai yang dapat dilanjutkan (`chain.py` menolaknya) — "
+                 "user memindahkan direktori itu keluar `frontenddev/docs/` atau menghapusnya")
 
 
 def finished(root: Path, rel: str) -> bool:
@@ -99,7 +110,7 @@ def classify(root: Path, rel: str) -> Dict[str, str]:
     task = taskdir / "TASK.md"
     out = {"taskdir": rel, "lane": "-", "state": "", "next": "", "detail": ""}
     if not TASKDIR_PATTERN.match(rel):
-        out.update(state="RUSAK", next="laporkan ke user",
+        out.update(state="RUSAK", next=UNROOTED_EXIT,
                    detail=f"path `{rel}` di luar {DOCS}/<YYMMDDhhmm>-<slug> (huruf kecil, angka, `-`)")
         return out
     if not taskdir.is_dir():
@@ -107,14 +118,14 @@ def classify(root: Path, rel: str) -> Dict[str, str]:
                    detail="direktori tidak ada")
         return out
     if not TASKDIR_NAME.match(taskdir.name):
-        out.update(state="RUSAK", next="laporkan ke user",
+        out.update(state="RUSAK", next=UNROOTED_EXIT,
                    detail=f"nama `{taskdir.name}` di luar pola <YYMMDDhhmm>-<slug> (huruf kecil, angka, `-`)")
         return out
     artifacts = [a for a in CHAIN_ARTIFACTS if (taskdir / a).is_file()] + \
                 [p.name for p in taskdir.glob("brief-*.md")]
     if not task.is_file():
         if artifacts:
-            out.update(state="RUSAK", next="laporkan ke user",
+            out.update(state="RUSAK", next=UNROOTED_EXIT,
                        detail="artefak rantai tanpa TASK.md — taskdir warisan tidak dilayani sejak v0.4.0")
         else:
             out.update(state="AKAR", next="frontend:task (lead Phase 7), atau hapus direktori kosong bila user batal",
@@ -125,7 +136,7 @@ def classify(root: Path, rel: str) -> Dict[str, str]:
         out.update(state="DITUTUP", next="-", detail="ditutup atas keputusan user (`chain.py abandon`)")
         return out
     if status != "ACTIVE":
-        out.update(state="RUSAK", next="laporkan ke user; tutup lewat `chain.py abandon` bila user memutuskan berhenti",
+        out.update(state="RUSAK", next=ROOTED_EXIT,
                    detail=f"`TASK.md` berstatus `{status or '(kosong)'}` — hanya `ACTIVE` (berjalan) atau "
                           "`ABANDONED` (ditutup) yang sah")
         return out
@@ -133,7 +144,7 @@ def classify(root: Path, rel: str) -> Dict[str, str]:
     out["lane"] = lane or "-"
     problem = lane_sections_problem(lane, sections) or lane_tamper(root, rel)
     if problem:
-        out.update(state="RUSAK", next="laporkan ke user", detail=problem)
+        out.update(state="RUSAK", next=ROOTED_EXIT, detail=problem)
         return out
     if not is_committed(root, f"{rel}/TASK.md"):
         out.update(state="AKAR", next="frontend:task (commit akar)", detail="TASK.md belum ter-commit")
@@ -143,7 +154,7 @@ def classify(root: Path, rel: str) -> Dict[str, str]:
         return out
     entries = read_chain(task.read_text(encoding="utf-8"))
     if [e["row"] for e in entries] != expected_rows(sections):
-        out.update(state="RUSAK", next="laporkan ke user",
+        out.update(state="RUSAK", next=ROOTED_EXIT,
                    detail=f"ledger {[e['row'] for e in entries]} ≠ jadwal sections {expected_rows(sections)}")
         return out
     for entry in entries:
@@ -179,9 +190,14 @@ def classify(root: Path, rel: str) -> Dict[str, str]:
         out.update(state="TERHENTI", next="chain.py reopen --row BRIEF → frontend:plan (mode APPEND)",
                    detail=f"brief-{open_blocked[0]} BLOCKED tanpa remedi")
         return out
-    if any(st == "READY" for st, _ in closure.values()):
-        out.update(state="EKSEKUSI", next="frontend:architect",
-                   detail=f"{sum(1 for st, _ in closure.values() if st == 'READY')} brief READY")
+    ready = sum(1 for st, _ in closure.values() if st == "READY")
+    if ready:
+        if not runnable_briefs(taskdir, root):
+            out.update(state="TERHENTI", next="chain.py reopen --row BRIEF → frontend:plan (mode APPEND, perbaiki depends_on)",
+                       detail=f"DAG: {ready} brief READY, tak satu pun dapat berangkat — prasyaratnya tidak pernah "
+                              "tertutup (mis. remedi ber-`depends_on` unit asalnya)")
+            return out
+        out.update(state="EKSEKUSI", next="frontend:architect", detail=f"{ready} brief READY")
         return out
     review = taskdir / "REVIEW.md"
     if not review.is_file() or not review_is_fresh(root, rel):

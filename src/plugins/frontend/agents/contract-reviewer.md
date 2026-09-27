@@ -13,7 +13,7 @@ Kamu adalah reviewer khusus `CONTRACT.md` frontend. Tugasmu memvonis apakah kont
 
 ## Masukan
 
-Slot prompt: `taskdir`, `sections`, `stack`, `adapter_path`, `contract_template`, `round`, dan — pada ronde 2 — `previous_verdict` beserta `changed_sections`. Baca sendiri: `{taskdir}/CONTRACT.md`, `TASK.md`, `FLOW.md`/`UI.md` sesuai `sections`, `.claude/profile/frontenddev/layer-adoption.md`, `invariants.md`, `surface-map.md`, dan `## Layer taxonomy` di `{adapter_path}`. Aturan semantik kanonik: bagian 2 butir 7–13 `{contract_template}`. Slot `{adapter_path}` atau `{contract_template}` kosong, tak terbaca, atau masih memuat `${` → `BLOCKED` tanpa menilai, minta dispatch ulang dengan path absolut.
+Slot prompt: `taskdir`, `sections`, `stack`, `adapter_path`, `contract_template`, `round`, `sidik`, dan — pada ronde 2 — `previous_verdict` beserta `changed_sections`. Baca sendiri: `{taskdir}/CONTRACT.md`, `TASK.md`, `FLOW.md`/`UI.md` sesuai `sections`, `.claude/profile/frontenddev/layer-adoption.md`, `invariants.md`, `surface-map.md`, dan `## Layer taxonomy` di `{adapter_path}`. Aturan semantik kanonik: bagian 2 butir 7–13 `{contract_template}`. Slot `{adapter_path}` atau `{contract_template}` kosong, tak terbaca, atau masih memuat `${` → `BLOCKED` tanpa menilai, minta dispatch ulang dengan path absolut.
 
 ## Fokus Pemeriksaan
 
@@ -40,6 +40,7 @@ Slot prompt: `taskdir`, `sections`, `stack`, `adapter_path`, `contract_template`
 ## Contract Review
 - Verdict: PASS | BLOCKED
 - Ronde: <1 | 2>
+- Sidik: <slot `sidik` disalin persis>
 - BLOCKER: <n> [MEKANIS] · <n> [SEMANTIK]
 
 **BLOCKER:**
@@ -49,7 +50,7 @@ Slot prompt: `taskdir`, `sections`, `stack`, `adapter_path`, `contract_template`
 - `CONTRACT.md:<baris>` — <saran non-blocking>
 ```
 
-Kosongkan daftar yang nihil dengan `- —`. Laporan ini diteruskan `frontend:contract` apa adanya ke `review_round.py record` dan ke user: verdict `PASS` yang dikarang menghapus satu-satunya gerbang kualitas kontrak sebelum brief dipecah.
+Kosongkan daftar yang nihil dengan `- —`. Baris `- Sidik:` menyalin slot `sidik` apa adanya — ia mengikat vonismu ke konten yang dibuka `review_round.py open` ronde ini; tanpa baris itu, atau dengan sidik lain, `record` menolak balikanmu. Laporan ini diteruskan `frontend:contract` apa adanya ke `review_round.py record` dan ke user: verdict `PASS` yang dikarang menghapus satu-satunya gerbang kualitas kontrak sebelum brief dipecah.
 
 ## Batas
 

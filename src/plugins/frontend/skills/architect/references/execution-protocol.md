@@ -17,14 +17,14 @@ python3 «check_preconditions.py» --taskdir <taskdir> --brief <NN>
 | # | Predikat |
 |---|---|
 | 1–9 | Predikat rantai: taskdir, akar & lane/sections, ledger `## Chain` tercentang penuh dan utuh, status brief (batch lolos `validate_briefs.py`; brief `DONE` wajib punya commit `implement unit NN` dan `report-NN.md`), profil lengkap, adapter, berkas plugin, working tree bersih, HEAD pada branch |
-| 10 | Brief target `READY` dan ber-`files_touched` |
+| 10 | Brief target `READY`, ber-`files_touched`, dan `stack`-nya = `stack` profil (satu profil melayani satu app pada satu waktu) |
 | 11 | Tiap `depends_on` tertutup — `DONE` dengan commit `implement unit NN` di riwayat, atau `BLOCKED` yang remedinya `DONE` |
 | 12 | `report-<NN>.md` belum ada — unit ini belum pernah didispatch |
 | 13 | `based_on` tidak lebih tua daripada commit asing terakhir yang menyentuh `files_touched` — `WARN`, bukan `FAIL`; sha `based_on` yang tidak ada di repo juga `WARN` |
 
 `FAIL` menahan dispatch; jalankan tindakan yang disebut, jangan menawar. `WARN` wajib disebut ke user sebelum dispatch berangkat.
 
-**Pengecualian `.gitignore`**: `.gitignore` kotor yang satu-satunya perubahannya baris `.frontenddev/` atau `.explore/` adalah jejak `frontend:profile` yang belum di-commit. Laporkan ke user dan rutekan ke `frontend:profile` mode REFRESH; dilarang men-stash, dilarang meng-commit atas nama rantai.
+**Pengecualian `.gitignore`**: `.gitignore` kotor yang satu-satunya perubahannya baris berjangkar `/.frontenddev/` atau `frontenddev/docs/**/.explore/` adalah jejak `frontend:profile` yang belum di-commit. Laporkan ke user dan rutekan ke `frontend:profile` mode REFRESH; dilarang men-stash, dilarang meng-commit atas nama rantai.
 
 ---
 
@@ -163,10 +163,19 @@ Dijalankan sekali di Phase 4, sesudah seluruh brief tertutup. Perintah: seluruh 
 Log penuh: `<taskdir>/.explore/verification-logs/closing/<nama>.log`
 ```
 
-**Merah** → klasifikasikan tiap berkas yang disebut galat baru terhadap union `files_touched` seluruh brief, lalu hentikan rantai sebelum reviewer berangkat:
+**Merah** (exit 1) → klasifikasikan tiap perintah yang tidak `HIJAU`, lalu hentikan rantai sebelum reviewer berangkat. Merah tanpa kelas tidak pernah terjadi: tiap baris tabel jatuh ke tepat satu cabang di bawah.
+
+| Tanda di `closing-verification.md` | Kelas | Rute |
+|---|---|---|
+| galat baru menyebut berkas | cacat eksekusi / berkas yatim | dua butir di bawah tabel ini |
+| `Exit` 126/127 | perintah tidak dapat dijalankan — selalu galat baru, tidak pernah warisan | perintah `commands.md` profil salah, bukan cacat rantai: `frontend:profile` REFRESH atas persetujuan user → baseline diukur ulang `--force` di worktree akar (Phase 0 butir 2) → Phase 4 ulang |
+| `TIMEOUT` (juga `TIMEOUT warisan`) | tak terverifikasi — merah | ulang sekali dengan `--timeout` 3× lipat; masih `TIMEOUT` → `AskUserQuestion`: perbaiki perintah/lingkungan (REFRESH + baseline ulang) atau hentikan. Tidak ada opsi "terima": `validate_review.py` memvonis `TIMEOUT` = `BLOCKED` |
+| `MERAH` yang ekor lognya tidak menyebut satu pun berkas (mis. tanpa baris bertanda galat — tanda galatnya ekor log itu sendiri) | tak terklasifikasi mesin | sajikan ekor log ke user lewat `AskUserQuestion`: cacat eksekusi (brief perbaikan membaca log ini) atau hentikan |
 
 - **Cacat eksekusi** — berkas di dalam union. Brief pemiliknya dari `git log --oneline -- <berkas>`. Rute, di taskdir yang sama: `chain.py reopen --row BRIEF` → `plan` APPEND brief perbaikan (tanpa `remedies` — unit asalnya `DONE`) yang membaca log ini → `architect` eksekusi → Phase 4 ulang.
 - **Cacat perencanaan (berkas yatim)** — berkas di luar union: tidak satu pun brief mengklaimnya, tidak satu pun gate menyetujui blast radius-nya. Rute: `chain.py reopen --row CONTRACT` (kaskade membuka BRIEF) → `contract` melengkapi `## 1. Files Touched` → approve → `plan` APPEND. Pada `HOTFIX_MINOR`: `chain.py reopen --row BRIEF` → `chain.py escalate --lane FAST_FORWARD --sections architecture` → `contract` → `plan` APPEND. Menyuruh `plan` mengarang brief penampung tanpa kontrak dilarang.
+
+**Hijau** (exit 0) → jalankan ulang `«check_preconditions.py» --taskdir <taskdir>` sebelum reviewer berangkat. Check 8 `FAIL` = perintah verifikasi meninggalkan jejak di tree (snapshot baru, coverage, `*.tsbuildinfo`, `lint --fix` atas berkas ter-track). Hentikan, sajikan path-nya ke user, dan ikuti keputusannya: buang/pulihkan, pola ignore lewat `frontend:profile` REFRESH, atau brief perbaikan bila berkas itu memang bagian rantai. Pembersihan otomatis dilarang karena berkas ter-track yang termutasi hanya dapat dinilai user. Tanpa langkah ini, check `TREE` `validate_review.py --log` memvonis jejak itu sebagai mutasi reviewer, dan penutup berulang tanpa akhir.
 
 Rute yang sama berlaku bagi `REVIEW.md` ber-verdict `BLOCKED` (P1, SC belum terbukti → cacat eksekusi; berkas yatim → cacat perencanaan). Review ulang sesudah brief perbaikan `DONE` menimpa `REVIEW.md` utuh; `REVIEW.md` yang lebih tua daripada `implement unit` terakhir dianggap basi (fase `PENUTUP`).
 

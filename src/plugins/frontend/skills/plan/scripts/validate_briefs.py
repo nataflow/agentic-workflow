@@ -376,6 +376,23 @@ class BriefValidator:
         roots = [nn for nn, deps in edges.items() if not deps]
         if edges and not roots:
             problems.append("tidak ada unit akar (`depends_on: []`); rantai tidak punya titik mulai")
+        # Remedi yang bergantung (langsung/transitif) pada unit asalnya tidak pernah dapat berangkat: unit
+        # `BLOCKED` hanya tertutup lewat remedinya sendiri (12 J58, `TERHENTI (DAG)`). Hanya brief `READY` —
+        # brief terkunci adalah riwayat.
+        for b in self.briefs:
+            origin = str(b["fm"].get("remedies", "") or "").strip()
+            if not origin or b["status"] != "READY":
+                continue
+            seen, stack = set(), list(edges.get(b["nn"], []))
+            while stack:
+                d = stack.pop()
+                if d not in seen:
+                    seen.add(d)
+                    stack.extend(edges.get(d, []))
+            if origin in seen:
+                problems.append(f"{b['name']}: remedi unit `{origin}` bergantung pada unit asalnya lewat `depends_on` "
+                                f"— `{origin}` hanya tertutup lewat remedinya sendiri, jadi brief ini tidak pernah "
+                                f"dapat berangkat; tunjuk prasyarat `{origin}` sendiri, bukan `{origin}`")
         if problems:
             self._add(cid, name, "FAIL", f"{len(problems)} cacat DAG",
                       "Buat `depends_on` linier satu arah ke unit bernomor lebih kecil; "

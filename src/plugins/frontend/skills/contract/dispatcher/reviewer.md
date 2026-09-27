@@ -48,7 +48,7 @@ python3 «review_round.py» open --taskdir {taskdir} --gate contract
 ```
 
 - `validate_doc.py` `FAIL` → perbaiki draft dulu; memberangkatkan subagent untuk temuan mekanis adalah pemborosan.
-- `review_round.py open` `FAIL` → plafon habis (2 per putaran, 8 per taskdir); dilarang mendispatch. Kontrak ber-BLOCKER tidak dapat disetujui (`chain.py approve` menuntut ronde terakhir `PASS`): hentikan Gate Contract, sajikan BLOCKER tersisa ke user, dan serahkan ke `frontend:lead` Phase 8 (klarifikasi lingkup: amandemen akar, atau `chain.py abandon`) — dua ronde yang gagal menandakan lingkupnya yang belum jelas, bukan redaksinya.
+- `review_round.py open` `FAIL` → plafon habis (2 per putaran, 8 per taskdir); dilarang mendispatch. Kontrak ber-BLOCKER tidak dapat disetujui (`chain.py approve` menuntut ronde terakhir `PASS`): hentikan Gate Contract tanpa commit, sajikan BLOCKER tersisa ke user, dan serahkan ke `frontend:lead` Phase 8 (plafon habis: `AskUserQuestion` rumuskan ulang di taskdir baru atau hentikan) — dua ronde yang gagal menandakan lingkupnya yang belum jelas, bukan redaksinya.
 - **Ronde 2** bila ronde 1 ber-verdict `BLOCKED` — termasuk yang hanya ber-`BLOCKER [MEKANIS]` — atau draft disunting sesudah ronde `PASS`: `chain.py approve` menuntut ronde terakhir `PASS` atas konten final, tanpa `reopen` hop sesudahnya.
 - **Dispatch langsung tanpa skill pembungkus**: doktrin review duduk di `agents/contract-reviewer.md`. Dilarang menyalin isi kontrak, FLOW, UI, atau profil ke prompt; sebut path-nya.
 - **Audit hidrasi**: batalkan dispatch bila prompt masih memuat slot `{...}` mentah atau `TBD`/`TODO`.

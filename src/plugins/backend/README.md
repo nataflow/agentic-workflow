@@ -177,11 +177,12 @@ oleh skrip prasyarat, sehingga vonis hook sama dengan vonis skrip.
 - **Kapan menyuntik**: profil `.claude/profile/backenddev/` ada, atau salah satu manifest memuat penanda di
   tabel stack. Manifest dicari di root git, workspace terdeklarasi (npm/pnpm workspaces, `go.work`, anggota
   Cargo), `apps/*`, `packages/*`, `services/*`, dan anak langsung root, maksimal 200 kandidat. Direktori
-  seperti `node_modules`, `vendor`, `docs`, `test(s)`, `examples`, dan direktori berawalan titik dilewati.
-  Di tempat lain hook diam.
+  seperti `node_modules`, `vendor`, `docs`, `test(s)`, `examples`, dan direktori berawalan titik dilewati;
+  pola workspace `.`/kosong dilewati dan manifest yang tak terbaca tidak menghentikan pemindaian. Di tempat
+  lain hook diam.
 - **Status profil**: ADA; di lokasi lama → MIGRATE; belum ada atau milik plugin lain → tetap lewat
-  `tech-lead`, yang menawarkan GENERATE; JSON rusak, tanpa stack, stack tidak dikenal, atau tidak lengkap →
-  REFRESH.
+  `tech-lead`, yang menawarkan GENERATE; JSON rusak, tanpa stack, stack tidak dikenal, field `plugin` asing
+  pada profil sendiri, atau tidak lengkap → REFRESH.
 - **Pengecualian**: jawaban atas klarifikasi rute yang sudah diputuskan, pengetahuan umum, operasi VCS atas
   kerja selesai, dan alur `/analyst:*` atau `/quickdev:*` yang dipanggil atau dilanjutkan secara eksplisit.
 - **Opt-out `.claude/workflow`**: lihat Hidup Berdampingan.
@@ -190,13 +191,15 @@ oleh skrip prasyarat, sehingga vonis hook sama dengan vonis skrip.
 untuk subagent `backend:code-implementor`, `backend:code-explorer`, dan `backend:code-reviewer`, dan menolak bila ragu (fail-closed). Implementor hanya
 boleh menjalankan git read-only (`status`, `diff`, `log`, `show`, `rev-parse`, `ls-files`),
 `git add <path>` eksplisit di dalam lease, dan `git commit -m` satu baris. Rantai perintah, pipe, pengalihan,
-substitusi, dan ekspansi shell (`$`, backtick, brace `{a,b}`) ditolak; operator dinilai sesudah tokenisasi,
+substitusi, dan ekspansi shell (`$`, backtick, brace `{a,b}`) ditolak, begitu pula glob (`*`, `?`, `[`)
+sebelum `--`, karena nama berkas hasil ekspansinya dapat menjadi flag; operator dinilai sesudah tokenisasi,
 jadi `<T>` atau `->` di dalam kutip tetap satu argumen. Edit/Write hanya boleh ke path lease. Lease ditulis `architect` sebelum dispatch
 (`guard_bash.py lease --brief <path>`) ke `<git-dir>/nataflow/lease-backend.json`, di luar
 working tree. Isinya `## File scope` brief, berkas brief, `report-NN.md`, dan `finding_source`. Tanpa lease,
 semua Bash/Edit/Write implementor ditolak. Untuk `backend:code-explorer`, hook yang sama hanya
 mengizinkan Edit/Write ke laporan `backenddev/docs/[<taskdir>/].explore/*.md`. `backend:code-reviewer` hanya
-boleh git read-only (ditambah `merge-base`, `symbolic-ref`), `ls`, serta `git add`/`git commit -m` dan
+boleh git read-only (ditambah `merge-base` dan `symbolic-ref` bentuk baca — tanpa `-d`/`--delete`/`-m`, maksimal
+satu argumen posisi, sehingga HEAD tidak dapat dipindah), `ls`, serta `git add`/`git commit -m` dan
 Edit/Write atas `<taskdir>/REVIEW.md` dan `backenddev/issues/README.md`; `reset`, `checkout`, `push`, build,
 dan test ditolak.
 
@@ -245,10 +248,10 @@ Tiap skill punya `skills/<skill>/scripts/check_preconditions.py` yang dijalankan
   `analyst`.
 - **quickdev**: permintaan `/quickdev:*` dilewati gerbang. Untuk repo yang sepenuhnya memakai quickdev,
   tulis `.claude/workflow`.
-- **`.claude/workflow`**: berkas teks berisi nama plugin yang boleh menggerbangi repo, dipisah spasi atau
-  baris. Bila berkas ada dan tidak memuat `backend`, hook SessionStart backend diam. Contoh: isi
-  `quickdev` → hook backend dan frontend diam; isi `frontend quickdev` → hanya frontend yang
-  menyala. Bila berkas tidak ada, hook berjalan normal.
+- **`.claude/workflow`**: berkas teks berisi nama plugin yang boleh menggerbangi repo, dipisah spasi, koma,
+  atau baris. Bila berkas ada dan tidak memuat `backend`, hook SessionStart backend diam. Contoh: isi
+  `quickdev` → hook backend dan frontend diam; isi `frontend, quickdev` → hanya frontend yang
+  menyala; berkas kosong → tidak ada plugin yang boleh. Bila berkas tidak ada, hook berjalan normal.
 
 ## Keterbatasan yang Diketahui
 

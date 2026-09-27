@@ -31,7 +31,8 @@ def _profile_note(v) -> str:
                 "dilarang REFRESH atau GENERATE di atasnya.")
     if p.state in ("ABSENT", "OTHER_OWNER"):
         note = (f"Profil `{PROFILE_DIR}` BELUM DIBUAT. {lead} (`frontend:profile` mode GENERATE) "
-                "lebih dulu, lalu melanjutkan rute tertunda.")
+                "lebih dulu, lalu melanjutkan rute tertunda. Pengecualian: pertanyaan letak simbol/struktur "
+                "(lane `EXPLORE_FACT`) dijawab lead lewat dispatch `code-explorer` tanpa profil (terdegradasi).")
         if p.state == "OTHER_OWNER":
             note += (f" `.claude/profile/` berisi profil milik `{p.owner}` (stack `{p.stack}`) — biarkan; "
                      "jangan dibaca sebagai profil frontend, jangan ditimpa; `force: true` tidak berlaku atasnya.")

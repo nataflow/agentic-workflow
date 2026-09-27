@@ -4,7 +4,7 @@ Sumber: review robustness plugin `frontend` 2026-09-27 (lima penelusur paralel: 
 prasyarat & verifikasi, validator dokumen, orkestrasi & prosa). Tiap temuan Tinggi/Sedang direproduksi di ruang
 kerja sementara sebelum masuk berkas ini. Basis kode: commit `b293564` (suite 615 test hijau).
 
-**Status (2026-09-27):** peta blast radius selesai; tahap 1–4 selesai, rilis menyusul.
+**Status (2026-09-27):** peta blast radius selesai; tahap 1–5 selesai, rilis menyusul.
 
 ## Tujuan
 
@@ -203,10 +203,10 @@ atau pola sama di plugin lain. **Test tersentuh** = test yang ada dan harus teta
 
 ## Tahap 5 — Orkestrasi & prosa
 
-- [ ] **J54 [Tinggi]** Verifikasi penutup merah tanpa berkas (TIMEOUT, ekor log, 126/127) tidak punya rute; PENUTUP berulang (prosa H15 belum dibawa).
-- [ ] **J55 [Sedang]** Artefak build/test di tree membuat TREE FAIL → PENUTUP berulang.
-- [ ] **J56 [Sedang]** Dispatcher explorer memeriksa baris `.gitignore`, profile memakai `git check-ignore` → loop REFRESH.
-- [ ] **J57 [Sedang]** Profil per-app di monorepo dijanjikan prosa tetapi tidak didukung skrip.
-- [ ] **J58 [Rendah]** Bundel: pesan "Phase 7" di `chain.py`; RUSAK tanpa jalan keluar; `TERHENTI (DAG)` divonis `EKSEKUSI` (remedi ber-`depends_on` unit asalnya); `subagent_type` explorer tidak disebut; kontradiksi adapter hilang di review; `EXPLORE_FACT`/`REVIEW_AUDIT` dipaksa lewat PROFILE penuh (H32); plan Phase 1 menjalankan semua perintah; hitungan README.
-- [ ] **Prosa J42/J43**: jalan keluar plafon = `AskUserQuestion` taskdir baru / hentikan.
+- [x] **J54 [Tinggi]** Verifikasi penutup merah tanpa berkas (TIMEOUT, ekor log, 126/127) tidak punya rute; PENUTUP berulang (prosa H15 belum dibawa).
+- [x] **J55 [Sedang]** Artefak build/test di tree membuat TREE FAIL → PENUTUP berulang.
+- [x] **J56 [Sedang]** Dispatcher explorer memeriksa baris `.gitignore`, profile memakai `git check-ignore` → loop REFRESH.
+- [x] **J57 [Sedang]** Profil per-app di monorepo dijanjikan prosa tetapi tidak didukung skrip.
+- [x] **J58 [Rendah]** Bundel: pesan "Phase 7" di `chain.py`; RUSAK tanpa jalan keluar; `TERHENTI (DAG)` divonis `EKSEKUSI` (remedi ber-`depends_on` unit asalnya); `subagent_type` explorer tidak disebut; kontradiksi adapter hilang di review; `EXPLORE_FACT`/`REVIEW_AUDIT` dipaksa lewat PROFILE penuh (H32); plan Phase 1 menjalankan semua perintah; hitungan README.
+- [x] **Prosa J42/J43**: jalan keluar plafon = `AskUserQuestion` taskdir baru / hentikan.
 - [ ] **Rilis**: README, `flow/frontend.md`, versi fe 0.9.0 dan be 0.10.0, Log Keputusan `ISSUES.md`.

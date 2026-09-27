@@ -9,12 +9,13 @@ description: Gunakan ketika ada permintaan kerja baru atau susulan di repo front
 - Sapuan lokasi berhenti pada nama path (`Glob`) dan pelokalan simbol (`Grep`); isi komponen tidak dibuka. Penelusuran lintas-layer didelegasikan ke `code-explorer` lewat `dispatcher/explorer.md`.
 - Keadaan taskdir dibaca dari `scripts/taskdir_state.py`, bukan dari ingatan sesi atau pembacaan frontmatter satu per satu.
 - Lane dan `sections` hanya bergeser lewat `chain.py escalate` (plafon 2 per taskdir); hop yang sudah disetujui hanya dibuka lewat `chain.py reopen` (kaskade ke seluruh hop tercentang di bawahnya; plafon 3 per hop — dihitung saat hop itu target `reopen`, kaskade tidak memakan kuota hop di bawahnya — dan 6 per taskdir untuk semua reopen) — keduanya atas konfirmasi user.
-- Tiap gate adalah persetujuan independen yang dimateraikan `chain.py approve` oleh gate pemiliknya — materainya (`Konten disetujui: <sha>` + `Hop: <ROW>`) sah hanya bila lebih baru daripada reopen terakhir hop itu; lead tidak pernah mencentang ledger.
+- Tiap gate adalah persetujuan independen yang dimateraikan `chain.py approve` oleh gate pemiliknya — materainya (commit `approve …` berbadan `Konten disetujui: <sha>`, `Sidik:`, dan `Hop: <ROW>`) sah hanya bila lebih baru daripada reopen terakhir hop itu; lead tidak pernah mencentang ledger.
+- Plafon (ronde reviewer, revisi, re-entry, eskalasi) tidak pernah di-reset: plafon habis → rantai berhenti, dan lead menanyakan user lewat `AskUserQuestion` — rumuskan ulang di taskdir baru (`chain.py abandon` taskdir ini) atau hentikan (Phase 8).
 
 ## Precondition [REQUIRED]
 
 1. Repositori target adalah proyek frontend dari stack adapter `skills/profile/stacks/<stack-id>.md`: React + Vite SPA, React Native/Expo, SvelteKit, atau Svelte + Vite. Next.js tidak dilayani.
-2. Profil `.claude/profile/frontenddev/` ada dan `index.json`-nya ber-field `stack`; tidak ada → Failure path 1.
+2. Profil `.claude/profile/frontenddev/` ada dan `index.json`-nya ber-field `stack`; tidak ada → Failure path 1 (kecuali `EXPLORE_FACT`, yang berangkat tanpa profil).
 3. Git repo lokal, working tree bersih di luar laci `.explore/`/`.frontenddev/`.
 4. `python3` tersedia. Skrip: `taskdir_state.py` = `${CLAUDE_PLUGIN_ROOT}/skills/lead/scripts/taskdir_state.py`; `chain.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py`.
 
@@ -46,12 +47,12 @@ Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/lead/scripts/taskdir_state.py`. T
 | `GATE` | skill pemilik hop pertama yang belum `[x]` (mode `plan` disebut skrip); draft `DRAFT` tertunda → gate itu menanyakan keputusan user; batch brief ter-commit belum disetujui → `plan` menjalankan prasyarat mode REVISE lalu langsung Phase 5 tanpa menulis ulang |
 | `DRIFT` | konten hop tercentang atau `SC-{n}` TASK.md berubah sesudah disetujui → tanyakan user: `chain.py reopen --row <ROW>` atau pulihkan isi yang disetujui |
 | `EKSEKUSI` / `PENUTUP` | `frontend:architect`; `PENUTUP` juga untuk `REVIEW.md` basi (ada commit yang menyentuh `brief-*.md` sesudahnya) — review ulang menimpanya |
-| `TERHENTI` | brief `BLOCKED` tanpa remedi → Phase 8 (re-entry BRIEF) → `plan` APPEND brief remedi |
+| `TERHENTI` | brief `BLOCKED` tanpa remedi → Phase 8 (re-entry BRIEF) → `plan` APPEND brief remedi. Detail `DAG` (brief `READY` ada, tak satu pun dapat berangkat — mis. remedi ber-`depends_on` unit asalnya) → Phase 8 (re-entry BRIEF) → `plan` APPEND memperbaiki `depends_on` brief `READY` itu |
 | `TEMUAN` | `REVIEW.md` `BLOCKED` → Phase 8: `chain.py reopen --row BRIEF` → `plan` APPEND brief perbaikan di taskdir yang sama → `architect` eksekusi dan review ulang |
 | `LAPORAN` | `frontend:architect` (Phase 5) — umpan balik profil dulu, lalu architect menyerahkan ke `report` |
 | `LAPORAN TERTUNDA` | `REPORT.md` tertulis tetapi commit-nya gagal → `frontend:architect` Phase 5 butir 4 (validasi lalu commit); dilarang membuka taskdir baru |
 | `DITUTUP` | `TASK.md` `status: ABANDONED` (`chain.py abandon`) — tidak tampil di pemindaian |
-| `RUSAK` | taskdir yang disebut tidak ada, nama direktori di luar pola `<YYMMDDhhmm>-<slug>`, artefak tanpa `TASK.md`, pasangan lane/sections tidak sah, `lane`/`sections` berubah di luar commit akar (`kunci TASK`) atau `chain.py escalate`, atau ledger ≠ jadwal sections → laporkan ke user; dilarang menambal akar atau ledger dengan tangan |
+| `RUSAK` | taskdir yang disebut tidak ada, nama direktori di luar pola `<YYMMDDhhmm>-<slug>`, artefak tanpa `TASK.md`, `status` akar selain `ACTIVE`/`ABANDONED`, pasangan lane/sections tidak sah, `lane`/`sections` berubah di luar commit akar (`kunci TASK`) atau `chain.py escalate`, atau ledger ≠ jadwal sections → Failure path 4; dilarang menambal akar atau ledger dengan tangan |
 
 Skrip keluar `[FAIL] ... bukan repo git` → hentikan; rantai frontend menuntut git.
 
@@ -66,8 +67,8 @@ Permintaan baru saat ada taskdir terbuka → tanyakan lewat `AskUserQuestion`: l
 | `FAST_FORWARD` | endpoint/logic data baru tanpa ubah alur & layout | `task` → `contract` |
 | `REFACTOR_ARCH` | restrukturisasi layer | `task` → `contract` |
 | `HOTFIX_MINOR` | bugfix/teks lokal, 1 berkas, tanpa DTO/alur/state baru | `task` → `plan` (MINOR) |
-| `EXPLORE_FACT` | pertanyaan faktual letak simbol/struktur | dispatch `code-explorer`, jawab, selesai — tanpa taskdir |
-| `REVIEW_AUDIT` | penilaian kode di luar rantai aktif | `frontend:review` — tanpa taskdir |
+| `EXPLORE_FACT` | pertanyaan faktual letak simbol/struktur | dispatch `code-explorer`, jawab, selesai — tanpa taskdir; profil absen tidak menahannya (explorer menyisir dari root dan mencatatnya di `### Caveats`) |
+| `REVIEW_AUDIT` | penilaian kode di luar rantai aktif | `frontend:review` — tanpa taskdir; butuh profil (`## Review checklist` adapter `stack`), jadi profil absen → `PROFILE` dulu |
 
 Sumber masalah atau letak simbol belum pasti → dispatch `code-explorer` lebih dulu, lalu putuskan lane dari pointer `file:baris`-nya. Rincian per lane di `references/lane-routing-matrix.md`.
 
@@ -87,6 +88,7 @@ Invarian pasangan ditegakkan skrip di setiap gate: `HOTFIX_MINOR` ⇔ sections k
 ### Phase 5 — Slug & Taskdir
 
 - Slug `<feature>-<jenis-kerja>` kebab-case dari path feature root profil; taskdir `./frontenddev/docs/<YYMMDDhhmm>-<slug>/` (`date +%y%m%d%H%M`).
+- Slug unik per repo: commit rantai dikenali dari `(<slug>)`, dan prasyarat `task` menolak slug yang sudah dipakai taskdir lain, termasuk yang `TUNTAS`/`DITUTUP`. Slug kembar → tambah sufiks `-2` (`-3`, …) sampai unik.
 - Buat `<taskdir>/.explore/` bersamaan; salin laporan explorer Phase 1 dari `.frontenddev/explore/` ke `<taskdir>/.explore/gate-<slug>.md`. Laci itu gitignored dan dilarang di-stage.
 - Nama berkas taskdir tetap: `TASK.md`, `FLOW.md`, `UI.md`, `CONTRACT.md`, `brief-<NN>-<unit>.md`, `REVIEW-PLAN.md`, `report-<NN>.md`, `REVIEW.md`, `REPORT.md`.
 
@@ -123,9 +125,10 @@ Dijalankan ketika gate hilir mengembalikan kendali dengan temuan yang menggeser 
 | `DRIFT` | `chain.py reopen --row <ROW>` atau user memulihkan isi yang disetujui |
 | `SC-{n}` berubah (amandemen akar) | atas persetujuan user, sunting `## Success Criteria`: SC baru ditambah di akhir tanpa menomori ulang; SC aktif maksimal 7 (butir gugur tidak dihitung); SC gugur tetap bernomor, ditulis `- [ ] **SC-n**: ~~<teks lama beserta — verifikasi: ...>~~ — gugur: <alasan>` (SC gugur tidak ditagih hilir: tanpa AC, tanpa `fulfills` brief aktif, tanpa vonis `REVIEW.md`, tanpa baris Catatan REPORT; brief `DONE` yang dulu memikulnya tetap sah; `CONTRACT.md` yang masih menyebut token SC gugur di Sumber AC gagal `validate_doc.py` → kontrak direvisi). Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/task/scripts/validate_task.py --taskdir <taskdir> --amend`, commit `docs(<slug>): amandemen akar TASK`, lalu `chain.py reopen --row <hop tercentang teratas>` — perubahan SC membuat tiap hop tercentang drift, kaskade membuka sisanya; tiap hop di-approve ulang oleh gate pemiliknya (BRIEF tanpa brief `READY` baru sah tanpa Plan Review baru) |
 | Temuan asal ditunda atau dibatalkan user | tulis `> Status: DEFERRED <tanggal> — <alasan>` / `DROPPED` di bawah temuan pada berkas `finding_source`, commit terpisah |
-| Plafon habis, atau user memutuskan berhenti | `chain.py abandon --taskdir <taskdir> --reason <keputusan user>` → `DITUTUP` |
+| Plafon habis (ronde reviewer, revisi, re-entry, eskalasi) | hentikan rantai; `AskUserQuestion`: *Rumuskan ulang di taskdir baru* → `chain.py abandon --taskdir <taskdir> --reason <plafon … habis — dirumuskan ulang>` lalu Phase 1 dengan permintaan yang dirumuskan ulang (taskdir lama tetap sebagai riwayat) · *Hentikan* → `chain.py abandon --reason <keputusan user>` atau biarkan terbuka atas pilihan user |
+| User memutuskan berhenti | `chain.py abandon --taskdir <taskdir> --reason <keputusan user>` → `DITUTUP` |
 
-Plafon ditegakkan skrip: eskalasi 2 per taskdir; re-entry 3 per hop (dihitung saat hop itu target `reopen`; kaskade tidak memakan kuota hop di bawahnya) dan 6 per taskdir (semua reopen). Plafon habis → cacatnya di lingkup, bukan di dokumen: klarifikasi lingkup bersama user di Phase 8 ini — amandemen akar (baris `SC-{n}` berubah), atau tutup taskdir lewat `chain.py abandon`.
+Plafon ditegakkan skrip: ronde reviewer 2 per putaran dan 8 per taskdir; revisi 2 berturut per gate; eskalasi 2 per taskdir; re-entry 3 per hop (dihitung saat hop itu target `reopen`; kaskade tidak memakan kuota hop di bawahnya) dan 6 per taskdir (semua reopen). Plafon habis → cacatnya di lingkup, bukan di dokumen. Tidak ada jalan pintas yang me-reset plafon: amandemen akar, `draft` ulang, atau reopen tambahan tidak membuka kuota baru — satu-satunya jalan lanjut adalah taskdir baru dengan permintaan yang dirumuskan ulang.
 
 ## Guardrails
 
@@ -157,10 +160,10 @@ Handoff ke gate berikutnya — tutup satu baris: `LEAD — <lane> · sections <n
 
 ## Failure path
 
-1. **Profil tidak ada, tidak sah, tidak lengkap, atau di lokasi lama**: rute `PROFILE` ke `frontend:profile` tanpa titik henti konfirmasi — mode GENERATE (belum ada), REFRESH (`index.json` bukan JSON valid, `stack` di luar kontrak, atau berkas hilang), atau MIGRATE (profil frontend di `.claude/profile/` lama), sesuai baris `Terselesaikan:` skrip prasyaratnya — lalu lanjutkan rute tertunda. `force: true` hanya bila rute REFRESH menyala di atas profil frontend sendiri; tidak pernah atas profil milik plugin lain atau lokasi lama. Profil milik plugin lain di `.claude/profile/` dibiarkan dan dianggap tidak ada.
+1. **Profil tidak ada, tidak sah, tidak lengkap, atau di lokasi lama**: lane `EXPLORE_FACT` tetap berangkat tanpa profil (explorer terdegradasi, tanpa penanda `surface-map.md`) — pertanyaan penelusuran tidak membayar pemindaian dan baseline penuh. Lane lain: rute `PROFILE` ke `frontend:profile` tanpa titik henti konfirmasi — mode GENERATE (belum ada), REFRESH (`index.json` bukan JSON valid, `stack` di luar kontrak, atau berkas hilang), atau MIGRATE (profil frontend di `.claude/profile/` lama), sesuai baris `Terselesaikan:` skrip prasyaratnya — lalu lanjutkan rute tertunda. `force: true` hanya bila rute REFRESH menyala di atas profil frontend sendiri; tidak pernah atas profil milik plugin lain atau lokasi lama. Profil milik plugin lain di `.claude/profile/` dibiarkan dan dianggap tidak ada.
 2. **Stack tidak didukung**: manifest memuat `next`, atau React/Svelte tanpa Vite (CRA, Rollup) → hentikan, jangan buat taskdir. `stack` profil di luar `profile/stacks/_CONTRACT.md` bukan cabang ini: itu profil tidak sah → Failure path 1 (REFRESH).
 3. **Ambiguitas monorepo**: fitur sama di lebih dari satu app → `AskUserQuestion` sebelum slug.
-4. **Taskdir RUSAK**: laporkan detail `taskdir_state.py` ke user; dilarang menulis ulang akar atau ledger.
+4. **Taskdir RUSAK**: laporkan detail `taskdir_state.py` ke user; dilarang menulis ulang akar atau ledger. Jalan keluar menurut jenisnya (rute `next` skrip), selalu atas keputusan user lewat `AskUserQuestion`: akar ber-`TASK.md` (status asing, lane/sections tidak sah atau diubah tangan, ledger ≠ jadwal) → `chain.py abandon --reason <...>` lalu rumuskan ulang di taskdir baru, atau user sendiri memulihkan `TASK.md` ke commit sahnya; nama di luar pola atau artefak tanpa `TASK.md` (`chain.py` menolak keduanya) → user memindahkan direktori itu keluar `frontenddev/docs/` atau menghapusnya — bukan artefak rantai yang dapat dilanjutkan.
 5. **Izin tulis ditolak**: laporkan galat OS; minta user memeriksa izin direktori.
 6. **Working tree kotor**: minta user commit atau stash kerjanya sendiri sebelum taskdir baru dibuka; dilarang men-stash atas namanya.
 

@@ -53,6 +53,7 @@ from precondition_lib import (  # noqa: E402
     read_status,
     report_json,
     review_is_fresh,
+    runnable_briefs,
     taskdir_slug,
     typecheck_per_brief,
 )
@@ -71,6 +72,14 @@ OWN_DIRT_ACTION = ("Seluruhnya artefak taskdir ini dari sesi lalu, bukan kerja u
                    "yang terputus → matriks bukti disk (`references/execution-protocol.md` bagian 3); `REVIEW.md` "
                    "belum ter-commit → Phase 4 (`validate_review.py` lalu commit); `REPORT.md` → Phase 5 butir 4. "
                    "Dilarang men-stash atau menghapusnya.")
+# Kotoran di luar taskdir pada fase PENUTUP (12 J55): prasyarat dijalankan ulang sesudah verifikasi penutup,
+# sebelum reviewer — jejak perintah verifikasi akan divonis check TREE `validate_review.py` sebagai mutasi reviewer.
+CLOSING_DIRT_ACTION = ("Fase PENUTUP: kotoran di luar taskdir sesudah verifikasi penutup adalah jejak perintah "
+                       "verifikasi (snapshot test baru, coverage, `*.tsbuildinfo`, `lint --fix` atas berkas ter-track) "
+                       "atau kerja user. Hentikan sebelum reviewer berangkat dan sajikan path-nya ke user lewat "
+                       "`AskUserQuestion`: buang/pulihkan (keputusan user), tambah pola ignore lewat `frontend:profile` "
+                       "REFRESH, atau brief perbaikan (`chain.py reopen --row BRIEF`) bila berkas itu bagian rantai; "
+                       "lalu ulangi Phase 4 dari butir 1. Dilarang membersihkan otomatis.")
 
 
 class PreconditionChecker:
@@ -111,11 +120,6 @@ class PreconditionChecker:
         if self._closure is None:
             self._closure = brief_closure(self.taskdir, self.root)
         return self._closure.get(nn, ("", False))[1]
-
-    def deps_ready(self, nn: str) -> bool:
-        path = self.briefs()[nn]
-        deps = as_list(parse_frontmatter(path.read_text(encoding="utf-8")).get("depends_on"))
-        return all(self.closed(d) for d in deps)
 
     def implemented(self, nn: str) -> bool:
         """Brief `DONE` sah hanya bila riwayatnya memuat commit `implement unit <NN>`, laporannya ada, dan
@@ -159,7 +163,8 @@ class PreconditionChecker:
         # ada: architect Phase 5 butir 4 memvalidasi dan menguncinya.
         check_worktree(self._add, 8, self.root, self.taskdir_rel,
                        allow=[f"{self.taskdir_rel}/REPORT.md"] if self.phase == "LAPORAN TERTUNDA" else [],
-                       own_action=OWN_DIRT_ACTION)
+                       own_action=OWN_DIRT_ACTION,
+                       foreign_action=CLOSING_DIRT_ACTION if self.phase == "PENUTUP" else "")
         self._check_9_head()
         if self.brief_nn:
             self._check_10_target()
@@ -190,14 +195,9 @@ class PreconditionChecker:
                       "Status DONE hanya ditulis architect bersama commit unit; status yang diketik "
                       "tangan dikembalikan ke READY lewat revisi brief dan dieksekusi sungguhan.")
             return
-        args = [sys.executable, str(VALIDATE_BRIEFS), "--taskdir", self.taskdir_rel, "--root", str(self.root)]
-        if self.sections:
-            args.append("--contract")
-        proc = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
-        if proc.returncode != 0:
-            self._add(4, name, "FAIL", "`validate_briefs.py` FAIL: " + proc.stdout.splitlines()[0][:100],
-                      "Batch brief tidak lagi sah terhadap akar/kontrak; kembali ke `frontend:lead`.")
-            return
+        # Brief BLOCKED tanpa remedi divonis **sebelum** validate_briefs: janji yang dipikulnya kini tak
+        # dipikul brief READY/DONE mana pun (Check G), jadi validator pasti FAIL dan menutupi fase TERHENTI
+        # beserta rutenya (12 J20).
         remedies = self.remedies()
         open_blocked = [nn for nn, s in sorted(states.items())
                         if s == "BLOCKED" and not remedies.get(nn)]
@@ -207,13 +207,22 @@ class PreconditionChecker:
                       "Rantai berhenti. Brief remedi lewat `chain.py reopen --row BRIEF` lalu "
                       "`frontend:plan` mode APPEND (`remedies: \"NN\"`) pada taskdir yang sama.")
             return
+        args = [sys.executable, str(VALIDATE_BRIEFS), "--taskdir", self.taskdir_rel, "--root", str(self.root)]
+        if self.sections:
+            args.append("--contract")
+        proc = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+        if proc.returncode != 0:
+            self._add(4, name, "FAIL", "`validate_briefs.py` FAIL: " + proc.stdout.splitlines()[0][:100],
+                      "Batch brief tidak lagi sah terhadap akar/kontrak; kembali ke `frontend:lead`.")
+            return
         ready = [nn for nn, s in sorted(states.items()) if s == "READY"]
         if ready:
-            runnable = [nn for nn in ready if self.deps_ready(nn)]
+            runnable = runnable_briefs(self.taskdir, self.root)
             if not runnable:
                 self.phase = "TERHENTI (DAG)"
                 self._add(4, name, "FAIL", f"{len(ready)} brief READY tetapi prasyaratnya tak satu pun tertutup",
-                          "Periksa `depends_on` dan `remedies` — rantai tidak punya unit yang dapat berangkat.")
+                          "Rantai buntu (mis. remedi ber-`depends_on` unit asalnya). Kembali ke `frontend:lead`: "
+                          "`chain.py reopen --row BRIEF` → `frontend:plan` mode APPEND memperbaiki `depends_on`.")
                 return
             self.phase = "EKSEKUSI"
             self.next_unit = runnable[0]

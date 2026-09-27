@@ -43,9 +43,9 @@ user-invocable: false
 
 ### Phase 1 — Rekonsiliasi 3-Check
 
-1. **Kecocokan repo**: tiap path target diperiksa di source root; `CREATE` bila baru, `MODIFY` bila ada — dengan `Anchor` ekspor top-level yang boleh disentuh. Panen laci `<taskdir>/.explore/*.md` lebih dulu; dispatch `code-explorer` lewat `dispatcher/explorer.md` (`{laci}` = `<taskdir>/.explore/`) hanya untuk unit yang laporannya belum ada. **Kuota sapuan gate**: 2 `Glob`+`Grep` dan 2 read ber-offset; lintas-layer, relasi, atau simbol tak ketemu → dispatch, bukan sapuan ketiga.
+1. **Kecocokan repo**: tiap path target diperiksa di source root; `CREATE` bila baru, `MODIFY` bila ada — dengan `Anchor` ekspor top-level yang boleh disentuh. Panen laci `<taskdir>/.explore/*.md` lebih dulu; dispatch `code-explorer` (`subagent_type`: `frontend:code-explorer`) lewat `dispatcher/explorer.md` (`{laci}` = `<taskdir>/.explore/`) hanya untuk unit yang laporannya belum ada. **Kuota sapuan gate**: 2 `Glob`+`Grep` dan 2 read ber-offset; lintas-layer, relasi, atau simbol tak ketemu → dispatch, bukan sapuan ketiga.
 2. **Kelengkapan transitif**: tiap berkas logic, view-model, service, atau API layer baru berpasangan test di `files_touched` yang sama.
-3. **Baseline terminal**: jalankan perintah `commands.md` profil sekali untuk merekam galat awal; Done Criteria berbunyi "nol galat baru dibanding baseline", bukan "bersih total". Perintah typecheck persis profil (`svelte-check` di repo Svelte, bukan `tsc` saja).
+3. **Baseline terminal**: plan **tidak** menjalankan perintah apa pun — baseline diukur sekali oleh `architect` Phase 0 (`verification-baseline.json`) sebelum unit pertama. Baca status tiap perintah dan kolom **Cakupan yang TIDAK Diperiksa** di `commands.md` profil; Done Criteria berbunyi "nol galat baru dibanding baseline", bukan "bersih total". Perintah `verification` persis profil (`svelte-check` di repo Svelte, bukan `tsc` saja).
 
 ### Phase 2 — Pemecahan Unit & DAG
 
@@ -55,7 +55,7 @@ Pecah per batas layer mengacu `references/slicing-patterns.md`: Unit 01 data & t
 
 1. Tulis tiap `brief-<NN>-<unit>.md` persis bagian 1 `templates/brief-template.md`: `status: READY`, `based_on` dari `git rev-parse --short HEAD`, `fulfills`, `covers` (kosong pada MINOR), `files_touched`, `verification`, dan lima seksi. Dilarang menulis langkah "jalankan typecheck/test" di seksi 4.
 2. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/plan/scripts/validate_briefs.py --taskdir <taskdir> [--brief <NN>] [--contract]` per brief lalu per batch — `--contract` pada lane non-MINOR. `FAIL` → perbaiki dan ulangi sampai `PASS`.
-3. **Gate Plan Review** (lane non-MINOR): hidrasi `dispatcher/reviewer.md`, jalankan gerbang masuknya (`review_round.py open --gate plan`), dispatch `doc-reviewer` (`subagent_type`: `frontend:doc-reviewer`), lalu petakan balikan lewat `### Penanganan Balikan` template itu — termasuk `review_round.py record`. Plafon 2 ronde per putaran, 8 per taskdir — putaran baru dimulai sesudah batch yang lolos ronde `PASS` di-commit (Phase 4) atau sesudah `reopen` yang membuka hop BRIEF; `BLOCKED` apa pun — termasuk yang hanya ber-`BLOCKER [MEKANIS]` — → perbaiki, jalankan validator sampai `PASS`, lalu ronde 2 menyempit atas konten final; konten yang berubah sesudah ronde `PASS` juga menuntut ronde menyempit. Approval menuntut ronde terakhir `PASS` atas konten batch yang persis sama dan tidak didahului `reopen` hop BRIEF sesudah ronde itu; commit Phase 4 (`draft breakdown`, `revise breakdown`, `draft breakdown append`) tidak membatalkan ronde.
+3. **Gate Plan Review** (lane non-MINOR): hidrasi `dispatcher/reviewer.md`, jalankan gerbang masuknya (`review_round.py open --gate plan`), dispatch `doc-reviewer` (`subagent_type`: `frontend:doc-reviewer`), lalu petakan balikan lewat `### Penanganan Balikan` template itu — termasuk `review_round.py record`. Plafon 2 ronde per putaran, 8 per taskdir — putaran baru dimulai sesudah batch yang lolos ronde `PASS` di-commit (Phase 4), sesudah `reopen` yang membuka hop BRIEF atau hop di atasnya, atau sesudah `chain.py escalate`; plafon habis → Failure path 7; `BLOCKED` apa pun — termasuk yang hanya ber-`BLOCKER [MEKANIS]` — → perbaiki, jalankan validator sampai `PASS`, lalu ronde 2 menyempit atas konten final; konten yang berubah sesudah ronde `PASS` juga menuntut ronde menyempit. Approval menuntut ronde terakhir `PASS` atas konten batch yang persis sama dan tidak didahului `reopen` hop BRIEF sesudah ronde itu; commit Phase 4 (`draft breakdown`, `revise breakdown`, `draft breakdown append`) tidak membatalkan ronde.
 
 ### Phase 4 — Batch Commit
 
@@ -73,8 +73,8 @@ Brief `DONE`/`BLOCKED` tidak pernah disunting, jadi tidak pernah ikut di-stage.
 
 1. Sajikan tabel: Unit, Nama, `files_touched`, `depends_on`, `fulfills`, `covers`, verdict Plan Review.
 2. `AskUserQuestion` dengan opsi berkonsekuensi: *Setujui breakdown — lanjut eksekusi* · *Revisi (sebut poinnya)* · *Hentikan*.
-3. **Setuju** → `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py approve --taskdir <taskdir> --row BRIEF --answer "<jawaban user apa adanya>"`. Skrip memvonis ulang `validate_briefs.py`, `REVIEW-PLAN.md` `PASS` yang merupakan laporan ronde terakhir (bukan basi), dan ronde reviewer terakhir `PASS` atas konten final yang tidak didahului `reopen` hop BRIEF, lalu mencentang ledger dalam satu commit (badan: `Konten disetujui: <sha>` + `Hop: BRIEF`). Pada BRIEF `[~]` tanpa brief `READY` (kaskade/amandemen tanpa kerja baru) skrip hanya memvonis `validate_briefs.py` — approval ulang sah tanpa ronde Plan Review baru.
-4. **Revisi** → cek sisa plafon `chain.py revisions --taskdir <taskdir> --row BRIEF` (plafon 2), lalu ulangi Phase 1–5 dengan mode `REVISE`. Plafon habis → hentikan, sajikan poin penolakan berurutan, serahkan ke `frontend:lead` Phase 8 (klarifikasi lingkup: amandemen akar, atau `chain.py abandon`).
+3. **Setuju** → `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py approve --taskdir <taskdir> --row BRIEF --answer "<jawaban user apa adanya>"`. Skrip memvonis ulang `validate_briefs.py`, `REVIEW-PLAN.md` `PASS` yang merupakan laporan ronde terakhir (bukan basi), dan ronde reviewer terakhir `PASS` atas konten final yang tidak didahului `reopen` hop BRIEF, lalu mencentang ledger dalam satu commit (badan: `Konten disetujui: <sha>`, `Sidik:`, `Review-Round:` bila direview, `Hop: BRIEF`). Pada BRIEF `[~]` skrip juga menolak brief `DONE`/`BLOCKED` yang status atau isinya berubah sejak reopen. Pada BRIEF `[~]` tanpa brief `READY` (kaskade/amandemen tanpa kerja baru) skrip hanya memvonis `validate_briefs.py` — approval ulang sah tanpa ronde Plan Review baru.
+4. **Revisi** → cek sisa plafon `chain.py revisions --taskdir <taskdir> --row BRIEF` (plafon 2; `draft` ulang dan amandemen akar tidak me-reset hitungan), lalu ulangi Phase 1–5 dengan mode `REVISE`. Plafon habis → hentikan, sajikan poin penolakan berurutan, serahkan ke `frontend:lead` Phase 8 (plafon habis: taskdir baru atau hentikan).
 
 ## Guardrails
 
@@ -89,7 +89,7 @@ Brief `DONE`/`BLOCKED` tidak pernah disunting, jadi tidak pernah ikut di-stage.
 - **RATIONALIZATION PREVENTION**:
   - "Semua digabung satu brief biar cepat" — brief besar membebani implementor dan menyulitkan rollback.
   - "Test pendamping tidak perlu masuk `files_touched`" — implementor dilarang menyentuh berkas di luar daftar.
-  - "Baseline ada galat, jadi saya lewati" — tanpa baseline, galat warisan tak dapat dibedakan dari regresi.
+  - "Saya jalankan test sekali untuk tahu baseline-nya" — baseline milik `architect` Phase 0; plan membaca status `commands.md` profil, dan tanpa baseline itu galat warisan tak dapat dibedakan dari regresi.
   - "Reviewer sudah PASS, saya rapikan sedikit lalu langsung minta approval" — `chain.py approve` menolak konten yang berubah sesudah ronde `PASS`.
   - "Unit ini tidak memikul SC mana pun, tapi perlu untuk kebersihan" — perluasan lingkup; Check G menolaknya.
   - "Satu grep lagi untuk memastikan path" — kuota mekanis; sapuan berikutnya milik explorer.
@@ -105,18 +105,18 @@ Breakdown disetujui — tutup satu baris: `PLAN — BRIEF @ READY <sha> · <N> b
 - **Validator**: <PASS | FAIL (<check>)>
 - **Plan Review**: <verdict ronde n · <n> BLOCKER [SEMANTIK] tersisa> | dilewati (MINOR)
 - **Plafon**: <revisi n/2 · ronde n/2 (taskdir n/8)> | —
-- **Rute**: <revisi di plan | frontend:lead Phase 8 (reopen CONTRACT / escalate / amandemen akar / abandon)>
+- **Rute**: <revisi di plan | frontend:lead Phase 8 (reopen CONTRACT / escalate / plafon habis: taskdir baru atau hentikan)>
 ```
 
 ## Failure path
 
 1. **Hop hulu belum sah**: hentikan di Precondition; kembali ke `frontend:lead` yang merutekan ke gate pemiliknya.
 2. **Kegagalan rekonsiliasi path**: berkas yang diasumsikan ada tidak ditemukan → sesuaikan brief; simbol acuan hilang total → dispatch explorer; tetap tidak ada → tanyakan path riil ke user.
-3. **Baseline terminal crash** (env belum siap): catat galat mentah, tandai baseline `UNVERIFIED_ENV_NOT_READY`, Done Criteria menyebut keadaan itu apa adanya.
+3. **Perintah profil berstatus `UNVERIFIED_ENV_NOT_READY` atau `TIMEOUT`**: Done Criteria menyebut keadaan itu apa adanya; jangan menjalankan perintahnya untuk "memastikan" — baseline diukur `architect` Phase 0.
 4. **Batch commit gagal** (hook, lock): perbaiki penyebabnya dan ulangi commit yang sama sebelum approval diajukan; dilarang `--no-verify`. State ronde rusak/hilang → pulihkan dari `.bak`, atau `review_round.py rebuild` bila trailer mencatat ronde; dilarang menulis state dengan tangan.
 5. **Siklus dependensi**: refaktor DAG menjadi rantai linier satu arah.
 6. **Adapter tidak ditemukan**: hentikan; arahkan ke `frontend:profile` — brief tanpa penamaan adapter tidak boleh lahir.
-7. **Plafon ronde Plan Review habis dengan BLOCKER tersisa**: jangan commit; sajikan BLOCKER ke user dan rutekan ke gate pemilik lewat `frontend:lead`.
+7. **Plafon ronde Plan Review habis dengan BLOCKER tersisa**: jangan commit; sajikan BLOCKER ke user dan serahkan ke `frontend:lead` Phase 8 (plafon habis: `AskUserQuestion` rumuskan ulang di taskdir baru atau hentikan). BLOCKER yang berakar di kontrak bukan jalan keluar plafon: ia diajukan sebagai bagian rumusan ulang.
 
 ## STYLE
 

@@ -31,7 +31,7 @@ user-invocable: false
 ### Phase 0 — Orientasi Navigasi & Profil
 
 - Baca `surface-map.md` profil dan `## UI & navigation surface` adapter `stacks/<stack>.md`: `react-vite` (React Router/TanStack, `/:id`/`$id`, loader guard) · `react-native` (Expo Router `app/**` atau React Navigation, `scheme`) · `sveltekit` (`src/routes/**`, `[id]`, grup `(app)`) · `svelte-vite` (library router repo).
-- Telusuri berkas rute terdekat via read ber-offset (≤30 baris) untuk penamaan parameter nyata. **Kuota sapuan gate**: 2 `Glob`+`Grep` dan 2 read ber-offset. Relasi lintas-berkas (pemilik layout, konsumen param), simbol tak ketemu, atau kuota habis → hidrasi `dispatcher/explorer.md` dan dispatch `code-explorer`; pakai pointer `file:baris` laporannya.
+- Telusuri berkas rute terdekat via read ber-offset (≤30 baris) untuk penamaan parameter nyata. **Kuota sapuan gate**: 2 `Glob`+`Grep` dan 2 read ber-offset. Relasi lintas-berkas (pemilik layout, konsumen param), simbol tak ketemu, atau kuota habis → hidrasi `dispatcher/explorer.md` dan dispatch `code-explorer` (`subagent_type`: `frontend:code-explorer`); pakai pointer `file:baris` laporannya.
 - Parameter rute ber-query string atau filter kompleks → dokumentasikan format deserialisasi dan default-nya.
 
 ### Phase 1 — Intent & Klarifikasi
@@ -66,7 +66,7 @@ Tawarkan 2–3 opsi mengacu `references/ux-patterns.md` — Direct/Modal · Mult
 1. Sajikan ringkasan: titik masuk, rute utama beserta parameternya, penanganan batal/dirty, cabang error, dan tabel Data Demands.
 2. `AskUserQuestion`: *Setujui alur* · *Revisi (sebut poinnya)* · *Hentikan*.
 3. **Setuju** → `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py approve --taskdir <taskdir> --row FLOW --answer "<jawaban user apa adanya>"`.
-4. **Revisi** → `chain.py revisions --taskdir <taskdir> --row FLOW` (plafon 2). Di bawah plafon → perbarui, validasi, commit `revise`, ajukan ulang. Plafon habis → hentikan, sajikan poin penolakan berurutan, serahkan ke `frontend:lead` Phase 8 (klarifikasi lingkup: amandemen akar, atau `chain.py abandon`).
+4. **Revisi** → `chain.py revisions --taskdir <taskdir> --row FLOW` (plafon 2; `draft` ulang dan amandemen akar tidak me-reset hitungan). Di bawah plafon → perbarui, validasi, commit `revise`, ajukan ulang. Plafon habis → hentikan, sajikan poin penolakan berurutan, serahkan ke `frontend:lead` Phase 8 (plafon habis: taskdir baru atau hentikan).
 
 ## Guardrails
 

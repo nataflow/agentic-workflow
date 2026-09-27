@@ -71,12 +71,13 @@ dan aturan pemutus saat lebih dari satu penanda hadir. Wajib memuat perintah kon
 penanda itu ada di repo, bukan sekadar daftar nama berkas. Sertakan penanda kelompok: router,
 state global, query/cache, styling, form & validasi, storage, test runner, bundler/config.
 
-### 2. `## Commands` — konsumen: `frontend:profile`, `frontend:review`, `frontend:plan`
+### 2. `## Commands` — konsumen: `frontend:profile`, `frontend:plan`, `frontend:architect`
 
 Lima baris perintah: `typecheck`, `lint`, `test`, `test-single`, `build`. Tulis `tidak berlaku`
 bila stack tidak punya padanannya — dilarang mengarang perintah. `profile` mengeksekusi tiap
-perintah minimal sekali sebelum menuliskannya ke `commands.md` profil; `plan` menjalankannya
-sekali sebagai Check 3; `architect` menjalankannya di verifikasi penutup taskdir (Phase 4). Seksi ini wajib
+perintah minimal sekali sebelum menuliskannya ke `commands.md` profil; `plan` membacanya (tanpa
+menjalankan) untuk perintah `verification` brief; `architect` mengukur baseline-nya sebelum unit pertama
+(Phase 0) dan menjalankannya di verifikasi penutup taskdir (Phase 4). Seksi ini wajib
 ditutup sub-bagian **Cakupan yang TIDAK diperiksa** per perintah — kolom itu yang mencegah `test`
 hijau dibaca sebagai bukti typecheck hijau.
 

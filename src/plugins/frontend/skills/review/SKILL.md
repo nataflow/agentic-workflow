@@ -68,7 +68,7 @@ Tutup satu baris: `REVIEW (<target>) — <PASS | WARNING | BLOCKED> · <x> P1, <
 2. **Perintah verifikasi macet** (>5 menit per perintah, ambang yang sama dengan verifikasi penutup `architect`): tandai `UNVERIFIED / TIMEOUT`, lanjutkan sembilan dimensi.
 3. **Diff >50 berkas**: nilai per direktori fitur, laporkan modular.
 4. **Nomor baris bergeser**: lokalisasi ulang lewat `Grep` sebelum mencatat bukti.
-5. **Adapter tidak ditemukan**: jalankan dimensi generik saja, tandai dimensi 6 `UNVERIFIED`, sarankan `frontend:profile`.
+5. **Profil atau adapter tidak ditemukan**: prasyarat `FAIL` (check 2/3) — hentikan di Precondition dan rutekan ke `frontend:profile`; dilarang menilai dengan dimensi generik saja, karena dimensi 6 dan predikat stack milik adapter.
 
 ## STYLE
 

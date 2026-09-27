@@ -49,7 +49,7 @@ monorepo/
    - Komponen bersama wajib domain-agnostic dan tidak boleh mengimpor tipe dari `apps/**` atau `src/features/**`.
 4. **Disambiguasi Ambiguitas Multi-Aplikasi**:
    - **WHEN** nama fitur ditemukan pada `apps/web` DAN `apps/mobile`:
-     - `THEN`: Tanyakan target aplikasi secara eksplisit kepada user di awal gate sebelum menetapkan slug. Dua app itu memakai dua `stack` berbeda, dan profil hanya melayani satu.
+     - `THEN`: Tanyakan target aplikasi secara eksplisit kepada user di awal gate sebelum menetapkan slug. Dua app itu memakai dua `stack` berbeda, dan profil hanya melayani satu (bagian 6, **Satu Profil, Satu App**).
    - **WHEN** komponen target berada di `packages/ui`:
      - `THEN`: Tetapkan slug dengan prefix komponen bersama (misal: `ui-dropdown-select`).
 
@@ -83,7 +83,8 @@ Keadaan tiap taskdir divonis `taskdir_state.py` (path di peta **Skrip:** `lead/S
 
 - Taskdir dengan brief `BLOCKED`, draft menggantung, atau ledger belum penuh tidak ditinggal diam-diam; ia muncul di setiap pemindaian sampai tuntas atau diputuskan user.
 - Taskdir tuntas (`REPORT.md` ada) tidak diedit ulang; permintaan baru membuka taskdir baru.
-- Taskdir tanpa `TASK.md` yang memuat artefak rantai, yang `lane`/`sections`-nya berubah di luar commit akar (`kunci TASK`) atau `chain.py escalate`, atau yang ledger-nya tak sesuai jadwal `sections`, divonis `RUSAK` (check akar tiap gate ikut `FAIL`): sejak v0.4.0 tidak ada taskdir warisan yang dilayani tanpa akar.
+- Taskdir tanpa `TASK.md` yang memuat artefak rantai, yang `status` akarnya selain `ACTIVE`/`ABANDONED`, yang `lane`/`sections`-nya berubah di luar commit akar (`kunci TASK`) atau `chain.py escalate`, atau yang ledger-nya tak sesuai jadwal `sections`, divonis `RUSAK` (check akar tiap gate ikut `FAIL`): sejak v0.4.0 tidak ada taskdir warisan yang dilayani tanpa akar. Jalan keluarnya keputusan user (`lead/SKILL.md` Failure path 4): akar ber-`TASK.md` → `chain.py abandon` lalu taskdir baru, atau user memulihkan `TASK.md`; nama di luar pola atau tanpa `TASK.md` → direktorinya dipindah keluar `frontenddev/docs/` atau dihapus user.
+- Brief `READY` yang tak satu pun dapat berangkat (prasyaratnya tidak pernah tertutup, mis. remedi ber-`depends_on` unit asalnya) divonis `TERHENTI` ber-detail `DAG`, bukan `EKSEKUSI`: reopen BRIEF → `plan` APPEND memperbaiki `depends_on`. `validate_briefs.py` Check D menolak pola itu sejak lahir.
 - `REVIEW.md` `BLOCKED` divonis `TEMUAN` dan diperbaiki di taskdir yang sama: reopen BRIEF → `plan` APPEND → `architect` eksekusi dan review ulang; tidak ada taskdir penerus.
 - Taskdir kosong divonis `AKAR` → `frontend:task`; user batal → hapus direktori kosong itu (tidak ada yang di-commit).
 - Taskdir yang tidak dilanjutkan ditutup `chain.py abandon --reason` (`status: ABANDONED`) atas keputusan user; ia divonis `DITUTUP` dan keluar dari pemindaian.
@@ -92,16 +93,18 @@ Keadaan tiap taskdir divonis `taskdir_state.py` (path di peta **Skrip:** `lead/S
 
 ## 5. Plafon Loop
 
-Loop yang berujung ke skill yang sama dapat berputar tanpa henti; plafonnya numerik dan ditegakkan skrip, bukan ingatan. Putaran ronde dimulai sesudah dokumen yang lolos ronde `PASS` di-commit, atau sesudah `reopen` hop itu; tiap putaran berhak 2 ronde; `DISPATCH_FAILED` tidak dihitung, maksimal 2. Melampauinya menandakan cacat satu lapis di atas tempat putaran itu bekerja.
+Loop yang berujung ke skill yang sama dapat berputar tanpa henti; plafonnya numerik dan ditegakkan skrip, bukan ingatan. Putaran ronde dimulai sesudah dokumen yang lolos ronde `PASS` di-commit, sesudah `reopen` yang membuka hop itu atau hop di atasnya, atau sesudah `chain.py escalate` — dokumen hulu yang berubah membatalkan vonis ronde hilir; tiap putaran berhak 2 ronde; `DISPATCH_FAILED` tidak dihitung, maksimal 2. Revisi dihitung sejak `draft` pertama sesudah akar atau reopen; `draft` berikutnya dan amandemen akar tidak me-reset hitungan. Melampauinya menandakan cacat satu lapis di atas tempat putaran itu bekerja.
+
+**Sesudah plafon** (baris bertanda *H28* di bawah): gate berhenti tanpa commit, menyajikan BLOCKER atau poin penolakan yang tersisa, dan menyerahkan ke lead Phase 8, yang menanyakan user lewat `AskUserQuestion`: *rumuskan ulang di taskdir baru* (`chain.py abandon` taskdir lama, lalu permintaan yang dirumuskan ulang masuk lead Phase 1) atau *hentikan*. Tidak ada jalan pintas yang me-reset plafon.
 
 | Loop | Plafon | Penegak | Sesudah plafon |
 |---|---|---|---|
-| Ronde `contract-reviewer` | 2 per putaran, 8 per taskdir | `review_round.py --gate contract` | Hentikan gate, sajikan BLOCKER, serahkan ke lead Phase 8 (klarifikasi lingkup: amandemen akar, atau `chain.py abandon`) |
-| Ronde `doc-reviewer` (Plan Review) | 2 per putaran, 8 per taskdir | `review_round.py --gate plan` | Hentikan, rutekan BLOCKER ke gate pemilik |
-| Revisi user per gate (FLOW, UI, CONTRACT, breakdown) | 2 berturut sejak draft/reopen | `chain.py revisions` · prasyarat `plan` mode REVISE | Hentikan gate, sajikan poin penolakan, serahkan ke lead Phase 8 (klarifikasi lingkup: amandemen akar, atau `chain.py abandon`) |
-| Brief remedi per unit asal | 2 | `validate_briefs.py` Check M | `reopen CONTRACT` — cacatnya di kontrak (MINOR: reopen BRIEF → escalate) |
-| Re-entry | 3 per hop (dihitung saat hop itu target; kaskade tidak memakan kuota hop di bawahnya), 6 per taskdir (semua reopen) | `chain.py reopen` | Klarifikasi lingkup bersama user, atau `abandon` |
-| Eskalasi lane per taskdir | 2 | `chain.py escalate` | Klarifikasi lingkup bersama user |
+| Ronde `contract-reviewer` | 2 per putaran, 8 per taskdir | `review_round.py --gate contract` | *H28* |
+| Ronde `doc-reviewer` (Plan Review) | 2 per putaran, 8 per taskdir | `review_round.py --gate plan` | *H28* |
+| Revisi user per gate (FLOW, UI, CONTRACT, breakdown) | 2 berturut sejak draft pertama/reopen | `chain.py revisions` · prasyarat `plan` mode REVISE | *H28* |
+| Brief remedi per unit asal | 2 (+1 per re-entry kontrak sesudah BLOCKED pertama) | `validate_briefs.py` Check M | `reopen CONTRACT` — cacatnya di kontrak (MINOR: reopen BRIEF → escalate) |
+| Re-entry | 3 per hop (dihitung saat hop itu target; kaskade tidak memakan kuota hop di bawahnya), 6 per taskdir (semua reopen) | `chain.py reopen` | *H28* |
+| Eskalasi lane per taskdir | 2 | `chain.py escalate` | *H28* |
 
 ---
 
@@ -111,4 +114,5 @@ Aturan ketat batasan perutean dan integritas taskdir:
 - **No Cross-Taskdir Pollution**: Setiap taskdir beroperasi secara mandiri; dilarang merujuk brief dari taskdir yang berbeda.
 - **Strict Timestamping**: Gunakan timestamp 10-digit (`date +%y%m%d%H%M`) untuk menjamin keunikan direktori task antar sesi.
 - **Kebab-Case Naming**: Slug wajib menggunakan format huruf kecil dipisah tanda hubung tanpa spasi atau karakter khusus.
-- **One Stack per Taskdir**: Satu taskdir hidup di bawah satu `stack` profil; pekerjaan yang menyentuh `apps/web` dan `apps/mobile` sekaligus dipecah menjadi dua taskdir, masing-masing dengan profil app-nya.
+- **One Stack per Taskdir**: Satu taskdir hidup di bawah satu `stack` profil; pekerjaan yang menyentuh `apps/web` dan `apps/mobile` sekaligus dipecah menjadi dua taskdir, dikerjakan bergantian.
+- **Satu Profil, Satu App**: satu repo punya satu profil `.claude/profile/frontenddev/`, yang melayani satu `target_app`/`stack` pada satu waktu; profil per-app tidak didukung. Pindah ke app lain berarti `frontend:profile` REFRESH ke app itu. Taskdir yang masih terbuka di stack lama tertahan sampai profil dikembalikan: ingest `architect` menolak brief yang `stack`-nya ≠ `stack` profil, sehingga brief tidak pernah dieksekusi dengan adapter yang salah.

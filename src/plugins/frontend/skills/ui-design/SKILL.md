@@ -29,7 +29,7 @@ user-invocable: false
 
 - Buka `FLOW.md` bila `sections` memuat `flow` (tercentang dan utuh, dijamin skrip) dan `TASK.md`: layar dan cabang yang dirancang memikul `SC-{n}`; `## Out of Scope` adalah plafon.
 - Baca `index.json` (`stack`), `stack.md`, dan `visual.md` profil, lalu `## UI & navigation surface` adapter: breakpoint web atau safe area/touch target/keyboard mobile, letak design token, atribut aksesibilitas.
-- Telusuri komponen bersama di lokasi `structure.md` profil (Button, Card, Modal, Input, Skeleton). **Kuota sapuan gate**: 2 `Glob`+`Grep` dan 2 read ber-offset; komponen tersebar lintas paket, relasi (konsumen komponen, pemilik token), atau kuota habis → hidrasi `dispatcher/explorer.md` dan dispatch `code-explorer`.
+- Telusuri komponen bersama di lokasi `structure.md` profil (Button, Card, Modal, Input, Skeleton). **Kuota sapuan gate**: 2 `Glob`+`Grep` dan 2 read ber-offset; komponen tersebar lintas paket, relasi (konsumen komponen, pemilik token), atau kuota habis → hidrasi `dispatcher/explorer.md` dan dispatch `code-explorer` (`subagent_type`: `frontend:code-explorer`).
 
 ### Phase 1 — Orientasi Design System
 
@@ -60,7 +60,7 @@ Tawarkan 2–3 opsi — Standard Card/List · Compact/Dense Table · Visual-Driv
 1. Sajikan mockup, hierarki P1–P3, enam cabang per layar, dan pemetaan data.
 2. `AskUserQuestion`: *Setujui desain* · *Revisi (sebut poinnya)* · *Hentikan*.
 3. **Setuju** → `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py approve --taskdir <taskdir> --row UI --answer "<jawaban user apa adanya>"`.
-4. **Revisi** → `chain.py revisions --taskdir <taskdir> --row UI` (plafon 2). Di bawah plafon → perbarui, validasi, commit `revise`, ajukan ulang. Plafon habis → hentikan, sajikan poin penolakan berurutan, serahkan ke `frontend:lead` Phase 8 (klarifikasi lingkup: amandemen akar, atau `chain.py abandon`).
+4. **Revisi** → `chain.py revisions --taskdir <taskdir> --row UI` (plafon 2; `draft` ulang dan amandemen akar tidak me-reset hitungan). Di bawah plafon → perbarui, validasi, commit `revise`, ajukan ulang. Plafon habis → hentikan, sajikan poin penolakan berurutan, serahkan ke `frontend:lead` Phase 8 (plafon habis: taskdir baru atau hentikan).
 
 ## Guardrails
 

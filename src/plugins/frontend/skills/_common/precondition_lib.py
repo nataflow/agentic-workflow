@@ -1265,11 +1265,12 @@ def check_plugin_files(add: AddFn, cid: int, skill_dir: Path, files: Iterable[st
 
 
 def check_worktree(add: AddFn, cid: int, root: Path, taskdir_rel: str = "",
-                   allow: Iterable[str] = (), own_action: str = "") -> bool:
+                   allow: Iterable[str] = (), own_action: str = "", foreign_action: str = "") -> bool:
     """Tree bersih; path di `allow` (mis. `REPORT.md` tertunda) tidak dihitung kotor.
 
     `own_action` = tindakan gate ini bila seluruh kotoran milik taskdir-nya sendiri (12 J22); tanpanya
-    dipakai tindakan draft gate dokumen (`review_round.py commit`).
+    dipakai tindakan draft gate dokumen (`review_round.py commit`). `foreign_action` menggantikan tindakan
+    kotoran di luar taskdir — mis. jejak perintah verifikasi penutup (12 J55); tanpanya kotoran itu kerja user.
     """
     name = "Working tree bersih"
     if not is_git_repo(root):
@@ -1297,7 +1298,7 @@ def check_worktree(add: AddFn, cid: int, root: Path, taskdir_rel: str = "",
             "atas konten itu (cek dulu: `review_round.py status --ready`); ditolak → **jangan commit**, "
             "lanjutkan dari validator + ronde reviewer gate itu. Brief lane MINOR dan `FLOW.md`/`UI.md` "
             "(tanpa ronde): commit hanya bila validator gate itu `PASS`. Lalu ulangi prasyarat."
-            if own else
+            if own else foreign_action or
             "Commit atomik gate ini menuntut tree bersih. Kotoran yang bukan milik rantai "
             "adalah kerja user — laporkan, jangan di-stash sendiri.")
         return False
@@ -1845,6 +1846,26 @@ def brief_closure(taskdir: Path, root: Optional[Path] = None) -> Dict[str, Tuple
         return status[nn] == "BLOCKED" and any(closed(r, seen + (nn,)) for r in remedies.get(nn, []))
 
     return {nn: (status[nn], closed(nn)) for nn in briefs}
+
+
+def runnable_briefs(taskdir: Path, root: Optional[Path] = None) -> List[str]:
+    """NN brief `READY` yang seluruh `depends_on`-nya tertutup (`brief_closure`), terurut.
+
+    Kosong padahal ada brief `READY` = rantai buntu (`TERHENTI (DAG)`, 12 J58): mis. remedi yang
+    bergantung pada unit asalnya — unit asal hanya tertutup lewat remedi itu. Satu implementasi untuk
+    `taskdir_state` dan prasyarat `architect`, supaya lead tidak merutekan `EKSEKUSI` ke architect
+    yang lalu menolaknya.
+    """
+    closure = brief_closure(taskdir, root)
+    out: List[str] = []
+    for p in sorted(taskdir.glob(BRIEF_GLOB)):
+        m = re.match(r"^brief-(\d{2})-[a-z0-9-]+\.md$", p.name)
+        if not m or closure.get(m.group(1), ("", False))[0] != "READY" or m.group(1) in out:
+            continue
+        deps = as_list(parse_frontmatter(p.read_text(encoding="utf-8")).get("depends_on"))
+        if all(closure.get(str(d).strip(), ("", False))[1] for d in deps):
+            out.append(m.group(1))
+    return out
 
 
 def cli(main: Callable[[], Any]) -> Any:

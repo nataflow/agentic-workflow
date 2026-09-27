@@ -4,7 +4,7 @@ Gunakan template ini saat `architect` mendispatch subagent penilai diff rantai (
 
 **Tujuan:** Menilai berkas rantai sejak akar terhadap union `files_touched`, sembilan dimensi, `CONTRACT.md`, dan `## Success Criteria` `TASK.md`, tepat satu kali, lalu mengunci hasilnya sebagai `{taskdir}/REVIEW.md` yang lolos `validate_review.py`.
 
-**Dispatch setelah:** Phase 4 butir 1 hijau — verifikasi penutup nol galat baru, log-nya tertulis di `{verification_log}`, dan seluruh brief tertutup.
+**Dispatch setelah:** Phase 4 butir 1 hijau dan butir 2 bersih — verifikasi penutup nol galat baru, log-nya tertulis di `{verification_log}`, seluruh brief tertutup, dan prasyarat rantai yang dijalankan ulang sesudah verifikasi lolos Check 8 (tree bersih). Artefak verifikasi yang tertinggal di tree akan divonis check `TREE` sebagai mutasi reviewer.
 
 ````markdown
 Review seluruh diff rantai untuk satu taskdir frontend.

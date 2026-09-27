@@ -142,7 +142,7 @@ python3 «review_round.py» open --taskdir {taskdir} --gate plan
 ```
 
 - `validate_briefs.py` `FAIL` → perbaiki brief dulu. Temuannya mekanis; memberangkatkan subagent berbayar untuk menemukannya lagi adalah pemborosan.
-- `review_round.py open` `FAIL` → plafon ronde habis (2 per putaran, 8 per taskdir). Dilarang mendispatch; batch ber-BLOCKER tidak dapat disetujui (`chain.py approve` menuntut ronde terakhir `PASS`) — sajikan `BLOCKER` tersisa ke user dan serahkan ke `frontend:lead` Phase 8 (klarifikasi lingkup: amandemen akar, atau `chain.py abandon`). Isi slot `{round}` dengan nomor ronde dari keluaran `open`.
+- `review_round.py open` `FAIL` → plafon ronde habis (2 per putaran, 8 per taskdir). Dilarang mendispatch; batch ber-BLOCKER tidak dapat disetujui (`chain.py approve` menuntut ronde terakhir `PASS`) — jangan commit batch; sajikan `BLOCKER` tersisa ke user dan serahkan ke `frontend:lead` Phase 8 (plafon habis: `AskUserQuestion` rumuskan ulang di taskdir baru atau hentikan). Isi slot `{round}` dengan nomor ronde dari keluaran `open`.
 
 **Predikat mekanis sudah dijamin.** Seluruh check `validate_briefs.py` — S, N, D, L, T, F, B, R, V, K, O, E, C, P, G, M — sudah `PASS`. `doc-reviewer` dilarang menghitung ulang satu pun.
 

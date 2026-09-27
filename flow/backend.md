@@ -1,6 +1,6 @@
 # Alur Plugin `backend`
 
-> Plugin `backend` (v0.8.0, `src/plugins/backend/.claude-plugin/plugin.json`) menyediakan 12 skill dan 6 subagent untuk kerja backend lintas-stack: Java Spring, Go, Node, Bun, Rust, PHP, dan CodeIgniter 4. Plugin ini dipakai untuk tiap permintaan kerja di repo backend, yaitu fitur, bugfix, audit, dokumentasi API, maupun pertanyaan tentang kode. Semua permintaan masuk lewat satu gerbang, `backend:tech-lead`. Gerbang itu memutuskan lane, risk level, dan taskdir dari kode aktual sebelum satu brief ditulis atau satu berkas `src/` disentuh. Plugin sengaja dibuat generic: pengetahuan spesifik-repo disimpan di `.claude/profile/backenddev/`, sedangkan pengetahuan spesifik-stack disimpan di adapter `skills/profile/stacks/<stack>.md`.
+> Plugin `backend` (v0.10.0, `src/plugins/backend/.claude-plugin/plugin.json`) menyediakan 12 skill dan 6 subagent untuk kerja backend lintas-stack: Java Spring, Go, Node, Bun, Rust, PHP, dan CodeIgniter 4. Plugin ini dipakai untuk tiap permintaan kerja di repo backend, yaitu fitur, bugfix, audit, dokumentasi API, maupun pertanyaan tentang kode. Semua permintaan masuk lewat satu gerbang, `backend:tech-lead`. Gerbang itu memutuskan lane, risk level, dan taskdir dari kode aktual sebelum satu brief ditulis atau satu berkas `src/` disentuh. Plugin sengaja dibuat generic: pengetahuan spesifik-repo disimpan di `.claude/profile/backenddev/`, sedangkan pengetahuan spesifik-stack disimpan di adapter `skills/profile/stacks/<stack>.md`.
 
 Semua path berkas di dokumen ini relatif terhadap `src/plugins/backend/`.
 
@@ -464,17 +464,17 @@ Semua dispatch memakai template `skills/<skill>/dispatcher/*.md` yang dihidrasi 
 
 - Hook menyuntik blok `<backend-tech-lead-gate>` sekali per sesi. Teksnya disusun `hooks/gate_text.py` dan berisi stack terdeteksi, status profil, dan aturan gerbang: permintaan apa yang WAJIB lewat `backend:tech-lead`, serta empat pengecualian.
 - Hook menyala bila profil `.claude/profile/backenddev/` ada, atau bila manifest memuat penanda framework server (maksimal 200 kandidat, direktori seperti `node_modules`, `vendor`, dan `docs` dilewati). Di tempat lain hook diam.
-- Status profil yang dilaporkan: ADA; lokasi lama → MIGRATE; absen atau milik plugin lain → tetap lewat gerbang dan GENERATE ditawarkan; JSON rusak, tanpa stack, atau tidak lengkap → REFRESH.
+- Status profil yang dilaporkan: ADA; lokasi lama → MIGRATE; absen atau milik plugin lain → tetap lewat gerbang dan GENERATE ditawarkan; JSON rusak, tanpa stack, field `plugin` asing pada profil sendiri, atau tidak lengkap → REFRESH. Pola workspace `.`/kosong dan manifest yang tak terbaca tidak menghentikan deteksi.
 - `detect.py` identik byte-per-byte dengan milik `frontend` dan diimpor `precondition_lib.py`, sehingga vonis hook sama dengan vonis skrip prasyarat.
-- Berkas `.claude/workflow` yang tidak memuat `backend` membuat hook diam (opt-out).
+- Berkas `.claude/workflow` yang tidak memuat `backend` membuat hook diam (opt-out). Nama plugin dipisah spasi, koma, atau baris; berkas kosong berarti tidak ada plugin yang boleh.
 
 **PreToolUse**. `hooks.json` menjalankan `python3 hooks/guard_bash.py hook` dengan matcher `Bash|Edit|Write` dan timeout 10 detik. Hook hanya berlaku bila input membawa `agent_type` salah satu dari tiga subagent; panggilan lain lolos (exit 0).
 
 | Subagent | Yang diizinkan | Alasan |
 |---|---|---|
-| `backend:code-implementor` | Git read-only (`status`, `diff`, `log`, `show`, `rev-parse`, `ls-files`), `git add <path lease>` tanpa flag, `git commit -m`. Edit/Write hanya ke path lease. Karakter meta (`;&|<>` backtick, `$(`, `${`) ditolak | Lease ditulis `architect` (`guard_bash.py lease --brief`) ke `<git-dir>/nataflow/lease-backend.json`, di luar working tree. Isinya File scope brief, berkas brief, `report-NN.md`, dan `finding_source`. Tanpa lease, semua Bash/Edit/Write ditolak. Bersifat fail-closed: galat internal pun menolak (exit 2) |
+| `backend:code-implementor` | Git read-only (`status`, `diff`, `log`, `show`, `rev-parse`, `ls-files`), `git add <path lease>` tanpa flag, `git commit -m`. Edit/Write hanya ke path lease. Karakter meta (`;&|<>` backtick, `$(`, `${`) dan glob (`*?[`) sebelum `--` ditolak | Lease ditulis `architect` (`guard_bash.py lease --brief`) ke `<git-dir>/nataflow/lease-backend.json`, di luar working tree. Isinya File scope brief, berkas brief, `report-NN.md`, dan `finding_source`. Tanpa lease, semua Bash/Edit/Write ditolak. Bersifat fail-closed: galat internal pun menolak (exit 2) |
 | `backend:code-explorer` | Edit/Write hanya ke `backenddev/docs/[<taskdir>/].explore/*.md` | Explorer hanya boleh menulis laporannya sendiri |
-| `backend:code-reviewer` | Git read-only ditambah `merge-base` dan `symbolic-ref`, `ls`, serta `git add`/`git commit -m` dan Edit/Write hanya atas `<taskdir>/REVIEW.md` dan `backenddev/issues/README.md` | Reviewer read-only atas repo kecuali laporannya. `reset`, `checkout`, `push`, build, dan test ditolak |
+| `backend:code-reviewer` | Git read-only ditambah `merge-base` dan `symbolic-ref` bentuk baca (tanpa `-d`/`--delete`/`-m`, ≤ 1 argumen posisi), `ls`, serta `git add`/`git commit -m` dan Edit/Write hanya atas `<taskdir>/REVIEW.md` dan `backenddev/issues/README.md` | Reviewer read-only atas repo kecuali laporannya. `reset`, `checkout`, `push`, build, dan test ditolak |
 
 ## Artefak & Siklus Status
 
@@ -568,7 +568,7 @@ Ledger `## Chain` di `TASK.md` berjalan `- [ ]` → `- [x] … @ <sha>` (centang
   - Skill `backend:analyst` berbeda dari plugin `analyst`.
 - **`frontend`**: profil terpisah (`.claude/profile/frontenddev/` vs `.claude/profile/backenddev/`). Di repo fullstack, kedua hook menyala dengan deteksinya masing-masing. Deteksi backend hanya membaca `dependencies` server.
 - **`quickdev`**: permintaan `/quickdev:*` dilewati gerbang. Repo yang sepenuhnya memakai quickdev menulis `.claude/workflow`.
-- **`.claude/workflow`**: berkas teks berisi daftar plugin yang boleh menggerbangi repo. Bila berkas ada dan tidak memuat `backend`, hook SessionStart backend diam.
+- **`.claude/workflow`**: berkas teks berisi daftar plugin yang boleh menggerbangi repo (dipisah spasi, koma, atau baris). Bila berkas ada dan tidak memuat `backend`, hook SessionStart backend diam.
 
 ## Titik Gagal & Pemulihan
 
