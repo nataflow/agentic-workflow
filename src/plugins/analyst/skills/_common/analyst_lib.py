@@ -224,6 +224,23 @@ def split_parts(body: str) -> Tuple[str, str]:
     return body, ""
 
 
+def duplicate_headings(body: str, level: int) -> List[str]:
+    """Heading level `level` yang muncul lebih dari sekali di luar pagar kode.
+
+    `sections()` memetakan heading ke dict, jadi heading ganda menimpa isi yang pertama tanpa mengubah
+    urutan kunci — cek struktur yang hanya membandingkan urutan kunci tidak melihatnya.
+    """
+    prefix = "#" * level + " "
+    seen: List[str] = []
+    in_fence = False
+    for line in body.splitlines():
+        if line.startswith("```"):
+            in_fence = not in_fence
+        elif not in_fence and line.startswith(prefix):
+            seen.append(line[len(prefix):].strip())
+    return sorted({h for h in seen if seen.count(h) > 1})
+
+
 LOG_ROW = re.compile(r"^\|\s*(\d+)\s*\|\s*(\d{4}-\d{2}-\d{2})\s*\|(.+)\|(.+)\|(.+)\|\s*$")
 
 
@@ -310,16 +327,21 @@ LEAK_TERMS = (
 LEAK_TERMS_CASED = ("API", "DB", "Spring Boot", "Rust")
 _EXT = (r"(?:tsx?|jsx?|mjs|py|go|java|kts?|rb|php|rs|sql|json|ya?ml|xml|html?|s?css|vue|svelte|"
         r"sh|env|cs|swift|dart|toml|ini|lock|conf)")
+# `(jenis, pola, berlaku di dalam kutipan)`. Teks layar yang dikutip sah memuat kode galat atau identifier
+# (laporan BUG mengutip "Error: invalid_grant"), tetapi tidak pernah perlu membawa path sistem atau
+# metode HTTP — pola itu tetap dipindai di dalam kutipan, supaya kutipan tidak menjadi jalan pintas (G5).
 LEAK_PATTERNS = (
-    ("path berkas", re.compile(rf"\b[\w-]+/[\w./-]*\.{_EXT}\b")),
-    ("rujukan file:baris", re.compile(rf"\.{_EXT}:\d+\b")),
-    ("metode HTTP + path", re.compile(r"\b(GET|POST|PUT|PATCH|DELETE)\s+/")),
-    ("path API", re.compile(r"(?<![\w/])/(api|v\d)/")),
-    ("kode HTTP", re.compile(r"\bHTTP\s*[1-5]\d\d\b", re.IGNORECASE)),
-    ("identifier snake_case", re.compile(r"\b[a-z][a-z0-9]*_[a-z0-9_]+\b")),
-    ("identifier camelCase", re.compile(r"\b[a-z]{2,}[A-Z][A-Za-z0-9]*\b")),
-    ("blok kode", re.compile(r"^```")),
+    ("path berkas", re.compile(rf"\b[\w-]+/[\w./-]*\.{_EXT}\b"), True),
+    ("rujukan file:baris", re.compile(rf"\.{_EXT}:\d+\b"), True),
+    ("metode HTTP + path", re.compile(r"\b(GET|POST|PUT|PATCH|DELETE)\s+/"), True),
+    ("path API", re.compile(r"(?<![\w/])/(api|v\d)/"), True),
+    ("kode HTTP", re.compile(r"\bHTTP\s*[1-5]\d\d\b", re.IGNORECASE), False),
+    ("kode HTTP", re.compile(r"\b(?:error|galat)\s*[1-5]\d\d\b", re.IGNORECASE), False),
+    ("identifier snake_case", re.compile(r"\b[a-z][a-z0-9]*_[a-z0-9_]+\b"), False),
+    ("identifier camelCase", re.compile(r"\b[a-z]{2,}[A-Z][A-Za-z0-9]*\b"), False),
+    ("blok kode", re.compile(r"^```"), True),
 )
+_URLISH = re.compile(r'https?://\S+|[\w.+-]+@[\w-]+\.[\w.]+')
 _EXEMPT = re.compile(r'"[^"\n]*"|“[^”\n]*”|https?://\S+|[\w.+-]+@[\w-]+\.[\w.]+')
 
 
@@ -334,9 +356,10 @@ def scan_leaks(body: str, allowed_terms: List[str], skip_sections: Tuple[str, ..
 
     `line_offset` menggeser N supaya menunjuk baris berkas, bukan baris `body`.
 
-    Teks di dalam tanda kutip dikecualikan karena itu tulisan yang benar-benar dilihat pengguna
-    (label tombol, pesan galat). `allowed_terms` adalah `domain_terms` frontmatter: istilah yang
-    memang kosakata bisnis produk ini (mis. produk API untuk mitra).
+    Istilah, kode HTTP, dan identifier di dalam tanda kutip dikecualikan karena itu tulisan yang benar-benar
+    dilihat pengguna (label tombol, pesan galat); path, metode HTTP, dan blok kode tidak. `allowed_terms`
+    adalah `domain_terms` frontmatter: istilah yang memang kosakata bisnis produk ini (mis. produk API
+    untuk mitra).
     """
     allowed = {t.strip().lower() for t in allowed_terms if t.strip()}
     term_res = []
@@ -353,12 +376,12 @@ def scan_leaks(body: str, allowed_terms: List[str], skip_sections: Tuple[str, ..
             continue
         if skipping or raw.strip().startswith("<!--"):
             continue
-        line = _EXEMPT.sub(" ", raw)
+        line, quoted = _EXEMPT.sub(" ", raw), _URLISH.sub(" ", raw)
         for term_re in term_res:
             for m in term_re.finditer(line):
                 hits.append(f"baris {no}: istilah teknis «{m.group(1)}»")
-        for label, pat in LEAK_PATTERNS:
-            for m in pat.finditer(line):
+        for label, pat, in_quotes in LEAK_PATTERNS:
+            for m in pat.finditer(quoted if in_quotes else line):
                 token = m.group(0).strip()
                 if token.lower() in allowed:
                     continue

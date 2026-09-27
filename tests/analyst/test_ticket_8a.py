@@ -239,7 +239,7 @@ def test_a9_open_dengan_asumsi_lolos(repo):
 def test_a9_domain_term_wajib_berjejak(repo):
     edit(repo, "domain_terms: []", "domain_terms: [API]")
     r = vd(repo, "elicit")
-    assert r.code == 1 and "tanpa jejak di Permintaan Asli/Log: API" in r.out
+    assert r.code == 1 and "tanpa baris konfirmasi di Log: API" in r.out
     row = "| 1 | 2026-09-23 | Invoice mana yang boleh dicicil? | Di atas 50 juta | Rina |"
     edit(repo, row, row + '\n| 2 | 2026-09-23 | Apakah "API" nama produk mitra? | Ya | Rina |')
     assert vd(repo, "elicit").code == 0

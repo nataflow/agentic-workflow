@@ -34,6 +34,7 @@ from analyst_lib import (  # noqa: E402
     Checker,
     body_offset,
     content_hash,
+    duplicate_headings,
     find_root,
     format_report,
     meaningful,
@@ -65,7 +66,10 @@ BR_NONE = re.compile(r"^- Tidak ada aturan khusus — .+")
 BR_TOKEN = re.compile(r"\bBR-(\d+)\b")
 OOS_LINE = re.compile(r"^- .+ — .+$")
 TICKET_Q = re.compile(r"^- \*\*Q-(\d+)\*\*: .+ — asumsi: .+$")
-ASSUMPTION = re.compile(r"^\s*(?:[-*]\s+)?Asumsi:")
+# `Asumsi:` di mana pun dalam baris, juga bentuk tebal (`**Asumsi**:`) — bukan hanya di awal baris (G7).
+ASSUMPTION = re.compile(r"(?:^|[\s(\[>*_])\**Asumsi\**\s*:", re.IGNORECASE)
+CONFIRMED = re.compile(r"^\s*ya\b", re.IGNORECASE)          # kolom jawaban baris konfirmasi istilah domain
+QUOTED = re.compile(r'"([^"\n]+)"|“([^”\n]+)”')
 BUG_FIELDS = ("**Langkah reproduksi**:", "**Yang diharapkan**:", "**Yang terjadi**:", "**Dampak**:")
 
 
@@ -140,8 +144,12 @@ class DocValidator(Checker):
             errors.append(f"`## {ELICIT_H2}` bukan H2 terakhir")
         elif tuple(self.h3) != ELICIT_H3:
             errors.append(f"sub-heading {list(self.h3)} bukan {list(ELICIT_H3)}")
+        dup = duplicate_headings(self.body, 2) + duplicate_headings("\n".join(self.h2.get(ELICIT_H2, [])), 3)
+        if dup:
+            errors.append("heading ganda (isi yang pertama tertimpa): " + ", ".join(dup))
         self.add(2, "Struktur", not errors, "; ".join(errors) or "lolos",
-                 f"Satu H1; `## {ELICIT_H2}` sebagai H2 terakhir dengan empat H3 persis urutan template.")
+                 f"Satu H1; `## {ELICIT_H2}` sebagai H2 terakhir dengan empat H3 persis urutan template, "
+                 "tiap heading sekali.")
 
         request = meaningful(self.h3.get("Permintaan Asli", []))
         self.add(3, "Permintaan asli terekam", bool(request) and all(l.startswith(">") for l in request),
@@ -153,6 +161,9 @@ class DocValidator(Checker):
         errors = []
         if list(facts) != expected:
             errors.append(f"pilar {list(facts)} bukan {expected}")
+        dup = duplicate_headings("\n".join(self.h3.get("Fakta", [])), 4)
+        if dup:
+            errors.append("pilar ganda (isi yang pertama tertimpa): " + ", ".join(dup))
         unanswered, empty = [], []
         for pillar in expected:
             body = meaningful(facts.get(pillar, []))
@@ -224,20 +235,26 @@ class DocValidator(Checker):
                  "Tulis `domain_terms: [<istilah>, ...]` atau `domain_terms: []`.")
 
         # 9–10 hanya menagih saat CLOSED: selama OPEN, asumsi dan istilah yang belum dikonfirmasi sah.
-        assumed = [l.strip()[:50] for l in self.h3.get("Fakta", []) if ASSUMPTION.match(l)]
+        assumed = [l.strip()[:50] for l in self.h3.get("Fakta", []) if ASSUMPTION.search(l)]
         self.add(9, "Asumsi terkonfirmasi", not (closed and assumed),
                  f"{len(assumed)} baris `Asumsi:`" + (" pada CLOSED" if closed and assumed else ""),
                  "Konfirmasi tiap `Asumsi:` di Phase 4 elicit (hapus labelnya) atau kembalikan pilarnya ke "
                  "Phase 2 sebelum `elicitation: CLOSED`.")
 
-        trail = "\n".join(self.h3.get("Permintaan Asli", []) + self.h3.get("Log Tanya-Jawab", [])).lower()
+        # Kemunculan di Permintaan Asli saja tidak cukup (G4): istilah teknis yang diucapkan peminta
+        # ("API-nya error 500") justru wajib diterjemahkan jadi perilaku, bukan dikecualikan dari pemindai.
+        confirmed = set()
+        for line in self.h3.get("Log Tanya-Jawab", []):
+            m = LOG_ROW.match(line.strip())
+            if m and CONFIRMED.match(m.group(4)):
+                confirmed.update((a or b).strip().lower() for a, b in QUOTED.findall(m.group(3)))
         listed = terms if isinstance(terms, list) else []
-        untraced = [t for t in listed if t.strip() and not re.search(
-            rf"(?<![\w-]){re.escape(t.strip().lower())}(?![\w-])", trail)]
-        self.add(10, "domain_terms berjejak", not (closed and untraced),
-                 "lolos" if not untraced else "tanpa jejak di Permintaan Asli/Log: " + ", ".join(untraced),
-                 "Tiap istilah `domain_terms` wajib muncul di permintaan asli atau baris log konfirmasinya "
-                 "(`| n | ... | Apakah \"<istilah>\" nama produk? | Ya | <peminta> |`).")
+        unconfirmed = [t for t in listed if t.strip() and t.strip().lower() not in confirmed]
+        self.add(10, "domain_terms dikonfirmasi", not (closed and unconfirmed),
+                 "lolos" if not unconfirmed else "tanpa baris konfirmasi di Log: " + ", ".join(unconfirmed),
+                 "Tiap istilah `domain_terms` wajib punya baris log berjawaban Ya yang mengutip istilahnya: "
+                 "`| n | ... | Apakah \"<istilah>\" nama produk? | Ya | <peminta> |`. Kemunculan di permintaan "
+                 "asli saja tidak cukup.")
 
     # ── kartu tiket ──
     def _ticket(self) -> None:
@@ -259,9 +276,12 @@ class DocValidator(Checker):
             errors.append("judul lebih dari 12 kata")
         if tuple(self.h2) != expected:
             errors.append(f"heading {list(self.h2)} bukan {list(expected)}")
+        dup = duplicate_headings(self.body, 2)
+        if dup:
+            errors.append("heading ganda (isi yang pertama tertimpa): " + ", ".join(dup))
         self.add(2, "Struktur", not errors, "; ".join(errors) or "lolos",
-                 f"Satu H1, tujuh H2 kartu persis urutan template tipe {typ}, lalu `## {ELICIT_H2}` "
-                 "tanpa disentuh.")
+                 f"Satu H1, tujuh H2 kartu persis urutan template tipe {typ} (tiap heading sekali), lalu "
+                 f"`## {ELICIT_H2}` tanpa disentuh.")
 
         background = meaningful(self.h2.get("Latar Belakang", []))
         if typ == "BUG":
@@ -346,12 +366,33 @@ class DocValidator(Checker):
                  "tanda kutip; istilah yang memang kosakata produk dicatat analyst:elicit di "
                  "`domain_terms` lebih dulu.")
 
+        # G6: tiap `Q-{n}` TIDAK MEMBLOKIR catatan dibawa kartu beserta asumsinya, dan kartu tidak
+        # mengarang pertanyaan yang tidak ada di catatan.
+        notes_q = sections("\n".join(self.h2.get(ELICIT_H2, [])), 3).get("Pertanyaan Terbuka", [])
+        open_q, all_q = set(), set()
+        for line in meaningful(notes_q):
+            m = ELICIT_Q.match(line.strip())
+            if m:
+                all_q.add(int(m.group(1)))
+                if m.group(2) == "TIDAK MEMBLOKIR":
+                    open_q.add(int(m.group(1)))
+        card_q = {int(m.group(1)) for m in (TICKET_Q.match(q.strip()) for q in qs) if m}
+        lost, ghost = sorted(open_q - card_q), sorted(card_q - all_q)
+        errors = ([f"Q TIDAK MEMBLOKIR catatan tanpa jejak di kartu: {', '.join(f'Q-{n}' for n in lost)}"]
+                  if lost else [])
+        if ghost:
+            errors.append(f"Q kartu tanpa asal di catatan: {', '.join(f'Q-{n}' for n in ghost)}")
+        self.add(10, "Pertanyaan terbuka terbawa", not errors,
+                 "; ".join(errors) or f"{len(card_q)} Q, sama dengan catatan",
+                 "Salin tiap `Q-{n}` TIDAK MEMBLOKIR dari `### Pertanyaan Terbuka` catatan ke `## Pertanyaan "
+                 "Terbuka` kartu dengan ID yang sama beserta asumsinya; Q yang sudah terjawab hapus dari kartu.")
+
         if self.fm.get("status") == "READY":
             current = content_hash(self.text)
             sealed = str(self.fm.get("approved_hash", ""))
             seal = str(self.fm.get("approved_seal", "-") or "-")
             seal_ok = seal == "-" or seal == ticket_seal(self.text)   # `-`: tiket sebelum 09 E8
-            self.add(10, "Konten = yang disetujui", sealed == current and seal_ok,
+            self.add(11, "Konten = yang disetujui", sealed == current and seal_ok,
                      f"approved_hash {sealed or '-'} · konten {current} · segel {'cocok' if seal_ok else 'BERBEDA'}",
                      "Tiket READY disunting sesudah disetujui: `ticket.py reopen`, atau pulihkan isinya.")
 

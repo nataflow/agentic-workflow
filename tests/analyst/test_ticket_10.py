@@ -239,3 +239,100 @@ def test_g3_ronde_dicocokkan_dengan_check(repo):
     assert review_with(repo, "BLOCKED", block(repo, "BLOCKED", counts=(0, 1), items=("x",))).code == 0
     assert check(repo)["ronde"] == "habis"
 
+
+# --- G4 ------------------------------------------------------------------------------------------
+
+@pytest.mark.regression("G4")
+def test_g4_istilah_hanya_di_permintaan_asli_tidak_cukup(repo):
+    """Probe G4: istilah teknis yang diucapkan peminta tidak otomatis menjadi kosakata produk."""
+    edit(repo, "Tolong bikin fitur cicilan.", "API-nya error kalau dipecah. Tolong bikin fitur cicilan API.")
+    edit(repo, "domain_terms: []", "domain_terms: [API]")
+    r = vd(repo, "elicit")
+    assert r.code == 1 and "tanpa baris konfirmasi di Log: API" in r.out
+    edit(repo, LOG_ROW_1, LOG_ROW_1 + '\n| 2 | 2026-09-23 | Apakah "API" nama produk mitra? | Tidak | Rina |')
+    assert vd(repo, "elicit").code == 1                              # jawaban bukan Ya
+    edit(repo, "nama produk mitra? | Tidak |", "nama produk mitra? | Ya, produk berbayar |")
+    assert vd(repo, "elicit").code == 0
+
+
+# --- G5 ------------------------------------------------------------------------------------------
+
+AC2_THEN = 'then pilihan "Buat Cicilan" tidak tersedia (BR-1)'
+
+
+@pytest.mark.regression("G5")
+@pytest.mark.parametrize("then, needle", [
+    ('then "POST /api/v1/installments" mengembalikan "201" (BR-1)', "metode HTTP + path"),
+    ('then muncul "data dari /api/cicilan/ gagal" (BR-1)', "path API"),
+    ('then halaman "src/pages/Invoice.tsx" terbuka (BR-1)', "path berkas"),
+    ("then muncul error 500 (BR-1)", "kode HTTP «error 500»"),
+])
+def test_g5_kebocoran_struktural_di_dalam_kutipan_tetap_ditandai(repo, then, needle):
+    edit(repo, AC2_THEN, then)
+    r = vd(repo, "ticket")
+    assert r.code == 1 and needle in r.out
+
+
+@pytest.mark.regression("G5")
+@pytest.mark.parametrize("then", [
+    'then muncul tulisan "Error: invalid_grant" (BR-1)',
+    'then muncul tulisan "Terjadi kesalahan (500), coba lagi" (BR-1)',
+    'then tautan "https://docs.example.com/api/v1/panduan.html" tampil (BR-1)',
+])
+def test_g5_teks_layar_yang_dikutip_tetap_sah(repo, then):
+    edit(repo, AC2_THEN, then)
+    assert vd(repo, "ticket").code == 0
+
+
+# --- G6 ------------------------------------------------------------------------------------------
+
+Q_NOTES = "- **Q-2** [TIDAK MEMBLOKIR]: Apakah pelanggan menerima pengingat? — menunggu: Rina"
+Q_CARD = "- **Q-{n}**: Apakah pelanggan menerima pengingat? — asumsi: tidak ada pengingat"
+
+
+@pytest.mark.regression("G6")
+def test_g6_q_tidak_memblokir_wajib_terbawa_ke_kartu(repo):
+    body = text(repo)
+    notes_at = body.index("### Pertanyaan Terbuka")
+    (repo / TDIR / "TICKET.md").write_text(body[:notes_at] + f"### Pertanyaan Terbuka\n\n{Q_NOTES}\n",
+                                           encoding="utf-8")
+    r = vd(repo, "ticket")
+    assert r.code == 1 and "tanpa jejak di kartu: Q-2" in r.out
+    edit(repo, "## Pertanyaan Terbuka\n\n- Tidak ada.", "## Pertanyaan Terbuka\n\n" + Q_CARD.format(n=3))
+    r = vd(repo, "ticket")
+    assert r.code == 1 and "Q kartu tanpa asal di catatan: Q-3" in r.out
+    edit(repo, Q_CARD.format(n=3), Q_CARD.format(n=2))
+    assert vd(repo, "ticket").code == 0
+
+
+# --- G7 ------------------------------------------------------------------------------------------
+
+@pytest.mark.regression("G7")
+@pytest.mark.parametrize("line", [
+    "Hanya pelanggan korporat. Asumsi: perorangan ditunda.",
+    "Hanya pelanggan korporat (**Asumsi**: perorangan ditunda).",
+])
+def test_g7_asumsi_di_tengah_baris_menahan_closed(repo, line):
+    edit(repo, "Hanya pelanggan korporat.", line)
+    r = vd(repo, "elicit")
+    assert r.code == 1 and "[9] Asumsi terkonfirmasi" in r.out and ": FAIL" in r.out
+
+
+# --- G8 ------------------------------------------------------------------------------------------
+
+@pytest.mark.regression("G8")
+def test_g8_h2_ganda_di_kartu_ditolak(repo):
+    """Probe G8: seksi pertama berisi placeholder dan baris rusak dulu tertimpa seksi kedua."""
+    edit(repo, "## Acceptance Criteria\n", "## Acceptance Criteria\n\n- TODO <isi nanti>\n\n## Acceptance Criteria\n")
+    r = vd(repo, "ticket")
+    assert r.code == 1 and "heading ganda (isi yang pertama tertimpa): Acceptance Criteria" in r.out
+    assert next(l for l in r.out.splitlines() if l.startswith("[4]")).endswith("PASS (2 AC)")  # isi tertimpa
+
+
+@pytest.mark.regression("G8")
+def test_g8_pilar_ganda_menyembunyikan_pilar_belum_terjawab(repo):
+    """Urutan kunci tetap, jadi dulu CLOSED lolos dengan `Urgensi` belum terjawab."""
+    edit(repo, "#### Urgensi\n", "#### Urgensi\n_(belum terjawab)_\n\n#### Urgensi\n")
+    r = vd(repo, "elicit")
+    assert r.code == 1 and "pilar ganda (isi yang pertama tertimpa): Urgensi" in r.out
+
