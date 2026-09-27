@@ -23,7 +23,7 @@ DILARANG MEMULAI IMPLEMENTASI ATAU MENULIS KODE SUMBER SEBELUM DOKUMEN RENCANA D
   - User memanggil `/quickdev:<skill>` secara eksplisit, atau melanjutkan artefak quickdev (`plan/<task>.md`, `repo-profile.md`) → lanjutkan skill ini. Blok gerbang itu mengecualikan alur plugin lain yang dipanggil eksplisit.
   - Permintaan kerja baru tanpa pilihan alur → tanyakan sekali lewat `AskUserQuestion`: "Alur ringan quickdev (`plan/<task>.md`)" atau "Gerbang `<backend:tech-lead | frontend:lead>` (taskdir + brief)". Jangan memilih sendiri.
 - `.claude/workflow` ada dan tidak memuat kata `quickdev` → repo ini memilih alur lain; laporkan dan tanyakan dulu sebelum lanjut.
-- Penanda opt-out `.claude/workflow` (nama plugin yang boleh menggerbangi repo, dipisah spasi/baris): isi `quickdev` membuat hook SessionStart `backend`/`frontend` diam; isi `frontend quickdev` hanya menyalakan hook `frontend`.
+- Penanda opt-out `.claude/workflow` (nama plugin yang boleh menggerbangi repo, dipisah spasi, koma, atau baris): isi `quickdev` membuat hook SessionStart `backend`/`frontend` diam; isi `frontend quickdev` hanya menyalakan hook `frontend`.
 
 ## Parameter [REQUIRED]
 
@@ -73,7 +73,7 @@ DILARANG MEMULAI IMPLEMENTASI ATAU MENULIS KODE SUMBER SEBELUM DOKUMEN RENCANA D
 
 1. Tulis dokumen rencana lengkap ke `<plan_dir>/<task_name>.md` dengan struktur format standar:
    - Header dokumen: `# Implementation Plan — <task_name>`
-   - Metadata: baris polos `Kunci: nilai` tepat di bawah H1 (tanpa butir/tebal): `Status: DRAFT`, `Author: quickdev:plan`, `Date: <ISO>`, `Profile: <profile_path>`, `Gates: explore=<EXPLORED|DILEWATI> clarify=<CLARIFIED|SKIPPED|DILEWATI>`. Baris `Approved-At`, `Approval`, dan `Plan-Hash` hanya ditulis `plan_lock.py lock`.
+   - Metadata: baris polos `Kunci: nilai` tepat di bawah H1 (tanpa butir/tebal): `Status: DRAFT`, `Author: quickdev:plan`, `Date: <ISO>`, `Profile: <profile_path>`, `Gates: explore=<EXPLORED|DILEWATI> clarify=<CLARIFIED|SKIPPED|DILEWATI>`. Baris `Approved-At`, `Approval`, `Plan-Hash`, dan `Hash-Scope` hanya ditulis `plan_lock.py lock`. Sidik mencakup Section 1–5 dan baris `Profile:`, karena profil menentukan pembanding regresi `quickdev:execute`.
    - Section 1: `## 1. Overview & Objectives` (Tujuan, deskripsi masalah, dan keputusan terkunci dari `clarify` agar spesifikasi tidak bergantung pada riwayat percakapan)
    - Section 2: `## 2. Architecture & Layer Impact` (Tabel modul yang disentuh beserta dampaknya terhadap komponen sekitar)
    - Section 3: `## 3. Atomic Implementation Steps` (Rincian langkah demi langkah bernomor urut dilengkapi checkbox interaktif `- [ ]`)
@@ -90,15 +90,21 @@ DILARANG MEMULAI IMPLEMENTASI ATAU MENULIS KODE SUMBER SEBELUM DOKUMEN RENCANA D
 2. Minta persetujuan eksplisit user (Approval Gate):
    - Minta user memberikan persetujuan eksplisit ("approve" / "setuju") atau memberikan poin revisi.
 3. Tangani evaluasi respons balik user:
-   - **Jika user meminta revisi atau penyesuaian**: Perbarui dokumen `<plan_dir>/<task_name>.md` sesuai feedback, pertahankan `Status: DRAFT`, dan ajukan draf pembaruan untuk review ulang. Rencana yang sudah memuat `## Execution Status`: revisi hanya Section 1–5 lewat Edit terarah; blok itu dan checkbox langkah yang teksnya tidak berubah dipertahankan.
-   - **Jika user menyatakan persetujuan eksplisit**: jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py lock --plan <plan_dir>/<task_name>.md --answer "<jawaban user apa adanya>" --profile <profile_path>`. `LOCK FAIL` → perbaiki sebabnya; dilarang menulis `Status: APPROVED` dengan tangan.
+   - **Jika user meminta revisi atau penyesuaian**: Perbarui dokumen `<plan_dir>/<task_name>.md` sesuai feedback, pertahankan `Status: DRAFT`, dan ajukan draf pembaruan untuk review ulang. Rencana yang sudah memuat `## Execution Status`: revisi hanya Section 1–5 lewat Edit terarah; blok itu dan checkbox langkah yang teksnya tidak berubah dipertahankan, sedangkan langkah yang teksnya berubah dikembalikan ke `- [ ]` supaya `quickdev:execute` mengerjakannya ulang.
+   - **Jika user menyatakan persetujuan eksplisit**: jalankan perintah di bawah dengan jawaban user apa adanya lewat stdin. Heredoc berkutip mencegah shell mengekspansi `` ` `` dan `$` di jawaban; dilarang memakai kutip ganda. `LOCK FAIL` → perbaiki sebabnya; dilarang menulis `Status: APPROVED` dengan tangan.
+
+     ```
+     python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py lock --plan <plan_dir>/<task_name>.md --profile <profile_path> --answer - <<'QD_EOF'
+     <jawaban user apa adanya>
+     QD_EOF
+     ```
 
 ### Fase 4 — Penguncian Status Terminal & Handoff
 
 1. Pastikan berkas `<plan_dir>/<task_name>.md` telah berstatus `APPROVED` di filesystem:
    - Pastikan keluaran `LOCK PASS` memuat sidik; `Approved-At`, `Approval`, dan `Plan-Hash` sudah ditulis skrip.
 2. Set status terminal `PLAN_APPROVED`.
-3. Alirkan dokumen rencana yang telah disetujui ke gate eksekusi: `execute`.
+3. Tawarkan `quickdev:execute` (`/quickdev:execute <plan_dir>/<task_name>.md`, sesudah user meng-commit rencana `APPROVED` bila ingin riwayatnya terlihat); tunggu user.
 
 ## Guardrails
 
@@ -106,7 +112,7 @@ DILARANG MEMULAI IMPLEMENTASI ATAU MENULIS KODE SUMBER SEBELUM DOKUMEN RENCANA D
 - MUST NOT mengizinkan transisi status ke `PLAN_APPROVED` tanpa persetujuan eksplisit tertulis dari user.
 - MUST NOT membuat langkah implementasi yang ambigu tanpa menyebutkan path berkas target yang pasti.
 - MUST NOT melompati seksi strategi pengujian dan verifikasi baseline dalam dokumen rencana.
-- MUST NOT mengubah Section 1–5 berkas `APPROVED`. Revisi atas permintaan user: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py unlock --plan <plan_path> --reason "<alasan>"` → revisi → approval ulang (`lock`). Blok `## Execution Status` dipertahankan apa adanya. Rencana `APPROVED` tanpa `Plan-Hash` (format lama) diperlakukan sama: `unlock`, lalu minta user menyetujui ulang.
+- MUST NOT mengubah Section 1–5 atau `Profile:` berkas `APPROVED`. Revisi atas permintaan user: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py unlock --plan <plan_path> --reason - <<'QD_EOF'` (alasan lewat stdin, ditutup `QD_EOF`) → revisi → approval ulang (`lock`). Blok `## Execution Status` dipertahankan apa adanya. Rencana `APPROVED` tanpa `Plan-Hash` (format lama) diperlakukan sama: `unlock`, lalu minta user menyetujui ulang.
 - Keputusan ruang lingkup fitur dan persetujuan arsitektur rencana implementasi tetap milik mutlak user.
 
 ## Output [REQUIRED]

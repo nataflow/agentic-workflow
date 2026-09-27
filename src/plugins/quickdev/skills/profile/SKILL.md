@@ -22,7 +22,7 @@ DILARANG MEMBUAT ASUMSI STACK ATAU PERINTAH BASELINE TANPA BUKTI KONFIGURASI NYA
   - User memanggil `/quickdev:<skill>` secara eksplisit, atau melanjutkan artefak quickdev (`plan/<task>.md`, `repo-profile.md`) → lanjutkan skill ini. Blok gerbang itu mengecualikan alur plugin lain yang dipanggil eksplisit.
   - Permintaan kerja baru tanpa pilihan alur → tanyakan sekali lewat `AskUserQuestion`: "Alur ringan quickdev (`plan/<task>.md`)" atau "Gerbang `<backend:tech-lead | frontend:lead>` (taskdir + brief)". Jangan memilih sendiri.
 - `.claude/workflow` ada dan tidak memuat kata `quickdev` → repo ini memilih alur lain; laporkan dan tanyakan dulu sebelum lanjut.
-- Penanda opt-out `.claude/workflow` (nama plugin yang boleh menggerbangi repo, dipisah spasi/baris): isi `quickdev` membuat hook SessionStart `backend`/`frontend` diam; isi `frontend quickdev` hanya menyalakan hook `frontend`.
+- Penanda opt-out `.claude/workflow` (nama plugin yang boleh menggerbangi repo, dipisah spasi, koma, atau baris): isi `quickdev` membuat hook SessionStart `backend`/`frontend` diam; isi `frontend quickdev` hanya menyalakan hook `frontend`.
 
 ## Parameter [REQUIRED]
 
@@ -83,11 +83,12 @@ DILARANG MEMBUAT ASUMSI STACK ATAU PERINTAH BASELINE TANPA BUKTI KONFIGURASI NYA
    - Perintah Build / Bundle Check: `pnpm build`, `npm run build`, `vite build`, atau `go build ./...`.
    - Jenis tanpa runner atau konfigurasi di manifest (mis. repo tanpa test runner) dicatat `TIDAK_ADA`, bukan dikarang dan bukan `SKIPPED`.
 2. Sebelum eksekusi (kecuali `skip_baseline_exec: true`):
-   - Catat `git status --porcelain` sebagai keadaan awal.
+   - Catat `git status --porcelain` sebagai keadaan awal dan `git rev-parse HEAD` (atau `none` di repo tanpa commit) sebagai `Baseline-Commit`. Tree kotor di luar profil → catat daftar berkasnya di baris `Baseline-Commit`: baseline itu tidak mewakili commit mana pun, sehingga `quickdev:execute` mengukur ulang.
    - Sajikan satu `AskUserQuestion`: daftar perintah beserta risikonya — test yang tampak integrasi (membaca `.env`, docker-compose, Testcontainers, `DATABASE_URL`) ditandai "menyentuh DB/jaringan"; build ditandai "dapat menulis artefak". Opsi: `jalankan semua` · `lewati yang menyentuh DB/jaringan` · `lewati semua (SKIPPED)`.
 3. Jalankan perintah yang disetujui satu per satu dengan `timeout` tool Bash 300000 ms:
    - Jalankan dari direktori kerja yang dicatat di kolom `Cwd` (`workspace_dir`, atau `.` untuk root) sebagai `(cd <Cwd> && <perintah>)` dari root repo.
-   - Tulis hasil tiap perintah ke tabel Section 5 template: Status (`PASSED`, `FAILED`, `TIMEOUT`, `SKIPPED`, `UNVERIFIED_ENV_NOT_READY`, `TIDAK_ADA`), Durasi, dan Known issues dengan penanda persis (`berkas:baris aturan`, nama test) — maksimal 10 baris, lebih dari itu `<n> issue — contoh: …` beserta perintah reproduksinya. `UNVERIFIED_ENV_NOT_READY` beserta pesan penyebab satu baris masuk kolom Known issues. `quickdev:execute` membedakan galat bawaan dari regresi hanya lewat kolom ini.
+   - Tulis hasil tiap perintah ke tabel Section 5 template: Status (`PASSED`, `FAILED`, `TIMEOUT`, `SKIPPED`, `UNVERIFIED_ENV_NOT_READY`, `TIDAK_ADA`), Durasi, dan Known issues dengan penanda persis (`berkas:baris aturan`, nama test) — maksimal 10 baris, lebih dari itu `<n> issue — contoh: …` beserta perintah reproduksinya. `UNVERIFIED_ENV_NOT_READY` beserta pesan penyebab satu baris masuk kolom Known issues. `SKIPPED` menulis alasannya di kolom yang sama (`ditolak user: menyentuh DB/jaringan`, `ditolak user: lewati semua`, atau `skip_baseline_exec`), karena `quickdev:execute` wajib meminta izin baru sebelum menjalankan perintah yang ditolak. `quickdev:execute` membedakan galat bawaan dari regresi lewat kolom ini, dicocokkan per berkas + aturan/nama test tanpa nomor baris.
+   - Tulis baris `Baseline-Commit:` Section 5 (di atas tabel) dengan nilai yang dicatat di butir 2.
 4. Bandingkan `git status --porcelain` dengan keadaan awal. Berkas baru yang tidak di-ignore dicatat di profil sebagai "artefak build perlu di-ignore" dan dilaporkan ke user; dilarang menghapusnya sendiri.
 5. Dilarang mencatat perintah verifikasi rekaan yang tidak dapat dieksekusi di runtime aktual repositori.
 
@@ -113,7 +114,7 @@ DILARANG MEMBUAT ASUMSI STACK ATAU PERINTAH BASELINE TANPA BUKTI KONFIGURASI NYA
    - Pastikan seluruh 6 section header hadir dan perintah baseline terbukti valid.
    - Pastikan ukuran berkas memenuhi batas kuota (< 10.000 karakter).
 2. Set status terminal `PROFILED` dan laporkan ringkasan metadata profil ke user.
-3. Bila konteks sesi memuat blok `<backend-tech-lead-gate>` atau `<frontend-lead-gate>` (atau `python3 <plugin>/hooks/detect.py --explain` menunjukkan hook engineer aktif), tawarkan penulisan penanda opt-out `.claude/workflow` berisi `quickdev` (ditambah nama plugin engineer yang tetap boleh menggerbangi repo, bila ada) agar hook engineer diam di repo ini. Tulis berkas itu hanya dengan persetujuan user.
+3. Bila konteks sesi memuat blok `<backend-tech-lead-gate>` atau `<frontend-lead-gate>` (tanda hook engineer aktif; path plugin lain tidak diketahui dari quickdev, jadi jangan mencari skrip deteksinya), tawarkan penulisan penanda opt-out `.claude/workflow` berisi `quickdev` (ditambah nama plugin engineer yang tetap boleh menggerbangi repo, bila ada) agar hook engineer diam di repo ini. Tulis berkas itu hanya dengan persetujuan user.
 4. Tawarkan `quickdev:explore`; tunggu user.
 
 ## Guardrails
@@ -141,7 +142,7 @@ Skill ini menghasilkan berkas profil repositori terstruktur dan laporan terminal
    TIPE: <backend | frontend | fullstack> — sumber <parameter type | deteksi manifes> — server-side <pola route server | tidak>
    STACK: <runtime> / <framework> / <package manager>
    LAYER: <n> layer terpetakan — <daftar path layer ringkas>
-   BASELINE: typecheck=<status> lint=<status> test=<status> build=<status>
+   BASELINE: typecheck=<status> lint=<status> test=<status> build=<status> — Baseline-Commit <sha12 | none>
    ISSUE BAWAAN: <ringkasan error/warning baseline eksisting | ->
    UKURAN: <n> karakter (batas 10.000)
    HANDOFF: explore

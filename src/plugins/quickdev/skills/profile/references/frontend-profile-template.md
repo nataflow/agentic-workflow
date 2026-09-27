@@ -47,7 +47,9 @@ Struktur arsitektur folder frontend dan batasan layer:
 
 ## 5. Verification Baseline
 
-Dijalankan dari root repo kecuali kolom Cwd menyebut lain. Status: `PASSED` | `FAILED` | `TIMEOUT` | `SKIPPED` | `UNVERIFIED_ENV_NOT_READY` | `TIDAK_ADA` (tidak ada runner/konfigurasi di manifest). Known issues memakai penanda persis (mis. `src/legacy/a.ts:12 no-explicit-any`, `test_order_refund`), maksimal 10 baris; bila lebih, tulis `<n> issue — contoh: …` beserta perintah untuk mereproduksi daftar lengkap. `UNVERIFIED_ENV_NOT_READY` diberi pesan penyebab satu baris di kolom Known issues.
+Dijalankan dari root repo kecuali kolom Cwd menyebut lain. Status: `PASSED` | `FAILED` | `TIMEOUT` | `SKIPPED` | `UNVERIFIED_ENV_NOT_READY` | `TIDAK_ADA` (tidak ada runner/konfigurasi di manifest). Known issues memakai penanda persis (mis. `src/legacy/a.ts:12 no-explicit-any`, `test_order_refund`), maksimal 10 baris; bila lebih, tulis `<n> issue — contoh: …` beserta perintah untuk mereproduksi daftar lengkap. `UNVERIFIED_ENV_NOT_READY` diberi pesan penyebab satu baris di kolom Known issues; `SKIPPED` diberi alasannya (`ditolak user: menyentuh DB/jaringan`, `ditolak user: lewati semua`, atau `skip_baseline_exec`). `quickdev:execute` mencocokkan galat per berkas + aturan/nama test, tanpa nomor baris.
+
+Baseline-Commit: `<sha HEAD saat baseline dijalankan | none (repo tanpa commit)>` — tree bersih: `<ya | tidak: daftar berkas>`
 
 | Jenis | Perintah | Cwd | Status | Durasi | Known issues (baseline) |
 |---|---|---|---|---|---|
