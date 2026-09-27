@@ -173,8 +173,10 @@ Rantai yang janji akarnya tidak mendarat tidak pernah sampai ke `report`, sebers
 
 1. **Ingest** — `check_preconditions.py --brief NN`: brief `READY`, `depends_on` tertutup lewat commit
    `implement unit`, `report-NN.md` belum ada, kesegaran `based_on`.
-2. **Dispatch** — `code-implementor` menerapkan brief tanpa satu perintah terminal pun (Bash hanya untuk
-   `git restore` ber-scope dan `rm --` atas berkas `CREATE` buatannya sendiri) dan menulis `report-<NN>.md` — laporan yang bertahan melewati sesi.
+2. **Dispatch** — `code-implementor` menerapkan brief tanpa satu perintah terminal pun (tool `Bash` tidak
+   tersedia) dan menulis `report-<NN>.md` — laporan yang bertahan melewati sesi. Berkas yang perlu
+   dipulihkan dicatatnya di `## Rollback`; rollback-nya (`git restore --` berkas `MODIFY`, `rm --` berkas
+   `CREATE`) milik `architect` di matriks bukti disk.
 3. **Matriks bukti disk** — `git status` dan hunk anchor disandingkan dengan `files_touched`; laporan
    adalah klaim, disk adalah bukti. Hasilnya commit unit (brief `DONE` + kode + laporan, satu commit)
    atau commit `BLOCKED`.

@@ -254,6 +254,7 @@ Tiap skill punya `skills/<skill>/scripts/check_preconditions.py` yang dijalankan
 - Stacktrace untuk `debug` dioper sebagai argumen shell. Tempel log dari sumber yang dipercaya saja.
 - `commit_message` brief berpola `<type>(<domain>): implement <unit>`; konvensi commit profil (mis. nomor
   tiket) belum dihormati.
-- Instruksi yang dimuat sebelum membaca kode besar (sekitar 90 ribu token untuk rantai penuh). Batas tulis
-  `code-explorer` ke laci `.explore/` ditegakkan lewat prompt, bukan hook.
+- Instruksi yang dimuat sebelum membaca kode besar (sekitar 90 ribu token untuk rantai penuh).
+- Hook memagari tulis `code-explorer` hanya sampai pola laci `backenddev/docs/[<taskdir>/].explore/*.md`;
+  kewajiban menulis tepat ke path `Berkas laporan` dari pendispatch ditegakkan lewat prompt, bukan hook.
 - Hook tidak jalan di Windows yang hanya punya `py`/`python` tanpa `python3`.
