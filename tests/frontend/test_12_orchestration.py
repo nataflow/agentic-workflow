@@ -405,6 +405,12 @@ def test_readme_catatan_upgrade():
     assert "0.8.0" in readme and "Sidik:" in readme and "`head`" in readme
 
 
+def test_versi_rilis():
+    fe = json.loads(read(FE / ".claude-plugin" / "plugin.json"))
+    be = json.loads(read(PLUGINS / "backend" / ".claude-plugin" / "plugin.json"))
+    assert (fe["version"], be["version"]) == ("0.9.0", "0.10.0")
+
+
 def test_flow_frontend_menyebut_perilaku_baru():
     flow = read(REPO / "flow" / "frontend.md")
     for token in ("Sidik:", "TERHENTI", "DAG", "126/127", "git check-ignore", "taskdir baru"):

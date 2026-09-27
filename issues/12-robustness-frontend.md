@@ -4,7 +4,7 @@ Sumber: review robustness plugin `frontend` 2026-09-27 (lima penelusur paralel: 
 prasyarat & verifikasi, validator dokumen, orkestrasi & prosa). Tiap temuan Tinggi/Sedang direproduksi di ruang
 kerja sementara sebelum masuk berkas ini. Basis kode: commit `b293564` (suite 615 test hijau).
 
-**Status (2026-09-27):** peta blast radius selesai; tahap 1–5 selesai, rilis menyusul.
+**Status (2026-09-27):** J1–J58 selesai (J10 batal) dalam lima tahap, masing-masing dengan test regresi (`tests/frontend/test_12_{guard,verification,validators,ledger,orchestration}.py`, `tests/backend/test_12_{guard,verification}.py`) yang merah di kode sebelum perbaikan. Suite penuh 1735 passed; lint M7 terhadap `b293564` lolos. Versi: frontend 0.9.0, backend 0.10.0 (guard, `detect.py`, `gate_text.py`, `run_verification.py`, `migrate_profile.py` dikembar).
 
 ## Tujuan
 
@@ -209,4 +209,4 @@ atau pola sama di plugin lain. **Test tersentuh** = test yang ada dan harus teta
 - [x] **J57 [Sedang]** Profil per-app di monorepo dijanjikan prosa tetapi tidak didukung skrip.
 - [x] **J58 [Rendah]** Bundel: pesan "Phase 7" di `chain.py`; RUSAK tanpa jalan keluar; `TERHENTI (DAG)` divonis `EKSEKUSI` (remedi ber-`depends_on` unit asalnya); `subagent_type` explorer tidak disebut; kontradiksi adapter hilang di review; `EXPLORE_FACT`/`REVIEW_AUDIT` dipaksa lewat PROFILE penuh (H32); plan Phase 1 menjalankan semua perintah; hitungan README.
 - [x] **Prosa J42/J43**: jalan keluar plafon = `AskUserQuestion` taskdir baru / hentikan.
-- [ ] **Rilis**: README, `flow/frontend.md`, versi fe 0.9.0 dan be 0.10.0, Log Keputusan `ISSUES.md`.
+- [x] **Rilis**: README, `flow/frontend.md`, versi fe 0.9.0 dan be 0.10.0, Log Keputusan `ISSUES.md`.
