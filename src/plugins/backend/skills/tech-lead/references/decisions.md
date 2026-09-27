@@ -107,6 +107,11 @@ backenddev/
 +-----------------------------------------------------------------------------------+
 ```
 
+Butir 1 dan 5 berlaku untuk taskdir berledger `## Chain`. Taskdir tanpa ledger (lane `DEFECT_RCA`, backfill
+`EXEC_BRIEF`) dirutekan ke `backend:plan` jalur `RCA` bila `RCA.md` `ROOT_CAUSE_CONFIRMED` ada, selain itu ke
+`backend:debug` lebih dulu (`gate-lifecycle.md` bagian 1). Butir 4 juga berlaku bila plafon `analyst` tertembus
+dan user memilih rumuskan ulang (`SKILL.md` `## Failure path` butir 7).
+
 ### Aturan Penetapan Identitas Taskdir:
 
 - **Format Slug**: `<domain>-<jenis-kerja>` (kebab-case, misal: `order-split`, `stock-lock- bugfix`).
@@ -128,7 +133,7 @@ Setiap direktori pekerjaan memuat tepat satu branch kerja:
   - `git status --porcelain` ada output di luar segmen `.explore/` → **BERHENTI SEGERA** dan laporkan uncommitted changes ke user. Berkas di bawah `.explore/` adalah laporan `code-explorer` dan tidak dihitung.
   - `base_branch` atau `branch_convention` tidak ada di profile → **BERHENTI SEGERA** dan minta user jalankan refresh profile.
 
-Branch kerja **selalu** bercabang dari `base_branch` profile; dilarang mencabangkannya dari branch kerja lain.
+Branch kerja **selalu** bercabang dari `base_branch` profile; dilarang mencabangkannya dari branch kerja lain. `AUDIT_SWEEP` dan `API_DOCS` tidak membuat branch kerja maupun taskdir (`SKILL.md` Fase 3): `AUDIT_SWEEP` berjalan di `base_branch` (`git checkout <base_branch>` bila tree bersih), sehingga laporan temuan yang di-commit Fase 5 terbawa ke taskdir perbaikan yang kelak bercabang dari base; `API_DOCS` tetap di branch aktif, karena mode `POST_CHAIN` menilai branch rantai dan branch baru dari base membuat diff-nya kosong.
 
 | Kondisi Posisi `HEAD`                       | Tindakan Gerbang                                                                     |
 | ------------------------------------------- | ------------------------------------------------------------------------------------ |
@@ -152,8 +157,8 @@ Pilih satu dari tujuh jalur kanonik berdasar fakta kode terverifikasi:
 | **PLANNING** | Permintaan mengubah perilaku sistem dan brief `READY`-nya belum terbit | `analyst` | `TASK.md` → `BRD.md`/`PRD.md` → `brief-<NN>-<unit>.md` |
 | **DEFECT_RCA** | Ada error/stacktrace/test merah, penyebab belum terbukti | `debug` | `RCA.md` |
 | **EXEC_BRIEF** | Eksekusi brief `READY` di taskdir eksisting | `architect` | `REVIEW.md` |
-| **AUDIT_SWEEP** | Audit kode terhadap 6 dimensi tanpa brief | `audit` | `backenddev/issues/<file>.md` |
-| **API_DOCS** | Dokumentasi API diminta, endpoint sudah ada di kode | `document-api` | `docs/api/<slug>.md` |
+| **AUDIT_SWEEP** | Audit kode terhadap 6 dimensi tanpa brief | `audit` | `backenddev/issues/<file>.md` — tanpa taskdir, di `base_branch` |
+| **API_DOCS** | Dokumentasi API diminta, endpoint sudah ada di kode | `document-api` | `docs/api/<slug>.md` — tanpa taskdir, di branch aktif |
 
 **Presedensi Lane**: Pilih prioritas menurun jika lebih dari satu kondisi masuk terpenuhi: `PROFILE` → `EXEC_BRIEF` → `AUDIT_SWEEP` → `DEFECT_RCA` → `PLANNING` → `API_DOCS` → `EXPLORE_FACT`. Sebutkan lane yang dikalahkan beserta alasannya di slot `Justifikasi Rute`.
 

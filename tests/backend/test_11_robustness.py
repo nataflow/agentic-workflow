@@ -594,3 +594,119 @@ def test_h25_set_frontmatter_menimpa_kunci_berspasi(tmp_path):
     f.write_text("--- \nstatus : READY\ntitle: x\n---\nbody\n")
     bs.set_frontmatter(f, status="SUPERSEDED")
     assert bs.read_frontmatter(f) == {"status": "SUPERSEDED", "title": "x"}
+
+
+# --- Tahap 5: orkestrasi -------------------------------------------------------------------------
+
+from conftest import run_hook  # noqa: E402
+
+BE = PLUGINS / "backend"
+
+
+@pytest.mark.regression("H26")
+def test_h26_taskdir_tanpa_ledger_gagal_check_7(chain_repo):
+    task = chain_repo / TD / "TASK.md"
+    task.write_text("---\nlane: DEFECT_RCA\nrisk: MINOR\nstatus: ACTIVE\n---\n# Fix\n## Success Criteria\n- SC-1 x\n")
+    commit(chain_repo, "docs(order-fix): akar", f"{TD}/TASK.md")
+    c7 = checks(chain_repo, ANALYST, "--taskdir", TD, "--risk", "MINOR", "--chain", "BRIEF")[7]
+    assert c7["status"] == "FAIL" and "tanpa ledger" in c7["summary"] and "RCA" in c7["action"], c7
+
+
+@pytest.mark.regression("H26")
+def test_h26_gerbang_merutekan_taskdir_tanpa_ledger_ke_rca():
+    lifecycle = (BE / "skills/tech-lead/references/gate-lifecycle.md").read_text(encoding="utf-8")
+    skill = (BE / "skills/tech-lead/SKILL.md").read_text(encoding="utf-8")
+    assert "Taskdir **tanpa ledger `## Chain`**" in lifecycle and "`entry_mode: RCA`" in lifecycle
+    assert "kecuali taskdir **tanpa ledger `## Chain`**" in skill
+
+
+@pytest.mark.regression("H27")
+def test_h27_penolakan_user_menolkan_ronde_reviewer_hop(chain_repo):
+    for key in ("review_round:BRD", "review_round:BRD"):
+        assert be_run(chain_repo, COUNTERS, "--taskdir", TD, "--bump", key).returncode == 0
+    commit(chain_repo, "docs(order-fix): ronde", f"{TD}/TASK.md")
+    r = be_run(chain_repo, COUNTERS, "--taskdir", TD, "--bump", "reject:BRD")
+    assert r.returncode == 0 and "review_round:BRD dinolkan" in r.stdout, r.stdout
+    commit(chain_repo, "docs(order-fix): tolak", f"{TD}/TASK.md")
+    assert be_run(chain_repo, COUNTERS, "--taskdir", TD, "--bump", "review_round:BRD").returncode == 0
+    assert be_run(chain_repo, COUNTERS, "--taskdir", TD, "--check").returncode == 0      # bukan tamper
+
+
+@pytest.mark.regression("H27")
+def test_h27_reentry_membuka_generasi_ronde_brief_baru(chain_repo):
+    brief(chain_repo, "01", "lock", "READY")
+    for _ in range(2):
+        assert be_run(chain_repo, VALIDATE, "--taskdir", TD, "--open-round").returncode == 0
+        assert be_run(chain_repo, VALIDATE, "--taskdir", TD, "--record-round", "Issues Found").returncode == 0
+    assert be_run(chain_repo, VALIDATE, "--taskdir", TD, "--open-round").returncode == 1
+    assert be_run(chain_repo, COUNTERS, "--taskdir", TD, "--bump", "reentry").returncode == 0
+    r = be_run(chain_repo, VALIDATE, "--taskdir", TD, "--open-round")
+    assert r.returncode == 0 and "ronde 1 dibuka" in r.stdout, r.stdout
+
+
+@pytest.mark.regression("H28")
+def test_h28_plafon_tertembus_punya_jalan_keluar_user():
+    skill = (BE / "skills/tech-lead/SKILL.md").read_text(encoding="utf-8")
+    assert "**Plafon tertembus**" in skill and "**rumuskan ulang di taskdir baru**" in skill
+    analyst = (BE / "skills/analyst/SKILL.md").read_text(encoding="utf-8")
+    assert "mengklasifikasi ulang permintaan dari awal" not in analyst
+
+
+@pytest.mark.regression("H29")
+@pytest.mark.parametrize("value", ["backend", "backenddev"])
+def test_h29_nilai_plugin_nama_tampilan_milik_sendiri(make_repo, value):
+    root = make_repo({"go.mod": "module x\n\ngo 1.22\n"})
+    be_profile(root, "go", extra={"plugin": value})
+    proc, _ = run_hook("backenddev", root, explain=True)
+    assert json.loads(proc.stdout)["profile"]["state"] == "OK", proc.stdout
+    text = (BE / "skills/profile/templates/profile-template.md").read_text(encoding="utf-8")
+    assert '`plugin` selalu `"backenddev"`' in text
+
+
+@pytest.mark.regression("H30")
+def test_h30_audit_dan_api_docs_tanpa_branch_baru():
+    skill = (BE / "skills/tech-lead/SKILL.md").read_text(encoding="utf-8")
+    assert "`AUDIT_SWEEP` (di `base_branch`) dan `API_DOCS` (di branch aktif): butir 0 saja, tanpa branch baru" in skill
+    decisions = (BE / "skills/tech-lead/references/decisions.md").read_text(encoding="utf-8")
+    assert "`AUDIT_SWEEP` dan `API_DOCS` tidak membuat branch kerja maupun taskdir" in decisions
+
+
+@pytest.mark.regression("H20")
+def test_h20_akar_defect_rca_sesudah_isolasi_branch():
+    skill = (BE / "skills/tech-lead/SKILL.md").read_text(encoding="utf-8")
+    assert skill.index("2. **Isolasi branch**") < skill.index("2a. **Akar `DEFECT_RCA`**")
+    assert "Lane `DEFECT_RCA` → panggil `backend:task` di sini" not in skill
+
+
+@pytest.mark.regression("H31")
+def test_h31_instruksi_agent_selaras_dengan_pagar():
+    impl = (BE / "agents/code-implementor.md").read_text(encoding="utf-8")
+    rev = (BE / "agents/code-reviewer.md").read_text(encoding="utf-8")
+    assert "Nomor migrasi bentrok → ambil nomor berikutnya" not in impl and "tanpa trailer" in impl
+    assert "$(git merge-base" not in rev
+    disp = (BE / "skills/architect/dispatcher/reviewer.md").read_text(encoding="utf-8")
+    assert "`git merge-base {base_branch} HEAD`..`HEAD`" not in disp and "bukan substitusi" in disp
+
+
+@pytest.mark.regression("H33")
+def test_h33_reviewer_punya_edit_dan_hook_mengizinkannya(chain_repo):
+    assert "tools: Read, Grep, Glob, Bash, Write, Edit" in (BE / "agents/code-reviewer.md").read_text(encoding="utf-8")
+    data = {"cwd": str(chain_repo), "tool_name": "Edit", "hook_event_name": "PreToolUse", "agent_type": REVIEWER,
+            "tool_input": {"file_path": str(chain_repo / "backenddev/issues/README.md"), "old_string": "a",
+                           "new_string": "b"}}
+    assert run_script(GUARD, "hook", stdin=json.dumps(data)).returncode == 0
+
+
+@pytest.mark.regression("H36")
+def test_h36_gate_text_gagal_tetap_menyuntik_gerbang(make_repo, tmp_path):
+    import shutil
+    plugin = tmp_path / "plug"
+    shutil.copytree(BE / "hooks", plugin / "hooks")
+    shutil.copytree(BE / "skills/_common", plugin / "skills/_common")
+    (plugin / "hooks/gate_text.py").write_text("def render(v):\n    raise RuntimeError('rusak')\n")
+    root = make_repo({"go.mod": "module x\n\ngo 1.22\n"})
+    be_profile(root, "go")
+    r = run_script(plugin / "hooks/detect.py", "--plugin", "backend",
+                   stdin=json.dumps({"cwd": str(root), "hook_event_name": "SessionStart"}))
+    out = json.loads(r.stdout)
+    assert r.returncode == 0 and "gagal dirender" in out["hookSpecificOutput"]["additionalContext"], (r.stdout, r.stderr)

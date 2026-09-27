@@ -364,10 +364,20 @@ def read_index(path: Path) -> Tuple[Optional[dict], str]:
     return (data, "OK") if isinstance(data, dict) else (None, "INVALID_JSON")
 
 
+def canonical_plugin(value: object) -> object:
+    """Nama tampilan (`backend`/`frontend`) → kunci profil (`backenddev`/`frontenddev`); selain itu apa adanya.
+
+    Sesudah rename fd08fc8 nilai `plugin` di `index.json` dapat berbunyi nama tampilan; `_grade` dulu
+    memvonisnya milik plugin lain sementara `owner_of` menganggapnya milik sendiri (11 H29).
+    """
+    return {v: k for k, v in PLUGIN_NAMES.items()}.get(value, value) if isinstance(value, str) else value
+
+
 def owner_of(data: dict) -> str:
     """Field `plugin` bila ada; profil lama tanpa field → dari keanggotaan `stack`."""
-    if data.get("plugin") in PLUGINS:
-        return data["plugin"]
+    plugin = canonical_plugin(data.get("plugin"))
+    if plugin in PLUGINS:
+        return plugin
     for plugin, stacks in STACKS.items():
         if data.get("stack") in stacks:
             return plugin
@@ -377,7 +387,7 @@ def owner_of(data: dict) -> str:
 def _grade(d: Path, plugin: str, data: dict, location: str) -> Profile:
     stack = data.get("stack")
     stack = stack.strip() if isinstance(stack, str) else ""
-    owner = data.get("plugin") or plugin
+    owner = canonical_plugin(data.get("plugin")) or plugin
     if owner != plugin:
         return Profile("OTHER_OWNER", location, stack, owner)
     if not stack:
@@ -478,9 +488,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(json.dumps(asdict(verdict), ensure_ascii=False, indent=2))
         return 0
     if verdict.emit:
-        sys.path.insert(0, str(Path(__file__).resolve().parent))
-        from gate_text import render  # teks milik plugin ini
-        emit(render(verdict))
+        try:
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            from gate_text import render  # teks milik plugin ini
+            text = render(verdict)
+        except Exception as exc:  # noqa: BLE001 — gerbang yang diam paling mahal (11 H36)
+            print(f"detect.py: gate_text: {exc!r}", file=sys.stderr)
+            text = (f"<{args.plugin}-gate>\nTeks gerbang gagal dirender ({exc!r}). Jalankan skrip prasyarat "
+                    f"skill secara manual sebelum merutekan kerja.\n</{args.plugin}-gate>")
+        emit(text)
     return 0
 
 

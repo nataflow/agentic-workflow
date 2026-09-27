@@ -9,7 +9,8 @@ pemanggilan ulang, sehingga loop analyst ↔ gerbang dapat melewati plafonnya
 tanpa terdeteksi. Skrip ini satu-satunya penulis tabel `## Counters`; perubahan
 `TASK.md`-nya ikut commit pembaruan `TASK.md` berikutnya milik penulisnya.
 
-    --bump <kunci>   naikkan satu; melewati plafon → FAIL exit 1, tabel tidak berubah
+    --bump <kunci>   naikkan satu; melewati plafon → FAIL exit 1, tabel tidak berubah;
+                     `reject:<HOP>`/`oq_return:<HOP>` sekaligus menolkan `review_round:<HOP>`
     --check          cetak seluruh kunci; exit 1 bila ada yang melebihi plafon, kunci tak dikenal,
                      atau nilai yang turun di luar `--reset-hop` menurut riwayat git `TASK.md`
     --reset-hop HOP  nolkan kunci ber-hop milik HOP dan hop hilirnya — dipanggil
@@ -81,7 +82,8 @@ def tampered(versions: List[Dict[str, int]]) -> List[str]:
 
     Kunci global (`reentry`, `chain_transition`, `root_amendment`) tidak pernah turun. Kunci ber-hop
     hanya boleh turun (atau hilang) di versi yang sama dengan kenaikan `reentry`: re-entry menaikkan
-    `reentry` lalu `--reset-hop`, dan keduanya ikut satu commit pembaruan `TASK.md`.
+    `reentry` lalu `--reset-hop`, dan keduanya ikut satu commit pembaruan `TASK.md`. `review_round:<HOP>`
+    juga boleh turun bersama kenaikan `reject:<HOP>` atau `oq_return:<HOP>`.
     """
     problems = []
     for before, after in zip(versions, versions[1:]):
@@ -92,6 +94,10 @@ def tampered(versions: List[Dict[str, int]]) -> List[str]:
                 continue
             if ":" in k and reentered:
                 continue
+            base, _, hop = k.partition(":")
+            if base == "review_round" and any(after.get(f"{t}:{hop}", 0) > before.get(f"{t}:{hop}", 0)
+                                              for t in ("reject", "oq_return")):
+                continue              # `--bump reject|oq_return:<HOP>` menolkan ronde reviewer hop itu (11 H27)
             problems.append(f"{k} turun {v} → {now} tanpa `--reset-hop` sesudah `--bump reentry`")
     return problems
 
@@ -188,8 +194,15 @@ def main():
         print(f"COUNTER: [FAIL] {args.bump} {n}/{PLAFON[base]} — plafon habis, jalankan Failure path analyst")
         sys.exit(1)
     counters[args.bump] = n
+    reset = ""
+    if base in ("reject", "oq_return"):
+        # Revisi yang dikembalikan user (reject) atau analyst (oq_return) sah mendapat review baru; loopnya
+        # tetap dibatasi plafon kunci pemicu ini (11 H27).
+        hop = args.bump.partition(":")[2]
+        if counters.pop(f"review_round:{hop}", 0):
+            reset = f" · review_round:{hop} dinolkan"
     task.write_text(render(text, counters), encoding="utf-8")
-    print(f"COUNTER: [PASS] {args.bump} {n}/{PLAFON[base]}")
+    print(f"COUNTER: [PASS] {args.bump} {n}/{PLAFON[base]}{reset}")
     print(f"    stage bersama commit pembaruan TASK.md berikutnya: {task}")
     sys.exit(0)
 

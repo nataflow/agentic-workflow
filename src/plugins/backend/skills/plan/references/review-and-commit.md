@@ -12,7 +12,7 @@ Seluruh check bagian 4 lulus lebih dulu; dispatch dilarang berangkat sebelum tit
 
 - **Baca state ronde lebih dulu.** Jalankan `scripts/validate_briefs.py --taskdir <taskdir> --review-state`. Keluarannya menyebut generasi batch aktif, ronde terpakai di generasi itu, sisa plafon, plafon keras taskdir, dan brief yang berubah sejak ronde terakhir.
 
-  **Plafon 2 ronde per generasi batch, 4 ronde per taskdir.** Satu *generasi* adalah himpunan berkas brief yang ada di taskdir; ia berganti hanya saat brief **ditambahkan** — re-entry `analyst`, berkas yatim `architect`, atau brief perbaikan. Menyunting isi brief tidak pernah membuka generasi baru, sehingga plafon tidak dapat diakali dengan mengedit.
+  **Plafon 2 ronde per generasi batch, 4 ronde per taskdir.** Satu *generasi* adalah himpunan berkas brief yang ada di taskdir beserta nilai `reentry` `## Counters` `TASK.md`; ia berganti saat brief **ditambahkan** (berkas yatim `architect`, brief perbaikan) atau saat hop `BRIEF` dibuka re-entry `analyst` — walau himpunan briefnya sama, sehingga revisi yang diminta re-entry mendapat review baru. Menyunting isi brief tidak pernah membuka generasi baru, sehingga plafon tidak dapat diakali dengan mengedit, dan plafon keras taskdir tetap mengikat.
 
   Plafon per-taskdir yang lama membuat brief yang lahir sesudah ronde kedua mustahil direview: skrip membalas "plafon habis" atas berkas yang belum pernah dilihat reviewer mana pun, dan brief itu terpaksa dikunci lewat jalur "self-review tidak tuntas". Plafon keras taskdir tetap ada supaya penambahan brief berulang tidak menjadi loop tanpa batas.
 

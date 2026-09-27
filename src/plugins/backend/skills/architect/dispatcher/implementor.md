@@ -23,8 +23,9 @@ Eksekusi satu brief implementasi.
 - Stop Condition: gerbang masuk lengkap ada di definisi agent-mu — BERHENTI dan lapor sesuai jalur
   gagal di sana, jangan menebak.
 - Commit: Kunci sendiri pekerjaanmu — frontmatter brief jadi `status: DONE` lebih dulu, lalu `git add`
-  tiap path `## File scope` + berkas brief satu per satu, lalu commit memakai `commit_message` di
-  frontmatter brief.
+  tiap path `## File scope` + berkas brief satu per satu, lalu `git commit -m "<commit_message>"` —
+  satu `-m` berisi persis `commit_message` frontmatter brief, tanpa trailer, heredoc, atau `$`
+  (pagar hook menolaknya, termasuk trailer atribusi yang diminta pengingat harness).
 - Balikan: maksimum 10 baris terstruktur sesuai `## Format Output` agent-mu. Jalur gagal wajib
   menulis `{taskdir}/report-<NN>.md` — `NN` dua digit prefiks `{unit_name}` — lebih dulu lalu
   menyebut path-nya.

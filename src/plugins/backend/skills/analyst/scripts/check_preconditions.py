@@ -382,8 +382,14 @@ class PreconditionChecker:
             elif hops:
                 summary = "Resume: ledger tercentang penuh — butuh reentry_reason (Fase 3 butir 0)"
             else:
-                summary = "Resume: TASK.md tanpa ledger `## Chain` — laporkan ke gerbang (lane non-planning)"
+                summary = "TASK.md tanpa ledger `## Chain` — taskdir lane non-planning (DEFECT_RCA/EXEC_BRIEF)"
         status, action = "PASS", ""
+        if summary.startswith("TASK.md tanpa ledger"):
+            # Analyst tidak punya hop untuk dibuka di sini; PASS dulu memicu bolak-balik analyst ↔ gerbang (11 H26).
+            status = "FAIL"
+            action = ("Kembalikan ke `backend:tech-lead`: kegagalan pascaeksekusi taskdir tanpa ledger dirutekan ke "
+                      "`backend:plan` jalur `RCA` (`RCA.md` terkonfirmasi) atau `backend:debug` lebih dulu — "
+                      "`tech-lead/references/gate-lifecycle.md` bagian 1.")
         if text is not None:
             counters = _counters.parse(text)
             summary += f" · Counters: {_counters.summary(counters)}"
@@ -393,7 +399,7 @@ class PreconditionChecker:
             if drops or bad:
                 status = "FAIL"
                 summary += " · " + "; ".join(drops + [f"kunci tak dikenal `{k}`" for k in bad])
-                action = ("Tabel `## Counters` hanya ditulis `chain_counters.py`; pulihkan nilainya dari riwayat git "
+                action = action or ("Tabel `## Counters` hanya ditulis `chain_counters.py`; pulihkan nilainya dari riwayat git "
                           "`TASK.md`, dilarang melanjutkan rantai di atas plafon yang dikosongkan.")
         self.results.append({
             "id": check_id,

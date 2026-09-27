@@ -54,7 +54,7 @@ Satu-satunya berkas mesin di profil. `hooks/detect.py` dan skrip prasyarat tiap 
 }
 ```
 
-`plugin` selalu `"frontend"`: penanda kepemilikan — profil ber-`plugin` lain tidak pernah dibaca atau ditimpa skill frontend, juga dengan `force: true`. `stack` wajib salah satu dari empat nilai sah — ia yang menentukan `stacks/<stack-id>.md` mana yang dimuat seluruh skill hilir. `commit_convention` diturunkan dari `git log -n 20 --oneline` nyata, bukan dari asumsi Conventional Commits; repo non-git menulis `UNINITIALIZED (default conventional commits)`.
+`plugin` selalu `"frontenddev"` (nama direktori profil, bukan nama plugin `frontend`): penanda kepemilikan — profil ber-`plugin` lain tidak pernah dibaca atau ditimpa skill frontend, juga dengan `force: true`. `stack` wajib salah satu dari empat nilai sah — ia yang menentukan `stacks/<stack-id>.md` mana yang dimuat seluruh skill hilir. `commit_convention` diturunkan dari `git log -n 20 --oneline` nyata, bukan dari asumsi Conventional Commits; repo non-git menulis `UNINITIALIZED (default conventional commits)`.
 
 ---
 

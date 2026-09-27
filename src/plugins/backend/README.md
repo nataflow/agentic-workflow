@@ -189,8 +189,9 @@ oleh skrip prasyarat, sehingga vonis hook sama dengan vonis skrip.
 **PreToolUse** (`python3 hooks/guard_bash.py hook`, matcher `Bash|Edit|Write`, timeout 10 detik) berlaku
 untuk subagent `backend:code-implementor`, `backend:code-explorer`, dan `backend:code-reviewer`, dan menolak bila ragu (fail-closed). Implementor hanya
 boleh menjalankan git read-only (`status`, `diff`, `log`, `show`, `rev-parse`, `ls-files`),
-`git add <path>` eksplisit di dalam lease, dan `git commit -m`. Rantai perintah, pipe, pengalihan, dan
-substitusi ditolak. Edit/Write hanya boleh ke path lease. Lease ditulis `architect` sebelum dispatch
+`git add <path>` eksplisit di dalam lease, dan `git commit -m` satu baris. Rantai perintah, pipe, pengalihan,
+substitusi, dan ekspansi shell (`$`, backtick, brace `{a,b}`) ditolak; operator dinilai sesudah tokenisasi,
+jadi `<T>` atau `->` di dalam kutip tetap satu argumen. Edit/Write hanya boleh ke path lease. Lease ditulis `architect` sebelum dispatch
 (`guard_bash.py lease --brief <path>`) ke `<git-dir>/nataflow/lease-backend.json`, di luar
 working tree. Isinya `## File scope` brief, berkas brief, `report-NN.md`, dan `finding_source`. Tanpa lease,
 semua Bash/Edit/Write implementor ditolak. Untuk `backend:code-explorer`, hook yang sama hanya
@@ -207,20 +208,22 @@ Tiap skill punya `skills/<skill>/scripts/check_preconditions.py` yang dijalankan
 
 | Skrip | Peran |
 |---|---|
-| `_common/precondition_lib.py` | parser frontmatter, taskdir, chain, status git, dan profil; mengimpor `hooks/detect.py` |
+| `_common/precondition_lib.py` | parser frontmatter, taskdir, chain, status git, profil, dan ikatan approval BRD/PRD ke commit `docs(spec): approve …`; mengimpor `hooks/detect.py` |
 | `_common/brief_status.py` | status brief dan penulis tunggalnya |
 | `_common/run_verification.py baseline\|closing` | verifikasi baseline dan penutup, log mesin di `.explore/` |
-| `_common/verify_scope.py` | diff commit/worktree terhadap `File scope` brief |
+| `_common/verify_scope.py` | diff commit/worktree terhadap `File scope` brief versi sebelum unit dikerjakan |
 | `plan/scripts/scaffold_brief.py` | kunci matriks alokasi, lalu kerangka brief |
 | `plan/scripts/validate_briefs.py` | validasi batch dan per-brief, ronde review brief |
-| `analyst/scripts/chain_counters.py` | plafon eskalasi, re-entry, dan amandemen akar |
+| `analyst/scripts/chain_counters.py` | plafon eskalasi, re-entry, amandemen akar, dan ronde reviewer; menolak tabel yang diturunkan tangan |
 | `architect/scripts/symbol_map.py` | peta simbol pada sha tertentu untuk ingest brief |
 
 ## Pemulihan
 
 - **`tech-lead` Fase 3** memakai ulang taskdir yang belum tuntas. Brief BLOCKED atau `HALT.md` → `PLANNING`
   pada taskdir yang sama dengan `reentry_reason`; brief READY → `architect`; dokumen DRAFT → `analyst`.
-  Taskdir baru hanya dibuat bila semua brief DONE/SUPERSEDED **dan** `REPORT.md` sudah terbit.
+  Taskdir tanpa ledger `## Chain` (lane `DEFECT_RCA`, backfill `EXEC_BRIEF`) dirutekan ke `plan` jalur RCA atau
+  `debug`, bukan `PLANNING`. Taskdir baru hanya dibuat bila semua brief DONE/SUPERSEDED **dan** `REPORT.md`
+  sudah terbit, atau bila plafon `analyst` tertembus dan user memilih merumuskan ulang permintaannya.
 - **`tech-lead` Fase 5** (re-entry rantai) meng-commit artefak yang menunggu, lalu mengikuti tabel pengirim
   balik di `skills/tech-lead/references/gate-lifecycle.md` §6. Temuan P1 `REVIEW.md` dikerjakan di taskdir
   yang sama lewat `PLANNING` + `finding_source`.
@@ -252,8 +255,6 @@ Tiap skill punya `skills/<skill>/scripts/check_preconditions.py` yang dijalankan
 - Filter `.explore` di gerbang git terlalu longgar (direktori ter-track bernama `.explore` ikut lolos), dan
   merge/rebase/cherry-pick yang menggantung belum dideteksi. Pastikan tree bersih sebelum memulai rantai.
 - Stacktrace untuk `debug` dioper sebagai argumen shell. Tempel log dari sumber yang dipercaya saja.
-- `commit_message` brief berpola `<type>(<domain>): implement <unit>`; konvensi commit profil (mis. nomor
-  tiket) belum dihormati.
 - Instruksi yang dimuat sebelum membaca kode besar (sekitar 90 ribu token untuk rantai penuh).
 - Hook memagari tulis `code-explorer` hanya sampai pola laci `backenddev/docs/[<taskdir>/].explore/*.md`;
   kewajiban menulis tepat ke path `Berkas laporan` dari pendispatch ditegakkan lewat prompt, bukan hook.

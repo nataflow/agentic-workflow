@@ -45,7 +45,7 @@ Metadata konfigurasi dan identitas repositori dalam format JSON valid:
 }
 ```
 
-`plugin` selalu `"backend"`: penanda kepemilikan. Profil ber-`plugin` lain tidak pernah dibaca atau ditimpa skill backend, dan skrip prasyarat memvonisnya FAIL.
+`plugin` selalu `"backenddev"` (nama direktori profil, bukan nama plugin `backend`): penanda kepemilikan. Profil ber-`plugin` lain tidak pernah dibaca atau ditimpa skill backend, dan skrip prasyarat memvonisnya FAIL.
 
 ---
 

@@ -14,7 +14,7 @@ description: Gunakan ketika ada permintaan kerja baru atau susulan di repo backe
 ## Precondition [REQUIRED]
 
 1. Fase 0 (tiap permintaan): `python3 ${CLAUDE_PLUGIN_ROOT}/skills/tech-lead/scripts/check_preconditions.py --read-only`. `FAIL` di sini berarti repo tak terbaca (bukan git, `index.json` rusak) → hentikan dan laporkan.
-2. Fase 3 butir 0 (hanya lane yang memprovisi taskdir/branch: `PLANNING`, `DEFECT_RCA`, `EXEC_BRIEF`, `AUDIT_SWEEP`, `API_DOCS`): skrip yang sama tanpa `--read-only`, ditambah `--re-entry` bila masuk lewat Fase 5. `PASS` (6/6) → lanjut. `FAIL` → remediasi: profil (`commands.md`, `base_branch`) bermasalah → rute `PROFILE`; tree kotor di luar zona artefak → minta user stash/commit; HEAD detached → minta checkout `base_branch`.
+2. Fase 3 butir 0 (lane `PLANNING`, `DEFECT_RCA`, `EXEC_BRIEF`, `AUDIT_SWEEP`, `API_DOCS`): skrip yang sama tanpa `--read-only`, ditambah `--re-entry` bila masuk lewat Fase 5. `PASS` (6/6) → lanjut. `FAIL` → remediasi: profil (`commands.md`, `base_branch`) bermasalah → rute `PROFILE`; tree kotor di luar zona artefak → minta user stash/commit; HEAD detached → minta checkout `base_branch`.
 
 ## Parameter [REQUIRED]
 
@@ -45,7 +45,7 @@ Evaluasi setiap pesan user, termasuk susulan di tengah sesi:
 ### Fase 0 — Prasyarat Read-Only & Profil
 
 1. Jalankan `check_preconditions.py --read-only`. Tree kotor, HEAD detached, izin tulis, dan `commands.md` tidak dinilai di sini — pindah ke Fase 3 butir 0.
-2. Check 1 **TERDEGRADASI** (profil absen): pertanyaan baca-kode dijawab lewat `references/explore-fact.md` tanpa profil, lalu tawarkan `backend:profile`. Rute yang mengubah kode → rute `PROFILE` (Keputusan 1) lebih dulu; mode GENERATE/REFRESH/MIGRATE diputuskan prasyarat `backend:profile`, lalu ulangi Fase 0 dan lanjutkan rute tertunda.
+2. Check 1 **TERDEGRADASI** (profil absen): pertanyaan baca-kode dijawab lewat `references/explore-fact.md` tanpa profil, lalu tawarkan `backend:profile`. Rute yang mengubah kode → rute `PROFILE` (Keputusan 1) lebih dulu, lalu ulangi Fase 0 dan lanjutkan rute tertunda.
 3. Profil ada: baca `index.json` dan `invariants.md` di `.claude/profile/backenddev/`. Lokasi lama `.claude/profile/` → `PROFILE` mode MIGRATE lebih dulu. Profil plugin lain jangan dibaca atau ditimpa.
 
 ### Fase 1 — Eksplorasi Kode Aktual Sebelum Memutuskan Rute
@@ -62,7 +62,7 @@ Tepat 1 kali per pemicu, hanya bila tersisa ambiguitas rute atau batas modul (`r
 
 ### Keputusan 1 — Pemilihan Jalur Kerja (Routing Lane)
 
-Baca `references/decisions.md` bagian 6 **sebelum** memilih lane: tabel kondisi masuk, rute awal, artefak, dan presedensi `PROFILE` → `EXEC_BRIEF` → `AUDIT_SWEEP` → `DEFECT_RCA` → `PLANNING` → `API_DOCS` → `EXPLORE_FACT`. Dilarang mengarang lane baru. Lane `PLANNING` menampung seluruh kerja perancangan — termasuk perbaikan temuan `backenddev/issues/` dan `REVIEW.md` ber-`finding_source` — dan panjang rantainya diputuskan `backend:analyst`, bukan gerbang.
+Baca `references/decisions.md` bagian 6 **sebelum** memilih lane: tabel kondisi masuk, rute awal, artefak, dan presedensi `PROFILE` → `EXEC_BRIEF` → `AUDIT_SWEEP` → `DEFECT_RCA` → `PLANNING` → `API_DOCS` → `EXPLORE_FACT`. Dilarang mengarang lane baru. Lane `PLANNING` menampung seluruh kerja perancangan, termasuk perbaikan temuan; panjang rantainya diputuskan `backend:analyst`.
 
 ### Keputusan 2 — Klasifikasi Tingkat Risiko (Risk Level)
 
@@ -70,11 +70,12 @@ Klasifikasikan permintaan yang mengubah kode menurut `references/decisions.md` b
 
 ### Fase 3 — Inisialisasi Direktori Kerja & Isolasi Branch
 
-Jalankan untuk rute yang menghasilkan artefak rancangan atau kode; lewati pada lane `EXPLORE_FACT` dan `PROFILE`.
+Jalankan untuk rute yang menghasilkan artefak rancangan atau kode; lewati pada lane `EXPLORE_FACT` dan `PROFILE`. `AUDIT_SWEEP` (di `base_branch`) dan `API_DOCS` (di branch aktif): butir 0 saja, tanpa branch baru (`decisions.md` bagian 5).
 
 0. **Prasyarat penuh**: jalankan `check_preconditions.py` tanpa `--read-only` sebelum provisi apa pun. `FAIL` → `## Failure path` butir 1–2.
-1. **Provisi taskdir** `backenddev/docs/<YYMMDDhhmm>-<slug>/` menurut tabel `references/gate-lifecycle.md` bagian 1 dan `references/decisions.md` bagian 4: pakai ulang taskdir yang ada; brief `BLOCKED` atau `HALT.md` → lane `PLANNING` taskdir sama dengan `reentry_reason`; brief `READY` → `architect`; `BRD.md`/`PRD.md` `DRAFT` → `analyst`; taskdir baru hanya untuk permintaan baru atau bila seluruh brief `DONE`/`SUPERSEDED` **dan** `REPORT.md` terbit. Lane `DEFECT_RCA` → panggil `backend:task` di sini (`chain` kosong, `risk` Keputusan 2, `evidence` Fase 1) kecuali `TASK.md` sudah ada (bagian 1a). Salin laporan explorer ke `<taskdir>/.explore/gate-<slug>.md`.
+1. **Provisi taskdir** `backenddev/docs/<YYMMDDhhmm>-<slug>/` menurut tabel `references/gate-lifecycle.md` bagian 1 dan `references/decisions.md` bagian 4: pakai ulang taskdir yang ada; brief `BLOCKED` atau `HALT.md` → lane `PLANNING` taskdir sama dengan `reentry_reason` — kecuali taskdir **tanpa ledger `## Chain`** (rute `plan` jalur `RCA`/`debug`, bagian 1); brief `READY` → `architect`; `BRD.md`/`PRD.md` `DRAFT` → `analyst`; taskdir baru hanya untuk permintaan baru, bila seluruh brief `DONE`/`SUPERSEDED` **dan** `REPORT.md` terbit, atau lewat `## Failure path` butir 7. Salin laporan explorer ke `<taskdir>/.explore/gate-<slug>.md`.
 2. **Isolasi branch**: cabangkan dari `base_branch`, bukan dari `HEAD` aktif (`references/gate-lifecycle.md` bagian 2).
+   - 2a. **Akar `DEFECT_RCA`**, sesudah branch aktif: panggil `backend:task` (`chain` kosong, `risk` Keputusan 2, `evidence` Fase 1) kecuali `TASK.md` sudah ada (bagian 1a).
 3. **Baseline build**: lane `PLANNING`/`EXEC_BRIEF` yang menyentuh `src/` → jalankan `build` profil sesudah branch aktif; merah → minta keputusan user; toolchain tidak tersedia → catat `tidak dijalankan` (`gate-lifecycle.md` bagian 3).
 
 ### Fase 4 — Framing Delegasi & Serah Terima
@@ -87,8 +88,8 @@ Jalankan untuk rute yang menghasilkan artefak rancangan atau kode; lewati pada l
 
 1. Jalankan prasyarat penuh dengan `--re-entry` (zona artefak yang boleh kotor: `references/gate-lifecycle.md` bagian 6 butir 1).
 2. Commit artefak yang menunggu (profil, laporan `audit`, `RCA.md`, `docs/api/`) dengan staging path eksplisit tiap path slot `Menunggu commit` pengirim (`references/gate-scope.md` bagian 3).
-3. Tentukan langkah lanjut dari tabel pengirim balik `references/gate-lifecycle.md` bagian 6 butir 3 — `analyst`, amandemen akar, `debug`, `plan` jalur RCA, `audit`, `architect` (`COMPLETED`/`COMPLETED (WARNING)`, `TERTAHAN (scope)`, `HALT.md`, `Umpan balik profil`), `document-api`.
-4. Perlakukan severity `P1` dari `architect` sebagai kerja lanjutan pada **taskdir yang sama**; dilarang memperbaiki di gerbang dan dilarang memprovisi taskdir baru (Fase 3 butir 1 tidak berlaku). Klasifikasikan ulang lewat Keputusan 2, seleksi temuan lewat `references/gate-scope.md` bagian 6, lalu berangkatkan lane `PLANNING` dengan `finding_source` `{taskdir}/REVIEW.md` **dan** `reentry_reason` `REVIEW P1: <ID temuan terpilih>`.
+3. Tentukan langkah lanjut dari tabel pengirim balik `references/gate-lifecycle.md` bagian 6 butir 3 (mis. `architect` `COMPLETED (WARNING)` = rantai selesai).
+4. Perlakukan severity `P1` dari `architect` sebagai kerja lanjutan pada **taskdir yang sama**; dilarang memperbaiki di gerbang dan dilarang memprovisi taskdir baru. Klasifikasikan ulang lewat Keputusan 2, seleksi temuan lewat `references/gate-scope.md` bagian 6, lalu berangkatkan lane `PLANNING` dengan `finding_source` `{taskdir}/REVIEW.md` **dan** `reentry_reason` `REVIEW P1: <ID temuan terpilih>` (taskdir tanpa ledger: Fase 3 butir 1).
 5. Skill hilir menutup `BLOCKED` atau rantai terputus → selesaikan akar masalah sesuai `## Failure path`; jangan menutupinya dengan taskdir baru.
 
 ## Guardrails
@@ -107,7 +108,7 @@ Jalur `EXPLORE_FACT` memakai format `references/explore-fact.md` bagian 3.
 ### TECH-LEAD GATEWAY DECISION
 - **Lane**    : <enum lane Keputusan 1> · Risk <BREAKING | MAJOR | MINOR | tanpa risk level>
 - **Taskdir** : backenddev/docs/<YYMMDDhhmm>-<slug>/ | tidak dialokasikan
-- **Branch**  : <nama-branch> dari <base_branch> | tetap di <base_branch> · Baseline build <hijau | merah | tidak dijalankan>
+- **Branch**  : <nama-branch> dari <base_branch> | tetap di <base_branch | branch aktif> · Baseline build <hijau | merah | tidak dijalankan>
 - **Bukti**   : `<file:baris>` · `code-explorer` <slug> @ `backenddev/docs/.explore/<slug>.md` | fast-path <n>/3 · Permukaan <n tertutup>/<n diminta> · belum terbukti: <daftar | nihil>
 - **Justifikasi Rute**: lane terpilih vs yang dikalahkan | tunggal · mitigasi blast radius
 - **File Scope**: <package atau modul target terisolasi>
@@ -124,7 +125,7 @@ Re-entry Fase 5 memakai `### TECH-LEAD RE-ENTRY DECISION` berslot **Pengirim Bal
 4. **Balikan explorer gagal** (`confidence: low`, payload rusak): pertajam `{objective}`, ulangi sekali, lalu sapuan manual dicatat di slot `Bukti`. Dilarang mengarang temuan.
 5. **Commit hulu gagal**: commit berkasnya di gerbang dengan format pesan penulisnya, catat penyimpangan di laporan re-entry.
 6. **Ambiguitas ekstrem** (3 pertanyaan tak dijawab): blast radius terkecil, naikkan `risk` satu tingkat, serahkan ke lane `PLANNING`.
-7. **Rantai planning tertahan** (`analyst` bervonis `NOT_READY_FOR_IMPLEMENTATION` atau menembus plafon): selesaikan akar yang dilaporkan, lalu berangkatkan ulang lane `PLANNING` pada taskdir yang sama dengan `reentry_reason` terisi. Dilarang membuat taskdir baru atau menambal artefak rancangan sendiri. Plafon re-entry dipegang `analyst` (`## Counters` `TASK.md`); rantai yang menembusnya diklasifikasi ulang dari awal.
+7. **Rantai planning tertahan** (`analyst` bervonis `NOT_READY_FOR_IMPLEMENTATION`): selesaikan akar yang dilaporkan, lalu berangkatkan ulang lane `PLANNING` pada taskdir yang sama dengan `reentry_reason` terisi. Dilarang membuat taskdir baru atau menambal artefak rancangan sendiri. **Plafon tertembus** (`analyst` Failure path 4, 5, 7–9) → `AskUserQuestion`: **rumuskan ulang di taskdir baru** atau **hentikan** (`gate-lifecycle.md` bagian 1).
 
 ## STYLE
 

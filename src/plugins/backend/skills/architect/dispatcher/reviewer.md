@@ -10,7 +10,8 @@ Gunakan template ini saat `architect` mendispatch subagent penilai diff (`code-r
 Review seluruh branch pekerjaan untuk satu direktori tugas.
 
 - Objek: `{taskdir}/`, dinilai terhadap seluruh diff branch ini terhadap `{base_branch}`.
-- Rentang Git: `git merge-base {base_branch} HEAD`..`HEAD` — bukan `{base_branch}..HEAD` polos.
+- Rentang Git: `<sha merge-base>..HEAD` — SHA dari `git merge-base {base_branch} HEAD` yang dijalankan
+  sendiri lebih dulu, bukan `{base_branch}..HEAD` polos dan bukan substitusi `$(…)` (ditolak hook).
 - Kontrak Penilai: Gabungan seluruh brief di `{taskdir}/`, bukan kualitas umum modul sekitarnya.
 - Adapter: `{adapter_path}` — `## Audit checklist` stack repo ini.
 - Kontrak Temuan: `{findings_contract}` — severity (bagian 1), ID (bagian 2), dan skema index (bagian 4).
@@ -23,7 +24,8 @@ Review seluruh branch pekerjaan untuk satu direktori tugas.
   kutip isi file review ke chat.
 - Commit: Commit sendiri `{taskdir}/REVIEW.md` **dan** `backenddev/issues/README.md` dalam satu
   commit sesudah laporan selesai ditulis, hanya di branch kerja (bukan detached, bukan `{base_branch}`),
-  dengan pesan yang disusun dari `commit_convention` profil (default `docs(<slug>): add final review report`).
+  dengan pesan yang disusun dari `commit_convention` profil (default `docs(<slug>): add final review report`),
+  satu `-m` satu baris tanpa trailer atau heredoc (pagar hook menolaknya).
 - Stop Condition: Dilarang melebar mengaudit kode di luar rentang diff; sweep konvensi umum adalah
   milik `audit`. Gerbang masuk lengkap ada di definisi agent-mu — BERHENTI dan lapor sesuai jalur
   gagal di sana, jangan menebak.

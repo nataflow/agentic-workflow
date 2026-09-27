@@ -4,7 +4,7 @@ Sumber: review robustness plugin `backend` 2026-09-27 (lima penelusur paralel: h
 plan/architect/analyst, prasyarat skill lain, orkestrasi dokumen). Temuan TINGGI terbukti lewat probe di
 ruang kerja sementara atau jejak kode `file:baris` dari kedua sisi. Basis kode: commit `e90cd69`.
 
-**Status (2026-09-27):** direncanakan.
+**Status (2026-09-27):** H1–H36 selesai, masing-masing dengan test regresi (`tests/backend/test_11_robustness.py`, `tests/frontend/test_11_guard_shell.py`) yang merah di kode sebelum perbaikan. Versi: backend 0.9.0, frontend 0.8.0 (guard, `verify_scope`, `run_verification`, `migrate_profile`, `detect.py` dikembar).
 
 ## Tujuan
 
@@ -251,7 +251,7 @@ frontmatter tetap dilaporkan.
 **Perbaikan:** `dirty_paths()` di luar taskdir → FAIL, seperti check 5 `task`.
 
 ## H20 [Sedang] Akar `DEFECT_RCA` di-commit sebelum branch diisolasi
-- [~] Skrip selesai — prasyarat `task` menagih `check_base_branch` + nama branch memuat slug taskdir; urutan Fase 3 tech-lead menyusul di Tahap 5
+- [x] Selesai — prasyarat `task` menagih `check_base_branch` + nama branch memuat slug taskdir; tech-lead Fase 3 butir 2a memanggil `task` sesudah isolasi branch
 
 `tech-lead/SKILL.md` Fase 3 memanggil `task` (commit `TASK.md`) di butir 1, baru mencabangkan branch di butir 2.
 Probe: HEAD di `feat/other-chain` → akar mendarat di branch lain; HEAD di base → akar mendarat di base.
@@ -296,14 +296,14 @@ tech-lead sebagai "HEAD detached". **Perbaikan:** pola kunci `^key\s*:`, pagar b
 ## Tahap 5 — Orkestrasi
 
 ## H26 [Tinggi] Taskdir tanpa ledger bolak-balik antara analyst dan gerbang
-- [ ] Belum
+- [x] Selesai — analyst check 7 FAIL atas taskdir tanpa ledger; gerbang (Fase 3 butir 1, Fase 5 butir 4, `gate-lifecycle.md` bagian 1 dan 6, `decisions.md` bagian 4) merutekannya ke `plan` jalur `RCA` atau `debug`
 
 `tech-lead/SKILL.md:76,91` merutekan `BLOCKED`/`HALT.md`/`P1` ke lane `PLANNING` → analyst; taskdir `DEFECT_RCA`
 dan backfill `EXEC_BRIEF` tidak punya `## Chain` (`task/SKILL.md:25`), dan analyst check 7 hanya berkata "laporkan
 ke gerbang" (PASS 7/7). **Perbaikan:** lihat Keputusan H26.
 
 ## H27 [Tinggi] Plafon ronde reviewer tidak di-reset saat hop dikembalikan
-- [ ] Belum
+- [x] Selesai — `--bump reject|oq_return:<HOP>` menolkan `review_round:<HOP>` dan `tampered()` menerimanya; kunci generasi ronde brief memuat `reentry`; analyst SKILL, chain-rules, review-and-commit, plan diperbarui
 
 `analyst/SKILL.md` Fase 4 butir 2 dan 5 mengulang Fase 3 pada hop yang sama; `review_round:<HOP>` hanya dinolkan
 `--reset-hop` pada re-entry. Probe: ronde 1 Issues Found, ronde 2 Approved, user menolak → revisi →
@@ -311,14 +311,14 @@ ke gerbang" (PASS 7/7). **Perbaikan:** lihat Keputusan H26.
 **Perbaikan:** lihat Keputusan H27.
 
 ## H28 [Tinggi] Plafon habis = jalan buntu
-- [ ] Belum
+- [x] Selesai — tech-lead Failure path 7: plafon tertembus → `AskUserQuestion` rumuskan ulang di taskdir baru atau hentikan; baris tabel `gate-lifecycle.md` bagian 1; analyst Failure path 5/8/9 merujuknya
 
 analyst Failure path 5, 8, 9 meminta gerbang "mengklasifikasi ulang dari awal"; gerbang melarang taskdir baru
 (`tech-lead/SKILL.md` Failure path 7, `gate-lifecycle.md` bagian 1) dan counter tidak pernah turun. P1 berikutnya
 berputar tanpa akhir. **Perbaikan:** lihat Keputusan H28.
 
 ## H29 [Sedang] Nilai `plugin` profil: satu nilai, dua vonis
-- [ ] Belum
+- [x] Selesai — `detect.canonical_plugin` di `owner_of` dan `_grade` (be=fe); template be/fe menulis `"backenddev"`/`"frontenddev"`
 
 `profile-template.md:48` berbunyi "`plugin` selalu `\"backend\"`" (sisa rename fd08fc8) sementara contoh `:35`
 `"backenddev"`. `detect._grade` membandingkan nilai mentah dengan `backenddev` → `OTHER_OWNER` → hook tiap sesi
@@ -326,14 +326,14 @@ menyuntik "Profil BELUM ADA", sedangkan `owner_of` (dipakai prasyarat) jatuh ke 
 sendiri. **Perbaikan:** lihat Keputusan H29.
 
 ## H30 [Sedang] `AUDIT_SWEEP` dan `API_DOCS` dicabangkan dari base
-- [ ] Belum
+- [x] Selesai — tech-lead Fase 3: `AUDIT_SWEEP` di `base_branch`, `API_DOCS` di branch aktif, keduanya tanpa taskdir/branch baru; rasional di `decisions.md` bagian 5
 
 Laporan audit ter-commit di branch audit; taskdir perbaikan bercabang dari base, sehingga `finding_source` tidak
 ada saat `plan` memverifikasi ulang dan penanda `FIXED` tidak punya sasaran. `document-api` mode `POST_CHAIN` di
 branch baru menilai diff kosong. **Perbaikan:** lihat Keputusan H30.
 
 ## H31 [Sedang] Instruksi agent bertabrakan dengan hook
-- [ ] Belum
+- [x] Selesai — implementor/reviewer + dispatcher: satu `-m` tanpa trailer/heredoc/`$`; penolakan bentuk boleh diulang sekali; rentang reviewer `<sha merge-base>..HEAD`; migrasi bentrok → `BLOCKED`
 
 (a) Pengingat atribusi harness mendorong trailer `Co-Authored-By … <…>` (newline, `<`, `>`), yang ditolak hook;
 `code-implementor.md:21` memperlakukan penolakan hook sebagai blocker. (b) `code-reviewer.md:34` menyuruh
@@ -343,33 +343,33 @@ trailer/heredoc; penolakan hook atas **bentuk** perintah boleh diulang sekali da
 SHA merge-base dari gerbang masuk butir 5; migrasi bentrok → `BLOCKED`.
 
 ## H32 [Rendah] `EXPLORE_FACT` tanpa profil membuang dua dispatch
-- [ ] Belum
+- [x] Selesai — `code-explorer` lanjut tanpa profil (caveat, plafon `confidence` `medium`); profil corrupt tetap gagal orientasi
 
 `code-explorer.md:45` berhenti pada profil absen, padahal gerbang menjawab baca-kode tanpa profil lewat jalur
 terdegradasi. **Perbaikan:** explorer lanjut dari root repo dengan caveat `tanpa profil` dan plafon `confidence`
 `medium`.
 
 ## H33 [Rendah] `code-reviewer` tanpa tool `Edit`
-- [ ] Belum
+- [x] Selesai — `tools` reviewer + `Edit`; baris indeks ditambah lewat `Edit`
 
 Menambah satu baris riwayat `backenddev/issues/README.md` menuntut penulisan ulang penuh lewat `Write`.
 Hook sudah mengizinkan `Edit` reviewer atas kedua path. **Perbaikan:** tambah `Edit` ke `tools`.
 
 ## H34 [Rendah] Guardrail analyst memvonis commit sahnya sendiri sebagai pelanggaran
-- [ ] Belum
+- [x] Selesai — daftar subjek commit sah per berkas (draft, approve, plan, implementor, koreksi architect); slot `Catatan`
 
 `analyst/SKILL.md:153` menuntut commit terakhir BRD/PRD/brief berformat pesan penulis, padahal commit terakhir
 BRD/PRD adalah `docs(spec): approve …` milik analyst sendiri, dan brief `DONE` milik implementor. Slot
 `Catatan Rantai` tidak ada di Output. **Perbaikan:** daftar subjek sah per berkas; slot `Catatan`.
 
 ## H35 [Rendah] Path relatif `skills/_common/validate_doc.py` di rujukan
-- [ ] Belum
+- [x] Selesai — `«validate_doc.py»` di `gate-lifecycle.md`/`chain-rules.md`, path absolut di analyst SKILL Fase 5 dan awalan Precondition butir 1 tech-lead
 
 `gate-lifecycle.md:37,109` dan `chain-rules.md:137` menyuruh menjalankan path relatif; `tech-lead/SKILL.md` tidak
 memuat perintah absolutnya. **Perbaikan:** perintah `${CLAUDE_PLUGIN_ROOT}` di SKILL.md; rujukan menunjuk ke sana.
 
 ## H36 [Rendah] `detect.py` diam saat `gate_text.render` gagal; README tertinggal
-- [ ] Belum
+- [x] Selesai — `render()` di dalam jaring galat `detect.py` (be=fe); README Hook, Penegakan Mekanis, Pemulihan, Keterbatasan diselaraskan
 
 `render()` dipanggil di luar `try` (`detect.py:482`): traceback exit 1 = gerbang hilang tanpa pesan. README
 "Keterbatasan" masih menyebut `commit_message` tidak menghormati konvensi profil (sudah `commit_template`, 08b B13).

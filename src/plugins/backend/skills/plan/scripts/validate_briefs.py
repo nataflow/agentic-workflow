@@ -339,7 +339,19 @@ class BriefValidator:
         membuat plafon tidak pernah mengikat.
         """
         names = sorted(self._brief_digests())
+        # Hop `BRIEF` yang dibuka re-entry analyst mendapat generasi baru walau himpunan briefnya sama
+        # (11 H27); plafon keras taskdir tetap mengikat. `reentry` 0 → kunci sama dengan bentuk lama.
+        reentry = self._reentry_count()
+        if reentry:
+            names.append(f"reentry={reentry}")
         return hashlib.sha1("\n".join(names).encode("utf-8")).hexdigest()[:12]
+
+    def _reentry_count(self) -> int:
+        """Nilai `reentry` tabel `## Counters` `TASK.md` (0 bila tidak ada)."""
+        text = self._read(self.taskdir / "TASK.md") or ""
+        sec = re.search(r"^## Counters[ \t]*\n(.*?)(?=^## |\Z)", text, re.M | re.S)
+        m = re.search(r"^\|\s*reentry\s*\|\s*(\d+)\s*\|", sec.group(1) if sec else "", re.M)
+        return int(m.group(1)) if m else 0
 
     def _load_state(self) -> Dict[str, Any]:
         text = self._read(self._state_path())
