@@ -41,6 +41,7 @@ Slot prompt: `ticketdir`, `type`, `round`, dan — pada ronde 2 — `previous_ve
 ```markdown
 ## Ticket Review
 - Verdict: PASS | BLOCKED
+- Sidik: <salin persis `Sidik konten` dari prompt>
 - Ronde: <1 | 2>
 - BLOCKER: <n> [MEKANIS] · <n> [SEMANTIK]
 
@@ -51,7 +52,7 @@ Slot prompt: `ticketdir`, `type`, `round`, dan — pada ronde 2 — `previous_ve
 - `TICKET.md:<baris>` — <saran non-blocking>
 ```
 
-Kosongkan daftar yang nihil dengan `- —`. Laporan ini diteruskan `analyst:spec` apa adanya ke `ticket.py review` dan ke user: verdict `PASS` yang dikarang menghapus satu-satunya pembaca independen sebelum tiket diserahkan ke engineer.
+Kosongkan daftar yang nihil dengan `- —`. `Sidik` disalin apa adanya dari prompt, tidak pernah dihitung atau ditebak: `ticket.py review` menolak vonis yang sidiknya tidak sama dengan tiket di disk. Laporan ini diteruskan `analyst:spec` apa adanya ke `ticket.py review` dan ke user: verdict `PASS` yang dikarang menghapus satu-satunya pembaca independen sebelum tiket diserahkan ke engineer.
 
 ## Batas
 

@@ -81,7 +81,8 @@ def git_commit(root: Path, paths: List[str], message: str) -> Tuple[bool, str]:
                                       universal_newlines=True).strip()
         return True, sha
     except subprocess.CalledProcessError as exc:
-        return False, (exc.output or str(exc)).strip()
+        step = exc.cmd[3] if len(exc.cmd) > 3 else "git"
+        return False, (exc.output or f"error: git {step} gagal tanpa keluaran (exit {exc.returncode})").strip()
 
 
 def git_error_line(out: str) -> str:
@@ -239,6 +240,29 @@ def content_hash(text: str, part: str = "all") -> str:
     fields = "\n".join(f"{k}={','.join(sorted(fm[k])) if isinstance(fm.get(k), list) else fm.get(k, '')}"
                        for k in CONTENT_FIELDS[part])
     return hashlib.sha256(f"{fields}\n{norm}".encode("utf-8")).hexdigest()[:12]
+
+
+# Segel serah-terima (09 E8). Sengaja tanpa parser YAML: penerima (backenddev/frontenddev
+# `precondition_lib.ticket_seal`) menyalin fungsi ini apa adanya, dan `tests/test_a1_ticket_source.py`
+# menagih ketiga salinan memberi hasil sama. Mencakup body utuh (kartu + catatan elisitasi) dan
+# baris frontmatter isi (`SEAL_FIELDS`) persis seperti tertulis; field pembukuan dan `external_ref`
+# di luar segel. Ubah ketiganya bersamaan.
+SEAL_FIELDS = ("type", "priority", "domain_terms")
+
+
+def ticket_seal(text: str) -> str:
+    text = text.lstrip("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
+    lines = text.split("\n")
+    head: List[str] = []
+    body = lines
+    if lines and lines[0].rstrip() == "---":
+        end = next((i for i in range(1, len(lines)) if lines[i].rstrip() == "---"), None)
+        if end is not None:
+            head = [l.rstrip() for l in lines[1:end]
+                    if re.match(r"^(%s)\s*:" % "|".join(SEAL_FIELDS), l)]
+            body = lines[end + 1:]
+    norm = "\n".join(l.rstrip() for l in body).strip("\n")
+    return hashlib.sha256(("\n".join(head) + "\n\x00\n" + norm).encode("utf-8")).hexdigest()[:16]
 
 
 def meaningful(lines: List[str]) -> List[str]:

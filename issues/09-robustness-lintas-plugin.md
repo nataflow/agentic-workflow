@@ -135,30 +135,30 @@ Profil memotong Known issues ke 10 baris; execute hanya mengenali galat bawaan l
 berkas yang disentuh rencana = regresi, sisanya `UNVERIFIED` dan dilaporkan.
 
 ## E7 [Tinggi] analyst: pemulihan commit gagal menyarankan commit tanpa subjek kunci
-- [ ] Selesai
+- [x] Selesai — `_commit_failed` memuat `-m "<subjek>"`; dampaknya ke penerima ditutup E8
 
 `_commit_failed` (`ticket.py:379`) mencetak `git commit -- <paths>` tanpa `-m`. Commit manual itu membuat penerima
 memvonis DRIFT, dan `approve` ulang ditolak. **Perbaikan:** pesan memuat `-m "<subjek kunci>"`; E8 menghapus
 ketergantungan penerima pada subjek untuk tiket bersegel.
 
 ## E8 [Tinggi] Penerima tiket: DRIFT bergantung subjek commit; di luar git tanpa cek isi
-- [ ] Selesai
+- [x] Selesai — `approved_seal` (`ticket_seal` × 3 salinan, paritas ditagih test); tiket lama tetap lewat subjek
 
 `ticket_source_verdict` (be/fe `precondition_lib.py`): di luar git langsung PASS; di dalam git, commit suntingan
 yang meniru subjek kunci ikut lolos. **Perbaikan:** `approve` menulis `approved_seal`; penerima menghitung segel yang
 sama dan membandingkan; tanpa segel → jalur lama.
 
 ## E9 [Sedang] analyst: gerbang reviewer tiket bisa dilewati
-- [ ] Selesai
+- [x] Selesai — `--report` wajib; `- Sidik:` dari slot `{sidik}` prompt dicocokkan ke disk
 
 `review --verdict PASS` tanpa `--report` diterima (`ticket.py:297`), dan sidik dicatat saat `review` dijalankan,
 bukan saat reviewer membaca. **Perbaikan:** lihat Keputusan E9.
 
 ## E10 [Rendah] analyst: `--report` path hilang → traceback; pesan commit gagal memuat repr
-- [ ] Selesai
+- [x] Selesai — `--report` tak terbaca → FAIL rapi; galat git tanpa keluaran tanpa repr
 
 ## E11 [Rendah] analyst: `new --type` tidak dipakai; `cancel` tiket READY tanpa jaga
-- [ ] Selesai
+- [x] Selesai — `--type` opsional & digemakan; `cancel` READY menuntut `--force`, pembatalan di-commit
 
 **Perbaikan:** `--type` menjadi opsional dan tercatat di keluaran `new` (elicit tetap penulis `type:`); `cancel`
 READY menuntut `--force` dan meng-commit pembatalannya di repo git.

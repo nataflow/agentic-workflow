@@ -14,6 +14,8 @@ Review satu draft TICKET.md analyst.
 - Tipe: `{type}`
 - Ronde: `{round}` dari plafon 2 per revisi.
 - Ronde 2 saja: vonis sebelumnya `{previous_verdict}`, seksi yang berubah `{changed_sections}`.
+- Sidik konten yang kamu nilai: `{sidik}` — salin apa adanya ke baris `- Sidik:` balikanmu; dilarang menghitung
+  atau mengubahnya.
 - Sudah Dijamin: `validate_doc.py --kind ticket` `PASS` — struktur, penomoran AC/BR, keterpikulan BR
   oleh AC, placeholder, dan kebocoran teknis leksikal. Dilarang menghitung ulang.
 - Larangan: read-only; dilarang menulis `status: READY`, menulis ulang tiket, menilai kelayakan teknis,
@@ -30,6 +32,7 @@ Review satu draft TICKET.md analyst.
 | `{round}` | `review_round` frontmatter `TICKET.md` + 1 | **[REQUIRED]** `1` atau `2` |
 | `{previous_verdict}` | Isi berkas `review_report` dari `check --gate spec` (blok `## Ticket Review` ronde 1) | **[OPTIONAL]** Hanya ronde 2; `-` di ronde 1 |
 | `{changed_sections}` | Heading `##` yang berubah sejak ronde 1 | **[OPTIONAL]** Hanya ronde 2; `-` di ronde 1 |
+| `{sidik}` | `Terselesaikan: sidik=` keluaran `ticket.py check --gate spec`, diambil **tepat sebelum** dispatch | **[REQUIRED]** `<12 hex>/<12 hex>`; `ticket.py review` menolak balikan yang sidiknya berbeda dari disk |
 
 ### Aturan untuk Pendispatch
 
@@ -43,7 +46,7 @@ Review satu draft TICKET.md analyst.
 
 ### Penanganan Balikan
 
-Catat tiap balikan sebelum melangkah — `ticket.py review --ticketdir {ticketdir} --verdict <PASS|BLOCKED|DISPATCH_FAILED>` (path skrip terhidrasi dari `SKILL.md`):
+Catat tiap balikan sebelum melangkah — `ticket.py review --ticketdir {ticketdir} --verdict <PASS|BLOCKED> --report -` dengan blok balikan apa adanya lewat stdin, atau `--verdict DISPATCH_FAILED` tanpa `--report` (path skrip terhidrasi dari `SKILL.md`). `REVIEW FAIL` karena sidik berbeda → draft berubah sesudah dispatch: dispatch ulang dengan `{sidik}` baru, bukan menyunting blok balikan:
 
 | Balikan subagent | Penanganan `spec` |
 | --- | --- |
@@ -52,4 +55,4 @@ Catat tiap balikan sebelum melangkah — `ticket.py review --ticketdir {ticketdi
 | `BLOCKER [MEKANIS]` muncul | catat vonis apa adanya; periksa ulang `validate_doc.py`: `FAIL` → perbaiki; `PASS` → perlakukan temuan itu sebagai ADVISORY. Vonis `BLOCKED` tetap menuntut ronde `PASS` sesudahnya |
 | Payload kosong, format rusak, atau error | catat `DISPATCH_FAILED` (tidak dihitung ronde), ulangi maksimal sekali |
 
-**Subagent mengembalikan:** blok `## Ticket Review` dengan `Verdict`, `Ronde`, hitungan BLOCKER, daftar BLOCKER berjangkar, dan ADVISORY.
+**Subagent mengembalikan:** blok `## Ticket Review` dengan `Verdict`, `Sidik`, `Ronde`, hitungan BLOCKER, daftar BLOCKER berjangkar, dan ADVISORY.

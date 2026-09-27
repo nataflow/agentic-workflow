@@ -363,3 +363,29 @@ reviewed_at: {f['reviewed_at']}
 |---|---|---|
 {dims}
 """
+
+
+# --- Analyst: blok reviewer tiket (09 E9) ------------------------------------------------------
+
+TICKET_PY = PLUGINS / "analyst" / "skills" / "_common" / "ticket.py"
+
+
+def ticket_block(root: Path, ticketdir: str, verdict: str, *, sidik: Optional[str] = None,
+                 cwd: Optional[Path] = None) -> str:
+    """Blok `## Ticket Review` sah untuk `ticket.py review --report -`.
+
+    `sidik` default = keluaran `check --gate spec` sekarang, persis yang disalin pendispatch ke
+    prompt reviewer; berikan nilai lain untuk mensimulasikan draft yang berubah sesudah dispatch.
+    """
+    if sidik is None:
+        chk = run_script(TICKET_PY, "check", "--gate", "spec", "--ticketdir", ticketdir, "--json", cwd=cwd or root)
+        sidik = json.loads(chk.stdout).get("sidik", "-")
+    return (f"## Ticket Review\n- Verdict: {verdict}\n- Sidik: {sidik}\n- Ronde: 1\n"
+            f"- BLOCKER: 0 [MEKANIS] · 0 [SEMANTIK]\n\n**BLOCKER:**\n- —\n\n**ADVISORY:**\n- —\n")
+
+
+def ticket_review(root: Path, ticketdir: str, verdict: str, *, cwd: Optional[Path] = None,
+                  sidik: Optional[str] = None) -> subprocess.CompletedProcess:
+    """`ticket.py review` dengan blok reviewer bersidik (jalur yang diperintahkan `analyst:spec`)."""
+    return run_script(TICKET_PY, "review", "--ticketdir", ticketdir, "--verdict", verdict, "--report", "-",
+                      cwd=cwd or root, stdin=ticket_block(root, ticketdir, verdict, sidik=sidik, cwd=cwd))

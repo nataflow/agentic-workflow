@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import PLUGINS, git, load_module, run_script
+from conftest import PLUGINS, git, load_module, run_script, ticket_block, ticket_review
 
 COMMON = PLUGINS / "analyst" / "skills" / "_common"
 TICKET = COMMON / "ticket.py"
@@ -48,6 +48,10 @@ def tk(root, *args, cwd=None, stdin=""):
     return Run(run_script(TICKET, *args, cwd=cwd or root, stdin=stdin))
 
 
+def review(root, verdict, **kw):
+    return Run(ticket_review(root, TDIR, verdict, **kw))
+
+
 def vd(root, kind):
     return Run(run_script(VALIDATE, "--kind", kind, "--ticketdir", TDIR, cwd=root))
 
@@ -73,7 +77,7 @@ def test_fixture_lolos_kedua_validator(repo):
 def test_a2_review_menolak_elisitasi_rusak(repo):
     edit(repo, "Tinggi — dua klien besar menunggu.", "_(belum terjawab)_")
     assert vd(repo, "elicit").code == 1
-    r = tk(repo, "review", "--ticketdir", TDIR, "--verdict", "PASS")
+    r = review(repo, "PASS")
     assert r.code == 1 and "--kind elicit FAIL" in r.out
 
 
@@ -101,7 +105,7 @@ BLOCK = ("## Ticket Review\n- Verdict: BLOCKED\n- Ronde: 1\n- BLOCKER: 0 [MEKANI
 def test_a3_blok_review_tersimpan_dan_verdict_dicocokkan(repo):
     r = tk(repo, "review", "--ticketdir", TDIR, "--verdict", "PASS", "--report", "-", stdin=BLOCK)
     assert r.code == 1 and "tidak sama" in r.out
-    assert tk(repo, "review", "--ticketdir", TDIR, "--verdict", "BLOCKED", "--report", "-", stdin=BLOCK).code == 0
+    assert review(repo, "BLOCKED").code == 0
     saved = (repo / TDIR / "review.md").read_text(encoding="utf-8")
     assert saved.startswith("<!-- ronde 1/2 · BLOCKED @") and "## Ticket Review" in saved
     assert f"review_report={TDIR}/review.md" in tk(repo, "check", "--gate", "spec", "--ticketdir", TDIR).out
@@ -109,8 +113,7 @@ def test_a3_blok_review_tersimpan_dan_verdict_dicocokkan(repo):
 
 @pytest.mark.regression("A3")
 def test_a3_approve_meng_commit_review_md(repo):
-    block = BLOCK.replace("Verdict: BLOCKED", "Verdict: PASS")
-    assert tk(repo, "review", "--ticketdir", TDIR, "--verdict", "PASS", "--report", "-", stdin=block).code == 0
+    assert review(repo, "PASS").code == 0
     assert tk(repo, "approve", "--ticketdir", TDIR, "--answer", "ok").code == 0
     committed = git(repo, "show", "--name-only", "--format=", "HEAD").split()
     assert f"{TDIR}/review.md" in committed and f"{TDIR}/TICKET.md" in committed
@@ -118,8 +121,12 @@ def test_a3_approve_meng_commit_review_md(repo):
 
 @pytest.mark.regression("A3")
 def test_a3_review_report_basi_tidak_dirujuk(repo):
-    assert tk(repo, "review", "--ticketdir", TDIR, "--verdict", "BLOCKED", "--report", "-", stdin=BLOCK).code == 0
-    assert tk(repo, "review", "--ticketdir", TDIR, "--verdict", "BLOCKED").code == 0   # ronde 2 tanpa blok
+    """Sejak E9 tiap vonis membawa blok; `review.md` selalu blok ronde terakhir, dan blok lama yang
+    kepalanya tidak cocok dengan frontmatter (jalur lama tanpa `--report`) tidak dirujuk."""
+    assert review(repo, "BLOCKED").code == 0
+    assert review(repo, "BLOCKED").code == 0
+    assert (repo / TDIR / "review.md").read_text(encoding="utf-8").startswith("<!-- ronde 2/2 · BLOCKED @")
+    edit(repo, "review_round: 2", "review_round: 1")      # frontmatter tidak lagi cocok dengan kepala blok
     assert "review_report=-" in tk(repo, "check", "--gate", "spec", "--ticketdir", TDIR).out
 
 
@@ -128,10 +135,10 @@ def test_a3_review_report_basi_tidak_dirujuk(repo):
 @pytest.mark.regression("A4")
 def test_a4_ronde_reset_saat_elisitasi_berubah(repo):
     for _ in range(2):
-        assert tk(repo, "review", "--ticketdir", TDIR, "--verdict", "BLOCKED").code == 0
+        assert review(repo, "BLOCKED").code == 0
     edit(repo, "Hanya pelanggan korporat.", "Hanya pelanggan korporat di Jabodetabek.")
     assert "review_basi=elisitasi" in tk(repo, "check", "--gate", "spec", "--ticketdir", TDIR).out
-    r = tk(repo, "review", "--ticketdir", TDIR, "--verdict", "PASS")
+    r = review(repo, "PASS")
     assert r.code == 0 and "ronde 1/2" in r.out
     assert tk(repo, "approve", "--ticketdir", TDIR, "--answer", "ok", "--no-commit").code == 0
 
@@ -139,11 +146,11 @@ def test_a4_ronde_reset_saat_elisitasi_berubah(repo):
 @pytest.mark.regression("A4")
 def test_a4_kartu_berubah_tetap_kena_plafon(repo):
     for _ in range(2):
-        tk(repo, "review", "--ticketdir", TDIR, "--verdict", "BLOCKED")
+        review(repo, "BLOCKED")
     edit(repo, "- Denda keterlambatan — ditunda ke fase berikutnya",
          "- Denda keterlambatan — ditunda ke fase berikutnya atas keputusan peminta")
     assert "review_basi=kartu" in tk(repo, "check", "--gate", "spec", "--ticketdir", TDIR).out
-    assert tk(repo, "review", "--ticketdir", TDIR, "--verdict", "PASS").code == 1
+    assert review(repo, "PASS").code == 1
 
 
 # --- A5 ------------------------------------------------------------------------------------------
@@ -193,7 +200,7 @@ def test_a7_requester_kosong_gagal_domain_terms_kosong_tetap_list(repo):
 @pytest.mark.parametrize("value", ["dua", ""])
 def test_a7_review_round_rusak_fail_rapi(repo, value):
     edit(repo, "review_round: 0", f"review_round: {value}".rstrip())
-    r = tk(repo, "review", "--ticketdir", TDIR, "--verdict", "PASS")
+    r = review(repo, "PASS")
     assert r.code == 1 and not r.traceback and "bukan bilangan" in r.err
 
 
@@ -262,7 +269,7 @@ def test_a11_commit_gagal_informatif_dan_exit_3(repo):
     (repo / ".gitignore").write_text("analyst/\n", encoding="utf-8")
     git(repo, "add", ".gitignore")
     git(repo, "commit", "-qm", "chore: ignore analyst")
-    assert tk(repo, "review", "--ticketdir", TDIR, "--verdict", "PASS").code == 0
+    assert review(repo, "PASS").code == 0
     r = tk(repo, "approve", "--ticketdir", TDIR, "--answer", "ok")
     assert r.code == 3 and "ignored" in r.out and "hint:" not in r.out
 
@@ -281,7 +288,7 @@ def test_a12_type_huruf_kecil_diterima(plain):
 
 @pytest.mark.regression("A12")
 def test_a12_ref_sesudah_ready_tanpa_drift_dan_ter_commit(repo):
-    assert tk(repo, "review", "--ticketdir", TDIR, "--verdict", "PASS").code == 0
+    assert review(repo, "PASS").code == 0
     assert tk(repo, "approve", "--ticketdir", TDIR, "--answer", "ok").code == 0
     assert tk(repo, "ref", "--ticketdir", TDIR, "--ref", "FIN-123").code == 0
     assert states(repo)[TDIR] == "READY"

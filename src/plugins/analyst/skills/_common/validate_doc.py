@@ -41,6 +41,7 @@ from analyst_lib import (  # noqa: E402
     scan_leaks,
     sections,
     split_frontmatter,
+    ticket_seal,
 )
 
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -348,8 +349,10 @@ class DocValidator(Checker):
         if self.fm.get("status") == "READY":
             current = content_hash(self.text)
             sealed = str(self.fm.get("approved_hash", ""))
-            self.add(10, "Konten = yang disetujui", sealed == current,
-                     f"approved_hash {sealed or '-'} · konten {current}",
+            seal = str(self.fm.get("approved_seal", "-") or "-")
+            seal_ok = seal == "-" or seal == ticket_seal(self.text)   # `-`: tiket sebelum 09 E8
+            self.add(10, "Konten = yang disetujui", sealed == current and seal_ok,
+                     f"approved_hash {sealed or '-'} · konten {current} · segel {'cocok' if seal_ok else 'BERBEDA'}",
                      "Tiket READY disunting sesudah disetujui: `ticket.py reopen`, atau pulihkan isinya.")
 
 

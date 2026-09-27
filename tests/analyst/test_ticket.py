@@ -8,7 +8,7 @@ import re
 
 import pytest
 
-from conftest import PLUGINS, git, run_script, write_files
+from conftest import PLUGINS, git, run_script, ticket_review, write_files
 
 SKILLS = PLUGINS / "analyst" / "skills"
 TICKET = SKILLS / "_common" / "ticket.py"
@@ -102,7 +102,7 @@ def test_frontmatter_rusak_fail(make_repo):
 def test_siklus_review_approve_reopen_cancel(make_repo):
     root = repo_with(make_repo, ticket_md())
     assert ticket(root, "check", "--gate", "spec", "--ticketdir", TD).returncode == 0
-    r = ticket(root, "review", "--ticketdir", TD, "--verdict", "PASS")
+    r = ticket_review(root, TD, "PASS")
     assert r.returncode == 0 and "REVIEW PASS" in r.stdout, r.stdout + r.stderr
     r = ticket(root, "approve", "--ticketdir", TD, "--answer", "ya")
     assert r.returncode == 0, r.stdout + r.stderr

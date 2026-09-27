@@ -59,7 +59,7 @@ Tipe `BUG` mengganti `## User Story` dengan seksi berikut di posisi yang sama; s
 **Dampak**: <siapa, seberapa sering, ada jalan pintas atau tidak>
 ````
 
-Field frontmatter `status`, `revision`, `revision_base`, `review`, `review_round`, `approved`, `approved_hash`, `approval`, `reopened`, `reopen_reason`, `cancel_reason` ditulis **hanya** oleh `ticket.py`; `elicitation` dan `domain_terms` milik `analyst:elicit`. Penulis kartu menyalin nilainya apa adanya. `external_ref` diisi kunci atau tautan kartu Jira/Trello bila tiket ini disalin ke sana (sesudah `READY` hanya lewat `ticket.py ref`) — yang disalin ke sana cukup kartunya, tanpa `## Catatan Elisitasi`.
+Field frontmatter `status`, `revision`, `revision_base`, `review`, `review_round`, `approved`, `approved_hash`, `approved_seal`, `approval`, `reopened`, `reopen_reason`, `cancel_reason` ditulis **hanya** oleh `ticket.py`; `elicitation` dan `domain_terms` milik `analyst:elicit`. Penulis kartu menyalin nilainya apa adanya. `external_ref` diisi kunci atau tautan kartu Jira/Trello bila tiket ini disalin ke sana (sesudah `READY` hanya lewat `ticket.py ref`) — yang disalin ke sana cukup kartunya, tanpa `## Catatan Elisitasi`.
 
 ---
 
@@ -76,7 +76,7 @@ Field frontmatter `status`, `revision`, `revision_base`, `review`, `review_round
 7. **Pertanyaan terbuka & lampiran**: `- Tidak ada.` atau `- **Q-{n}**: <pertanyaan> — asumsi: <asumsi yang dipakai tiket ini>`; token `MEMBLOKIR` terlarang. `## Lampiran` berupa butir daftar (tautan atau nama dokumen) atau `- Tidak ada.`
 8. **Placeholder**: nol `TBD`/`TODO`/`diisi nanti` dan nol slot `<...>` di kartu, di luar `## Lampiran`; autolink `<https://…>` dan alamat `<nama@…>` bukan slot. `## Catatan Elisitasi` divonis `--kind elicit`.
 9. **Nol kebocoran teknis** di kartu, di luar `## Lampiran` (catatan elisitasi dikecualikan — permintaan asli dan log adalah kutipan mentah): istilah teknis (endpoint, database, query, nama framework, `API`, …), path berkas, `file:baris`, metode HTTP, kode status HTTP, identifier `snake_case`/`camelCase`, dan blok kode. Teks dalam tanda kutip dikecualikan — itu tulisan yang dilihat pengguna. Istilah yang memang kosakata bisnis produk dikecualikan lewat `domain_terms: [API]` — list itu milik `analyst:elicit`; `spec` tidak menambahnya.
-10. **Keutuhan `READY`**: sidik berkas utuh — kartu, catatan elisitasi, beserta `type`, `priority`, dan `domain_terms` — sama dengan `approved_hash`; suntingan sesudah disetujui menuntut `ticket.py reopen`.
+10. **Keutuhan `READY`**: sidik berkas utuh — kartu, catatan elisitasi, beserta `type`, `priority`, dan `domain_terms` — sama dengan `approved_hash`, dan segel serah-terima sama dengan `approved_seal` (bila ada); suntingan sesudah disetujui menuntut `ticket.py reopen`.
 
 **Semantik** — self-test penulis sebelum dispatch `ticket-reviewer`, dan fokus reviewer:
 

@@ -100,16 +100,16 @@ Kerangka kanonik dan contoh terisi: `skills/elicit/templates/elicit-template.md`
 | Skrip | Memvonis |
 |---|---|
 | `_common/ticket.py state` | keadaan tiap ticketdir: `KOSONG`, `ELISITASI`, `SPEC`, `DRAFT`, `READY`, `DRIFT`, `RUSAK`, `NAMA_TIDAK_SAH`, `DIBATALKAN` |
-| `_common/ticket.py check --gate elicit\|spec` | prasyarat gate atas satu ticketdir; mencetak `root=` (path ticketdir relatif root, bukan cwd) dan, untuk draft, `review_basi` (bagian yang berubah sesudah review) serta `review_report` |
+| `_common/ticket.py check --gate elicit\|spec` | prasyarat gate atas satu ticketdir; mencetak `root=` (path ticketdir relatif root, bukan cwd) dan, untuk draft, `sidik` (slot prompt reviewer), `review_basi` (bagian yang berubah sesudah review), serta `review_report` |
 | `_common/validate_doc.py --kind elicit` | `## Catatan Elisitasi`: struktur, pilar per tipe, log bernomor, `CLOSED` ⇒ nol pilar kosong, nol pertanyaan memblokir, nol baris `Asumsi:`, dan tiap `domain_terms` berjejak di permintaan asli atau log |
 | `_common/validate_doc.py --kind ticket` | kartu: struktur per tipe, AC Given/When/Then, BR terpikul AC, nol placeholder, **nol kebocoran teknis** |
-| `_common/ticket.py review` | vonis reviewer disimpan bersama sidik `<kartu>/<catatan elisitasi>` yang dinilai, bloknya ke `review.md` (`--report`, `- Verdict:` wajib sama dengan `--verdict`); ditolak bila salah satu validator `FAIL`; plafon 2 ronde per revisi, dibuka ulang bila catatan elisitasi berubah |
-| `_common/ticket.py approve` | `READY` hanya bila kedua validator (`ticket`, `elicit`) `PASS`, `elicitation: CLOSED`, **dan** vonis review `PASS` atas sidik kartu dan catatan elisitasi sekarang |
-| `_common/ticket.py revise` / `reopen` / `cancel` | plafon 3 revisi per basis fakta; buka ulang tiket `READY`; tutup ticketdir (direktori kosong dihapus) |
+| `_common/ticket.py review` | vonis `PASS`/`BLOCKED` **wajib** membawa blok reviewer (`--report`): `- Verdict:` sama dengan `--verdict`, dan `- Sidik:` (disalin reviewer dari prompt) sama dengan sidik `<kartu>/<catatan elisitasi>` di disk — draft yang berubah sesudah dispatch ditolak; blok disimpan ke `review.md`; ditolak bila salah satu validator `FAIL`; plafon 2 ronde per revisi, dibuka ulang bila catatan elisitasi berubah |
+| `_common/ticket.py approve` | `READY` hanya bila kedua validator (`ticket`, `elicit`) `PASS`, `elicitation: CLOSED`, **dan** vonis review `PASS` atas sidik kartu dan catatan elisitasi sekarang; menulis `approved_hash` dan `approved_seal` (segel yang dibaca engineer) |
+| `_common/ticket.py revise` / `reopen` / `cancel` | plafon 3 revisi per basis fakta; buka ulang tiket `READY`; tutup ticketdir (direktori kosong dihapus; tiket `READY` hanya dengan `--force`; di-commit `docs(ticket): batalkan TICKET <slug>`) |
 | `_common/ticket.py ref` | isi `external_ref` pada `DRAFT`/`READY` tanpa `DRIFT`, commit `docs(ticket): ref TICKET <slug>` |
 
-Kontrak exit `approve`/`ref`: 0 = tertulis dan ter-commit (atau tanpa git), 1 = ditolak, 3 = tertulis tetapi
-commit gagal — baris `COMMIT GAGAL` memuat sebab git dan perintah commit manualnya.
+Kontrak exit `approve`/`ref`/`cancel`: 0 = tertulis dan ter-commit (atau tanpa git), 1 = ditolak, 3 = tertulis tetapi
+commit gagal — baris `COMMIT GAGAL` memuat sebab git dan perintah commit manualnya, lengkap dengan subjeknya.
 
 Pemindai kebocoran teknis menolak istilah sistem (endpoint, database, query, nama framework, `API`, …), path
 berkas, `file:baris`, metode dan kode status HTTP, identifier `snake_case`/`camelCase`, dan blok kode di kartu, di luar
@@ -120,7 +120,7 @@ dan istilah yang memang kosakata produk (mis. produk API untuk mitra, aplikasi `
 
 Sidik review dihitung per bagian — kartu (beserta `type`, `priority`) dan catatan elisitasi (beserta `type`,
 `domain_terms`) — sehingga suntingan di bagian mana pun membuat vonis basi. `approve` memateraikan sidik berkas
-utuh. Tiket `READY` yang disunting sesudah disetujui terbaca `DRIFT`: sidiknya tidak lagi sama dengan `approved_hash`. Perubahan resmi dimulai
+utuh (`approved_hash`) dan segel serah-terima (`approved_seal`). Tiket `READY` yang disunting sesudah disetujui terbaca `DRIFT`: sidik atau segelnya tidak lagi sama. Perubahan resmi dimulai
 dari `/analyst:intake`, yang merutekan ke `analyst:spec` (reopen) untuk mengulang review dan persetujuan.
 
 ## Git
@@ -134,10 +134,12 @@ eksplisit (`docs(ticket): ...`); di luar git, commit dilewati dan disebut di Out
 Tiket `READY` diserahkan lewat parameter `ticket_source` = path `<ticketdir>/TICKET.md` ke
 `backenddev:tech-lead` dan/atau `frontenddev:lead` (baris penutup `SPEC — READY` memuatnya). Kontraknya:
 
-- **Syarat**: frontmatter `status: READY` dan `elicitation: CLOSED`; di repo git, commit terakhir yang
-  menyentuh berkas bersubjek `docs(ticket): kunci TICKET <slug> READY` atau `docs(ticket): ref TICKET <slug>`,
-  dan berkasnya bersih. Tiket yang disunting sesudah approve ditolak prasyarat `task` kedua plugin (DRIFT)
-  dan dikembalikan ke `analyst:spec`.
+- **Syarat**: frontmatter `status: READY` dan `elicitation: CLOSED`, dan isi berkas sama dengan
+  `approved_seal` — di dalam maupun di luar repo git, apa pun subjek commit-nya. Tiket lama tanpa
+  `approved_seal` dinilai cara lama: commit terakhir yang menyentuh berkas bersubjek
+  `docs(ticket): kunci TICKET <slug> READY` atau `docs(ticket): ref TICKET <slug>`, dan berkasnya bersih.
+  Tiket yang disunting sesudah approve ditolak prasyarat `task` kedua plugin (DRIFT) dan dikembalikan ke
+  `analyst:spec`.
 - **Yang dibaca**: kartu saja (H1 sampai akhir `## Lampiran`); catatan elisitasi hanya jejak, bukan sumber
   kriteria.
 - **Namespace**: kartu tetap menulis `AC-{n}`/`BR-{n}`. Di hilir keduanya dirujuk `TAC-{n}`/`TBR-{n}` agar
@@ -148,8 +150,9 @@ Tiket `READY` diserahkan lewat parameter `ticket_source` = path `<ticketdir>/TIC
   `backenddev:analyst` tidak menjadwalkan BRD hanya karena fakta itu; bila BRD tetap terbit karena fakta di
   luar tiket, `business-analysis` menyerap `TBR-{n}` tanpa menanyakannya ulang (`— Asal: TBR-{m}`).
 
-Mengubah format subjek commit `approve`/`ref` di `_common/ticket.py` berarti mengubah pembacanya juga
-(`ticket_source_verdict` di `_common/precondition_lib.py` backenddev dan frontenddev).
+`ticket_seal` di `_common/analyst_lib.py` disalin apa adanya ke `_common/precondition_lib.py` backenddev dan
+frontenddev (`tests/test_a1_ticket_source.py` menagih ketiganya identik); mengubah segel atau subjek commit
+`approve`/`ref` berarti mengubah ketiganya bersamaan.
 
 Engineer menerbitkan `TASK.md` teknisnya sendiri —
 lengkap dengan `file:baris`, alat ukur teknis, dan ledger — dari tiket itu. Nama `TICKET.md` sengaja berbeda

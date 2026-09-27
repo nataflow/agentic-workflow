@@ -9,7 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from conftest import BE_SKILLS, FE_SKILLS, PLUGINS, be_checks, be_profile, commit, fe_profile, fe_run, run_script, write_files
+from conftest import (BE_SKILLS, FE_SKILLS, PLUGINS, be_checks, be_profile, commit, fe_profile, fe_run, git,
+                      load_module, run_script, ticket_review, write_files)
 
 TICKET_PY = PLUGINS / "analyst/skills/_common/ticket.py"
 FIXTURE = Path(__file__).resolve().parent / "analyst" / "fixtures" / "ticket_valid.md"
@@ -39,7 +40,8 @@ def repo(make_repo):
 
 @pytest.fixture
 def ready(repo):
-    tk(repo, "review", "--ticketdir", TDIR, "--verdict", "PASS")
+    proc = ticket_review(repo, TDIR, "PASS")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
     tk(repo, "approve", "--ticketdir", TDIR, "--answer", "ok")
     return repo
 
@@ -64,7 +66,7 @@ CHECKERS = pytest.mark.parametrize("check", [be_ticket_check, fe_ticket_check], 
 @CHECKERS
 def test_tiket_ready_hasil_approve_lolos(ready, check):
     c = check(ready, TICKET)
-    assert c["status"] == "PASS" and "docs(ticket): kunci TICKET cicilan READY" in c["summary"], c
+    assert c["status"] == "PASS" and "READY bersegel" in c["summary"], c
 
 
 @pytest.mark.regression("A1")
@@ -91,7 +93,7 @@ def test_suntingan_sesudah_approve_drift(ready, check):
     assert c["status"] == "FAIL" and "DRIFT" in c["summary"] and "analyst:spec" in c["action"], c
     commit(ready, "chore: ubah ambang cicilan", TICKET)
     c = check(ready, TICKET)
-    assert c["status"] == "FAIL" and "chore: ubah ambang cicilan" in c["summary"], c
+    assert c["status"] == "FAIL" and "DRIFT" in c["summary"], c
 
 
 @pytest.mark.regression("A1")
@@ -108,6 +110,77 @@ def test_path_bukan_tiket_ditolak(repo, check, value, needle):
 @CHECKERS
 def test_tanpa_tiket_lolos(repo, check):
     assert check(repo, "")["status"] == "PASS"
+
+
+# --- segel `approved_seal` (09 E7, E8) ------------------------------------------------------------
+
+LIBS = {name: load_module(path, f"seal_{name}") for name, path in (
+    ("analyst", PLUGINS / "analyst/skills/_common/analyst_lib.py"),
+    ("backenddev", PLUGINS / "backenddev/skills/_common/precondition_lib.py"),
+    ("frontenddev", PLUGINS / "frontenddev/skills/_common/precondition_lib.py"),
+)}
+
+
+@pytest.mark.regression("E8")
+def test_segel_ketiga_salinan_identik():
+    base = FIXTURE.read_text(encoding="utf-8")
+    variants = [base, base.replace("\n", "\r\n"), "\ufeff" + base, base + "\n\n",
+                base.replace("status: DRAFT", "status: READY\nexternal_ref: FIN-9\napproved_seal: x"),
+                base.replace("minimal Rp 50.000.000", "minimal Rp 10.000.000"), "# tanpa frontmatter\n"]
+    for text in variants:
+        seals = {name: lib.ticket_seal(text) for name, lib in LIBS.items()}
+        assert len(set(seals.values())) == 1, seals
+    seal = LIBS["analyst"].ticket_seal
+    assert seal(variants[0]) == seal(variants[1]) == seal(variants[2]) == seal(variants[3]) == seal(variants[4])
+    assert seal(variants[0]) != seal(variants[5])
+
+
+@pytest.mark.regression("E8")
+@CHECKERS
+def test_commit_suntingan_meniru_subjek_kunci_tetap_drift(ready, check):
+    p = ready / TICKET
+    p.write_text(p.read_text(encoding="utf-8").replace("minimal Rp 50.000.000", "minimal Rp 10.000.000"),
+                 encoding="utf-8")
+    commit(ready, "docs(ticket): kunci TICKET cicilan READY", TICKET)
+    c = check(ready, TICKET)
+    assert c["status"] == "FAIL" and "DRIFT" in c["summary"], c
+
+
+@pytest.mark.regression("E7")
+@CHECKERS
+def test_commit_manual_bersubjek_lain_tidak_drift(repo, check):
+    """Pemulihan sesudah commit kunci gagal: isi bersegel, subjek commit tidak lagi menentukan."""
+    assert ticket_review(repo, TDIR, "PASS").returncode == 0
+    tk(repo, "approve", "--ticketdir", TDIR, "--answer", "ok", "--no-commit")
+    commit(repo, "docs: simpan tiket", TICKET, f"{TDIR}/review.md")
+    assert check(repo, TICKET)["status"] == "PASS"
+
+
+@pytest.mark.regression("E8")
+@CHECKERS
+def test_di_luar_git_suntingan_sesudah_ready_drift(make_repo, check):
+    root = make_repo({TICKET: FIXTURE.read_text(encoding="utf-8"), f"{BE_TD}/.keep": "", f"{FE_TD}/.keep": ""},
+                     name="plain", git_init=False)
+    be_profile(root, "go")
+    fe_profile(root, "react-vite")
+    assert ticket_review(root, TDIR, "PASS").returncode == 0
+    tk(root, "approve", "--ticketdir", TDIR, "--answer", "ok")
+    assert check(root, TICKET)["status"] == "PASS"
+    p = root / TICKET
+    p.write_text(p.read_text(encoding="utf-8").replace("minimal Rp 50.000.000", "minimal Rp 10.000.000"),
+                 encoding="utf-8")
+    c = check(root, TICKET)
+    assert c["status"] == "FAIL" and "DRIFT" in c["summary"], c
+
+
+@pytest.mark.regression("E7")
+def test_pesan_commit_gagal_memuat_subjek_kunci(repo):
+    git(repo, "rm", "-rq", "--cached", "analyst")
+    (repo / ".gitignore").write_text("analyst/\n", encoding="utf-8")
+    commit(repo, "chore: ignore analyst", ".gitignore")
+    assert ticket_review(repo, TDIR, "PASS").returncode == 0
+    r = run_script(TICKET_PY, "approve", "--ticketdir", TDIR, "--answer", "ok", cwd=repo)
+    assert r.returncode == 3 and 'commit -m "docs(ticket): kunci TICKET cicilan READY"' in r.stdout, r.stdout
 
 
 # --- keterpikulan `TAC-{n}` di TASK.md --------------------------------------------------------

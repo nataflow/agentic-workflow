@@ -513,6 +513,45 @@ def ticket_acs(text: str) -> List[int]:
     return sorted({int(m.group(1)) for line in ticket_card(text) for m in [TICKET_AC_RE.match(line)] if m})
 
 
+# Segel serah-terima tiket (09 E8) — salinan persis `analyst_lib.ticket_seal`; ketiganya ditagih sama
+# oleh `tests/test_a1_ticket_source.py`. Ubah bersamaan.
+TICKET_SEAL_FIELDS = ("type", "priority", "domain_terms")
+
+
+def ticket_seal(text: str) -> str:
+    text = text.lstrip("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
+    lines = text.split("\n")
+    head: List[str] = []
+    body = lines
+    if lines and lines[0].rstrip() == "---":
+        end = next((i for i in range(1, len(lines)) if lines[i].rstrip() == "---"), None)
+        if end is not None:
+            head = [l.rstrip() for l in lines[1:end]
+                    if re.match(r"^(%s)\s*:" % "|".join(TICKET_SEAL_FIELDS), l)]
+            body = lines[end + 1:]
+    norm = "\n".join(l.rstrip() for l in body).strip("\n")
+    return hashlib.sha256(("\n".join(head) + "\n\x00\n" + norm).encode("utf-8")).hexdigest()[:16]
+
+
+def sealed_verdict(root: Path, rel: str, fm: Dict[str, Any]) -> Optional[Tuple[str, str, str]]:
+    """Vonis dari `approved_seal` bila tiket bersegel; None = tiket lama (vonis dari subjek commit).
+
+    Segel menilai isi, bukan riwayat: suntingan sesudah READY → DRIFT di dalam maupun di luar git,
+    dan commit suntingan yang meniru subjek kunci tidak lagi lolos.
+    """
+    seal = str(fm.get("approved_seal") or "-").strip()
+    if seal in ("", "-"):
+        return None
+    try:
+        now = ticket_seal((root / rel).read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError) as exc:
+        return "FAIL", f"`{rel}` tak terbaca ({exc})", TICKET_ACTION
+    if now != seal:
+        return ("FAIL", f"isi `{rel}` berubah sesudah disetujui (segel {seal}, sekarang {now}) — DRIFT",
+                TICKET_ACTION)
+    return "PASS", f"{rel} READY bersegel {seal}", ""
+
+
 def ticket_source_verdict(root: Path, value: Any) -> Tuple[str, str, str]:
     """`(status, ringkasan, tindakan)` untuk `ticket_source`: kosong → PASS; tiket wajib READY dan terkunci."""
     rel = normalize_ticket_path(value)
@@ -533,8 +572,11 @@ def ticket_source_verdict(root: Path, value: Any) -> Tuple[str, str, str]:
     if status != "READY" or elicit != "CLOSED":
         return ("FAIL", f"tiket berstatus `{status}`, elisitasi `{elicit}` — wajib `READY` dan `CLOSED`",
                 "Selesaikan tiket di `analyst:spec` sampai READY.")
+    sealed = sealed_verdict(root, rel, fm)
+    if sealed:
+        return sealed
     if not is_git_repo(root):
-        return "PASS", f"{rel} READY (bukan repo git — DRIFT tidak dinilai)", ""
+        return "PASS", f"{rel} READY (bukan repo git, tiket tanpa segel — DRIFT tidak dinilai)", ""
     slug = m.group(1)
     locks = (f"docs(ticket): kunci TICKET {slug} READY", f"docs(ticket): ref TICKET {slug}")
     subject = git(root, "log", "-1", "--format=%s", "--", rel).strip()

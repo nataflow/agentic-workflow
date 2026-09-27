@@ -58,7 +58,7 @@ user-invocable: false
 
 1. `review_round` sudah 2 → dilarang dispatch; lompat ke Phase 5 dengan BLOCKER tersisa (lihat `dispatcher/reviewer.md` gerbang masuk).
 2. Muat `dispatcher/reviewer.md`, hidrasi slot `ticketdir`, `type`, `round` (`review_round` + 1), dan pada ronde 2 `previous_verdict` beserta `changed_sections`; dispatch `ticket-reviewer` (`subagent_type`: `analyst:ticket-reviewer`) langsung, tanpa skill pembungkus.
-3. Catat balikan **seketika**, sebelum satu suntingan pun: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py review --ticketdir <ticketdir> --verdict <PASS|BLOCKED> --report - <<'EOF'`, lalu blok `## Ticket Review` reviewer apa adanya, lalu `EOF` (`--verdict DISPATCH_FAILED` tanpa `--report`). Skrip menyimpan sidik konten yang benar-benar dinilai reviewer dan bloknya ke `<ticketdir>/review.md`; menolak bila `- Verdict:` di blok berbeda dengan `--verdict`, atau bila `validate_doc.py` `ticket`/`elicit` `FAIL` (dispatch tidak sah). Suntingan sesudahnya membuat vonis itu basi dan menuntut ronde berikut. Tangani per tabel `### Penanganan Balikan` template itu.
+3. Catat balikan **seketika**, sebelum satu suntingan pun: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py review --ticketdir <ticketdir> --verdict <PASS|BLOCKED> --report - <<'EOF'`, lalu blok `## Ticket Review` reviewer apa adanya, lalu `EOF` (`--verdict DISPATCH_FAILED` tanpa `--report`; vonis lain tanpa blok ditolak). Skrip menyimpan sidik konten yang benar-benar dinilai reviewer dan bloknya ke `<ticketdir>/review.md`; menolak bila `- Verdict:` di blok berbeda dengan `--verdict`, bila `- Sidik:` di blok (disalin reviewer dari slot `{sidik}` prompt) berbeda dengan sidik disk, atau bila `validate_doc.py` `ticket`/`elicit` `FAIL` (dispatch tidak sah). Suntingan sesudahnya membuat vonis itu basi dan menuntut ronde berikut. Tangani per tabel `### Penanganan Balikan` template itu.
 
 ### Phase 4 — Commit Draft
 
@@ -78,7 +78,7 @@ Repo git (`git=ya`): `git -C <root> add <ticketdir>/TICKET.md <ticketdir>/review
 - **ELISITASI SATU-SATUNYA SUMBER**: dilarang menambah aturan, batas, peran, notifikasi, atau kasus yang tidak ada di `## Catatan Elisitasi`, sekalipun "biasanya perlu".
 - **AC TERAMATI**: `then` berupa teks layar, tombol, status, angka, atau pesan yang diterima — bukan "data tersimpan" atau "sistem memproses".
 - **NOL TEKNIS**: dilarang menyebut penyimpanan, integrasi, teknologi, struktur data, estimasi, atau pembagian backend/frontend.
-- **APPROVAL LEWAT SKRIP**: dilarang menulis `status: READY`, `approved_hash`, atau `review:` dengan tangan.
+- **APPROVAL LEWAT SKRIP**: dilarang menulis `status: READY`, `approved_hash`, `approved_seal`, atau `review:` dengan tangan.
 - **CATATAN MILIK ELICIT**: dilarang menyunting `## Catatan Elisitasi`, `elicitation`, atau `domain_terms` dari skill ini; tiap perubahan fakta lewat `analyst:elicit` dengan `reopen_reason`.
 - **REVIEWER LEWAT TEMPLATE**: `ticket-reviewer` hanya lewat prompt terhidrasi `dispatcher/reviewer.md`; blok vonisnya diteruskan ke user tanpa parafrase.
 - **ATOMIC COMMIT**: staging path eksplisit; dilarang `git add .`/`-A`, `--no-verify`, push.
