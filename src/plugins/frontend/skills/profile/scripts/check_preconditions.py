@@ -265,9 +265,16 @@ class PreconditionChecker:
         except (OSError, ValueError):
             stack, owner = None, ""
         missing = [f for f in PROFILE_FILES if not (self.profile_dir / f).is_file()]
-        dirty = subprocess.run(["git", "-C", str(self.root), "status", "--porcelain", "--", self.profile_rel],
-                               capture_output=True, text=True).stdout.strip()
-        problem = ("`index.json` absen atau bukan JSON valid" if stack is None
+        # PATCH meng-commit `drift.md`: status yang tak terbaca (git absen, bukan repo) bukan "bersih" (12 J19).
+        try:
+            proc = subprocess.run(["git", "-C", str(self.root), "status", "--porcelain", "--", self.profile_rel],
+                                  capture_output=True, text=True, timeout=60)
+            unreadable = "" if proc.returncode == 0 else (proc.stderr.strip() or f"exit {proc.returncode}")
+            dirty = proc.stdout.strip()
+        except (OSError, subprocess.SubprocessError) as exc:
+            unreadable, dirty = str(exc), ""
+        problem = (f"`git status` tak terbaca ({unreadable.splitlines()[-1][:120]})" if unreadable
+                   else "`index.json` absen atau bukan JSON valid" if stack is None
                    else f"`index.json` milik `{owner}`; bukan profil {PLUGIN}" if owner and owner != PLUGIN
                    else f"{len(missing)} berkas profil hilang: {', '.join(missing[:4])}" if missing
                    else f"stack profil `{stack}` ≠ stack terdeteksi `{self.stack}`" if stack != self.stack

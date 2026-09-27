@@ -80,9 +80,14 @@ def test_bukti_perintah_hijau_sah(fe_minor_chain):
 
 
 def log(repo, *entries):
+    """Log mesin `run_verification.py closing`; baseline yang ada diukur di akar `TASK.md` (12 J13)."""
     rel = f"{TD}/.explore/closing-verification.json"
-    write_files(repo, {rel: json.dumps([dict(zip(("cmd", "status", "new_errors", "baseline_status"), e))
-                                        for e in entries])})
+    akar = git(repo, "log", "--diff-filter=A", "--format=%H", "--", f"{TD}/TASK.md").split()[-1]
+    rows = [dict(zip(("cmd", "status", "new_errors", "baseline_status"), e)) for e in entries]
+    for r in rows:
+        if r["baseline_status"] is not None:
+            r["baseline_head"] = akar
+    write_files(repo, {rel: json.dumps(rows)})
     return rel
 
 

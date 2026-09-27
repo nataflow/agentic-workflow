@@ -4,7 +4,7 @@ Sumber: review robustness plugin `frontend` 2026-09-27 (lima penelusur paralel: 
 prasyarat & verifikasi, validator dokumen, orkestrasi & prosa). Tiap temuan Tinggi/Sedang direproduksi di ruang
 kerja sementara sebelum masuk berkas ini. Basis kode: commit `b293564` (suite 615 test hijau).
 
-**Status (2026-09-27):** peta blast radius selesai; tahap 1 selesai, rilis menyusul.
+**Status (2026-09-27):** peta blast radius selesai; tahap 1–2 selesai, rilis menyusul.
 
 ## Tujuan
 
@@ -151,18 +151,18 @@ atau pola sama di plugin lain. **Test tersentuh** = test yang ada dan harus teta
 
 ## Tahap 2 — Verifikasi penutup & prasyarat
 
-- [ ] **J11 [Sedang]** `false | cat` → HIJAU (`run_verification.py:66`, `shell=True` tanpa `pipefail`).
-- [ ] **J12 [Sedang]** Galat baru yang kembar dengan galat baseline dianggap warisan (`:34-58`, perbandingan himpunan).
-- [ ] **J13 [Sedang]** Baseline tidak terikat commit; `.explore/` yang hilang membuat baseline diukur di atas unit yang sudah mendarat.
-- [ ] **J15 [Sedang]** Brief `DONE` sah hanya dari subjek commit (09 E18 belum dibawa ke fe).
-- [ ] **J16 [Sedang]** `stack` brief ≠ `stack` profil tidak ditolak di ingest.
-- [ ] **J17 [Sedang]** `.git/index` rusak → check 8 "nol perubahan menggantung" (`git()` menelan kegagalan).
-- [ ] **J18 [Sedang]** `lane_tamper` lolos bila commit meniru subjek `kunci TASK`; ledger bisa ikut dipangkas sehingga gate FLOW/UI terlewati.
-- [ ] **J19 [Rendah]** `cli()` belum menangkap `OSError` (padanan H21); `profile --mode patch` tanpa git → traceback.
-- [ ] **J20 [Rendah]** `remedies` siklik → `RecursionError` di ingest architect.
-- [ ] **J21 [Rendah]** `migrate_profile.py` menimpa berkas tujuan untracked; pesan menyarankan REFRESH alih-alih melanjutkan MIGRATE.
-- [ ] **J22 [Rendah]** `REPORT.md` tertunda milik rantai sendiri disebut "kerja user" (report, architect).
-- [ ] **J23 [Rendah]** `run_verification.py`: NAMA `--cmd` ganda saling menimpa; race `killpg`; log dibaca utuh ke memori.
+- [x] **J11 [Sedang]** `false | cat` → HIJAU (`run_verification.py:66`, `shell=True` tanpa `pipefail`).
+- [x] **J12 [Sedang]** Galat baru yang kembar dengan galat baseline dianggap warisan (`:34-58`, perbandingan himpunan).
+- [x] **J13 [Sedang]** Baseline tidak terikat commit; `.explore/` yang hilang membuat baseline diukur di atas unit yang sudah mendarat.
+- [x] **J15 [Sedang]** Brief `DONE` sah hanya dari subjek commit (09 E18 belum dibawa ke fe).
+- [x] **J16 [Sedang]** `stack` brief ≠ `stack` profil tidak ditolak di ingest.
+- [x] **J17 [Sedang]** `.git/index` rusak → check 8 "nol perubahan menggantung" (`git()` menelan kegagalan).
+- [x] **J18 [Sedang]** `lane_tamper` lolos bila commit meniru subjek `kunci TASK`; ledger bisa ikut dipangkas sehingga gate FLOW/UI terlewati.
+- [x] **J19 [Rendah]** `cli()` belum menangkap `OSError` (padanan H21); `profile --mode patch` tanpa git → traceback.
+- [x] **J20 [Rendah]** `remedies` siklik → `RecursionError` di ingest architect.
+- [x] **J21 [Rendah]** `migrate_profile.py` menimpa berkas tujuan untracked; pesan menyarankan REFRESH alih-alih melanjutkan MIGRATE.
+- [x] **J22 [Rendah]** `REPORT.md` tertunda milik rantai sendiri disebut "kerja user" (report, architect).
+- [x] **J23 [Rendah]** `run_verification.py`: NAMA `--cmd` ganda saling menimpa; race `killpg`; log dibaca utuh ke memori.
 
 ## Tahap 3 — Validator dokumen
 

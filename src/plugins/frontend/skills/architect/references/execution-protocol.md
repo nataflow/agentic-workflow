@@ -127,7 +127,7 @@ Pakai `typecheck_per_brief` dari baris `Terselesaikan:` prasyarat rantai (nilai 
 | Nilai | Tindakan sesudah commit unit |
 |---|---|
 | `tidak` | Lewati; pembuktian menunggu Phase 4 |
-| `ya` | `python3 «run_verification.py» closing --taskdir <taskdir> --cmd typecheck='<typecheck commands.md>' --out {taskdir}/.explore/gate-<NN>.md` — dibandingkan dengan baseline Phase 0; exit 1 = galat baru atau `TIMEOUT` |
+| `ya` | `python3 «run_verification.py» closing --taskdir <taskdir> --cmd typecheck='<typecheck commands.md>' --out {taskdir}/.explore/gate-<NN>.md` — dibandingkan dengan baseline Phase 0 (diukur sebelum unit pertama mendarat); exit 1 = galat baru atau `TIMEOUT` |
 
 Vonis **relatif baseline**: nol galat *baru*, bukan hijau absolut. Galat baru → unit `BLOCKED` retroaktif: tambahkan `## Triase` berisi galat mentahnya ke `report-<NN>.md`, turunkan brief `DONE` → `BLOCKED`, dan commit keduanya (`docs(<slug>): unit <NN> BLOCKED - galat kompilasi baru`). Kode unit **tetap** di tree — `git revert` hanya atas persetujuan eksplisit user, karena ia ikut membalik `report-<NN>.md` dan status brief. Brief remedi (`remedies: "<NN>"`) memperbaikinya dengan aksi `MODIFY`. Dilarang melanjutkan ke `NN+1` di atas galat yang unit ini terbitkan. Lint, test, dan build tidak pernah ikut gerbang ini.
 
@@ -150,7 +150,7 @@ Brief `BLOCKED` tidak pernah dinaikkan lagi, dan brief `DONE`/`BLOCKED` tidak pe
 
 Dijalankan sekali di Phase 4, sesudah seluruh brief tertutup. Perintah: seluruh baris `commands.md` profil (typecheck, lint, test, build), ditambah tiap perintah `verification` brief yang belum tercakup. Baca kolom **Cakupan yang TIDAK Diperiksa** profil sebelum menyimpulkan — test hijau bukan bukti typecheck hijau bila adapter menyatakan demikian.
 
-`run_verification.py closing` menulis `{taskdir}/.explore/closing-verification.md` (laci kerja, tidak di-commit) — sumber tunggal `## Verifikasi Penutup` `REVIEW.md`. Tabel dan ekor log diketik mesin, bukan LLM; galat baru = tanda galat ternormalisasi yang tidak ada di `verification-baseline.json` Phase 0:
+`run_verification.py closing` menulis `{taskdir}/.explore/closing-verification.md` (laci kerja, tidak di-commit) — sumber tunggal `## Verifikasi Penutup` `REVIEW.md`. Tabel dan ekor log diketik mesin, bukan LLM; galat baru = tanda galat ternormalisasi yang tidak ada di `verification-baseline.json` Phase 0, dihitung per kemunculan — galat kedua yang identik dengan galat warisan tetap baru. Log mesin `closing-verification.json` membawa `baseline_head` tiap perintah; `validate_review.py --log` menolak baseline yang diukur sesudah commit `implement unit` pertama rantai (baseline absen → Phase 0 butir 2):
 
 ```markdown
 | Perintah | Hasil | Galat baru vs baseline | Exit | Durasi | Perintah penuh |

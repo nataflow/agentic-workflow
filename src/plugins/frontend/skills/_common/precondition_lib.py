@@ -264,9 +264,29 @@ def is_git_repo(root: Path) -> bool:
     return git(root, "rev-parse", "--is-inside-work-tree").strip() == "true"
 
 
+class GitError(RuntimeError):
+    """git tidak dapat membaca keadaan tree (index rusak, git absen, izin)."""
+
+
+def git_status(root: Path, *paths: str) -> str:
+    """`git status --porcelain` apa adanya; `GitError` bila git gagal (12 J17).
+
+    `git()` menelan kegagalan jadi string kosong — untuk status, kosong berarti "bersih", jadi index
+    rusak dulu terbaca "nol perubahan menggantung". Selaras `dirty_paths` backend.
+    """
+    try:
+        proc = subprocess.run(["git", "-C", str(root), "status", "--porcelain", *(["--", *paths] if paths else [])],
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, timeout=60)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise GitError(str(exc)) from exc
+    if proc.returncode != 0:
+        raise GitError((proc.stderr.strip().splitlines() or [f"exit {proc.returncode}"])[-1])
+    return proc.stdout
+
+
 def dirty_lines(root: Path) -> List[str]:
-    """Baris `git status --porcelain` di luar laci kerja."""
-    out = strip_explore_scratch(git(root, "status", "--porcelain"))
+    """Baris `git status --porcelain` di luar laci kerja; `GitError` bila tree tak terbaca."""
+    out = strip_explore_scratch(git_status(root))
     return [l for l in out.splitlines() if l.strip()]
 
 
@@ -279,15 +299,52 @@ def as_list(value: Any) -> List[str]:
 
 
 def is_committed(root: Path, rel: str) -> bool:
-    """Benar bila `rel` pernah di-commit **dan** tidak punya perubahan menggantung."""
+    """Benar bila `rel` pernah di-commit **dan** tidak punya perubahan menggantung.
+
+    Status yang tak terbaca bukan "tanpa perubahan" (12 J17): hasilnya False.
+    """
     if not git(root, "log", "-1", "--format=%h", "--", rel).strip():
         return False
-    return not git(root, "status", "--porcelain", "--", rel).strip()
+    try:
+        return not git_status(root, rel).strip()
+    except GitError:
+        return False
 
 
 def last_commit(root: Path, *paths: str) -> str:
     """Sha pendek commit terakhir yang menyentuh salah satu `paths`, atau kosong."""
     return git(root, "log", "-1", "--format=%h", "--", *paths).strip()
+
+
+def _status_at(root: Path, rev: str, rel: str) -> str:
+    try:
+        proc = subprocess.run(["git", "-C", str(root), "show", f"{rev}:{rel}"], stdout=subprocess.PIPE,
+                              stderr=subprocess.DEVNULL)
+    except OSError:
+        return ""
+    if proc.returncode != 0:
+        return ""
+    value = parse_frontmatter(proc.stdout.decode("utf-8", errors="replace")).get("status", "")
+    return value.strip() if isinstance(value, str) else ""
+
+
+def carries_code(root: Path, sha: str) -> bool:
+    """Commit menyentuh berkas di luar dokumen rantai (`frontenddev/`, `.claude/`)."""
+    return bool(git(root, "show", "--name-only", "--format=", sha, "--", ".", ":(exclude)frontenddev",
+                    ":(exclude).claude").strip())
+
+
+def done_landed(root: Path, brief_rel: str) -> str:
+    """Sha pendek commit transisi `→ DONE` brief yang membawa kode, atau kosong (12 J15, padanan 09 E18).
+
+    architect meng-commit `status: DONE` bersama kode unit dan `report-<NN>.md` dalam satu commit; subjek
+    `implement unit NN` dapat diketik di commit yang hanya membawa dokumen. fe tidak punya koreksi
+    brief-saja (11 H5), jadi transisi tanpa kode tidak pernah sah.
+    """
+    for sha in git(root, "log", "--format=%H", "--", brief_rel).splitlines():
+        if _status_at(root, sha, brief_rel) == "DONE" and _status_at(root, f"{sha}^", brief_rel) != "DONE":
+            return sha[:7] if carries_code(root, sha) else ""
+    return ""
 
 
 class FrontmatterError(ValueError):
@@ -1042,7 +1099,10 @@ def check_profile(add: AddFn, cid: int, profile_dir: Path, required: Tuple[str, 
         return ""
     stack, missing = load_profile(profile_dir, required)
     if missing:
+        moved = [f for f in missing if is_legacy_profile_dir(profile_dir) and (profile_dir / PLUGIN / f).is_file()]
         add(cid, name, "FAIL", f"{len(missing)} berkas profil hilang: " + ", ".join(missing),
+            (f"Migrasi profil terputus ({', '.join(moved)} sudah di `{DEFAULT_PROFILE_DIR}/`): lanjutkan "
+             "`frontend:profile` mode MIGRATE (`migrate_profile.py`), bukan REFRESH (12 J21).") if moved else
             "Jalankan `frontend:profile` mode REFRESH untuk menulis ulang profil.")
         return ""
     if not stack:
@@ -1088,20 +1148,32 @@ def check_plugin_files(add: AddFn, cid: int, skill_dir: Path, files: Iterable[st
 
 
 def check_worktree(add: AddFn, cid: int, root: Path, taskdir_rel: str = "",
-                   allow: Iterable[str] = ()) -> bool:
-    """Tree bersih; path di `allow` (mis. `REPORT.md` tertunda) tidak dihitung kotor."""
+                   allow: Iterable[str] = (), own_action: str = "") -> bool:
+    """Tree bersih; path di `allow` (mis. `REPORT.md` tertunda) tidak dihitung kotor.
+
+    `own_action` = tindakan gate ini bila seluruh kotoran milik taskdir-nya sendiri (12 J22); tanpanya
+    dipakai tindakan draft gate dokumen (`review_round.py commit`).
+    """
     name = "Working tree bersih"
     if not is_git_repo(root):
         add(cid, name, "FAIL", "git tidak dapat membaca repo (bukan repo git, atau ditolak git)",
             "Jalankan di root repo git yang sah; tree yang tak terbaca tidak pernah dianggap bersih.")
         return False
     allowed = set(allow)
-    dirty = [l for l in dirty_lines(root) if l[3:].strip().strip('"') not in allowed]
+    try:
+        lines = dirty_lines(root)
+    except GitError as exc:
+        add(cid, name, "FAIL", f"`git status` gagal: {exc}",
+            "Pulihkan repo (mis. index rusak: `git reset` atas persetujuan user) lalu ulangi prasyarat; "
+            "tree yang tak terbaca tidak pernah dianggap bersih.")
+        return False
+    dirty = [l for l in lines if l[3:].strip().strip('"') not in allowed]
     if dirty:
         paths = [l[3:].strip().strip('"') for l in dirty]
         preview = ", ".join(paths[:5])
         own = bool(taskdir_rel) and all(p.startswith(taskdir_rel + "/") for p in paths)
         add(cid, name, "FAIL", f"{len(dirty)} berkas belum bersih: {preview}",
+            own_action if own and own_action else
             "Seluruhnya artefak taskdir ini dari sesi lalu. `CONTRACT.md` atau batch brief lane "
             "non-MINOR: commit hanya lewat `review_round.py commit --gate <contract|plan> --subject "
             "\"<subjek gate pemiliknya>\"` — skrip menolak bila ronde reviewer terakhir belum `PASS` "
@@ -1150,31 +1222,64 @@ def check_task_root(add: AddFn, cid: int, root: Path, taskdir_rel: str) -> Tuple
     return lane, sections
 
 
-def lane_tamper(root: Path, taskdir_rel: str) -> str:
-    """Kosong bila `lane`/`sections` sekarang sama dengan yang ditulis commit akar atau eskalasi terakhir.
+# Urutan lane untuk replay eskalasi — sama dengan `chain.LANE_RANK` (lane hanya naik).
+LANE_RANK = {"HOTFIX_MINOR": 0, "FAST_FORWARD": 1, "REFACTOR_ARCH": 1, "FULL_PIPELINE": 2}
+_ESCALATE_SECTIONS = re.compile(r"^Sections: (?P<old>.*?) → (?P<new>.*)$", re.MULTILINE)
 
-    Eskalasi ditulis `chain.py escalate` (subjeknya pasti). Commit akar diketik model: bila tidak ada
-    commit bersubjek `kunci TASK`, pembandingnya commit pertama yang menambahkan `TASK.md` — bukan
-    diloloskan tanpa pembanding (09 E12).
+
+def _lane_key(fm: Dict[str, Any]) -> Tuple[str, List[str]]:
+    return str(fm.get("lane", "")).strip(), sorted(parse_sections(fm.get("sections", "")))
+
+
+def _escalation_ok(slug: str, before: Tuple[str, List[str]], after: Tuple[str, List[str]],
+                   subject: str, body: str) -> bool:
+    """Satu commit sah mengubah lane/sections hanya bila ia commit `chain.py escalate` yang monoton."""
+    if not norm_subject(subject).startswith(norm_subject(f"docs({slug}): eskalasi lane")):
+        return False
+    if norm_subject(subject) != norm_subject(f"docs({slug}): eskalasi lane {before[0]} → {after[0]}"):
+        return False
+    if LANE_RANK.get(after[0], -1) < LANE_RANK.get(before[0], -1) or not set(before[1]) <= set(after[1]):
+        return False
+    m = _ESCALATE_SECTIONS.search(body)
+    return bool(m) and (sorted(parse_sections(m.group("old"))), sorted(parse_sections(m.group("new")))) == \
+        (before[1], after[1])
+
+
+def lane_tamper(root: Path, taskdir_rel: str) -> str:
+    """Kosong bila `lane`/`sections` hanya pernah bergeser lewat `chain.py escalate` sejak commit akar.
+
+    Riwayat `TASK.md` di-replay dari commit penambahan tertua (12 J18): tiap commit yang mengubah
+    pasangan itu wajib bersubjek `eskalasi lane <lama> → <baru>`, berbadan `Sections: <lama> → <baru>`
+    yang cocok, dan monoton (lane naik, sections bertambah). Subjek `kunci TASK` dapat ditiru; riwayat
+    tidak. Commit akar diketik model, jadi pembandingnya commit pertama yang menambahkan `TASK.md`,
+    bukan subjeknya (09 E12).
     """
     rel = f"{taskdir_rel}/TASK.md"
     slug = taskdir_slug(taskdir_rel)
-    log = [l.partition(" ") for l in git(root, "log", "--format=%H %s", "--", rel).splitlines()]
     root_add = git(root, "log", "--diff-filter=A", "--format=%H", "--", rel).split()
-    marks = (norm_subject(f"docs({slug}): eskalasi lane"), norm_subject(f"docs({slug}): kunci TASK"))
-    picked = next((sha for sha, _, subject in log if norm_subject(subject).startswith(marks)), None)
-    if picked is None and root_add:
-        picked = root_add[-1]
-    if picked is None:
+    if not root_add:
         return ""                                  # TASK.md belum pernah di-commit: belum ada akar
-    then = parse_frontmatter(show_at(root, picked, rel) or "")
+    commits = [l.split("\x1f") for l in
+               git(root, "log", "--reverse", "--format=%H%x1f%s%x1f%b%x1e", "--", rel).split("\x1e")
+               if l.strip()]
+    commits = [(c[0].strip(), c[1] if len(c) > 1 else "", c[2] if len(c) > 2 else "") for c in commits]
+    shas = [c[0] for c in commits]
+    start = shas.index(root_add[-1]) if root_add[-1] in shas else 0
+    state = _lane_key(parse_frontmatter(show_at(root, commits[start][0], rel) or ""))
+    for sha, subject, body in commits[start + 1:]:
+        now = _lane_key(parse_frontmatter(show_at(root, sha, rel) or ""))
+        if now == state:
+            continue
+        if not _escalation_ok(slug, state, now, subject, body):
+            return (f"`lane`/`sections` berubah di luar commit akar atau `chain.py escalate` "
+                    f"(commit {sha[:7]} `{subject.strip()[:60]}`)")
+        state = now
     try:
-        now = parse_frontmatter((root / rel).read_text(encoding="utf-8"))
+        disk = _lane_key(parse_frontmatter((root / rel).read_text(encoding="utf-8")))
     except (OSError, UnicodeDecodeError):
         return f"`{rel}` tak terbaca atau {NOT_UTF8}"
-    if (str(then.get("lane", "")).strip(), sorted(parse_sections(then.get("sections", "")))) != \
-       (str(now.get("lane", "")).strip(), sorted(parse_sections(now.get("sections", "")))):
-        return "`lane`/`sections` berubah di luar commit akar atau `chain.py escalate`"
+    if disk != state:
+        return "`lane`/`sections` berubah di luar commit akar atau `chain.py escalate` (belum di-commit)"
     return ""
 
 
@@ -1450,12 +1555,21 @@ def design_gate_checks(add: AddFn, root: Path, taskdir_rel: str, profile_dir: Pa
     return stack, sections
 
 
-def brief_closure(taskdir: Path) -> Dict[str, Tuple[str, bool]]:
-    """`{NN: (status, tertutup)}` — tertutup = `DONE`, atau `BLOCKED` yang remedinya tertutup.
+def brief_closure(taskdir: Path, root: Optional[Path] = None) -> Dict[str, Tuple[str, bool]]:
+    """`{NN: (status, tertutup)}` — tertutup = `DONE` yang mendarat bersama kode (`done_landed`, 12 J15),
+    atau `BLOCKED` yang remedinya tertutup.
 
-    Remedi dikenali dari field `remedies: "NN"` brief. Dipakai `architect`
-    (fase rantai, prasyarat `depends_on`) dan `report` (seluruh unit tertutup).
+    Remedi dikenali dari field `remedies: "NN"` brief; remedi siklik tidak pernah tertutup. Dipakai
+    `architect` (fase rantai, prasyarat `depends_on`), `report` (seluruh unit tertutup), dan
+    `taskdir_state`. `root` default: toplevel git `taskdir`.
     """
+    if root is None:
+        top = git(taskdir, "rev-parse", "--show-toplevel").strip() if taskdir.is_dir() else ""
+        root = Path(top) if top else taskdir
+    try:
+        taskdir_rel = taskdir.resolve().relative_to(Path(root).resolve()).as_posix()
+    except ValueError:
+        taskdir_rel = ""
     briefs: Dict[str, Path] = {}
     for p in sorted(taskdir.glob(BRIEF_GLOB)):
         m = re.match(r"^brief-(\d{2})-[a-z0-9-]+\.md$", p.name)
@@ -1468,28 +1582,34 @@ def brief_closure(taskdir: Path) -> Dict[str, Tuple[str, bool]]:
         if origin:
             remedies.setdefault(origin, []).append(nn)
 
+    landed = {nn: bool(taskdir_rel) and bool(done_landed(root, f"{taskdir_rel}/{p.name}"))
+              for nn, p in briefs.items() if status[nn] == "DONE"}
+
     def closed(nn: str, seen: Tuple[str, ...] = ()) -> bool:
         if nn in seen or nn not in status:
             return False
         if status[nn] == "DONE":
-            return True
+            return landed[nn]
         return status[nn] == "BLOCKED" and any(closed(r, seen + (nn,)) for r in remedies.get(nn, []))
 
     return {nn: (status[nn], closed(nn)) for nn in briefs}
 
 
 def cli(main: Callable[[], Any]) -> Any:
-    """Jaring terakhir skrip ber-CLI: berkas non-UTF-8 yang lolos dari penanganan per titik baca
-    menjadi vonis FAIL terbaca (JSON bila `--json`), bukan traceback (09 E1)."""
+    """Jaring terakhir skrip ber-CLI: berkas non-UTF-8 (09 E1), `--root` yang tidak ada, atau git yang tidak
+    terpasang (11 H21, 12 J19) menjadi vonis FAIL terbaca (JSON bila `--json`), bukan traceback."""
     try:
         return main()
     except UnicodeDecodeError as exc:
-        msg = (f"berkas yang dibaca skrip ini bukan UTF-8 ({exc.reason} @ byte {exc.start}) — pulihkan dari "
-               f"git atau simpan ulang sebagai UTF-8; jangan menebak isinya")
-        if "--json" in sys.argv:
-            print(json.dumps({"status": "FAIL", "error": msg, "checks": [
-                {"id": 0, "name": "Berkas terbaca", "status": "FAIL", "summary": msg, "action": ""}]},
-                ensure_ascii=False, indent=2))
-        else:
-            print(f"FAIL: {msg}")
-        return 1
+        name, msg = "Berkas terbaca", (f"berkas yang dibaca skrip ini bukan UTF-8 ({exc.reason} @ byte {exc.start}) "
+                                       f"— pulihkan dari git atau simpan ulang sebagai UTF-8; jangan menebak isinya")
+    except OSError as exc:
+        name, msg = "Lingkungan terbaca", (f"{exc.strerror or exc} ({exc.filename or '—'}) — periksa `--root` dan "
+                                           f"pastikan `git` terpasang di PATH")
+    if "--json" in sys.argv:
+        print(json.dumps({"status": "FAIL", "error": msg, "checks": [
+            {"id": 0, "name": name, "status": "FAIL", "summary": msg, "action": ""}]},
+            ensure_ascii=False, indent=2))
+    else:
+        print(f"FAIL: {msg}")
+    return 1

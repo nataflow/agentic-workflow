@@ -73,7 +73,10 @@ class PreconditionChecker:
             else:
                 self._add(cid, fn.__doc__ or "", "FAIL", "taskdir tidak sah",
                           "Perbaiki Check 1 lebih dulu.")
-        check_worktree(self._add, 7, self.root)
+        check_worktree(self._add, 7, self.root, self.taskdir_rel if ok else "", own_action=(
+            "Seluruhnya artefak taskdir ini, bukan kerja user (12 J22): `REPORT.md` tertunda dikunci lewat "
+            "`frontend:architect` Phase 5 butir 4 (validasi lalu commit), bukan ditulis ulang; berkas rantai lain "
+            "yang berubah → kembali ke `frontend:lead`."))
         if ok and self.sections is not None:
             check_chain_rows(self._add, 8, self.root, self.taskdir_rel,
                              expected_rows(self.sections), self.sections)
@@ -122,11 +125,12 @@ class PreconditionChecker:
     def _check_4_briefs(self, cid: int) -> None:
         """Seluruh brief tertutup"""
         name = self._check_4_briefs.__doc__
-        closure = brief_closure(self.taskdir)
+        closure = brief_closure(self.taskdir, self.root)
         if not closure:
             self._add(cid, name, "FAIL", "nol brief di taskdir", "Rantai belum pernah dieksekusi.")
             return
-        pending = [f"brief-{nn} ({st})" for nn, (st, done) in closure.items() if not done]
+        pending = [f"brief-{nn} ({'DONE tanpa commit unit berkode' if st == 'DONE' else st})"
+                   for nn, (st, done) in closure.items() if not done]
         if pending:
             self._add(cid, name, "FAIL", "belum tertutup: " + ", ".join(pending),
                       "Selesaikan eksekusi lewat `frontend:architect`.")

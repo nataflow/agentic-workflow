@@ -3,7 +3,9 @@
 
 Hanya berkas profil milik plugin ini yang dipindah (`git mv` bila ter-track,
 rename biasa bila belum). Berkas lain di `.claude/profile/` dilaporkan sebagai
-sisa dan tidak disentuh — bisa jadi milik plugin lain. Skrip ini tidak
+sisa dan tidak disentuh — bisa jadi milik plugin lain. Berkas tujuan yang sudah
+ada tidak pernah ditimpa: isi berbeda → gagal sebelum apa pun dipindah; isi
+identik byte (migrasi terputus) → salinan lama dibuang (12 J21). Skrip ini tidak
 meng-commit; commit milik fase kerja skill `profile`.
 
 Isi berkas ini sama di `backend` dan `frontend`: nama plugin dan daftar
@@ -36,6 +38,15 @@ def _git_mv(root: Path, src: Path, dst: Path) -> bool:
     return proc.returncode == 0
 
 
+def _git_rm(root: Path, src: Path) -> bool:
+    try:
+        proc = subprocess.run(["git", "-C", str(root), "rm", "-q", "--", src.relative_to(root).as_posix()],
+                              capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return proc.returncode == 0
+
+
 class MigrateError(Exception):
     """Profil lama tidak bisa dipindah; tidak ada berkas yang disentuh."""
 
@@ -53,14 +64,26 @@ def migrate(root: Path, plugin: str = PLUGIN) -> Tuple[List[str], List[str]]:
         raise MigrateError(f".claude/profile/index.json bukan milik {plugin}")
     if (target / "index.json").exists():
         raise MigrateError(f".claude/profile/{plugin}/index.json sudah ada; lokasi baru tidak ditimpa")
-    target.mkdir(parents=True, exist_ok=True)
-    moved: List[str] = []
     # `index.json` dipindah terakhir (11 H24): selama ia masih di lokasi lama, migrasi yang terputus di
     # tengah dapat dijalankan ulang dan melanjutkan berkas yang tersisa.
     names = [n for n in _detect.PROFILE_FILES[plugin] if n != "index.json"] + ["index.json"]
+    # Berkas tujuan yang sudah ada dinilai seluruhnya lebih dulu (12 J21): suntingan user di lokasi baru
+    # tidak pernah ditimpa, dan penolakan terjadi sebelum satu berkas pun berpindah.
+    clash = [n for n in names if (legacy / n).is_file() and (target / n).exists()
+             and not ((target / n).is_file() and (target / n).read_bytes() == (legacy / n).read_bytes())]
+    if clash:
+        raise MigrateError(f".claude/profile/{plugin}/ sudah memuat {', '.join(clash)} berisi beda dari lokasi lama; "
+                           "tidak ada berkas yang dipindah — putuskan salinan mana yang dipakai bersama user")
+    target.mkdir(parents=True, exist_ok=True)
+    moved: List[str] = []
     for name in names:
         src = legacy / name
         if not src.is_file():
+            continue
+        if (target / name).is_file():            # identik byte: sisa migrasi terputus
+            if not _git_rm(root, src):
+                src.unlink()
+            moved.append(name)
             continue
         if name == "index.json":
             data["plugin"] = plugin

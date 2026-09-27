@@ -8,6 +8,10 @@ Mode:
             `validate_review.py`, backend architect Fase 4)
             dan log mesin closing-verification.json di sebelahnya (frontend `validate_review.py --log`)
 
+Perintah dijalankan `bash -o pipefail -c` (exit sisi kiri pipa tidak hilang, 12 J11); tanpa `bash`, lewat
+`sh -c` dan `--cmd` ber-`|` ditolak. Tiap hasil baseline mencatat `head` (commit tempat ia diukur) dan log
+closing membawanya sebagai `baseline_head` (12 J13).
+
 Exit: 0 = tidak ada merah baru; 1 = ada TIMEOUT atau galat baru; 2 = argumen/IO salah.
 Hanya pustaka standar.
 """
@@ -15,12 +19,14 @@ import argparse
 import json
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
 import time
+from collections import Counter, deque
 from pathlib import Path
-from typing import Optional
+from typing import Iterable, Optional
 
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 # Kata kunci galat, atau diagnostik kompilator `berkas:baris[:kolom]: pesan` (Go, gcc, …) yang tidak memuat
@@ -28,6 +34,7 @@ ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 ERROR_LINE = re.compile(r"\b(error|errors|failed|failure|fatal|exception)\b|✗|✖|\bFAIL\b"
                         r"|(?:^|\s)[\w./\\-]+\.\w+:\d+(?::\d+)?:\s", re.I)
 TAIL_LINES = 10                      # ekor log pengganti tanda galat saat MERAH tanpa satu tanda pun
+LOG_TAIL = 40                        # ekor log di laporan
 NOT_RUNNABLE = (126, 127)            # perintah tidak dapat dieksekusi / tidak ditemukan
 NAME = re.compile(r"^[A-Za-z0-9_-]+$")
 VOLATILE = [
@@ -44,59 +51,95 @@ def _normalize(raw: str) -> str:
     return line[:300]
 
 
-def signatures(text: str, red: bool = False) -> set:
-    """Baris galat yang dinormalisasi; selisih himpunan = galat baru.
+def signatures(lines: Iterable[str], red: bool = False) -> list:
+    """Baris galat yang dinormalisasi, **berulang bila berulang** (multiset); selisih multiset = galat baru.
 
-    Perintah MERAH tanpa satu baris bertanda galat memakai ekor log ternormalisasi sebagai tandanya:
-    "tidak ada tanda" dulu terbaca "tidak ada galat baru" (11 H14).
+    Galat kedua yang identik sesudah normalisasi (baris/kolom berbeda di berkas yang sama) adalah galat
+    baru, bukan warisan (12 J12). Perintah MERAH tanpa satu baris bertanda galat memakai ekor log
+    ternormalisasi sebagai tandanya — tetap himpunan: "tidak ada tanda" dulu terbaca "tidak ada galat
+    baru" (11 H14). `lines` dibaca bertahap; log raksasa tidak dimuat utuh (12 J23).
     """
-    sigs = {_normalize(raw) for raw in text.splitlines() if raw.strip() and ERROR_LINE.search(ANSI.sub("", raw))}
+    sigs, tail = [], deque(maxlen=TAIL_LINES)
+    for raw in lines:
+        raw = raw.rstrip("\r\n")
+        if not raw.strip():
+            continue
+        if ERROR_LINE.search(ANSI.sub("", raw)):
+            sigs.append(_normalize(raw))
+        elif red and not sigs:
+            norm = _normalize(raw)
+            if norm:
+                tail.append(norm)
     if red and not sigs:
-        tail = [ln for ln in (_normalize(raw) for raw in text.splitlines()) if ln][-TAIL_LINES:]
-        sigs = {f"ekor: {ln}" for ln in tail} or {"ekor: (log kosong)"}
-    return sigs
+        return sorted({f"ekor: {ln}" for ln in tail}) or ["ekor: (log kosong)"]
+    return sorted(sigs)
+
+
+def head_of(cwd: Path) -> Optional[str]:
+    """Commit tempat perintah diukur (`git rev-parse HEAD`), atau None di luar git (12 J13)."""
+    try:
+        proc = subprocess.run(["git", "-C", str(cwd), "rev-parse", "HEAD"], capture_output=True, text=True,
+                              timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    return proc.stdout.strip() or None
+
+
+def _killpg(pid: int, sig: int) -> None:
+    try:
+        os.killpg(pid, sig)
+    except ProcessLookupError:       # proses sudah keluar di antara timeout dan kill (12 J23)
+        pass
 
 
 def run_one(name: str, cmd: str, timeout: int, log_dir: Path, cwd: Path) -> dict:
     log_path = log_dir / f"{name}.log"
     start = time.monotonic()
     status, exit_code = None, None
+    bash = shutil.which("bash")
+    argv = [bash, "-o", "pipefail", "-c", cmd] if bash else ["/bin/sh", "-c", cmd]
     with open(log_path, "wb") as log:
         # start_new_session: seluruh pohon proses (worker jest, daemon gradle) bisa dibunuh saat timeout
-        proc = subprocess.Popen(cmd, shell=True, cwd=cwd, stdout=log, stderr=subprocess.STDOUT,
+        proc = subprocess.Popen(argv, cwd=cwd, stdout=log, stderr=subprocess.STDOUT,
                                 stdin=subprocess.DEVNULL, start_new_session=True)
         try:
             exit_code = proc.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
-            os.killpg(proc.pid, signal.SIGTERM)
+            _killpg(proc.pid, signal.SIGTERM)
             try:
                 proc.wait(timeout=10)
             except subprocess.TimeoutExpired:
-                os.killpg(proc.pid, signal.SIGKILL)
+                _killpg(proc.pid, signal.SIGKILL)
                 proc.wait()
             status = "TIMEOUT"
-    text = log_path.read_text(encoding="utf-8", errors="replace")
     status = status or ("HIJAU" if exit_code == 0 else "MERAH")
+    with open(log_path, encoding="utf-8", errors="replace") as fh:
+        sigs = signatures(fh, red=status == "MERAH")
+    with open(log_path, encoding="utf-8", errors="replace") as fh:
+        tail = [ln.rstrip("\r\n") for ln in deque(fh, maxlen=LOG_TAIL)]
     return {
         "name": name, "cmd": cmd, "exit": exit_code,
         "status": status,
         "duration_s": round(time.monotonic() - start, 1),
-        "signatures": sorted(signatures(text, red=status == "MERAH")),
-        "tail": text.splitlines()[-40:],
+        "signatures": sigs,
+        "tail": tail,
         "log": str(log_path),
+        "head": head_of(cwd),
     }
 
 
 def new_errors(res: dict, base: Optional[dict]) -> int:
     if res["status"] == "HIJAU":
         return 0
-    cur = set(res["signatures"])
     base = base if isinstance(base, dict) else None
+    fresh = sum((Counter(res["signatures"]) - Counter((base or {}).get("signatures", []))).values())
     # Tidak ada baseline merah yang bisa memaafkan, atau perintahnya tidak dapat dijalankan sama sekali
     # (exit 126/127 = verifikasi tidak pernah terjadi, bukan merah warisan — 11 H14): minimal 1 galat baru.
     if base is None or base.get("status") == "HIJAU" or res.get("exit") in NOT_RUNNABLE:
-        return max(1, len(cur - set((base or {}).get("signatures", []))))
-    return len(cur - set(base.get("signatures", [])))
+        return max(1, fresh)
+    return fresh
 
 
 def render_md(results: list, baseline: dict) -> str:
@@ -149,6 +192,13 @@ def main() -> int:
         bad = [p[0] for p in pairs if not NAME.match(p[0])]
         if bad:   # nama menjadi nama berkas log (11 H16)
             raise ValueError(f"NAMA --cmd hanya huruf, angka, `_`, `-`: {', '.join(bad)}")
+        names = [p[0] for p in pairs]
+        dup = sorted({n for n in names if names.count(n) > 1})
+        if dup:   # log dan entri baseline saling menimpa (12 J23)
+            raise ValueError(f"NAMA --cmd ganda: {', '.join(dup)}")
+        if not shutil.which("bash") and any("|" in p[1] for p in pairs):
+            raise ValueError("`bash` tidak ada di PATH: `--cmd` berpipa tidak dapat divonis tanpa `pipefail` "
+                             "(12 J11) — pasang bash atau jalankan tanpa pipa")
     except (OSError, ValueError) as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 2
@@ -185,7 +235,8 @@ def main() -> int:
         return b if isinstance(b, dict) else {}
     log = [{"cmd": r["name"], "full": r["cmd"], "status": r["status"], "exit": r["exit"], "new_errors": r["new"],
             "baseline_status": _base(r["name"]).get("status"),
-            "baseline_errors": len(_base(r["name"]).get("signatures", []))} for r in results]
+            "baseline_errors": len(_base(r["name"]).get("signatures", [])),
+            "baseline_head": _base(r["name"]).get("head")} for r in results]
     out.with_suffix(".json").write_text(json.dumps(log, indent=1), encoding="utf-8")
     print(f"VERDICT: {'MERAH' if red else 'HIJAU'} -> {out}")
     return 1 if red else 0

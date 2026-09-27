@@ -34,6 +34,7 @@ from precondition_lib import (  # noqa: E402
     profile_dir_for,
     PROFILE_FILES,
     as_list,
+    brief_closure,
     check_adapter,
     check_chain_rows,
     check_plugin_files,
@@ -41,6 +42,7 @@ from precondition_lib import (  # noqa: E402
     check_task_root,
     check_taskdir,
     check_worktree,
+    done_landed,
     expected_rows,
     find_repo_root,
     format_report,
@@ -64,6 +66,11 @@ PLUGIN_FILES = ("dispatcher/implementor.md", "dispatcher/reviewer.md",
                 "scripts/validate_review.py", "../../agents/code-implementor.md",
                 "../../agents/code-reviewer.md")
 BRIEF_STATUS = ("READY", "DONE", "BLOCKED")
+# Kotoran yang seluruhnya milik taskdir ini (12 J22) — bukan kerja user.
+OWN_DIRT_ACTION = ("Seluruhnya artefak taskdir ini dari sesi lalu, bukan kerja user: `report-<NN>.md`/brief unit "
+                   "yang terputus → matriks bukti disk (`references/execution-protocol.md` bagian 3); `REVIEW.md` "
+                   "belum ter-commit → Phase 4 (`validate_review.py` lalu commit); `REPORT.md` → Phase 5 butir 4. "
+                   "Dilarang men-stash atau menghapusnya.")
 
 
 class PreconditionChecker:
@@ -81,6 +88,7 @@ class PreconditionChecker:
         self.sections: List[str] = []
         self.phase = "-"
         self.next_unit = "-"
+        self._closure: Optional[Dict[str, Any]] = None
 
     def _add(self, cid: int, name: str, status: str, summary: str, action: str = "") -> None:
         self.results.append({"id": cid, "name": name, "status": status,
@@ -96,14 +104,13 @@ class PreconditionChecker:
         return out
 
     def closed(self, nn: str) -> bool:
-        """Unit tertutup: `DONE`, atau `BLOCKED` yang punya remedi tertutup."""
-        path = self.briefs().get(nn)
-        if path is None:
-            return False
-        status = read_status(path)
-        if status == "DONE":
-            return True
-        return status == "BLOCKED" and any(self.closed(r) for r in self.remedies().get(nn, []))
+        """Unit tertutup: `DONE` yang mendarat bersama kode, atau `BLOCKED` yang punya remedi tertutup.
+
+        Satu implementasi dengan `report`/`taskdir_state` (`brief_closure`, penjaga siklus remedi — 12 J20).
+        """
+        if self._closure is None:
+            self._closure = brief_closure(self.taskdir, self.root)
+        return self._closure.get(nn, ("", False))[1]
 
     def deps_ready(self, nn: str) -> bool:
         path = self.briefs()[nn]
@@ -111,12 +118,14 @@ class PreconditionChecker:
         return all(self.closed(d) for d in deps)
 
     def implemented(self, nn: str) -> bool:
-        """Brief `DONE` sah hanya bila riwayatnya memuat commit `implement unit <NN>` dan laporannya ada."""
+        """Brief `DONE` sah hanya bila riwayatnya memuat commit `implement unit <NN>`, laporannya ada, dan
+        transisi `→ DONE`-nya mendarat bersama kode (12 J15, padanan 09 E18)."""
         path = self.briefs().get(nn)
         if path is None or not (self.taskdir / f"report-{nn}.md").is_file():
             return False
-        subjects = git(self.root, "log", "--format=%s", "--", f"{self.taskdir_rel}/{path.name}")
-        return any(f"implement unit {nn}" in sub for sub in subjects.splitlines())
+        rel = f"{self.taskdir_rel}/{path.name}"
+        subjects = git(self.root, "log", "--format=%s", "--", rel)
+        return any(f"implement unit {nn}" in sub for sub in subjects.splitlines()) and bool(done_landed(self.root, rel))
 
     def briefs(self) -> Dict[str, Path]:
         out: Dict[str, Path] = {}
@@ -148,8 +157,9 @@ class PreconditionChecker:
         check_plugin_files(self._add, 7, self.skill_dir, PLUGIN_FILES)
         # REPORT.md tertunda (tertulis, gagal di-commit) adalah satu-satunya kotoran yang boleh
         # ada: architect Phase 5 butir 4 memvalidasi dan menguncinya.
-        check_worktree(self._add, 8, self.root,
-                       allow=[f"{self.taskdir_rel}/REPORT.md"] if self.phase == "LAPORAN TERTUNDA" else [])
+        check_worktree(self._add, 8, self.root, self.taskdir_rel,
+                       allow=[f"{self.taskdir_rel}/REPORT.md"] if self.phase == "LAPORAN TERTUNDA" else [],
+                       own_action=OWN_DIRT_ACTION)
         self._check_9_head()
         if self.brief_nn:
             self._check_10_target()
@@ -175,8 +185,8 @@ class PreconditionChecker:
             return
         fake = [nn for nn, st in states.items() if st == "DONE" and not self.implemented(nn)]
         if fake:
-            self._add(4, name, "FAIL", "brief DONE tanpa commit `implement unit NN` atau `report-NN.md`: "
-                      + ", ".join(fake),
+            self._add(4, name, "FAIL", "brief DONE tanpa commit `implement unit NN` berkode atau "
+                      "`report-NN.md`: " + ", ".join(fake),
                       "Status DONE hanya ditulis architect bersama commit unit; status yang diketik "
                       "tangan dikembalikan ke READY lewat revisi brief dan dieksekusi sungguhan.")
             return
@@ -262,6 +272,12 @@ class PreconditionChecker:
         if not fm.get("files_touched"):
             self._add(10, name, "FAIL", f"{path.name} tanpa `files_touched`",
                       "Batas scope unit tidak ada; kembalikan ke `frontend:plan`.")
+            return
+        stack = str(fm.get("stack", "")).strip()
+        if self.stack and stack != self.stack:
+            self._add(10, name, "FAIL", f"{path.name} `stack: {stack or '(kosong)'}` ≠ stack profil `{self.stack}`",
+                      "Brief lahir untuk stack lain (12 J16); kembalikan ke `frontend:lead` — dilarang menyunting "
+                      "`stack` brief agar lolos.")
             return
         self._add(10, name, "PASS", f"{path.name}, {len(fm['files_touched'])} berkas")
 

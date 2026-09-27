@@ -18,8 +18,10 @@ bukan dipilih reviewer:
 `--log <taskdir>/.explore/closing-verification.json` (dipakai `architect` Phase 4,
 sesi yang sama dengan `run_verification.py closing`) mencocokkan tabel
 `## Verifikasi Penutup` dengan log mesin: himpunan perintah, hasil, dan galat
-baru wajib identik, dan `MERAH` bergalat baru 0 sah hanya di atas baseline yang
-juga merah. Tanpa `--log` (laci `.explore/` tidak di-commit, jadi `report` dan
+baru wajib identik, `MERAH` bergalat baru 0 sah hanya di atas baseline yang
+juga merah, dan tiap baseline wajib diukur (`baseline_head`) di leluhur commit
+`implement unit` pertama rantai — baseline di atas unit yang sudah mendarat
+menelan galatnya sebagai warisan (12 J13). Tanpa `--log` (laci `.explore/` tidak di-commit, jadi `report` dan
 sesi lain tidak dapat menuntutnya) check `LOG` dicatat `SKIP`.
 
 Dipakai `architect` sebelum commit `REVIEW.md`, dan `frontend:report` sebagai
@@ -32,6 +34,7 @@ import argparse
 import datetime
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -414,8 +417,47 @@ class ReviewValidator:
                 p.append(f"`{cmd}` {result}/{new} ≠ log mesin {e.get('status')}/{e.get('new_errors')}")
             elif result == "MERAH" and new == "0" and e.get("baseline_status") != "MERAH":
                 p.append(f"`{cmd}` MERAH/0 tanpa baseline merah di log mesin")
+        p += self._baseline_heads(log)
         self._add("LOG", name, p, f"{len(log)} perintah identik dengan log",
                   "Salin tabel `closing-verification.md` apa adanya; dilarang mengetik hasil sendiri.")
+
+    def _first_unit(self) -> str:
+        """Sha penuh commit `implement unit` pertama taskdir ini sejak akar, atau kosong."""
+        since = task_root_sha(self.root, self.taskdir_rel)
+        if not since:
+            return ""
+        rx = re.compile(rf"^[a-z]+!?\({re.escape(taskdir_slug(self.taskdir_rel))}\)!?: implement unit \d+")
+        units = [l.split(" ", 1)[0] for l in git(self.root, "log", "--format=%H %s", f"{since}..HEAD").splitlines()
+                 if " " in l and rx.match(l.split(" ", 1)[1])]
+        return units[-1] if units else ""
+
+    def _baseline_heads(self, log: Dict[str, Any]) -> List[str]:
+        """Baseline yang ada wajib diukur sebelum unit pertama mendarat (12 J13, padanan merge-base be 3a)."""
+        first = self._first_unit()
+        p, verdicts = [], {}
+        for cmd, e in sorted(log.items()):
+            if e.get("baseline_status") is None:          # baseline absen: tiap MERAH sudah galat baru
+                continue
+            head = str(e.get("baseline_head") or "").strip()
+            if not head:
+                p.append(f"`{cmd}` baseline tanpa `baseline_head` — tidak terikat commit; ukur ulang baseline "
+                         "di akar rantai")
+                continue
+            if head not in verdicts:
+                full = git(self.root, "rev-parse", "--verify", "-q", f"{head}^{{commit}}").strip()
+                if not full:
+                    verdicts[head] = f"di {head[:7]} yang tidak ada di repo"
+                elif first and (full == first or not self._is_ancestor(full, first)):
+                    verdicts[head] = f"di {head[:7]}, sesudah unit pertama rantai ({first[:7]}) mendarat"
+                else:
+                    verdicts[head] = ""
+            if verdicts[head]:
+                p.append(f"`{cmd}` baseline diukur {verdicts[head]} — galat unit tertelan jadi warisan")
+        return p
+
+    def _is_ancestor(self, a: str, b: str) -> bool:
+        return subprocess.run(["git", "-C", str(self.root), "merge-base", "--is-ancestor", a, b],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
 
     def _check_verdict(self, counts: Dict[str, int], sc_blocked: bool, ac_open: bool, red: bool) -> None:
         if counts["P1"] or sc_blocked or red:
