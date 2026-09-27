@@ -3,7 +3,8 @@
 Sumber: review robustness plugin `analyst` 2026-09-27. Semua temuan **terbukti lewat probe** di ruang kerja
 sementara (tiket contoh `cicilan-pembayaran`). Basis kode: commit `b6fbb1c`.
 
-**Status:** dikerjakan.
+**Status (2026-09-27):** G1–G10 selesai, G1–G9 masing-masing dengan test regresi (`tests/analyst/test_ticket_10.py`).
+Versi: analyst 0.6.0.
 
 ## Tujuan
 
@@ -54,7 +55,7 @@ dan harus disesuaikan, bukan test baru.
 ---
 
 ## G1 [Tinggi] `ref` meng-commit tiket DRIFT dengan subjek kunci
-- [ ] Selesai
+- [x] Selesai — `ref` menolak `DRIFT`/`RUSAK`; DRAFT ditulis tanpa commit
 
 `cmd_ref` (`ticket.py:490`) hanya mengecek `status`, padahal README menjanjikan "tanpa DRIFT". Probe: tiket
 READY tanpa `approved_seal`, BR diubah 50 juta → 10 juta, `ref` → commit `docs(ticket): ref TICKET <slug>`;
@@ -62,22 +63,26 @@ READY tanpa `approved_seal`, BR diubah 50 juta → 10 juta, `ref` → commit `do
 belum di-commit di bawah subjek yang sama. **Perbaikan:** tolak `DRIFT`/`RUSAK`; pada DRAFT tulis tanpa commit.
 
 ## G2 [Tinggi] Penutupan elisitasi tanpa segel
-- [ ] Selesai
+- [x] Selesai — `ticket.py close` + segel `elicit_hash`/`elicit_log`, ditagih `check --gate spec`/`review`/`approve`
 
 `elicitation: CLOSED` ditulis tangan; tidak ada sidik catatan saat ditutup. `spec` dapat menyunting catatan
 sebelum review pertama tanpa terdeteksi, dan satu baris kosong di catatan me-reset plafon ronde review
 (`ticket.py:316`) serta revisi (`ticket.py:367`). Probe: dua ronde BLOCKED → plafon → sisip baris kosong →
 `REVIEW PASS: ronde 1/2`. **Perbaikan:** lihat Keputusan G2.
 
+Temuan sampingan saat menguji `close` ulang: `analyst_lib.git_commit` melaporkan exit 3 (`COMMIT GAGAL`,
+"nothing to commit") bila isi berkas sudah sama dengan HEAD — juga menimpa `ref` dengan kunci yang sama dua
+kali. Kini `(True, "tanpa perubahan")`, tanpa commit kosong.
+
 ## G3 [Sedang] Blok reviewer tidak dicek konsistensinya
-- [ ] Selesai
+- [x] Selesai — `report_problems` (hitungan, predikat, ronde); `check --gate spec` memberi `ronde`
 
 `review` hanya mencocokkan `- Verdict:` (`ticket.py:336`). Probe: `Verdict: PASS` dengan
 `BLOCKER: 0 [MEKANIS] · 2 [SEMANTIK]` dan dua butir BLOCKER → tercatat PASS → `approve` READY.
 **Perbaikan:** lihat Keputusan G3.
 
 ## G4 [Sedang] `domain_terms` lolos tanpa konfirmasi peminta
-- [ ] Selesai
+- [x] Selesai — check elicit 10 menuntut baris log konfirmasi berjawaban `Ya`
 
 Check elicit 10 (`validate_doc.py:233`) menerima jejak di Permintaan Asli saja. Probe: permintaan "API error
 500 …" + `domain_terms: [API]` → kartu "then API menampilkan …" lolos kedua validator, padahal panduan
@@ -85,33 +90,33 @@ elisitasi bagian 3 memakai contoh itu sebagai istilah yang wajib diterjemahkan. 
 wajib punya baris log `Apakah "<istilah>" …?` berjawaban `Ya`.
 
 ## G5 [Sedang] Kutipan menjadi jalan pintas kebocoran teknis
-- [ ] Selesai
+- [x] Selesai — `LEAK_PATTERNS` bertanda berlaku-di-kutipan; pola `error|galat <kode>`
 
 `_EXEMPT` (`analyst_lib.py:305`) membuang seluruh isi kutipan sebelum semua pola dipindai. Probe:
 `then "POST /api/v1/installments" mengembalikan "201"` lolos; `muncul error 500` juga lolos karena pola kode
 status hanya `HTTP 500`. **Perbaikan:** lihat Keputusan G5; pola baru `error|galat <kode>`.
 
 ## G6 [Rendah] Pertanyaan TIDAK MEMBLOKIR tidak ditagih ke kartu
-- [ ] Selesai
+- [x] Selesai — check ticket 10 `Pertanyaan terbuka terbawa`
 
 Catatan memuat `Q-2 [TIDAK MEMBLOKIR]`, kartu `- Tidak ada.` → PASS. **Perbaikan:** check ticket baru: ID
 `Q-{n}` TIDAK MEMBLOKIR di catatan = ID `Q-{n}` di kartu.
 
 ## G7 [Rendah] `Asumsi:` di tengah kalimat lolos `CLOSED`
-- [ ] Selesai
+- [x] Selesai — `ASSUMPTION` dicari di mana pun dalam baris, termasuk bentuk tebal
 
 `ASSUMPTION` (`validate_doc.py:68`) berjangkar di awal baris. Probe: "Hanya pelanggan korporat. Asumsi:
 perorangan ditunda." → PASS. **Perbaikan:** cari di mana pun dalam baris, termasuk bentuk tebal.
 
 ## G8 [Rendah] Heading ganda menelan seksi
-- [ ] Selesai
+- [x] Selesai — `duplicate_headings` di check struktur kedua validator (H2/H3/H4)
 
 `sections()` (`analyst_lib.py:195`) menimpa isi heading yang sama tanpa mengubah urutan kunci. Probe: dua
 `## Acceptance Criteria`, yang pertama berisi `TODO <isi nanti>` → PASS. **Perbaikan:** check struktur kedua
 validator menolak H2/H3/H4 ganda.
 
 ## G9 [Sedang] `new` hanya membuat direktori
-- [ ] Selesai
+- [x] Selesai — `new` menulis `ticket_skeleton` + `request_hash`; `KOSONG` dipakai ulang; test menagih kerangka = template
 
 `cmd_new` (`ticket.py:235`) hanya `mkdir`; kerangka dan permintaan asli ditulis model belakangan. Sesi yang
 putus di antaranya meninggalkan ticketdir `KOSONG` tanpa permintaan asli, dan tidak ada yang menjaga
@@ -119,7 +124,7 @@ putus di antaranya meninggalkan ticketdir `KOSONG` tanpa permintaan asli, dan ti
 Keputusan G9.
 
 ## G10 [Rendah] Dokumen tertinggal
-- [ ] Selesai
+- [x] Selesai — docstring, `ticket-template.md` butir 6, `flow/backend.md` Handoff diperbarui
 
 Docstring `ticket.py` menyebut kontrak exit hanya untuk `approve`/`ref` (README: juga `cancel`);
 `ticket-template.md` tidak menyebut bentuk `- Tidak ada — <alasan>` untuk Di Luar Cakupan saat Batas Cakupan
