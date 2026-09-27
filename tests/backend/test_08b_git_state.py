@@ -52,7 +52,7 @@ def test_b6_report_mendeteksi_rebase_edit(ready):
     commit(ready, "c1")
     write_files(ready, {"a.txt": "a\n"})
     commit(ready, "c2")
-    _raw_git(ready, "rebase", "-q", "-i", "HEAD~1", env={"GIT_SEQUENCE_EDITOR": "sed -i 1s/^pick/edit/"})
+    _raw_git(ready, "rebase", "-q", "-i", "HEAD~1", env={"GIT_SEQUENCE_EDITOR": "sed -i.bak 1s/^pick/edit/"})
     c = be_checks(ready, REPORT, "--taskdir", TD)[7]
     assert c["status"] == "FAIL" and "rebase" in c["summary"]
 

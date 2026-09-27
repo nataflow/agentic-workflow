@@ -104,7 +104,7 @@ mkdir -p src/features/order
 echo 'export const OrderButton = () => <button>Pesan</button>;' > src/features/order/OrderButton.tsx
 echo 'test("x", () => { expect(1).toBe(1) })' > src/features/order/OrderButton.test.tsx
 printf -- '---\nartifact: UNIT_REPORT\nunit: "01"\nbrief: brief-01-order-button.md\nstatus: DONE\n---\n\n# Unit 01 — order-button\n' > $T/report-01.md
-sed -i 's/^status: READY/status: DONE/' $T/brief-01-order-button.md
+sed 's/^status: READY/status: DONE/' $T/brief-01-order-button.md > $T/brief-01.tmp && mv $T/brief-01.tmp $T/brief-01-order-button.md
 git add src $T/brief-01-order-button.md $T/report-01.md
 git commit -qm "feat(order-checkout): implement unit 01 - order button"
 cat > $T/REVIEW.md <<EOF
