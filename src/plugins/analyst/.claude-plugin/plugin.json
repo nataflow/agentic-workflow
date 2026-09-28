@@ -1,7 +1,7 @@
 {
   "name": "analyst",
   "description": "Skill dan subagent jembatan antara pengguna/stakeholder dan engineer: klasifikasi permintaan, elisitasi terarah dengan peminta non-engineer, dan penulisan TICKET.md non-teknis (user story, acceptance criteria, aturan bisnis) setara kartu Jira/Trello — dengan review independen dan persetujuan user. Tiket READY diserahkan ke backend:tech-lead / frontend:lead lewat parameter ticket_source",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "author": {
     "name": "Fakhrul Nugroho",
     "email": "fakhrulnugroho15@gmail.com"
