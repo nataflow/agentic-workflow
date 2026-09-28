@@ -1,7 +1,29 @@
 # Langkah 15 — Perubahan plugin `backend` (backenddev)
 
 Rujukan: `01-mcp-tools.md`, yaitu tool T1–T10, kontrak identitas, dan pola pemakaian tool.
-**Status:** PEMETAAN, belum dieksekusi.
+**Status:** SELESAI (tahap 3). B1–B12 terpasang; B8 lewat payload dua fase (E4), jadi `--point` tidak ada. Versi
+dinaikkan di commit rilis. Test: `tests/backend/test_15_sync_payload.py` (16) + dua `CASES` smoke; suite penuh 1903
+hijau, lint 0 FAIL. `tech-lead/SKILL.md` 13979 byte (anggaran 14000): kalimat Output `EXPLORE_FACT` yang sudah
+dinyatakan di Fase 1 butir 5 dan dua frasa prasyarat dipadatkan untuk memberi ruang.
+
+## Peta blast radius (sebelum kode)
+
+| Berkas | Perubahan | Yang bisa pecah |
+|---|---|---|
+| `skills/_common/sync_payload.py` (baru, CLI) | B2/B8/B9/B10: `--taskdir` \| `--repo-docs audit\|api\|profile`, `--remote -`, `--json` | `test_smoke::test_inventaris_lengkap` (wajib masuk `CASES`); `test_profile_paths` (`.py` di luar daftar izin dilarang memuat literal path profil → pakai `PROFILE_DIR_REL`/`resolve_profile_dir`); lint R4/S1 |
+| `skills/_common/nataflow_sync.py` | Tambah `head_files` dan `pick_sections`; disalin ulang ke keempat plugin | `test_15_nataflow_sync` salinan identik |
+| `skills/tech-lead/SKILL.md` | Fase 5 butir 2 + sinkron; slot **Nataflow** di blok re-entry; penunjuk rute sinkron ulang (B7) di Gerbang Masuk | `test_l28_tech_lead::test_skill_size_budget` ≤ 14000 byte (sisa 7 byte) → prosa rinci ke `references/`, beberapa kalimat dipadatkan tanpa menyentuh substring yang ditagih (`test_l211` butir `4. Perlakukan severity \`P1\``, `test_h26`/`h28`/`h30`/`h20`, `test_a1` parameter `ticket_source`, `test_l212` `COMPLETED (WARNING)`). Nomor butir Fase 5 tidak bergeser |
+| `skills/tech-lead/references/gate-lifecycle.md` bagian 6 | Butir `2a.` sinkron beserta peta pengirim → mode | Rujukan "bagian 6 butir 3" di SKILL tetap sah karena tidak ada penomoran ulang; `test_l211` hanya membaca tabel bagian 1 |
+| `skills/tech-lead/references/gate-scope.md` bagian 1 | Butir rute "sinkron ulang taskdir" (B7); "Empat Pengecualian" tidak bertambah | `test_l21_reviewer_commit` baris matriks `REVIEW.md` (tidak disentuh) |
+| `skills/tech-lead/references/nataflow-sync.md` (baru) | Prosedur dua fase (01 § Protokol) + varian dokumen repo | Lint R2 (tanpa `${CLAUDE_PLUGIN_ROOT}`); `test_08b_findings_contract` melarang `diff: ` di `.md` plugin |
+| `skills/analyst/SKILL.md` | Fase 2 butir 4 (akar terkunci), Fase 4 butir 4 (sesudah centang ledger), baris `Nataflow` di `PLANNING CHAIN REPORT` | `test_l211` (`temuan \`P1\` \`REVIEW.md\``), `test_h28` (frasa terlarang), `test_a1` parameter; tidak ada test yang mengunci slot laporan |
+| `README.md`, `flow/backend.md` | Seksi sinkron, artefak & status, titik gagal | Tidak ada test yang membaca keduanya; `test_08b_findings_contract` memindai README |
+| `tests/backend/test_15_sync_payload.py` (baru), `tests/test_smoke.py` | Kontrak skrip (B12) + dua `CASES` | — |
+
+Keputusan tambahan: taskdir tanpa `TASK.md` di `HEAD` → `FAIL` (akar belum terkunci). Status task hanya naik ke
+`in_progress` begitu ada jejak eksekusi (brief `DONE`/`BLOCKED`/`SUPERSEDED`, `report-NN.md`, `HALT.md`, `REVIEW.md`);
+`REPORT.md` menutup task sendiri menjadi `done`, tetapi task tiket tetap `in_progress` (E8). Deskripsi task tanpa tiket
+= seksi `Description`, `Success Criteria`, dan `Out of Scope` `TASK.md`.
 
 ## Ringkasan
 

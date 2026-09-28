@@ -56,6 +56,7 @@ Tiga keadaan normal masuk lewat jalur ini: taskdir ber-`BRD.md`/`PRD.md` `DRAFT`
 1. Panggil `backend:task` dengan `taskdir`, `lane` terminal chain (matriks bagian 1.3 `references/chain-rules.md`, kolom keempat), `risk`, `request`, `evidence`, `clarification`, `chain`, `finding_source`, dan `ticket_source` apa adanya.
 2. Tangkap laporan `### TASK ROOT LOCKED`; `Uji Akar` bukan `9/9 lolos` atau `Commit` bernilai `GAGAL` → `## Failure path` butir 2.
 3. Verifikasi `TASK.md` **yang baru diterbitkan `task` di giliran ini** memuat frontmatter `chain:` sesuai Fase 1 dan seksi `## Chain` berisi tepat hop chain itu, seluruhnya belum tercentang. Butir ini tidak berlaku pada jalur resume Fase 0.
+4. **Sinkron nataflow** (akar yang terkunci di giliran ini saja): jalankan prosedur `tech-lead/references/nataflow-sync.md` dengan target `--taskdir <taskdir>` di main loop. Segmennya dibawa ke baris `Nataflow` laporan penutup; `GAGAL` tidak menahan Fase 3.
 
 ### Fase 3 — Eksekusi Hop Rantai
 
@@ -93,7 +94,7 @@ Dijalankan atas tiap `BRD.md` dan `PRD.md` sebelum hop berikutnya berangkat, men
 1. Kunci draft yatim: periksa `git status --porcelain` atas artefak hop; belum terkunci → commit seketika memakai format pesan penulisnya, tanpa menunggu persetujuan siapa pun.
 2. Verifikasi `## Open questions` artefak: maksimal tiga entri dan tidak satu pun memblokir menurut predikat rumah kanoniknya. Ada yang memblokir → jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/analyst/scripts/chain_counters.py --taskdir <taskdir> --bump oq_return:<HOP>` lebih dulu (`FAIL` → `## Failure path` butir 7), lalu kembalikan poin revisinya ke skill hop, pertahankan `DRAFT`, ulangi Fase 3 pada hop yang sama. Plafon dua pengembalian per hop. Bump itu sekaligus menolkan `review_round:<HOP>`: revisi yang dikembalikan mendapat ronde reviewer baru, dan loopnya dibatasi plafon `oq_return`.
 3. Sajikan ringkasan eksekutif artefak — termasuk enumerasi tiap `BR-DISANGGAH: BR-{n}` PRD dan tiap asumsi aktif `sementara dipakai:` — lalu mintakan persetujuan eksplisit user lewat `AskUserQuestion`.
-4. User menyetujui → tulis `status: APPROVED` di frontmatter, commit approval seketika dengan staging path eksplisit, lalu centang hop itu di ledger `## Chain` beserta sha commit tersebut dan commit pembaruan `TASK.md`-nya. Urutan itu tidak dapat dipadatkan jadi satu commit: baris centang memuat sha yang belum ada saat berkasnya di-stage (`references/chain-rules.md` bagian 4 butir 5). Lanjut ke hop berikutnya.
+4. User menyetujui → tulis `status: APPROVED` di frontmatter, commit approval seketika dengan staging path eksplisit, lalu centang hop itu di ledger `## Chain` beserta sha commit tersebut dan commit pembaruan `TASK.md`-nya. Urutan itu tidak dapat dipadatkan jadi satu commit: baris centang memuat sha yang belum ada saat berkasnya di-stage (`references/chain-rules.md` bagian 4 butir 5). Sesudah commit `TASK.md` itu, jalankan prosedur `tech-lead/references/nataflow-sync.md` (`--taskdir <taskdir>`) supaya dokumen `APPROVED` tercermin seketika; `GAGAL` tidak menahan hop. Lanjut ke hop berikutnya.
 5. User menolak → jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/analyst/scripts/chain_counters.py --taskdir <taskdir> --bump reject:<HOP>` lebih dulu (`FAIL` → `## Failure path` butir 4), lalu pertahankan `DRAFT`, teruskan poin revisi ke skill hop, ulangi Fase 3 pada hop yang sama. Bump itu sekaligus menolkan `review_round:<HOP>`, sehingga revisi yang diminta user mendapat ronde reviewer baru di bawah plafon `reject`. Dilarang mengubah commit draft yang sudah mendarat.
 
 ### Fase 4a — Kanal Amandemen Akar
@@ -161,7 +162,7 @@ Ini satu-satunya titik yang memeriksa rantai sebagai satu kesatuan. Tiap skill h
 
 ## Output [REQUIRED]
 
-Vonis `READY_FOR_IMPLEMENTATION` (15/15) → tutup satu baris tanpa blok: `### PLANNING CHAIN REPORT — READY_FOR_IMPLEMENTATION (15/15) · <taskdir> · Chain <enum> · Risk <level> · Brief <n> READY @ <sha>`, ditambah baris `Verifikasi Manual` bila ada. Selain itu, sajikan blok berikut dan hapus tiap baris bernilai `—`:
+Vonis `READY_FOR_IMPLEMENTATION` (15/15) → tutup satu baris tanpa blok: `### PLANNING CHAIN REPORT — READY_FOR_IMPLEMENTATION (15/15) · <taskdir> · Chain <enum> · Risk <level> · Brief <n> READY @ <sha>`, ditambah baris `Nataflow: <segmen sinkron terakhir>` bila sinkron berjalan dan baris `Verifikasi Manual` bila ada. Selain itu, sajikan blok berikut dan hapus tiap baris bernilai `—`:
 
 ```markdown
 ### PLANNING CHAIN REPORT — NOT_READY_FOR_IMPLEMENTATION
@@ -170,6 +171,7 @@ Vonis `READY_FOR_IMPLEMENTATION` (15/15) → tutup satu baris tanpa blok: `### P
 - **Hop**    : tertahan di <HOP> · TASK <sha> · BRD <sha | —> · PRD <sha | —> · BRIEF <n READY @ sha | —>
 - **Re-entry**: <n>/2 · hop <HOP> dibuka karena <reentry_reason> @ <sha> | — (putaran `REVIEW P1` ikut memakan plafon ini; putaran P1 ketiga kembali ke gerbang)
 - **Verifikasi Manual**: <tiap `AC-{n}` bertanda `QA manual:` + brief pengklaim + langkah konkretnya> | —
+- **Nataflow**: <segmen sinkron terakhir (`tech-lead/references/nataflow-sync.md`)> | —
 - **Catatan**: <eskalasi · amandemen akar · `BR-DISANGGAH` disetujui user · asumsi `sementara dipakai:` pembentuk kontrak> | —
 ```
 

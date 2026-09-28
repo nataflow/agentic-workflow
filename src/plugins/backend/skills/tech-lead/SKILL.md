@@ -8,12 +8,12 @@ description: Gunakan ketika ada permintaan kerja baru atau susulan di repo backe
 - Lewatkan setiap permintaan kerja baru melalui gerbang ini sebelum kode di `src/` disentuh.
 - Tetapkan rute dan risk level, lalu jalankan langkah pertama di giliran yang sama.
 - Dilarang membuat, mengedit, atau menghapus berkas kode secara langsung.
-- Buktikan setiap keputusan rute dari kode aktual; **isi prompt** tiap dispatch gerbang bersumber dari `dispatcher/explorer.md` terhidrasi penuh, tidak pernah dari prompt yang disusun sendiri.
+- Buktikan setiap keputusan rute dari kode aktual; **isi prompt** dispatch gerbang hanya dari `dispatcher/explorer.md` terhidrasi penuh.
 - Inisialisasi taskdir dan branch sebelum delegasi ke hilir.
 
 ## Precondition [REQUIRED]
 
-1. Fase 0 (tiap permintaan): `python3 ${CLAUDE_PLUGIN_ROOT}/skills/tech-lead/scripts/check_preconditions.py --read-only`. `FAIL` di sini berarti repo tak terbaca (bukan git, `index.json` rusak) → hentikan dan laporkan.
+1. Fase 0 (tiap permintaan): `python3 ${CLAUDE_PLUGIN_ROOT}/skills/tech-lead/scripts/check_preconditions.py --read-only`. `FAIL` = repo tak terbaca (bukan git, `index.json` rusak) → hentikan dan laporkan.
 2. Fase 3 butir 0 (lane `PLANNING`, `DEFECT_RCA`, `EXEC_BRIEF`, `AUDIT_SWEEP`, `API_DOCS`): skrip yang sama tanpa `--read-only`, ditambah `--re-entry` bila masuk lewat Fase 5. `PASS` (6/6) → lanjut. `FAIL` → remediasi: profil (`commands.md`, `base_branch`) bermasalah → rute `PROFILE`; tree kotor di luar zona artefak → minta user stash/commit; HEAD detached → minta checkout `base_branch`.
 
 ## Parameter [REQUIRED]
@@ -37,14 +37,14 @@ description: Gunakan ketika ada permintaan kerja baru atau susulan di repo backe
 
 Evaluasi setiap pesan user, termasuk susulan di tengah sesi:
 
-1. Aktifkan gerbang untuk permintaan perubahan perilaku, bugfix, audit, eksekusi artefak, susulan cakupan, atau koreksi arah. Pertanyaan baca-kode murni (letak simbol, pemanggil, tracing) juga lewat gerbang, tetapi hanya menjalankan Fase 0 `--read-only` lalu jalur cepat `references/explore-fact.md`.
+1. Aktifkan gerbang untuk permintaan perubahan perilaku, bugfix, audit, eksekusi artefak, susulan cakupan, atau koreksi arah. Pertanyaan baca-kode murni (letak simbol, pemanggil, tracing) dan "sinkron ulang taskdir" juga lewat gerbang, tetapi hanya menjalankan Fase 0 `--read-only` lalu jalur cepat `references/explore-fact.md` atau `references/nataflow-sync.md`.
 2. Jawab langsung tanpa gerbang hanya untuk 4 pengecualian: jawaban klarifikasi Fase 2 / `## Open questions`, konsep umum non-repo, operasi VCS murni atas kerja tuntas, atau alur plugin lain yang dipanggil/dilanjutkan eksplisit (`/analyst:*`, `/quickdev:*`) (`references/gate-scope.md` bagian 1).
 3. Persetujuan `BRD.md`/`PRD.md` bukan pemicu: teruskan ke `backend:analyst` (`gate-scope.md` bagian 2).
 4. Tahan dan proses sebagai pemicu terpisah jika permintaan baru disisipkan saat rantai berjalan, atau objek kerja berupa berkas non-`src/` berefek runtime (`references/gate-lifecycle.md` bagian 5).
 
 ### Fase 0 — Prasyarat Read-Only & Profil
 
-1. Jalankan `check_preconditions.py --read-only`. Tree kotor, HEAD detached, izin tulis, dan `commands.md` tidak dinilai di sini — pindah ke Fase 3 butir 0.
+1. Jalankan `check_preconditions.py --read-only`. Tree kotor, HEAD detached, izin tulis, dan `commands.md` dinilai di Fase 3 butir 0.
 2. Check 1 **TERDEGRADASI** (profil absen): pertanyaan baca-kode dijawab lewat `references/explore-fact.md` tanpa profil, lalu tawarkan `backend:profile`. Rute yang mengubah kode → rute `PROFILE` (Keputusan 1) lebih dulu, lalu ulangi Fase 0 dan lanjutkan rute tertunda.
 3. Profil ada: baca `index.json` dan `invariants.md` di `.claude/profile/backenddev/`. Lokasi lama `.claude/profile/` → `PROFILE` mode MIGRATE lebih dulu. Profil plugin lain jangan dibaca atau ditimpa.
 
@@ -87,7 +87,7 @@ Jalankan untuk rute yang menghasilkan artefak rancangan atau kode; lewati pada l
 ### Fase 5 — Re-entry Rantai: Commit Artefak & Langkah Lanjut
 
 1. Jalankan prasyarat penuh dengan `--re-entry` (zona artefak yang boleh kotor: `references/gate-lifecycle.md` bagian 6 butir 1).
-2. Commit artefak yang menunggu (profil, laporan `audit`, `RCA.md`, `docs/api/`) dengan staging path eksplisit tiap path slot `Menunggu commit` pengirim (`references/gate-scope.md` bagian 3).
+2. Commit artefak yang menunggu (profil, laporan `audit`, `RCA.md`, `docs/api/`) dengan staging path eksplisit tiap path slot `Menunggu commit` pengirim (`references/gate-scope.md` bagian 3), lalu sinkron nataflow (`gate-lifecycle.md` bagian 6 butir 2a).
 3. Tentukan langkah lanjut dari tabel pengirim balik `references/gate-lifecycle.md` bagian 6 butir 3 (mis. `architect` `COMPLETED (WARNING)` = rantai selesai).
 4. Perlakukan severity `P1` dari `architect` sebagai kerja lanjutan pada **taskdir yang sama**; dilarang memperbaiki di gerbang dan dilarang memprovisi taskdir baru. Klasifikasikan ulang lewat Keputusan 2, seleksi temuan lewat `references/gate-scope.md` bagian 6, lalu berangkatkan lane `PLANNING` dengan `finding_source` `{taskdir}/REVIEW.md` **dan** `reentry_reason` `REVIEW P1: <ID temuan terpilih>` (taskdir tanpa ledger: Fase 3 butir 1).
 5. Skill hilir menutup `BLOCKED` atau rantai terputus → selesaikan akar masalah sesuai `## Failure path`; jangan menutupinya dengan taskdir baru.
@@ -102,8 +102,6 @@ Jalankan untuk rute yang menghasilkan artefak rancangan atau kode; lewati pada l
 
 ## Output [REQUIRED]
 
-Jalur `EXPLORE_FACT` memakai format `references/explore-fact.md` bagian 3.
-
 ```markdown
 ### TECH-LEAD GATEWAY DECISION
 - **Lane**    : <enum lane Keputusan 1> · Risk <BREAKING | MAJOR | MINOR | tanpa risk level>
@@ -115,7 +113,7 @@ Jalur `EXPLORE_FACT` memakai format `references/explore-fact.md` bagian 3.
 - **First Action**: <skill dan langkah pertama — sebut tiap parameter tanpa nilai bawaan; rute `RCA` wajib `entry_mode: RCA`>
 ```
 
-Re-entry Fase 5 memakai `### TECH-LEAD RE-ENTRY DECISION` berslot **Pengirim Balik**, **Artefak Commit** (`<path> @ <sha>` | `dikunci penulisnya` | `tidak ada`), **Status Rantai** (`LANJUT` | `SELESAI` | `TERTAHAN`), dan **Langkah Lanjut**. Tutup gerbang satu baris: `Rute: <urutan-skill> | Slug: <slug> | Taskdir: <path> | Risiko: <risk>`.
+Re-entry Fase 5 memakai `### TECH-LEAD RE-ENTRY DECISION` berslot **Pengirim Balik**, **Artefak Commit** (`<path> @ <sha>` | `dikunci penulisnya` | `tidak ada`), **Status Rantai** (`LANJUT` | `SELESAI` | `TERTAHAN`), **Nataflow** (segmen sinkron), dan **Langkah Lanjut**. Tutup gerbang satu baris: `Rute: <urutan-skill> | Slug: <slug> | Taskdir: <path> | Risiko: <risk>`.
 
 ## Failure path
 

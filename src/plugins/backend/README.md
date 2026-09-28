@@ -215,6 +215,8 @@ Tiap skill punya `skills/<skill>/scripts/check_preconditions.py` yang dijalankan
 | `_common/brief_status.py` | status brief dan penulis tunggalnya |
 | `_common/run_verification.py baseline\|closing` | verifikasi baseline dan penutup, log mesin di `.explore/` |
 | `_common/verify_scope.py` | diff commit/worktree terhadap `File scope` brief versi sebelum unit dikerjakan |
+| `_common/sync_payload.py` | argumen tool MCP nataflow untuk taskdir atau dokumen repo; read-only (lihat Sinkron nataflow) |
+| `_common/nataflow_sync.py` | pustaka sinkron nataflow, salinan identik di keempat plugin |
 | `plan/scripts/scaffold_brief.py` | kunci matriks alokasi, lalu kerangka brief |
 | `plan/scripts/validate_briefs.py` | validasi batch dan per-brief, ronde review brief |
 | `analyst/scripts/chain_counters.py` | plafon eskalasi, re-entry, amandemen akar, dan ronde reviewer; menolak tabel yang diturunkan tangan |
@@ -233,6 +235,32 @@ Tiap skill punya `skills/<skill>/scripts/check_preconditions.py` yang dijalankan
 - **`architect`** mulai dari brief READY pertama. Rantai dianggap tuntas hanya bila `REVIEW.md` dan
   `REPORT.md` sama-sama ada. `REVIEW.md` yang lebih tua dari commit brief/kode terakhir dianggap basi dan
   memicu review ulang. Matriks lengkapnya ada di `skills/architect/references/lifecycle-recovery.md`.
+
+## Sinkron nataflow (opsional)
+
+Artefak taskdir dan dokumen repo dapat dicerminkan ke nataflow. Disk dan git tetap sumber kebenaran: sinkron
+tidak menulis berkas dan tidak meng-commit, dan kegagalannya tidak menahan rantai.
+
+- **Aktif per repo** lewat `.claude/nataflow.json` (ter-commit, dibaca juga oleh `analyst`, `frontend`, dan
+  `quickdev`): `mcp_server` (default `nataflow-api`), `workspace_id` (UUID; wajib bila MCP key ber-scope
+  project), `pic_id`, dan `repo` (default: remote `origin` ternormalisasi). Berkas absen → dilewati; ada tetapi
+  rusak → `GAGAL`. Server MCP didaftarkan user di Claude Code; plugin tidak menyimpan key.
+- **Jangkar**: satu taskdir = satu workdir `backenddev:<repo>:<path taskdir>`, tertaut ke task tiket analyst
+  bila `TASK.md` membawa `ticket_source` (taskdir frontend dari tiket yang sama bernaung di task itu juga),
+  atau ke task baru dari `TASK.md`.
+- **Yang didorong** (isi blob `HEAD`): `TASK.md`; `BRD.md`/`PRD.md` hanya `APPROVED`; brief semua status;
+  `RCA.md`, `report-NN.md`, `HALT.md`, `REVIEW.md`, `REPORT.md`. Dokumen yang pernah tercermin tetap
+  diperbarui, dan yang dihapus dari git ditandai `removed: true`. `.explore/` dan berkas belum ter-commit
+  tidak pernah ikut. Laporan `audit`, `docs/api/`, dan profil didorong ke workspace.
+- **Kapan** (main loop saja): `analyst` Fase 2 (akar terkunci) dan Fase 4 (BRD/PRD `APPROVED`), serta
+  `tech-lead` Fase 5 sesudah artefak yang menunggu di-commit. Prosedurnya di
+  `skills/tech-lead/references/nataflow-sync.md`; subagent tidak berubah.
+- **Status**: workdir `done` bila `REPORT.md` ada, `blocked` bila `HALT.md` atau brief `BLOCKED`, selain itu
+  `active`. Task naik ke `in_progress` sejak eksekusi dimulai; task milik taskdir ini menjadi `done` saat
+  `REPORT.md` terbit, sedangkan task tiket tidak ditutup plugin ini.
+- **Hemat token**: `sync_payload.py` menerbitkan isi hanya untuk dokumen yang berbeda dari manifest remote.
+- **Gagal tidak memblokir**: slot **Nataflow** laporan re-entry dan baris `Nataflow` laporan `analyst`
+  memuat `dilewati` atau `GAGAL: <sebab>`. Ulangi lewat `/backend:tech-lead` ("sinkron ulang taskdir <slug>").
 
 ## Hidup Berdampingan
 

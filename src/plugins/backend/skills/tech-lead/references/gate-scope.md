@@ -11,6 +11,7 @@ ______________________________________________________________________
 Setiap pesan user yang meminta pemahaman kode, perubahan perilaku, perbaikan bug, audit, atau dokumentasi:
 
 - **Pertanyaan Kode**: "di mana implementasi X", "siapa yang memanggil service Y", "trace flow endpoint Z". Lewat jalur cepat read-only (`references/explore-fact.md`): tidak menuntut tree bersih, branch, `commands.md`, maupun profil.
+- **Sinkron Ulang nataflow**: "sinkron ulang taskdir <slug>", "dorong ulang artefak ke nataflow". Varian re-entry tanpa lane baru (15 B7): Fase 0 `--read-only`, tanpa provisi taskdir, branch, maupun commit, lalu jalankan `nataflow-sync.md` atas taskdir itu (ditambah `--repo-docs` yang diminta user) dan tutup dengan satu baris `SINKRON — <taskdir> · nataflow <segmen>`. Jalan ulang untuk segmen `GAGAL`.
 - **Permintaan Perubahan / Fitur / Bugfix**: "tambahkan endpoint baru", "perbaiki race condition di order", "audit module payment".
 - **Permintaan Menjalankan Artefak**: "jalankan brief 01", "lanjutkan pengerjaan taskdir <slug>" (apa pun status artefaknya).
 - **Susulan di Tengah Sesi**: "sekalian ubah response field A", "jangan lupa tambah log di B".

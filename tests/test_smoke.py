@@ -31,6 +31,8 @@ CASES = [
     ("backend/hooks/detect.py", ["--plugin", "backend"], "hook", HOOK_STDIN),
     ("backend/hooks/guard_bash.py", ["hook"], "hook", BASH_STDIN),
     ("backend/skills/_common/validate_doc.py", ["--kind", "task", "--taskdir", BE_TD, "--json"], True, None),
+    ("backend/skills/_common/sync_payload.py", ["--taskdir", BE_TD, "--json"], True, None),
+    ("backend/skills/_common/sync_payload.py", ["--repo-docs", "audit", "--json"], True, None),
     ("backend/skills/_common/run_verification.py", ["closing", "--taskdir", BE_TD, "--cmd", "test=true"], False, None),
     ("backend/skills/_common/verify_scope.py", ["--brief", f"{BE_TD}/brief-01.md", "--worktree"], False, None),
     ("backend/skills/analyst/scripts/chain_counters.py", ["--taskdir", BE_TD, "--check"], False, None),

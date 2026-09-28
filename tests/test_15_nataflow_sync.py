@@ -134,6 +134,22 @@ def test_removed_text_versi_terakhir(ns, make_repo):
     assert ns.removed_text(root, "td/tidak-pernah.md") == (None, "")
 
 
+def test_head_files_langsung_di_bawah_direktori(ns, make_repo):
+    root = make_repo({"td/B.md": "b", "td/A.md": "a", "td/.explore/x.md": "x", "td/sub/c.md": "c", "tdx/D.md": "d"})
+    commit(root, "init")
+    write_files(root, {"td/baru.md": "belum commit"})
+    assert ns.head_files(root, "td") == ["A.md", "B.md"]
+    assert ns.head_files(root, "td/") == ["A.md", "B.md"]
+    assert ns.head_files(root, "tidak-ada") == []
+
+
+def test_pick_sections(ns):
+    text = ("---\nstatus: ACTIVE\n---\n# Judul\n\n## Chain\n- [ ] BRIEF\n\n## Description\nIsi.\n\n"
+            "## Success Criteria\n- SC-1\n\n## Counters\n| a |\n")
+    assert ns.pick_sections(text, ("Description", "Success Criteria")) == "## Description\nIsi.\n\n## Success Criteria\n- SC-1"
+    assert ns.pick_sections(text, ("Tidak Ada",)) == ""
+
+
 def test_frontmatter_dan_h1(ns):
     text = '---\nstatus: "APPROVED"\nrisk: MAJOR\n---\n\n# Judul Kerja\n\n## Seksi\n'
     assert ns.frontmatter_value(text, "status") == "APPROVED"

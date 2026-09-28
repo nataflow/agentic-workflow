@@ -150,6 +150,20 @@ def head_text(root: Path, rel: str) -> Tuple[Optional[str], str]:
         return None, f"{rel} di HEAD bukan UTF-8 ({exc.reason} @ byte {exc.start})"
 
 
+def head_files(root: Path, rel_dir: str) -> List[str]:
+    """Nama berkas yang ter-commit langsung di bawah `rel_dir` pada `HEAD` (tanpa subdirektori), terurut."""
+    prefix = rel_dir.rstrip("/") + "/"
+    code, out = _git(root, "ls-tree", "HEAD", prefix)
+    if code != 0:
+        return []
+    names = []
+    for line in out.decode("utf-8", "replace").splitlines():
+        info, _, path = line.partition("\t")           # `<mode> <type> <object>\t<path>`
+        if info.split(" ")[1:2] == ["blob"] and path.startswith(prefix) and "/" not in path[len(prefix):]:
+            names.append(path[len(prefix):])
+    return sorted(names)
+
+
 def last_commit(root: Path, rel: str) -> str:
     """Sha commit terakhir yang menyentuh `rel` (termasuk yang menghapusnya), atau kosong."""
     code, out = _git(root, "log", "-1", "--format=%H", "--", rel)
@@ -202,6 +216,19 @@ def h1_title(text: str) -> str:
         body = body[3 + end.end():] if end else body
     m = re.search(r"^# (.+)$", body, re.M)
     return m.group(1).strip() if m else ""
+
+
+def pick_sections(text: str, names: Tuple[str, ...]) -> str:
+    """Seksi H2 bernama `names` (urutan kemunculan di berkas) beserta heading-nya; kosong bila tak satu pun ada."""
+    parts, keep = [], False
+    for line in text.lstrip(BOM).splitlines():
+        if line.startswith("## "):
+            keep = line[3:].strip() in names
+        elif line.startswith("# "):
+            keep = False
+        if keep:
+            parts.append(line)
+    return "\n".join(parts).strip()
 
 
 # ── Argumen tool ──────────────────────────────────────────────────────────────
