@@ -1,6 +1,6 @@
 # Alur Plugin `analyst`
 
-> Plugin `analyst` (v0.7.0) adalah jembatan antara pengguna/stakeholder dan engineer. Ia menerima permintaan,
+> Plugin `analyst` (v0.8.0) adalah jembatan antara pengguna/stakeholder dan engineer. Ia menerima permintaan,
 > keluhan, atau laporan bug dari sisi pengguna, menggali faktanya lewat tanya-jawab dengan peminta
 > non-engineer, lalu menerbitkan `TICKET.md`: kartu tiket non-teknis setara kartu Jira/Trello, berisi user
 > story, acceptance criteria, dan aturan bisnis. Tiket melewati review independen dan persetujuan user sebelum

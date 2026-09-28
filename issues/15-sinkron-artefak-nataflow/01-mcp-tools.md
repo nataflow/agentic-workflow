@@ -11,6 +11,12 @@ pada induk `workspace`). Status deploy belum tercatat. Sisi plugin dikerjakan di
 menurut `02-plugin-backend.md`, `03-plugin-frontend.md`, `04-plugin-analyst.md`, dan `05-plugin-quickdev.md`,
 dengan keputusan dan protokol di § Pelaksanaan sisi plugin (akhir dokumen ini).
 
+**Status sisi plugin (2026-09-28):** SELESAI di branch `feat/15-sinkron-artefak`, bertahap dengan peta blast radius
+di tiap berkas plugin sebelum kode: pustaka bersama (tahap 1), `quickdev` (tahap 2, pilot prosedur), `backend`
+(tahap 3), `frontend` (tahap 4), `analyst` (tahap 5), lalu rilis analyst 0.8.0, backend 0.11.0, frontend 0.10.0,
+dan quickdev 0.6.0. Suite penuh 1934 hijau (Python 3.9: 1933 + 1 skip `tomllib`), lint `--base main` 0 FAIL,
+`claude plugin validate .` lulus. Uji ujung ke ujung terhadap server nataflow yang ter-deploy belum dijalankan.
+
 ## Tujuan
 
 Semua artefak yang dihasilkan plugin `analyst`, `backend`, `frontend`, dan `quickdev` ikut tersimpan di

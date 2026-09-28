@@ -90,4 +90,4 @@ def test_rilis_readme_dan_versi():
     for phrase in ("Hash-Scope", "Verified-Hash", "Tree-Hash", "Remediation-State", "Baseline-Commit",
                    "plan_lock.py baseline", "<<'QD_EOF'"):
         assert phrase in readme, phrase
-    assert '"version": "0.5.0"' in (QD / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8")
+    assert '"version": "0.6.0"' in (QD / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8")

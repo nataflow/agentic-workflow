@@ -5,10 +5,10 @@ mulai dari tiket stakeholder sampai kode yang direview.
 
 | Plugin | Versi | Fungsi | Titik masuk |
 |---|---|---|---|
-| [`analyst`](src/plugins/analyst/README.md) | 0.7.0 | Permintaan pengguna/stakeholder menjadi `TICKET.md` non-teknis (user story, acceptance criteria, aturan bisnis) lewat elisitasi, review independen, dan persetujuan | `/analyst:intake` |
-| [`backend`](src/plugins/backend/README.md) | 0.6.0 | Kerja backend 7 stack (Java Spring, Go, Node, Bun, Rust, PHP, CodeIgniter 4): profil, TASK/BRD/PRD/brief, eksekusi, review, dan laporan | `/backend:tech-lead` |
-| [`frontend`](src/plugins/frontend/README.md) | 0.5.0 | Kerja frontend (React + Vite, React Native/Expo, SvelteKit, Svelte + Vite): alur layar, bentuk layar, kontrak, brief, eksekusi, review, dan laporan dengan ledger approval | `/frontend:lead` |
-| [`quickdev`](src/plugins/quickdev/README.md) | 0.2.0 | Alur ringan untuk stack apa pun: profil, explore, clarify, satu berkas rencana, execute, dan review, tanpa taskdir dan tanpa subagent | `/quickdev:profile`, `/quickdev:plan` |
+| [`analyst`](src/plugins/analyst/README.md) | 0.8.0 | Permintaan pengguna/stakeholder menjadi `TICKET.md` non-teknis (user story, acceptance criteria, aturan bisnis) lewat elisitasi, review independen, dan persetujuan | `/analyst:intake` |
+| [`backend`](src/plugins/backend/README.md) | 0.11.0 | Kerja backend 7 stack (Java Spring, Go, Node, Bun, Rust, PHP, CodeIgniter 4): profil, TASK/BRD/PRD/brief, eksekusi, review, dan laporan | `/backend:tech-lead` |
+| [`frontend`](src/plugins/frontend/README.md) | 0.10.0 | Kerja frontend (React + Vite, React Native/Expo, SvelteKit, Svelte + Vite): alur layar, bentuk layar, kontrak, brief, eksekusi, review, dan laporan dengan ledger approval | `/frontend:lead` |
+| [`quickdev`](src/plugins/quickdev/README.md) | 0.6.0 | Alur ringan untuk stack apa pun: profil, explore, clarify, satu berkas rencana, execute, dan review, tanpa taskdir dan tanpa subagent | `/quickdev:profile`, `/quickdev:plan` |
 
 Skill internal (mis. `backend:plan`, `frontend:contract`, `analyst:spec`) tidak muncul di menu `/`.
 Model memanggilnya dari gerbang masing-masing.
@@ -65,6 +65,11 @@ Keempat plugin biasanya dipasang user-wide. Yang menentukan perilaku di satu rep
   repo itu, dipisah spasi atau baris. Hook yang namanya tidak tercantum akan diam. Isi `quickdev` membuat
   kedua hook engineer diam; isi `frontend quickdev` hanya menyalakan frontend. Bila berkas tidak ada,
   semua hook berjalan normal.
+- **Sinkron nataflow (opsional).** `.claude/nataflow.json` di repo pengguna mengaktifkan cermin artefak ke
+  server MCP nataflow untuk keempat plugin sekaligus: tiket analyst menjadi task, taskdir backend/frontend dan
+  rencana quickdev menjadi workdir beserta dokumennya. Taskdir yang berangkat dari tiket menempel ke task tiket
+  itu. Pustaka `skills/_common/nataflow_sync.py` identik byte-per-byte di keempat plugin; disk dan git tetap
+  sumber kebenaran, dan kegagalan sinkron tidak pernah menahan rantai.
 
 ## Pengembangan
 
