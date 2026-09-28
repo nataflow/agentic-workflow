@@ -49,7 +49,7 @@ permintaan ──► intake ──┬─► di luar wilayah (kerja teknis murni)
                               ▼
                             spec ─► kartu DRAFT di atas catatan → validate_doc → ticket-reviewer (≤2 ronde)
                                     → commit → AskUserQuestion → ticket.py approve → READY (+ commit)
-                                      → sinkron nataflow bila analyst/nataflow.json ada (gagal ≠ batal READY)
+                                      → sinkron nataflow bila .claude/nataflow.json ada (gagal ≠ batal READY)
                                                                    │
                     ticket_source: <ticketdir>/TICKET.md ke ──┘ backend:tech-lead / frontend:lead
 ```
@@ -62,7 +62,7 @@ kebenaran tertulis.
 
 ```
 ./analyst/
-  nataflow.json   opsional, ditulis user: mengaktifkan sinkron tiket READY ke nataflow
+  nataflow.json   opsional, format lama; config bersama `.claude/nataflow.json` (keduanya ditulis user)
   tickets/
     2609231400-cicilan-pembayaran/
       TICKET.md   satu-satunya artefak yang disunting skill
@@ -111,7 +111,7 @@ Kerangka kanonik dan contoh terisi: `skills/elicit/templates/elicit-template.md`
 | `_common/ticket.py approve` | `READY` hanya bila kedua validator (`ticket`, `elicit`) `PASS`, `elicitation: CLOSED` dengan catatan sama dengan segelnya, **dan** vonis review `PASS` atas sidik kartu dan catatan elisitasi sekarang; menulis `approved_hash` dan `approved_seal` (segel yang dibaca engineer) |
 | `_common/ticket.py revise` / `reopen` / `cancel` | plafon 3 revisi per basis fakta; buka ulang tiket `READY`; tutup ticketdir (direktori kosong dihapus; tiket `READY` hanya dengan `--force`; di-commit `docs(ticket): batalkan TICKET <slug>`) |
 | `_common/ticket.py ref` | isi `external_ref` pada `DRAFT`/`READY`; `DRIFT`/`RUSAK` ditolak (subjek `ref TICKET` dibaca penerima tiket lama sebagai tanda terkunci); `READY` di-commit `docs(ticket): ref TICKET <slug>`, `DRAFT` tidak di-commit |
-| `_common/ticket.py sync-payload` | argumen tool MCP nataflow untuk tiket `READY` (bukan `DRIFT`/`RUSAK`): `lookup` (`list_task`), `create`, `update` — judul dari H1, deskripsi = kartu tanpa catatan elisitasi, `metadata` teks JSON byte-stabil berkunci `ticket_key`; `SKIP` tanpa `analyst/nataflow.json`, `FAIL` bila config rusak; read-only, tanpa commit |
+| `_common/ticket.py sync-payload` | argumen tool MCP nataflow untuk tiket `READY` (bukan `DRIFT`/`RUSAK`): `lookup` (`list_task`), `create`, `update` — judul dari H1, deskripsi = kartu tanpa catatan elisitasi, `metadata` teks JSON byte-stabil berkunci `ticket_key`; `documents` (`review.md`); tiket pernah-`READY` yang dibatalkan → `lookup` + `task_status` `cancelled`; `SKIP` tanpa `.claude/nataflow.json` maupun `analyst/nataflow.json`, `FAIL` bila config rusak atau keduanya berbeda isi; read-only, tanpa commit |
 
 Kontrak exit `close`/`approve`/`ref`/`cancel`: 0 = tertulis dan ter-commit (atau tanpa git, atau isinya sudah sama
 dengan HEAD), 1 = ditolak, 3 = tertulis tetapi commit gagal — baris `COMMIT GAGAL` memuat sebab git dan perintah commit manualnya, lengkap dengan subjeknya.
@@ -175,9 +175,11 @@ Untuk repo yang hanya memakai analyst, tulis `.claude/workflow` tanpa nama plugi
 Tiket `READY` dapat dicerminkan sebagai task di nataflow. `TICKET.md` di disk dan git tetap satu-satunya
 sumber kebenaran; task hanya cermin kartunya, dan tidak ada yang ditulis balik ke `TICKET.md`.
 
-- **Aktif per repo** lewat `analyst/nataflow.json` (ter-commit): `mcp_server` (default `nataflow-api`),
-  `workspace_id` (UUID; wajib bila MCP key ber-scope project), `pic_id` (UUID; kosong → pemilik key). Berkas
-  absen → sinkron dilewati; ada tetapi rusak (kunci asing, nilai bukan string, UUID tidak sah) → `GAGAL`.
+- **Aktif per repo** lewat `.claude/nataflow.json` (ter-commit, dibaca juga oleh `backend`, `frontend`, dan
+  `quickdev`): `mcp_server` (default `nataflow-api`), `workspace_id` (UUID; wajib bila MCP key ber-scope
+  project), `pic_id` (UUID; kosong → pemilik key), dan `repo` (default: remote `origin` ternormalisasi). Berkas
+  lama `analyst/nataflow.json` tetap diterima; bila keduanya ada dengan isi berbeda → `GAGAL`. Berkas absen →
+  sinkron dilewati; ada tetapi rusak (kunci asing, nilai bukan string, UUID tidak sah) → `GAGAL`.
 - **Prasyarat di luar plugin**: server MCP nataflow terdaftar di Claude Code beserta MCP key-nya. Plugin tidak
   mendeklarasikan server dan tidak menyimpan key.
 - **Kapan**: `analyst:spec` sesudah `approve` (`READY` tertulis, termasuk bila commit-nya gagal). Prosedurnya
@@ -187,8 +189,15 @@ sumber kebenaran; task hanya cermin kartunya, dan tidak ada yang ditulis balik k
   berhenti tanpa menulis. Approve ulang sesudah `reopen` memperbarui task yang sama; tiket baru ber-slug sama
   menjadi task baru karena ticketdir-nya berbeda.
 - **Isi**: judul = H1 kartu; deskripsi = kartu (H1 sampai akhir `## Lampiran`) tanpa catatan elisitasi;
-  metadata `source`, `ticket_key`, `slug`, `type`, `priority`, `approved`, `approved_seal`, `reopened`, dan
-  `external_ref` bila terisi. Status task tidak pernah dikirim; `requester` tetap di disk.
+  metadata `source`, `ticket_key`, `repo`, `slug`, `type`, `priority`, `approved`, `approved_seal`, `reopened`,
+  dan `external_ref` bila terisi (`repo` tidak ikut saringan pencarian, supaya task lama tetap ditemukan).
+  `review.md` (blok `## Ticket Review` terakhir) menempel ke task sebagai dokumen `TICKET_REVIEW`. Catatan
+  elisitasi dan `requester` tetap di disk.
+- **Pembatalan**: `/analyst:intake` ("batalkan tiket …") merutekan ke `analyst:spec`, yang menjalankan
+  `ticket.py cancel` (`--force` untuk tiket `READY` atas konfirmasi eksplisit). Tiket yang pernah `READY` lalu
+  dibatalkan membuat task cerminnya `cancelled`; itu satu-satunya status task yang dikirim analyst.
+- **Induk kerja engineer**: taskdir `backend`/`frontend` yang berangkat dari `ticket_source` tiket ini menempel
+  ke task yang sama sebagai workdir, beserta artefaknya (`TASK.md`, PRD, brief, `REVIEW.md`, `REPORT.md`).
 - **Gagal tidak memblokir**: baris penutup `SPEC — READY` memuat segmen `nataflow <dibuat #<code> | diperbarui
   #<code> | dilewati | GAGAL: <sebab>>`. `GAGAL` tidak menurunkan `READY`; ulangi lewat `/analyst:intake`
   ("sinkron ulang tiket `<ticketdir>`").
@@ -208,6 +217,6 @@ sumber kebenaran; task hanya cermin kartunya, dan tidak ada yang ditulis balik k
 - **`split`** — pemecahan epic menjadi beberapa tiket. Sementara ini `intake` memilih satu tujuan per tiket dan
   mengembalikan sisanya sebagai antrian tiket.
 - **`acceptance`** — UAT: membaca `REPORT.md` engineer dan memvonis AC tiket dalam bahasa bisnis.
-- **Sinkron nataflow lanjutan** — status task (`cancel` → dibatalkan, selesai engineer → selesai), artefak
-  engineer (`TASK.md`, `PRD.md`, brief, `REPORT.md`) sebagai dokumen, dan penghapusan task saat tiket dibatalkan.
-  Sinkron sekarang hanya membuat dan memperbarui isi task.
+- **Sinkron nataflow lanjutan** — status task selesai saat seluruh engineer tuntas (plugin engineer hanya
+  menaikkannya ke `in_progress`, karena satu tiket bisa menaungi taskdir backend dan frontend), penghapusan task
+  saat tiket dibatalkan, dan catatan elisitasi sebagai dokumen (sengaja tidak dikirim).

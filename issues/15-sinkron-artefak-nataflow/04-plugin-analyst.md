@@ -1,7 +1,22 @@
 # Langkah 15 — Perubahan plugin `analyst`
 
 Rujukan: `01-mcp-tools.md`, yaitu tool T1–T10, kontrak identitas, dan pola pemakaian tool.
-**Status:** PEMETAAN, belum dieksekusi.
+**Status:** SELESAI (tahap 5). A1–A4 dan A6–A9 terpasang; A5 tidak dikerjakan (E2). A6 memakai rute
+`analyst:intake` → `analyst:spec` (`cancel_request`) supaya intake tetap tidak menulis berkas; "pernah READY" =
+`approved_hash` terisi atau `reopened` > 0. Versi dinaikkan di commit rilis. Test: `tests/analyst/test_ticket_15.py`
+(9, termasuk A7 lintas plugin) dan penyesuaian `test_ticket_14.py`; suite penuh 1934 hijau, lint 0 FAIL.
+
+## Peta blast radius (sebelum kode)
+
+| Berkas | Perubahan | Yang bisa pecah |
+|---|---|---|
+| `skills/_common/analyst_lib.py` | A1: `load_sync_config` mendelegasikan ke `nataflow_sync.load_config(root, "analyst/nataflow.json")`; implementasi lama (`SYNC_KEYS`, `SYNC_DEFAULT_SERVER`, `UUID_RE`) dibuang karena tidak dipakai di tempat lain | `test_ticket_14::test_config_default_dan_nilai_eksplisit` (kesamaan dict persis → kunci `repo` ikut); substring pesan `test_config_rusak_terlapor` tetap terpenuhi pesan pustaka; pesan kini sudah berawalan nama berkas → `ticket.py` tidak menambah awalan lagi |
+| `skills/_common/ticket.py` `cmd_sync_payload` | A2 identitas repo dari pustaka; A3 `repo` di metadata `create`/`update` (sesudah `ticket_key`), tidak di `lookup`; A4 `documents: [review.md]` (isi disk, `TICKET_REVIEW`) bila `review_report` sah; A6 tiket `DIBATALKAN` yang pernah READY (`approved_hash` terisi atau `reopened` > 0) → `PASS` berisi `lookup` + `task_status` `cancelled`, tanpa `create`/`update` | `test_ticket_14::test_pass_isi_payload_dari_kartu` (`META_KEYS` dan kesamaan `update`); `test_bukan_ready_ditolak[DIBATALKAN]` tetap `FAIL` karena fixture-nya membatalkan DRAFT yang belum pernah READY; `test_smoke` (keadaan `rusak` kini juga merusak `.claude/nataflow.json`) |
+| `skills/spec/references/nataflow-sync.md` | Config bersama + `repo`; langkah `upsert_document` sesudah task; cabang pembatalan (`update_task_status`) | Lint R2 |
+| `skills/spec/SKILL.md` | Parameter `cancel_request` + Precondition pembatalan (analog `change_request`); sinkron sesudah `cancel` tiket yang pernah READY (termasuk Phase 5 butir 5); baris `SPEC — BATAL`; Failure path 6 menyebut config bersama | Frontmatter `description` (lint F1/F3: tetap "Dipanggil …" + `user-invocable: false`) |
+| `skills/intake/SKILL.md` | Phase 2: baris "Membatalkan tiket" → `analyst:spec` dengan `cancel_request` (intake tetap tidak menulis berkas); rute sinkron ulang menerima `DIBATALKAN` yang pernah READY | Iron Law "gate ini tidak menulis berkas" tetap berlaku |
+| `README.md`, `flow/analyst.md` | A8 | `test_a1::test_klaim_analyst_bukan_lagi_manual` (frasa terlarang di README) |
+| `tests/analyst/test_ticket_14.py`, `tests/analyst/test_ticket_15.py` (baru), `tests/test_15_nataflow_sync.py` | A9 + A7 (turunan `ticket_key` backend/frontend = analyst; `lookup` ketiganya byte-identik) | — |
 
 ## Ringkasan
 

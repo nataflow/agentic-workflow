@@ -17,7 +17,8 @@ FIXTURE = Path(__file__).resolve().parent / "fixtures" / "ticket_valid.md"
 TITLE = "Admin Finance dapat mencatat pembayaran invoice korporat secara cicilan"
 WS = "a3e1d6c4-1f2b-4c3d-9e8f-7a6b5c4d3e2f"
 PIC = "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f"
-META_KEYS = ["source", "ticket_key", "slug", "type", "priority", "approved", "approved_seal", "reopened"]
+# `repo` (15 A3) hanya di metadata create/update, sesudah `ticket_key`; `lookup` tetap dua kunci langkah 14.
+META_KEYS = ["source", "ticket_key", "repo", "slug", "type", "priority", "approved", "approved_seal", "reopened"]
 lib = load_module(COMMON / "analyst_lib.py", "analyst_lib_14")
 
 
@@ -87,10 +88,11 @@ def test_config_rusak_terlapor(tmp_path, raw, needle):
 @pytest.mark.regression("N1")
 def test_config_default_dan_nilai_eksplisit(tmp_path):
     config(tmp_path, {})
-    assert lib.load_sync_config(tmp_path) == ({"mcp_server": "nataflow-api", "workspace_id": "", "pic_id": ""}, [])
+    assert lib.load_sync_config(tmp_path) == (
+        {"mcp_server": "nataflow-api", "workspace_id": "", "pic_id": "", "repo": ""}, [])
     config(tmp_path, {"mcp_server": "nataflow-staging", "workspace_id": WS, "pic_id": PIC})
     assert lib.load_sync_config(tmp_path) == (
-        {"mcp_server": "nataflow-staging", "workspace_id": WS, "pic_id": PIC}, [])
+        {"mcp_server": "nataflow-staging", "workspace_id": WS, "pic_id": PIC, "repo": ""}, [])
 
 
 # --- N2: sync-payload --------------------------------------------------------------------------

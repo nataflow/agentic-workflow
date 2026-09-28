@@ -19,8 +19,9 @@ Satu-satunya jalan mutasi status yang punya konsekuensi di luar penulisnya:
 - `reopen`  — buka ulang tiket `READY` menjadi `DRAFT` untuk perubahan permintaan.
 - `cancel`  — tutup ticketdir atas keputusan user.
 - `ref`     — isi `external_ref` (kunci kartu Jira/Trello) pada DRAFT maupun READY.
-- `sync-payload` — isi argumen tool MCP nataflow (`list_task`/`create_task`/`update_task`) untuk tiket
-              READY; read-only, tanpa commit, dan tidak pernah menulis `TICKET.md`.
+- `sync-payload` — isi argumen tool MCP nataflow untuk tiket READY (`list_task`/`create_task`/`update_task`
+              beserta `upsert_document` `review.md`) atau tiket pernah-READY yang dibatalkan
+              (`update_task_status cancelled`); read-only, tanpa commit, dan tidak pernah menulis `TICKET.md`.
 
 `approve` menuntut kedua validator (`ticket`, `elicit`) `PASS`, `elicitation: CLOSED`, catatan elisitasi
 sama dengan segel `close`, **dan** vonis review `PASS` atas sidik `<kartu>/<catatan elisitasi>` yang sama
@@ -69,6 +70,7 @@ from analyst_lib import (  # noqa: E402
     ticket_skeleton,
 )
 from validate_doc import DocValidator  # noqa: E402
+import nataflow_sync as ns  # noqa: E402
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[2]
 REVISION_CAP = 3
@@ -697,30 +699,68 @@ def _sync_fail(args: argparse.Namespace, problems: List[str]) -> int:
     return 1
 
 
-def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:
-    """Argumen tool MCP nataflow untuk satu tiket READY (14 N2) — read-only, tanpa commit.
+def _was_ready(fm: Dict[str, Any]) -> bool:
+    """Tiket pernah `READY`: segel approve masih tertulis, atau pernah dibuka ulang (`reopen` mengosongkan segel)."""
+    approved = str(fm.get("approved_hash", "-")).strip()
+    reopened = str(fm.get("reopened", "0")).strip()
+    return approved not in ("", "-") or (reopened.isdigit() and int(reopened) > 0)
 
-    Model mengirim `lookup`, `create`, dan `update` apa adanya; skrip ini satu-satunya penyusun isinya, supaya
-    yang tercermin di nataflow selalu kartu yang disetujui (K1, K5). Identitas task adalah `ticket_key` = path
-    ticketdir, bukan slug: `new` membuat ticketdir baru ber-slug sama begitu tiket lama READY/batal (K2).
-    Status task tidak pernah dikirim.
+
+def _review_document(root: Path, rel: str, fm: Dict[str, Any], repo: str) -> List[Dict[str, Any]]:
+    """`review.md` (blok `## Ticket Review` terakhir) sebagai dokumen `TICKET_REVIEW` di bawah task (15 A4).
+
+    Hanya bila kepalanya sah terhadap frontmatter (`review_report`): blok basi tidak pernah dicerminkan. Isi diambil
+    dari disk, karena analyst boleh berjalan tanpa git.
+    """
+    path = review_report(root / rel, fm)
+    if path is None:
+        return []
+    content, problem = ns.disk_text(path)
+    if content is None:
+        return []
+    verdict = re.search(r"^- Verdict:\s*(\w+)", content, re.M)
+    meta = ns.doc_meta("analyst", repo, f"{rel}/{REVIEW_FILE}", verdict.group(1) if verdict else "",
+                       ns.last_commit(root, f"{rel}/{REVIEW_FILE}"))
+    return [ns.document("task", REVIEW_FILE, "TICKET_REVIEW", content, meta)]
+
+
+def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:
+    """Argumen tool MCP nataflow untuk satu tiket (14 N2, 15 A1–A4, A6) — read-only, tanpa commit.
+
+    Model mengirim `lookup`, `create`, `update`, dan `documents` apa adanya; skrip ini satu-satunya penyusun isinya,
+    supaya yang tercermin di nataflow selalu kartu yang disetujui (K1, K5). Identitas task adalah `ticket_key` = path
+    ticketdir, bukan slug: `new` membuat ticketdir baru ber-slug sama begitu tiket lama READY/batal (K2). `lookup`
+    tidak memuat `repo`, supaya task langkah 14 tetap ditemukan; plugin engineer menurunkan `ticket_key` yang sama
+    dari `ticket_source` untuk menautkan workdir-nya ke task ini. Status task hanya dikirim untuk tiket pernah-READY
+    yang dibatalkan (`task_status` `cancelled`, A6).
     """
     config, problems = load_sync_config(root)
     if problems:
-        return _sync_fail(args, [f"{SYNC_CONFIG} rusak — " + "; ".join(problems)])
+        return _sync_fail(args, problems)
     if config is None:
         if args.json:
             print(json.dumps({"status": "SKIP", "enabled": False}, indent=2))
         else:
-            print(f"SYNC-PAYLOAD SKIP: {SYNC_CONFIG} tidak ada — sinkron nataflow tidak aktif di repo ini")
+            print(f"SYNC-PAYLOAD SKIP: {ns.CONFIG_FILE} (atau {SYNC_CONFIG} lama) tidak ada — sinkron nataflow "
+                  f"tidak aktif di repo ini")
         return 0
     rel = normalize_ticketdir(args.ticketdir, root)
     if not TICKETDIR_RE.match(rel) or not (root / rel).is_dir():
         return _sync_fail(args, [f"`{rel}` bukan direktori {TICKETS_DIR}/<YYMMDDhhmm>-<slug>"])
     state = classify(root, rel)          # non-UTF-8 → RUSAK, bukan traceback
+    key = {"source": "analyst", "ticket_key": rel}
+    scope = {"workspace_id": config["workspace_id"]} if config["workspace_id"] else {}
+    if state["state"] == "DIBATALKAN" and _was_ready(read(root / rel / TICKET_FILE)):
+        payload = {"status": "PASS", "enabled": True, "mcp_server": config["mcp_server"], "ticket_key": rel,
+                   "lookup": dict(scope, metadata=_compact(key)), "task_status": ns.task_status("cancelled")}
+        if args.json:
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+        else:
+            print(f"SYNC-PAYLOAD PASS: {rel} DIBATALKAN · task cermin menjadi cancelled — argumen tool lewat `--json`")
+        return 0
     if state["state"] != "READY":
-        return _sync_fail(args, [f"{rel} {state['state']} — hanya tiket READY yang disinkronkan "
-                                 f"({state['route']})"])
+        return _sync_fail(args, [f"{rel} {state['state']} — hanya tiket READY (atau pernah READY lalu dibatalkan) "
+                                 f"yang disinkronkan ({state['route']})"])
     path = root / rel / TICKET_FILE
     text = text_of(path)
     fm, body = split_frontmatter(text)
@@ -731,8 +771,8 @@ def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:
     if not reopened.isdigit():
         return _sync_fail(args, [f"field `reopened: {reopened}` bukan bilangan — field ini hanya ditulis "
                                  f"ticket.py; pulihkan nilainya dari riwayat git"])
-    key = {"source": "analyst", "ticket_key": rel}
-    meta = dict(key, slug=str(fm.get("slug", "")).strip() or rel.split("-", 1)[-1],
+    repo = ns.repo_identity(root, config)
+    meta = dict(key, repo=repo, slug=str(fm.get("slug", "")).strip() or rel.split("-", 1)[-1],
                 type=str(fm.get("type", "-")), priority=str(fm.get("priority", "-")),
                 approved=str(fm.get("approved", "-")),
                 # READY menjamin `approved_seal` tertulis = segel isi sekarang; tiket lama tanpa field itu
@@ -741,8 +781,7 @@ def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:
     ref = str(fm.get("external_ref", "-")).strip()
     if ref and ref != "-":
         meta["external_ref"] = ref
-    card = split_parts(body)[0].strip()   # kartu saja: `## Catatan Elisitasi` tetap di disk (K5)
-    scope = {"workspace_id": config["workspace_id"]} if config["workspace_id"] else {}
+    card = split_parts(body)[0].strip()   # kartu saja: `## Catatan Elisitasi` tetap di disk (K5, 15 A5 tidak diambil)
     create: Dict[str, Any] = {"title": title, "description": card}
     create.update(scope)
     if config["pic_id"]:
@@ -753,12 +792,14 @@ def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:
         "lookup": dict(scope, metadata=_compact(key)),
         "create": create,
         "update": {"title": title, "description": card, "metadata": create["metadata"]},
+        "documents": _review_document(root, rel, fm, repo),
     }
     if args.json:
         print(json.dumps(payload, indent=2, ensure_ascii=False))
     else:
         print(f"SYNC-PAYLOAD PASS: {rel} · server {config['mcp_server']} · workspace "
-              f"{config['workspace_id'] or '-'} · pic {config['pic_id'] or '-'} — argumen tool lewat `--json`")
+              f"{config['workspace_id'] or '-'} · pic {config['pic_id'] or '-'} · {len(payload['documents'])} dokumen "
+              f"— argumen tool lewat `--json`")
     return 0
 
 

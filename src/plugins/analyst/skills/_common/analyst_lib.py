@@ -15,11 +15,15 @@ import hashlib
 import json
 import re
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))   # pustaka bersama sebelah, apa pun pemuatnya
+import nataflow_sync as ns  # noqa: E402
+
 TICKETS_DIR = "analyst/tickets"
-SYNC_CONFIG = "analyst/nataflow.json"  # opt-in sinkron nataflow, sejajar TICKETS_DIR (14 N1)
+SYNC_CONFIG = "analyst/nataflow.json"  # config sinkron lama (14 N1); yang bersama `.claude/nataflow.json` (15 A1)
 TICKETDIR_RE = re.compile(r"^analyst/tickets/\d{10}-[a-z0-9]+(?:-[a-z0-9]+)*$")
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 TYPES = ("FEATURE", "IMPROVEMENT", "BUG")
@@ -422,45 +426,13 @@ def scan_leaks(body: str, allowed_terms: List[str], skip_sections: Tuple[str, ..
 
 # ── Sinkron nataflow ──────────────────────────────────────────────────────────
 
-SYNC_DEFAULT_SERVER = "nataflow-api"
-SYNC_KEYS = ("mcp_server", "workspace_id", "pic_id")
-UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
-
-
 def load_sync_config(root: Path) -> Tuple[Optional[Dict[str, str]], List[str]]:
-    """`analyst/nataflow.json` → `(config, masalah)`; berkas absen → `(None, [])` (sinkron tidak aktif).
+    """`.claude/nataflow.json` bersama (15 A1) atau `analyst/nataflow.json` lama → `(config, masalah)`.
 
-    Config sah selalu memuat ketiga `SYNC_KEYS`: `mcp_server` default `nataflow-api`, `workspace_id` dan
-    `pic_id` string kosong bila tidak diisi. Berkas yang ada tetapi rusak tidak pernah dianggap absen —
-    repo yang sudah memilih sinkron tidak boleh berhenti sinkron diam-diam karena salah ketik. Pesan
-    masalah tanpa nama berkas; pemanggil yang menyebutnya.
+    Berkas absen → `(None, [])` (sinkron tidak aktif). Aturan kunci, UUID, dan konflik kedua berkas milik pustaka
+    bersama `nataflow_sync.load_config`, salinan identik di keempat plugin. Pesan masalah sudah menyebut berkasnya.
     """
-    path = root / SYNC_CONFIG
-    if not path.is_file():
-        return None, []
-    try:
-        data = json.loads(path.read_text(encoding="utf-8").lstrip(BOM))
-    except UnicodeDecodeError as exc:
-        return None, [f"bukan UTF-8 ({exc.reason} @ byte {exc.start})"]
-    except ValueError as exc:
-        return None, [f"bukan JSON sah ({exc})"]
-    if not isinstance(data, dict):
-        return None, [f"harus objek JSON, bukan {type(data).__name__}"]
-    problems = [f"kunci `{k}` tidak dikenal (sah: {', '.join(SYNC_KEYS)})" for k in data if k not in SYNC_KEYS]
-    config = {"mcp_server": SYNC_DEFAULT_SERVER, "workspace_id": "", "pic_id": ""}
-    for key in SYNC_KEYS:
-        if key not in data:
-            continue
-        value = data[key]
-        if not isinstance(value, str):
-            problems.append(f"`{key}` harus string, bukan {type(value).__name__}")
-            continue
-        value = value.strip()
-        if key != "mcp_server" and value and not UUID_RE.match(value):
-            problems.append(f"`{key}` `{value}` bukan UUID")
-        elif value:
-            config[key] = value
-    return (None, problems) if problems else (config, [])
+    return ns.load_config(root, SYNC_CONFIG)
 
 
 # ── Laporan ───────────────────────────────────────────────────────────────────
