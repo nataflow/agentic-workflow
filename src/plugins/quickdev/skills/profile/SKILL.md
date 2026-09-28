@@ -113,9 +113,10 @@ DILARANG MEMBUAT ASUMSI STACK ATAU PERINTAH BASELINE TANPA BUKTI KONFIGURASI NYA
    - Pastikan berkas berhasil dibuat di filesystem, tidak kosong, dan berformat markdown valid.
    - Pastikan seluruh 6 section header hadir dan perintah baseline terbukti valid.
    - Pastikan ukuran berkas memenuhi batas kuota (< 10.000 karakter).
-2. Set status terminal `PROFILED` dan laporkan ringkasan metadata profil ke user.
-3. Bila konteks sesi memuat blok `<backend-tech-lead-gate>` atau `<frontend-lead-gate>` (tanda hook engineer aktif; path plugin lain tidak diketahui dari quickdev, jadi jangan mencari skrip deteksinya), tawarkan penulisan penanda opt-out `.claude/workflow` berisi `quickdev` (ditambah nama plugin engineer yang tetap boleh menggerbangi repo, bila ada) agar hook engineer diam di repo ini. Tulis berkas itu hanya dengan persetujuan user.
-4. Tawarkan `quickdev:explore`; tunggu user.
+2. **Sinkron nataflow**: jalankan prosedur `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/nataflow-sync.md` (langkah profil) atas `target_path` apa adanya dengan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py`; hasilnya baris `NATAFLOW:` ringkasan. `GAGAL` tidak mengubah status terminal.
+3. Set status terminal `PROFILED` dan laporkan ringkasan metadata profil ke user.
+4. Bila konteks sesi memuat blok `<backend-tech-lead-gate>` atau `<frontend-lead-gate>` (tanda hook engineer aktif; path plugin lain tidak diketahui dari quickdev, jadi jangan mencari skrip deteksinya), tawarkan penulisan penanda opt-out `.claude/workflow` berisi `quickdev` (ditambah nama plugin engineer yang tetap boleh menggerbangi repo, bila ada) agar hook engineer diam di repo ini. Tulis berkas itu hanya dengan persetujuan user.
+5. Tawarkan `quickdev:explore`; tunggu user.
 
 ## Guardrails
 
@@ -145,6 +146,7 @@ Skill ini menghasilkan berkas profil repositori terstruktur dan laporan terminal
    BASELINE: typecheck=<status> lint=<status> test=<status> build=<status> — Baseline-Commit <sha12 | none>
    ISSUE BAWAAN: <ringkasan error/warning baseline eksisting | ->
    UKURAN: <n> karakter (batas 10.000)
+   NATAFLOW: repo · <n> dokumen (<c> baru, <u> diperbarui, <s> sama) | dilewati | GAGAL: <sebab>
    HANDOFF: explore
    ```
    Nilai `<status>`: `PASSED`, `FAILED`, `TIMEOUT`, `SKIPPED` (ditolak user atau `skip_baseline_exec`), `UNVERIFIED_ENV_NOT_READY`, atau `TIDAK_ADA` (tanpa runner/konfigurasi).

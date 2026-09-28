@@ -1,6 +1,6 @@
 # Alur Plugin `quickdev`
 
-> `quickdev` (v0.5.0) adalah alur kerja ringan untuk repo backend, frontend, dan fullstack. Plugin ini punya enam skill, tanpa taskdir, tanpa subagent, tanpa hook, dan hanya satu skrip pengunci rencana. Setiap tugas punya **satu berkas rencana** (`plan/<task>.md`), sedangkan perubahan kodenya boleh menyentuh banyak berkas dan layer. Pakai plugin ini untuk perubahan kecil sampai menengah yang tidak butuh BRD/PRD, ledger approval, atau review subagent. Plugin ini juga cocok untuk stack yang tidak dilayani `backend`/`frontend` (Next.js, FastAPI, Django, Rails), atau untuk kerja yang sengaja dibuat ringan di repo yang sudah memakai kedua plugin itu. Kerja berisiko (kontrak API, migrasi skema, perubahan lintas modul yang butuh jejak keputusan) sebaiknya naik ke `backend:tech-lead` atau `frontend:lead`.
+> `quickdev` (v0.5.0) adalah alur kerja ringan untuk repo backend, frontend, dan fullstack. Plugin ini punya enam skill, tanpa taskdir, tanpa subagent, tanpa hook, dan hanya satu skrip pengunci rencana (ditambah pustaka sinkron nataflow opsional). Setiap tugas punya **satu berkas rencana** (`plan/<task>.md`), sedangkan perubahan kodenya boleh menyentuh banyak berkas dan layer. Pakai plugin ini untuk perubahan kecil sampai menengah yang tidak butuh BRD/PRD, ledger approval, atau review subagent. Plugin ini juga cocok untuk stack yang tidak dilayani `backend`/`frontend` (Next.js, FastAPI, Django, Rails), atau untuk kerja yang sengaja dibuat ringan di repo yang sudah memakai kedua plugin itu. Kerja berisiko (kontrak API, migrasi skema, perubahan lintas modul yang butuh jejak keputusan) sebaiknya naik ke `backend:tech-lead` atau `frontend:lead`.
 
 ## Peta Komponen
 
@@ -14,7 +14,9 @@ Path relatif terhadap `src/plugins/quickdev/`.
 | `quickdev:plan` | skill | Menulis `plan/<task>.md` sebagai `DRAFT`, lalu menguncinya jadi `APPROVED` sesudah user menyetujui | `skills/plan/SKILL.md` |
 | `quickdev:execute` | skill | Menerapkan langkah rencana, memverifikasi terhadap baseline profil, dan memperbaiki regresi dalam cakupan rencana | `skills/execute/SKILL.md` |
 | `quickdev:review` | skill | Menilai diff sejak `Base-Commit` terhadap rencana dan profil dalam 7 dimensi. Read-only, hasilnya hanya laporan terminal | `skills/review/SKILL.md` |
-| `plan_lock.py` | script | Pengunci rencana: sidik `Profile:` + Section 1–5 (`Plan-Hash`), penurunan mode eksekusi (termasuk predikat tree bersih mode `awal`), baseline segar terikat `Base-Commit`, segel verifikasi (`Verified-Hash`/`Tree-Hash`), dan penulisan blok `## Execution Status` | `skills/_common/plan_lock.py` |
+| `plan_lock.py` | script | Pengunci rencana: sidik `Profile:` + Section 1–5 (`Plan-Hash`), penurunan mode eksekusi (termasuk predikat tree bersih mode `awal`), baseline segar terikat `Base-Commit`, segel verifikasi (`Verified-Hash`/`Tree-Hash`), penulisan blok `## Execution Status`, dan argumen sinkron nataflow (`sync-payload`, read-only) | `skills/_common/plan_lock.py` |
+| `nataflow_sync.py` | pustaka | Config `.claude/nataflow.json`, identitas repo, argumen task/workdir/dokumen, dan diff manifest remote. Salinan identik di keempat plugin | `skills/_common/nataflow_sync.py` |
+| Prosedur sinkron nataflow | referensi | Urutan panggilan tool MCP dua fase untuk rencana dan profil; dipakai `plan`, `execute`, dan `profile` | `skills/plan/references/nataflow-sync.md` |
 | Templat profil backend | referensi | Enam section profil untuk repo backend | `skills/profile/references/backend-profile-template.md` |
 | Templat profil frontend | referensi | Enam section profil untuk repo frontend | `skills/profile/references/frontend-profile-template.md` |
 | Templat profil fullstack | referensi | Enam section profil untuk fullstack satu paket | `skills/profile/references/fullstack-profile-template.md` |
@@ -92,7 +94,7 @@ Semua panah antar-skill adalah **tawaran**. Skill berikutnya baru jalan setelah 
      - Catat Status, Durasi, dan Known issues (maksimal 10 baris penanda persis). `SKIPPED` membawa alasannya (`ditolak user: …` atau `skip_baseline_exec`) supaya `execute` meminta izin baru.
      - Bandingkan `git status` sesudahnya. Berkas baru dilaporkan sebagai "artefak build perlu di-ignore" dan tidak dihapus.
   4. **Fase 3: tulis profil.** Isi templat yang sesuai dengan keenam header persis. Ukuran total harus di bawah 10.000 karakter (`wc -m`). Bila lebih, ringkas daftar berkas dengan pola glob. Tulis ke `target_path`.
-  5. **Fase 4: validasi dan handoff.** Periksa bahwa berkas ada, keenam header lengkap, dan ukurannya di bawah kuota. Set status `PROFILED`. Bila blok gerbang engineer ada di konteks sesi, tawarkan penanda `.claude/workflow`. Terakhir, tawarkan `explore`.
+  5. **Fase 4: validasi dan handoff.** Periksa bahwa berkas ada, keenam header lengkap, dan ukurannya di bawah kuota. Jalankan sinkron nataflow varian profil (`sync-payload --repo-profile`, dokumen `PROFILE` di bawah workspace). Set status `PROFILED`. Bila blok gerbang engineer ada di konteks sesi, tawarkan penanda `.claude/workflow`. Terakhir, tawarkan `explore`.
 - **Subagent yang didispatch**: Tidak ada.
 - **Output / artefak**: `repo-profile.md` (atau `<workspace_dir>/repo-profile.md`; alternatif yang dikenali: `.dev/profile.md`) berisi 6 section, plus ringkasan terminal maksimal 17 baris. Status: `PROFILED`.
 - **Gerbang & commit**:
@@ -175,7 +177,8 @@ Semua panah antar-skill adalah **tawaran**. Skill berikutnya baru jalan setelah 
      - User minta revisi → perbarui rencana, tetap `DRAFT`, ajukan ulang.
      - User minta revisi pada rencana yang sudah dieksekusi → langkah yang teksnya berubah dikembalikan ke `- [ ]`.
      - User setuju → jalankan `plan_lock.py lock --plan … --profile … --answer -` dengan jawaban user apa adanya lewat heredoc berkutip (`<<'QD_EOF'`), supaya shell tidak mengekspansi backtick atau `$`.
-  5. **Fase 4.** Setelah `LOCK PASS`, set status `PLAN_APPROVED` dan tawarkan `/quickdev:execute`.
+  5. **Fase 4.** Setelah `LOCK PASS`, jalankan sinkron nataflow (`references/nataflow-sync.md`), set status `PLAN_APPROVED`, dan tawarkan `/quickdev:execute`.
+  6. **Rute sinkron ulang.** "sinkron ulang `<plan_path>`" hanya menjalankan prosedur sinkron atas rencana yang sudah ada, lalu menutup dengan `SINKRON — <plan_path> · nataflow <segmen>`, tanpa menyentuh rencana.
 - **Subagent yang didispatch**: Tidak ada.
 
 ```mermaid
@@ -231,6 +234,7 @@ flowchart TD
 
      Regresi di berkas Section 3 diperbaiki, maksimal `max_fix_iterations` kali (default 3). Regresi yang menuntut berkas di luar Section 3 → `BLOCKED`.
   5. **Fase 4.** Jalankan `close --status COMPLETED|VERIFICATION_MANUAL_REQUIRED --verification -`. Skrip menolak `COMPLETED` bila masih ada `- [ ]`, menutup ronde remediasi yang `OPEN`, dan menyegel `Verified-Hash` + `Tree-Hash`. Susun laporan dan tawarkan `review`, dengan perubahan dibiarkan uncommitted.
+  6. **Sinkron nataflow.** Sesudah **tiap** `close`/`confirm` yang PASS (termasuk `BLOCKED` di Fase 0, 1, 3, dan Failure path), prosedur sinkron mendorong rencana beserta blok eksekusinya. Hasilnya baris `NATAFLOW:` ringkasan; `GAGAL` tidak mengubah status terminal.
 - **Subagent yang didispatch**: Tidak ada.
 
 ```mermaid
@@ -376,6 +380,7 @@ Tidak ada. README menyebutkan "semua kerja berlangsung di percakapan utama", dan
 | `confirm` | `execute` mode `manual` | Semua `[x]`, blok `VERIFICATION_MANUAL_REQUIRED`, jawaban user tidak kosong, segel cocok | `COMPLETED (manual)` + `Manual-Confirmation` |
 | `status` | `review` (`--json`) | — | Ringkasan: `hash_ok`, `hash_scope`, jumlah langkah, `remediation_round`/`remediation_open`/`open_findings`, `base_drift`/`commits_since_base`, `baseline`, `consistent`/`inconsistency` (termasuk segel basi), blok eksekusi |
 | `unlock` | `plan` (revisi) | `APPROVED`, `--reason` tidak kosong | `Status: DRAFT`, `Plan-Hash: -`, `Unlock-Reason`. Blok eksekusi dipertahankan |
+| `sync-payload` | prosedur sinkron (`plan`, `execute`, `profile`) | `.claude/nataflow.json` ada dan sah (absen → `SKIP` sebelum rencana dibaca). `--plan`: rencana pernah dikunci (`Approved-At`). `--repo-profile`: berkas ada | Read-only. Tanpa `--remote`: argumen `task`/`workdir`/`list_document` tanpa isi. `--remote -`: dokumen yang sha, tipe, atau metadatanya berbeda dari manifest remote |
 
 **Keterbatasan yang diakui README**:
 
@@ -393,6 +398,7 @@ Tidak ada. README menyebutkan "semua kerja berlangsung di percakapan utama", dan
 | Penanda alur | `.claude/workflow` | `profile` Fase 4, atas persetujuan user | `quickdev` → hook backend/frontend diam. `frontend quickdev` → hanya hook frontend menyala |
 | Laporan explore / spesifikasi clarify / laporan review | Terminal | `explore`, `clarify`, `review` | Tidak menjadi berkas |
 | Perubahan kode | Working tree (uncommitted) | `execute` | Commit adalah keputusan user |
+| Cermin nataflow (opsional) | Server MCP nataflow | prosedur sinkron | Workdir `quickdev:<repo>:<path rencana>` + task; dokumen `QUICKDEV_PLAN` (isi disk) dan `PROFILE` (workspace). Status workdir: `COMPLETED*` → `done`, `BLOCKED` → `blocked`, selain itu `active`; task `in_progress` sejak eksekusi dimulai, `done` saat `COMPLETED*` |
 
 Header keenam section profil per templat:
 
@@ -453,7 +459,8 @@ Urutan git yang disarankan README: `plan` → commit rencana `APPROVED` → `exe
   | `frontend quickdev` | Hanya hook frontend yang menyala |
   | (berkas tidak ada) | Perilaku normal |
 
-- **analyst.** Sumber quickdev tidak menyebut integrasi dengan tiket `analyst`.
+- **analyst.** Sumber quickdev tidak menyebut integrasi dengan tiket `analyst`. Task cermin nataflow quickdev selalu task baru ber-`workdir_key`, tidak pernah task tiket.
+- **Config nataflow bersama.** `.claude/nataflow.json` yang sama dibaca `analyst`, `backend`, dan `frontend`; quickdev tidak membaca `analyst/nataflow.json` lama.
 
 ## Titik Gagal & Pemulihan
 
@@ -490,3 +497,5 @@ Urutan git yang disarankan README: `plan` → commit rencana `APPROVED` → `exe
 | Diff terlalu besar | review | Lapor jumlah berkas/baris | User mempersempit lewat `scope_paths` |
 | Berkas biner/generated | review | `SKIPPED (binary/generated)` di tabel cakupan | — |
 | Bukti baris tidak terkonfirmasi | review | Kandidat dibuang, jumlahnya dicatat | — |
+| `.claude/nataflow.json` rusak, server MCP mati, tool galat, sha ditolak, atau task ber-`workdir_key` kembar | plan / execute / profile | Baris `NATAFLOW: GAGAL: <sebab>`; status terminal tidak berubah, berkas tidak disentuh | Perbaiki sebabnya, lalu `/quickdev:plan` "sinkron ulang `<plan_path>`" |
+| Rencana belum pernah dikunci | `plan_lock.py sync-payload` | `FAIL`: rencana DRAFT tidak didorong | Kunci dulu lewat `quickdev:plan` |

@@ -77,6 +77,9 @@ CASES = [
     ("frontend/skills/ux-design/scripts/check_preconditions.py", ["--taskdir", FE_TD, "--json"], True, None),
 
     ("quickdev/skills/_common/plan_lock.py", ["status", "--plan", "plan/smoke.md", "--json"], True, None),
+    ("quickdev/skills/_common/plan_lock.py", ["sync-payload", "--plan", "plan/smoke.md", "--json"], True, None),
+    ("quickdev/skills/_common/plan_lock.py", ["sync-payload", "--repo-profile", "repo-profile.md", "--json"], True,
+     None),
 ]
 
 STATES = ["commit", "tanpa-commit", "detached", "bukan-git", "rusak"]
@@ -88,6 +91,7 @@ CORRUPT = [f"{td}/{doc}" for td in (BE_TD, FE_TD) for doc in
            ("TASK.md", "brief-01.md", "REVIEW.md", "REPORT.md")] + [
     f"{BE_TD}/BRD.md", f"{BE_TD}/PRD.md", f"{BE_TD}/HALT.md", f"{BE_TD}/RCA.md",
     f"{FE_TD}/FLOW.md", f"{FE_TD}/UI.md", f"{FE_TD}/CONTRACT.md", f"{AN_TD}/TICKET.md", "analyst/nataflow.json",
+    ".claude/nataflow.json",
     "frontenddev/reviews/2609250000-smoke.md", "plan/smoke.md", "repo-profile.md",
     ".claude/profile/backenddev/index.json", ".claude/profile/backenddev/commands.md",
     ".claude/profile/frontenddev/index.json", ".claude/profile/frontenddev/commands.md",

@@ -14,7 +14,7 @@ DILARANG MEMULAI IMPLEMENTASI ATAU MENULIS KODE SUMBER SEBELUM DOKUMEN RENCANA D
 2. Spesifikasi kebutuhan fungsional, kontrak data API, skema payload, atau alur UI/UX telah terkunci tanpa ambiguitas yang tersisa.
 3. Direktori kerja repositori memiliki izin tulis aktif untuk membuat folder `plan/` dan berkas rencana implementasi markdown.
 4. Profil repositori pada `profile_path` tersedia sebagai panduan arsitektur dan baseline verifikasi; bila absen, hentikan dan arahkan pemanggil ke `quickdev:profile` (jangan `backend:profile`/`frontend:profile`) karena perintah baseline rencana wajib diambil dari profil.
-5. `python3` (3.9+) tersedia untuk `plan_lock.py`, yang mengunci rencana saat approval.
+5. `python3` (3.9+) tersedia untuk `plan_lock.py`, yang mengunci rencana saat approval dan menyusun argumen sinkron nataflow.
 
 ## Koeksistensi [REQUIRED]
 
@@ -35,6 +35,10 @@ DILARANG MEMULAI IMPLEMENTASI ATAU MENULIS KODE SUMBER SEBELUM DOKUMEN RENCANA D
 - `include_rollback` — boolean — default `true` — bila `false`, Section 5 (rollback) tidak ditulis.
 
 ## Workflow
+
+### Rute sinkron ulang
+
+User meminta sinkron ulang rencana yang sudah ada ("sinkron ulang `<plan_path>`"), biasanya sesudah segmen `NATAFLOW: GAGAL`: lewati Precondition 1–4 dan Fase 0–4, jalankan prosedur `references/nataflow-sync.md` (langkah rencana) atas `<plan_path>` apa adanya, lalu tutup dengan satu baris `SINKRON — <plan_path> · nataflow <segmen>`. Rencana tidak disentuh dan status terminal tidak berubah.
 
 ### Fase 0 — Inisialisasi & Resolusi Konteks Arsitektur
 
@@ -103,8 +107,9 @@ DILARANG MEMULAI IMPLEMENTASI ATAU MENULIS KODE SUMBER SEBELUM DOKUMEN RENCANA D
 
 1. Pastikan berkas `<plan_dir>/<task_name>.md` telah berstatus `APPROVED` di filesystem:
    - Pastikan keluaran `LOCK PASS` memuat sidik; `Approved-At`, `Approval`, dan `Plan-Hash` sudah ditulis skrip.
-2. Set status terminal `PLAN_APPROVED`.
-3. Tawarkan `quickdev:execute` (`/quickdev:execute <plan_dir>/<task_name>.md`, sesudah user meng-commit rencana `APPROVED` bila ingin riwayatnya terlihat); tunggu user.
+2. **Sinkron nataflow**: jalankan prosedur `references/nataflow-sync.md` (langkah rencana) atas `<plan_dir>/<task_name>.md` apa adanya; hasilnya baris `NATAFLOW:` ringkasan. `GAGAL` tidak membatalkan `PLAN_APPROVED`.
+3. Set status terminal `PLAN_APPROVED`.
+4. Tawarkan `quickdev:execute` (`/quickdev:execute <plan_dir>/<task_name>.md`, sesudah user meng-commit rencana `APPROVED` bila ingin riwayatnya terlihat); tunggu user.
 
 ## Guardrails
 
@@ -112,7 +117,7 @@ DILARANG MEMULAI IMPLEMENTASI ATAU MENULIS KODE SUMBER SEBELUM DOKUMEN RENCANA D
 - MUST NOT mengizinkan transisi status ke `PLAN_APPROVED` tanpa persetujuan eksplisit tertulis dari user.
 - MUST NOT membuat langkah implementasi yang ambigu tanpa menyebutkan path berkas target yang pasti.
 - MUST NOT melompati seksi strategi pengujian dan verifikasi baseline dalam dokumen rencana.
-- MUST NOT mengubah Section 1–5 atau `Profile:` berkas `APPROVED`. Revisi atas permintaan user: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py unlock --plan <plan_path> --reason - <<'QD_EOF'` (alasan lewat stdin, ditutup `QD_EOF`) → revisi → approval ulang (`lock`). Blok `## Execution Status` dipertahankan apa adanya. Rencana `APPROVED` tanpa `Plan-Hash` (format lama) diperlakukan sama: `unlock`, lalu minta user menyetujui ulang.
+- MUST NOT mengubah Section 1–5 atau `Profile:` berkas `APPROVED`. Revisi atas permintaan user: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py unlock --plan <plan_path> --reason - <<'QD_EOF'` (alasan lewat stdin, ditutup `QD_EOF`) → prosedur `references/nataflow-sync.md` (cermin menjadi `DRAFT`) → revisi → approval ulang (`lock`). Blok `## Execution Status` dipertahankan apa adanya. Rencana `APPROVED` tanpa `Plan-Hash` (format lama) diperlakukan sama: `unlock`, lalu minta user menyetujui ulang.
 - Keputusan ruang lingkup fitur dan persetujuan arsitektur rencana implementasi tetap milik mutlak user.
 
 ## Output [REQUIRED]
@@ -134,6 +139,7 @@ Skill ini menghasilkan dokumen rencana implementasi terstruktur dan status termi
    GATES: explore=<…> clarify=<…> — profil <profile_path>
    VERIFIKASI: <perintah baseline yang akan dijalankan execute>
    REVISI: <n> putaran sebelum disetujui
+   NATAFLOW: workdir <nama> · <n> dokumen (<c> baru, <u> diperbarui, <s> sama) | dilewati | GAGAL: <sebab>
    HANDOFF: execute (plan_path=<plan_dir>/<task_name>.md)
    ```
 

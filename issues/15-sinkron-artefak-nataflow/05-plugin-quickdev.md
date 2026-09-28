@@ -1,7 +1,26 @@
 # Langkah 15 — Perubahan plugin `quickdev`
 
 Rujukan: `01-mcp-tools.md`, yaitu tool T1–T10, kontrak identitas, dan pola pemakaian tool.
-**Status:** PEMETAAN, belum dieksekusi.
+**Status:** SELESAI (tahap 2, dikerjakan lebih dulu dari backend sebagai pilot prosedur karena plugin terkecil).
+Q1–Q5, Q7–Q13 terpasang; Q6 opsi (a) tanpa perubahan (E3); Q9 lewat payload dua fase (E4). Versi dinaikkan di commit
+rilis. Test: `tests/quickdev/test_15_sync.py` (17) dan dua kasus smoke baru; suite penuh 1876 hijau, lint 0 FAIL.
+
+## Peta blast radius (sebelum kode)
+
+| Berkas | Perubahan | Yang bisa pecah |
+|---|---|---|
+| `skills/_common/plan_lock.py` | Subperintah `sync-payload (--plan <p> \| --repo-profile <p>) [--remote -] [--json]` ditangani sebelum cek berkas rencana, sehingga config absen tetap `SKIP` | Dispatch `globals()[f"cmd_{a.cmd}"]` gagal pada tanda hubung; semua subparser lain mewajibkan `--plan`; cek `path.is_file()` berjalan sebelum subperintah; `die()` berbentuk `{"status","error"}`. Karena itu `sync-payload` diurus di jalur sendiri tanpa mengubah jalur subperintah lama |
+| `skills/plan/references/nataflow-sync.md` (baru) | Prosedur dua fase (01 § Protokol), varian rencana dan profil | Lint R1/R2: rujukan dari SKILL memakai `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/…`, dan berkas referensinya sendiri tidak memuat `${CLAUDE_PLUGIN_ROOT}` |
+| `skills/plan/SKILL.md` | Fase 4 butir sinkron sesudah `LOCK PASS`; baris `NATAFLOW:` di ringkasan; sinkron sesudah `unlock`; rute sinkron ulang (Q8) | `test_08d_text` d1/d7/d12 dan `test_13_text` q4 (substring dan larangan kutip ganda). Tidak ada test yang mengunci format ringkasan |
+| `skills/execute/SKILL.md` | Satu aturan di Konvensi `plan_lock.py`: sesudah tiap `close`/`confirm` PASS jalankan sinkron (Fase 0 butir 3, Fase 1 butir 4, Fase 3 butir 3, Fase 4 butir 1, Failure path 2/5); baris `NATAFLOW:` | `test_13_text` q1–q16 memotong seksi pada `### Fase 0/1/3/4`, `## Guardrails`, dan butir parameter; d5 mengunci substring baris `REGRESI BARU` |
+| `skills/profile/SKILL.md` | Fase 4 sinkron `repo-profile.md` ke workspace (Q11); baris `NATAFLOW:` | `test_skill_text` Fase 2 profil (tidak disentuh) |
+| `README.md`, `flow/quickdev.md` | Seksi sinkron, tabel subperintah, siklus status | Tidak ada test yang membaca `flow/`. `test_13_text::test_rilis_readme_dan_versi` mengunci versi `0.5.0` (diubah di commit rilis) |
+| `tests/test_smoke.py` | `CASES` + `.claude/nataflow.json` di `CORRUPT` | Keadaan `rusak` ikut menguji jalur `FAIL` config pada skrip lain yang membaca config |
+| `tests/quickdev/test_15_sync.py` (baru) | Kontrak `sync-payload` (Q13) | — |
+
+Keputusan tambahan: Q8 memakai rute di `plan` ("sinkron ulang `<plan_path>`"), karena `execute` Fase 0 selalu menjalankan
+`start` yang bisa menulis blok. "Pernah dikunci" dinilai dari `Approved-At`, bukan `Status:`, sehingga rencana hasil
+`unlock` tetap tercermin dengan status `DRAFT` (baris P2 `unlock`).
 
 ## Ringkasan
 

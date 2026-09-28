@@ -1,7 +1,8 @@
 # quickdev
 
 Alur kerja ringan untuk repo backend, frontend, dan fullstack: enam skill tanpa taskdir, tanpa subagent, tanpa
-hook, dan dengan satu skrip (`skills/_common/plan_lock.py`, pengunci rencana). Setiap tugas punya **satu berkas rencana** (`plan/<task>.md`), sedangkan perubahan kodenya
+hook, dan dengan satu skrip (`skills/_common/plan_lock.py`, pengunci rencana, beserta pustaka sinkron
+`nataflow_sync.py`). Setiap tugas punya **satu berkas rencana** (`plan/<task>.md`), sedangkan perubahan kodenya
 boleh menyentuh banyak berkas dan layer. Semua kerja berlangsung di percakapan utama.
 
 ## Kapan Dipakai
@@ -209,6 +210,28 @@ Isinya nama plugin yang boleh menggerbangi repo, dipisah spasi, koma, atau baris
 | (berkas tidak ada) | perilaku normal |
 
 Bila berkas ada tetapi tidak memuat `quickdev`, skill quickdev melapor dan bertanya dulu sebelum lanjut.
+
+## Sinkron nataflow (opsional)
+
+Rencana dan profil dapat dicerminkan ke nataflow. Berkas di disk tetap satu-satunya sumber kebenaran: sinkron
+tidak menulis berkas apa pun, sehingga `Plan-Hash`, `Verified-Hash`, dan `Tree-Hash` tidak basi.
+
+- **Aktif per repo** lewat `.claude/nataflow.json` (ter-commit, dibaca juga oleh `analyst`, `backend`, dan
+  `frontend`): `mcp_server` (default `nataflow-api`), `workspace_id` (UUID; wajib bila MCP key ber-scope
+  project), `pic_id` (UUID), dan `repo` (default: remote `origin` ternormalisasi). Berkas absen → dilewati; ada
+  tetapi rusak → `GAGAL`. Server MCP nataflow didaftarkan user di Claude Code; plugin tidak menyimpan key.
+- **Jangkar**: satu rencana = satu workdir `quickdev:<repo>:<path rencana>` bernama `<task_name>`, tertaut ke task
+  yang dibuat dari H1 dan Section 1 rencana. Rencana didorong sebagai dokumen `QUICKDEV_PLAN`; `repo-profile.md`
+  sebagai dokumen `PROFILE` di bawah workspace.
+- **Kapan**: `plan` sesudah `LOCK PASS` dan sesudah `unlock` (cermin menjadi `DRAFT`); `execute` sesudah tiap
+  `close`/`confirm`; `profile` sesudah profil tertulis. Rencana yang belum pernah dikunci tidak didorong.
+- **Status**: workdir `active`, `blocked` (`BLOCKED`), atau `done` (`COMPLETED`, `COMPLETED (manual)`); task naik
+  ke `in_progress` begitu eksekusi dimulai dan `done` saat selesai, tanpa pernah diturunkan.
+- **Hemat token**: `plan_lock.py sync-payload` menyusun seluruh argumen dalam dua fase. Isi dokumen hanya
+  diterbitkan bila sha, tipe, atau metadatanya berbeda dari manifest `list_document` remote.
+- **Gagal tidak memblokir**: ringkasan skill memuat baris `NATAFLOW: <… | dilewati | GAGAL: <sebab>>`, dan
+  status terminal tidak berubah. Ulangi lewat `/quickdev:plan` ("sinkron ulang `plan/<task>.md`").
+- **Tidak didorong**: laporan terminal `explore`, `clarify`, dan `review`.
 
 ## Keterbatasan yang Diketahui
 

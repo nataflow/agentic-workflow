@@ -50,6 +50,8 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py close --plan <plan_pat
 QD_EOF
 ```
 
+**Sinkron nataflow.** Sesudah tiap `close` atau `confirm` yang PASS (Fase 0 butir 3, Fase 1 butir 4, Fase 3 butir 3, Fase 4 butir 1, dan Failure path yang menutup `BLOCKED`), jalankan prosedur `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/nataflow-sync.md` (langkah rencana) atas `<plan_path>` apa adanya, lalu tulis hasilnya di baris `NATAFLOW:` ringkasan. Semua jalur tutup didorong, bukan hanya `COMPLETED`, supaya status `blocked` juga tercermin. Sinkron tidak menulis berkas maupun menyentuh kode, sehingga segel `close` tidak basi. `GAGAL` tidak mengubah status terminal; sinkron diulang lewat `/quickdev:plan` ("sinkron ulang `<plan_path>`").
+
 ### Fase 0 — Validasi Status Rencana & Persiapan Lingkungan
 
 1. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py start --plan <plan_path>` (tambah `--findings --findings-text -` dengan temuan ringkas lewat stdin bila `review_findings` terisi) sebelum mutasi apa pun. Skrip memanggil `verify`, menurunkan mode dari berkas, dan menulis blok `## Execution Status` (`Status`, `Base-Commit`, `Remediation-Round`, `Remediation-State`, `Findings-<n>`); `Base-Commit` tidak pernah ditimpa:
@@ -167,6 +169,7 @@ Skill ini menghasilkan perubahan kode sumber yang terverifikasi dan laporan term
    VERIFIKASI: typecheck=<status> lint=<status> test=<status> build=<status>  (status boleh bawaan(n), UNVERIFIED(n), atau TIDAK_ADA)
    REGRESI BARU: <n> | - — di luar rencana: <daftar berkas> | -
    ITERASI PERBAIKAN: <n>/<max_fix_iterations>
+   NATAFLOW: workdir <nama> · <n> dokumen (<c> baru, <u> diperbarui, <s> sama) | dilewati | GAGAL: <sebab>
    HANDOFF: review (plan_path) | user (perintah manual atau blocker)
    ```
 

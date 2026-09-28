@@ -16,6 +16,8 @@
 - `confirm` VERIFICATION_MANUAL_REQUIRED → COMPLETED (manual) dengan jawaban user apa adanya; segel basi → FAIL.
 - `status`  ringkasan untuk execute/review (`--json`); `consistent` menilai blok terhadap checklist dan segel.
 - `unlock`  APPROVED → DRAFT untuk revisi atas permintaan user; blok eksekusi dipertahankan.
+- `sync-payload` argumen tool MCP nataflow untuk rencana yang pernah dikunci (`--plan`) atau profil
+            (`--repo-profile`); read-only. Config `.claude/nataflow.json` absen → SKIP sebelum rencana dibaca (15 Q2).
 
 Metadata rencana adalah baris polos `Kunci: nilai` di antara H1 dan `## 1.`. Sidik mencakup
 `## 1.` sampai sebelum `## Execution Status`: CRLF → LF, spasi ujung baris dibuang, `- [x]` dihitung
@@ -41,6 +43,9 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Optional
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import nataflow_sync as ns  # noqa: E402
 
 EXEC_H2 = "## Execution Status"
 STEP = re.compile(r"^\s*- \[([ xX])\]\s*(.*)$")
@@ -579,6 +584,131 @@ def cmd_status(p: Plan, a) -> int:
     return 0
 
 
+# ------------------------------------------------------------------ sinkron nataflow (15 Q2, Q10, Q11)
+
+SYNC = "SYNC-PAYLOAD"
+
+
+def sync_root() -> Path:
+    """Root git cwd (letak `.claude/nataflow.json`), atau cwd di luar repo git."""
+    r = git(Path.cwd(), "rev-parse", "--show-toplevel")
+    top = r.stdout.strip() if r is not None and r.returncode == 0 else ""
+    return Path(top).resolve() if top else Path.cwd().resolve()
+
+
+def root_relative(root: Path, raw: str):
+    """(path absolut, path relatif root) atau (None, pesan) bila di luar root."""
+    path = (Path.cwd() / raw).resolve()
+    try:
+        return path, path.relative_to(root).as_posix()
+    except ValueError:
+        return None, f"`{raw}` di luar root repo {root}"
+
+
+def section_one(p: Plan) -> str:
+    """Isi `## 1.` sampai heading `## ` berikutnya: deskripsi task (tujuan dan keputusan terkunci)."""
+    end = p._first(lambda l: l.startswith("## "), p.body_start + 1)
+    return "\n".join(p.lines[p.body_start:end]).strip()
+
+
+def plan_title(p: Plan) -> str:
+    return next((l[2:].strip() for l in p.lines[:p.body_start] if l.startswith("# ")), "")
+
+
+def _sync_emit(a, payload: dict, line: str) -> int:
+    ns.emit(payload, a.json, f"{SYNC} PASS: {line}")
+    return 0
+
+
+def _sync_documents(a, config: dict, docs: list, head: dict, line: str) -> int:
+    """Fase 1 (tanpa `--remote`): argumen task/workdir/manifest tanpa isi. Fase 2: dokumen yang berbeda saja."""
+    problems = ns.check_documents(docs)
+    if problems:
+        return ns.emit_fail(a.json, SYNC, problems)
+    base = {"status": "PASS", "enabled": True, "mcp_server": config["mcp_server"]}
+    if a.remote is None:
+        base.update(head, documents_total=len(docs))
+        return _sync_emit(a, base, line + " — argumen tool lewat `--json`")
+    remote, problems = ns.read_remote(a.remote, a.remote_text)
+    if problems:
+        return ns.emit_fail(a.json, SYNC, problems)
+    push, same = ns.split_remote(docs, remote)
+    base.update(documents=push, same=same, documents_total=len(docs))
+    return _sync_emit(a, base, f"{len(push)} dokumen perlu didorong, {same} sama — argumen lewat `--json`")
+
+
+def cmd_sync_payload(a) -> int:
+    """Argumen tool MCP nataflow; read-only, tanpa commit (D4, D5). Model mengirim nilainya apa adanya.
+
+    Rencana: satu workdir `quickdev:<repo>:<path rencana>` bernama `<task_name>`, task baru ber-`workdir_key`
+    (quickdev tidak mengenal tiket analyst), dan satu dokumen `QUICKDEV_PLAN` berisi berkas di disk (skill tidak
+    meng-commit). Rencana yang belum pernah `lock` (tanpa `Approved-At`) → FAIL: DRAFT tidak didorong (D2).
+    Profil: dokumen `PROFILE` di bawah workspace, `key` = `<repo>/<path>` (T10).
+    """
+    root = sync_root()
+    config, problems = ns.load_config(root)
+    if problems:
+        return ns.emit_fail(a.json, SYNC, problems)
+    if config is None:
+        return ns.emit_skip(a.json, SYNC)
+    path, rel = root_relative(root, a.repo_profile or a.plan)
+    if path is None:
+        return ns.emit_fail(a.json, SYNC, [rel])
+    if not path.is_file():
+        return ns.emit_fail(a.json, SYNC, [f"{rel} tidak ada"])
+    content, problem = ns.disk_text(path)
+    if problem:
+        return ns.emit_fail(a.json, SYNC, [f"{rel}: {problem} — pulihkan dari git; jangan menebak isinya"])
+    repo = ns.repo_identity(root, config)
+    commit = ns.last_commit(root, rel)
+    if a.repo_profile:
+        doc = ns.document("workspace", f"{repo}/{rel}", "PROFILE", content, ns.doc_meta("quickdev", repo, rel, "", commit))
+        head = {"repo": repo, "workspace_id": config["workspace_id"],
+                "list_document": {"reference_table": "workspace", "include_content": False,
+                                  "metadata": ns.compact({"source": "quickdev", "repo": repo})}}
+        return _sync_documents(a, config, [doc], head, f"{rel} → workspace {config['workspace_id'] or '-'}")
+    try:
+        p = Plan(path)
+        m, b = p.meta(), p.block()
+    except SystemExit as exc:           # kunci ganda: FAIL rapi dari pembaca
+        return ns.emit_fail(a.json, SYNC, [str(exc.code)[len("FAIL: "):] if str(exc.code).startswith("FAIL: ")
+                                           else str(exc.code)])
+    if (m.get("Approved-At") or "-") == "-":
+        return ns.emit_fail(a.json, SYNC, [f"{rel} belum pernah dikunci (`lock`) — rencana DRAFT tidak didorong"])
+    body, title = section_one(p), plan_title(p) or path.stem
+    if p.body_start == len(p.lines) or not body:
+        return ns.emit_fail(a.json, SYNC, [f"{rel} tanpa `## 1.` — deskripsi task diambil dari Section 1"])
+    execution = b.get("Status", "")
+    done = execution.startswith("COMPLETED")
+    status = "done" if done else "blocked" if execution == "BLOCKED" else "active"
+    key = f"quickdev:{repo}:{rel}"
+    problems = ns.workdir_problems(key, path.stem, status)
+    if problems:
+        return ns.emit_fail(a.json, SYNC, problems)
+    task = ns.task_args(config, {"source": "quickdev", "workdir_key": key}, repo, title, body)
+    task["status"] = ns.task_status("done" if done else "in_progress" if execution else "")
+    meta = {"source": "quickdev", "repo": repo, "path": rel, "plan_status": m.get("Status", ""),
+            "plan_hash": m.get("Plan-Hash", ""), "base_commit": b.get("Base-Commit", ""), "execution": execution}
+    workdir = ns.workdir_args(config, key, path.stem, status, {k: v for k, v in meta.items() if v})
+    doc = ns.document("workdir", path.name, "QUICKDEV_PLAN", content,
+                      ns.doc_meta("quickdev", repo, rel, m.get("Status", ""), commit, execution=execution))
+    head = {"repo": repo, "task": task, "workdir": workdir,
+            "list_document": {"reference_table": "workdir", "include_content": False}}
+    return _sync_documents(a, config, [doc], head,
+                           f"{rel} · workdir {path.stem} ({status}) · server {config['mcp_server']}")
+
+
+def main_sync(a) -> None:
+    """`sync-payload` berjalan di luar jalur subperintah lain: config absen harus SKIP walau rencana tidak ada."""
+    a.remote_text = ""
+    if a.remote == "-":
+        try:
+            a.remote_text = sys.stdin.read()
+        except UnicodeDecodeError:
+            sys.exit(ns.emit_fail(a.json, SYNC, ["stdin bukan UTF-8"]))
+    sys.exit(cmd_sync_payload(a))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Kunci rencana quickdev")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -602,7 +732,15 @@ def main() -> None:
             s.add_argument("--reason", required=True)
         if name == "status":
             s.add_argument("--json", action="store_true")
+    s = sub.add_parser("sync-payload")
+    target = s.add_mutually_exclusive_group(required=True)
+    target.add_argument("--plan", help="rencana yang pernah dikunci")
+    target.add_argument("--repo-profile", dest="repo_profile", help="profil repo (dokumen tingkat workspace)")
+    s.add_argument("--remote", default=None, help="balikan list_document include_content=false (`-` = stdin)")
+    s.add_argument("--json", action="store_true")
     a = ap.parse_args()
+    if a.cmd == "sync-payload":
+        main_sync(a)
     path = Path(a.plan)
 
     def die(msg: str) -> None:
