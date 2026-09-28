@@ -1,11 +1,11 @@
 ---
 name: intake
-description: Gunakan ketika ada permintaan, keluhan, atau laporan dari pengguna/stakeholder yang perlu dijadikan tiket (fitur baru, perbaikan, bug dari sisi pengguna), atau tiket analyst yang sudah ada perlu dilanjutkan atau diubah - klasifikasi tipe, cek duplikat, pecah permintaan besar, dan tentukan rute, sebelum pertanyaan elisitasi diajukan atau TICKET.md ditulis
+description: Gunakan ketika ada permintaan, keluhan, atau laporan dari pengguna/stakeholder yang perlu dijadikan tiket (fitur baru, perbaikan, bug dari sisi pengguna), tiket analyst yang sudah ada perlu dilanjutkan atau diubah, atau tiket READY perlu disinkron ulang ke nataflow - klasifikasi tipe, cek duplikat, pecah permintaan besar, dan tentukan rute, sebelum pertanyaan elisitasi diajukan atau TICKET.md ditulis
 ---
 
 ## THE IRON LAW
 
-- Gate ini tidak menulis berkas apa pun. Ticketdir dialokasikan `analyst:elicit`; tiket ditulis `analyst:spec`.
+- Gate ini tidak menulis berkas apa pun. Ticketdir dialokasikan `analyst:elicit`; tiket ditulis `analyst:spec`. Satu-satunya tulisan keluar dari gate adalah sinkron ulang tiket `READY` ke nataflow (Phase 2), dan isinya ditentukan `ticket.py sync-payload`, bukan gate.
 - Keadaan ticketdir dibaca dari `ticket.py state`, bukan dari ingatan sesi atau pembacaan frontmatter satu per satu.
 - Satu tiket, satu tujuan pengguna. Permintaan yang memuat beberapa tujuan yang dapat dirilis terpisah dipecah **sebelum** elisitasi, bukan sesudahnya.
 - Dilarang membaca, mencari, atau menilai kode. Analyst memvonis dari kata-kata peminta; pertanyaan tentang letak atau perilaku kode milik engineer.
@@ -45,6 +45,7 @@ Permintaan yang jelas menyambung ticketdir terbuka (topik, peminta, atau jawaban
 | Kebutuhan, masalah, atau keluhan dari sisi pengguna/bisnis | lanjut Phase 3 |
 | Mengubah tiket yang sudah `READY` ("tambah aturan di tiket cicilan") | `analyst:spec` pada ticketdir itu dengan `change_request` = permintaan; spec yang membuka ulang |
 | Menanyakan status atau daftar tiket | jawab dari `ticket.py state --ready`, selesai |
+| Sinkron ulang tiket ke nataflow ("sinkron ulang tiket cicilan", sesudah segmen `nataflow GAGAL`) | cari ticketdir-nya di `ticket.py state --ready` (lebih dari satu kandidat → `AskUserQuestion`). `READY` → jalankan prosedur `${CLAUDE_PLUGIN_ROOT}/skills/spec/references/nataflow-sync.md` apa adanya atas ticketdir itu tanpa `reopen`, lalu tutup dengan baris `SINKRON`; `DRIFT` → rute Phase 1 baris `DRIFT`; keadaan lain → belum ada yang disetujui untuk disinkronkan, rute Phase 1 keadaannya |
 | Kerja teknis murni — refaktor, upgrade pustaka, stacktrace/log dari developer, pertanyaan letak kode | di luar wilayah analyst: sebut `backend:tech-lead` atau `frontend:lead`, selesai |
 
 Laporan bug dari **pengguna** ("tombol bayar tidak bisa diklik") tetap wilayah analyst; stacktrace yang ditempel **developer** tidak.
@@ -88,7 +89,7 @@ Jalankan `ticket.py state --ready` dan bandingkan judul tiap baris dengan tujuan
 
 ## Output [REQUIRED]
 
-Serah terima bersih → tutup satu baris: `INTAKE — <BARU | LANJUT | UBAH> · <type> · <slug atau ticketdir> · next analyst:<elicit | spec>`. Di luar wilayah → `INTAKE — DI LUAR WILAYAH · next <backend:tech-lead | frontend:lead>`. Selain itu, atau bila ada antrian tiket, sajikan blok berikut dan hapus baris bernilai `—`:
+Serah terima bersih → tutup satu baris: `INTAKE — <BARU | LANJUT | UBAH> · <type> · <slug atau ticketdir> · next analyst:<elicit | spec>`. Di luar wilayah → `INTAKE — DI LUAR WILAYAH · next <backend:tech-lead | frontend:lead>`. Sinkron ulang → `SINKRON — <ticketdir> · nataflow <dibuat #<code> | diperbarui #<code> | dilewati | GAGAL: <sebab>>`; `GAGAL` tidak mengubah `READY`. Selain itu, atau bila ada antrian tiket, sajikan blok berikut dan hapus baris bernilai `—`:
 
 ```markdown
 ### INTAKE — <TERTAHAN | DILANJUTKAN DENGAN ANTRIAN>

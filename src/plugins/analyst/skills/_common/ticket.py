@@ -19,6 +19,8 @@ Satu-satunya jalan mutasi status yang punya konsekuensi di luar penulisnya:
 - `reopen`  — buka ulang tiket `READY` menjadi `DRAFT` untuk perubahan permintaan.
 - `cancel`  — tutup ticketdir atas keputusan user.
 - `ref`     — isi `external_ref` (kunci kartu Jira/Trello) pada DRAFT maupun READY.
+- `sync-payload` — isi argumen tool MCP nataflow (`list_task`/`create_task`/`update_task`) untuk tiket
+              READY; read-only, tanpa commit, dan tidak pernah menulis `TICKET.md`.
 
 `approve` menuntut kedua validator (`ticket`, `elicit`) `PASS`, `elicitation: CLOSED`, catatan elisitasi
 sama dengan segel `close`, **dan** vonis review `PASS` atas sidik `<kartu>/<catatan elisitasi>` yang sama
@@ -33,6 +35,7 @@ Zero external dependencies (Python Standard Library only).
 
 import argparse
 import datetime as dt
+import json
 import re
 import sys
 from pathlib import Path
@@ -42,6 +45,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from analyst_lib import (  # noqa: E402
     ELICIT_H2,
     SLUG_RE,
+    SYNC_CONFIG,
     TICKET_FILE,
     TICKETDIR_RE,
     TICKETS_DIR,
@@ -54,6 +58,7 @@ from analyst_lib import (  # noqa: E402
     git_commit,
     git_error_line,
     is_git_repo,
+    load_sync_config,
     log_rows,
     normalize_ticketdir,
     report_json,
@@ -679,6 +684,84 @@ def cmd_ref(root: Path, args: argparse.Namespace) -> int:
     return 0
 
 
+def _compact(obj: Dict[str, Any]) -> str:
+    """Teks JSON byte-stabil: ketiga tool MCP menerima `metadata` sebagai string, bukan objek."""
+    return json.dumps(obj, separators=(",", ":"), ensure_ascii=False)
+
+
+def _sync_fail(args: argparse.Namespace, problems: List[str]) -> int:
+    if args.json:
+        print(json.dumps({"status": "FAIL", "enabled": True, "problems": problems}, indent=2, ensure_ascii=False))
+    else:
+        print("SYNC-PAYLOAD FAIL: " + "; ".join(problems))
+    return 1
+
+
+def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:
+    """Argumen tool MCP nataflow untuk satu tiket READY (14 N2) — read-only, tanpa commit.
+
+    Model mengirim `lookup`, `create`, dan `update` apa adanya; skrip ini satu-satunya penyusun isinya, supaya
+    yang tercermin di nataflow selalu kartu yang disetujui (K1, K5). Identitas task adalah `ticket_key` = path
+    ticketdir, bukan slug: `new` membuat ticketdir baru ber-slug sama begitu tiket lama READY/batal (K2).
+    Status task tidak pernah dikirim.
+    """
+    config, problems = load_sync_config(root)
+    if problems:
+        return _sync_fail(args, [f"{SYNC_CONFIG} rusak — " + "; ".join(problems)])
+    if config is None:
+        if args.json:
+            print(json.dumps({"status": "SKIP", "enabled": False}, indent=2))
+        else:
+            print(f"SYNC-PAYLOAD SKIP: {SYNC_CONFIG} tidak ada — sinkron nataflow tidak aktif di repo ini")
+        return 0
+    rel = normalize_ticketdir(args.ticketdir, root)
+    if not TICKETDIR_RE.match(rel) or not (root / rel).is_dir():
+        return _sync_fail(args, [f"`{rel}` bukan direktori {TICKETS_DIR}/<YYMMDDhhmm>-<slug>"])
+    state = classify(root, rel)          # non-UTF-8 → RUSAK, bukan traceback
+    if state["state"] != "READY":
+        return _sync_fail(args, [f"{rel} {state['state']} — hanya tiket READY yang disinkronkan "
+                                 f"({state['route']})"])
+    path = root / rel / TICKET_FILE
+    text = text_of(path)
+    fm, body = split_frontmatter(text)
+    title = title_of(path)
+    if title == "-":
+        return _sync_fail(args, [f"{rel}/{TICKET_FILE} tanpa H1 — judul task diambil dari H1 kartu"])
+    reopened = str(fm.get("reopened", "0")).strip() or "0"
+    if not reopened.isdigit():
+        return _sync_fail(args, [f"field `reopened: {reopened}` bukan bilangan — field ini hanya ditulis "
+                                 f"ticket.py; pulihkan nilainya dari riwayat git"])
+    key = {"source": "analyst", "ticket_key": rel}
+    meta = dict(key, slug=str(fm.get("slug", "")).strip() or rel.split("-", 1)[-1],
+                type=str(fm.get("type", "-")), priority=str(fm.get("priority", "-")),
+                approved=str(fm.get("approved", "-")),
+                # READY menjamin `approved_seal` tertulis = segel isi sekarang; tiket lama tanpa field itu
+                # mendapat nilai yang sama dari isinya.
+                approved_seal=ticket_seal(text), reopened=int(reopened))
+    ref = str(fm.get("external_ref", "-")).strip()
+    if ref and ref != "-":
+        meta["external_ref"] = ref
+    card = split_parts(body)[0].strip()   # kartu saja: `## Catatan Elisitasi` tetap di disk (K5)
+    scope = {"workspace_id": config["workspace_id"]} if config["workspace_id"] else {}
+    create: Dict[str, Any] = {"title": title, "description": card}
+    create.update(scope)
+    if config["pic_id"]:
+        create["pic_id"] = config["pic_id"]
+    create["metadata"] = _compact(meta)
+    payload = {
+        "status": "PASS", "enabled": True, "mcp_server": config["mcp_server"], "ticket_key": rel,
+        "lookup": dict(scope, metadata=_compact(key)),
+        "create": create,
+        "update": {"title": title, "description": card, "metadata": create["metadata"]},
+    }
+    if args.json:
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+    else:
+        print(f"SYNC-PAYLOAD PASS: {rel} · server {config['mcp_server']} · workspace "
+              f"{config['workspace_id'] or '-'} · pic {config['pic_id'] or '-'} — argumen tool lewat `--json`")
+    return 0
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description="Siklus hidup ticketdir analyst")
     p.add_argument("--root", default=None, help="root ruang kerja; default root git atau cwd")
@@ -723,11 +806,14 @@ def main() -> None:
     s.add_argument("--ticketdir", required=True)
     s.add_argument("--ref", required=True, help="kunci atau tautan kartu Jira/Trello")
     s.add_argument("--no-commit", action="store_true", dest="no_commit")
+    s = sub.add_parser("sync-payload")
+    s.add_argument("--ticketdir", required=True)
+    s.add_argument("--json", action="store_true")
     args = p.parse_args()
     root = (Path(args.root) if args.root else find_root()).resolve()
     handler = {"state": cmd_state, "new": cmd_new, "check": cmd_check, "close": cmd_close, "review": cmd_review,
                "revise": cmd_revise, "approve": cmd_approve, "reopen": cmd_reopen,
-               "cancel": cmd_cancel, "ref": cmd_ref}[args.cmd]
+               "cancel": cmd_cancel, "ref": cmd_ref, "sync-payload": cmd_sync_payload}[args.cmd]
     sys.exit(handler(root, args))
 
 

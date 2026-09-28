@@ -69,9 +69,10 @@ Repo git (`git=ya`): `git -C <root> add <ticketdir>/TICKET.md <ticketdir>/review
 1. Sajikan tiket: judul, tipe, prioritas beserta alasannya, user story atau laporan bug, daftar AC dan `BR-{n}`, Di Luar Cakupan, Pertanyaan Terbuka — ditambah blok `## Ticket Review` terakhir apa adanya (isi `review_report`, yaitu `<ticketdir>/review.md`).
 2. `AskUserQuestion`: *Setujui (READY)* — **hanya bila `review_segar=ya`** · *Revisi (sebut poinnya)* · *Kembali ke elisitasi* · *Tahan*. `review_segar=tidak` dengan plafon ronde habis → sajikan sebabnya tanpa opsi *Setujui*.
 3. **Setujui** → `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py approve --ticketdir <ticketdir> --answer "<jawaban user apa adanya>"`. Skrip memateraikan `READY` dan meng-commit `TICKET.md` (beserta `review.md`) bila repo git. `FAIL` → sebab di keluaran; review basi dengan plafon ronde tersisa → Phase 3 ronde berikut; plafon ronde habis → sajikan sebabnya dan ajukan ulang pilihan *Revisi* (satu-satunya jalan membuka ronde baru) atau *Kembali ke elisitasi*.
-4. **Revisi** → `ticket.py revise --ticketdir <ticketdir>` (plafon 3; mengosongkan vonis review) → perbarui draft → Phase 2–4 → ajukan ulang. Poin revisi yang menambah fakta baru → `analyst:elicit` dengan `reopen_reason`. Plafon habis → lingkup belum jelas: tawarkan *Kembali ke elisitasi* atau `ticket.py cancel` atas keputusan user.
-5. **Kembali ke elisitasi** → `analyst:elicit` dengan `ticketdir` dan `reopen_reason` = alasan user.
-6. **Tahan** → biarkan `DRAFT`; ticketdir muncul lagi di `ticket.py state`.
+4. **Sinkron nataflow** — tepat sesudah `approve` exit 0 atau exit 3 (`READY` tertulis, commit gagal), sebelum baris penutup: jalankan prosedur `references/nataflow-sync.md` apa adanya atas `<ticketdir>`, dengan `ticket.py` dari Precondition. Hasilnya satu segmen `nataflow …` di baris penutup. `approve` exit 1 → langkah ini tidak berjalan.
+5. **Revisi** → `ticket.py revise --ticketdir <ticketdir>` (plafon 3; mengosongkan vonis review) → perbarui draft → Phase 2–4 → ajukan ulang. Poin revisi yang menambah fakta baru → `analyst:elicit` dengan `reopen_reason`. Plafon habis → lingkup belum jelas: tawarkan *Kembali ke elisitasi* atau `ticket.py cancel` atas keputusan user.
+6. **Kembali ke elisitasi** → `analyst:elicit` dengan `ticketdir` dan `reopen_reason` = alasan user.
+7. **Tahan** → biarkan `DRAFT`; ticketdir muncul lagi di `ticket.py state`.
 
 ## Guardrails
 
@@ -81,6 +82,7 @@ Repo git (`git=ya`): `git -C <root> add <ticketdir>/TICKET.md <ticketdir>/review
 - **APPROVAL LEWAT SKRIP**: dilarang menulis `status: READY`, `approved_hash`, `approved_seal`, atau `review:` dengan tangan.
 - **CATATAN MILIK ELICIT**: dilarang menyunting `## Catatan Elisitasi`, `elicitation`, atau `domain_terms`, dan dilarang menjalankan `ticket.py close` kecuali adopsi segel tiket lama (check 5 *elisitasi tanpa segel*; skrip menolaknya bila catatan berubah sesudah review terakhir), dari skill ini; tiap perubahan fakta lewat `analyst:elicit` dengan `reopen_reason`. Suntingan catatan di luar jalur itu ditolak `check`, `review`, dan `approve` lewat segel `elicit_hash`.
 - **REVIEWER LEWAT TEMPLATE**: `ticket-reviewer` hanya lewat prompt terhidrasi `dispatcher/reviewer.md`; blok vonisnya diteruskan ke user tanpa parafrase.
+- **SINKRON LEWAT SKRIP**: argumen tool nataflow hanya dari keluaran `ticket.py sync-payload`, dikirim apa adanya; dilarang merangkai judul, deskripsi, atau metadata sendiri, dan dilarang mengirim status.
 - **ATOMIC COMMIT**: staging path eksplisit; dilarang `git add .`/`-A`, `--no-verify`, push.
 - **RATIONALIZATION PREVENTION**:
   - "Reviewer cuma ADVISORY, langsung setujui saja tanpa ronde lagi" — menyerap advisory mengubah sidik konten; `approve` menolak vonis atas konten lama.
@@ -90,7 +92,7 @@ Repo git (`git=ya`): `git -C <root> add <ticketdir>/TICKET.md <ticketdir>/review
 
 ## Output [REQUIRED]
 
-Tiket disetujui — tutup satu baris: `SPEC — READY · <ticketdir>/TICKET.md @<sidik> · <type> · <priority> · <n> AC · <n> BR · <commit <sha> | tanpa git> — serahkan ke engineer: backend:tech-lead dan/atau frontend:lead dengan ticket_source: <ticketdir>/TICKET.md (lihat README Serah Terima).` Selain itu sajikan blok berikut dan hapus baris bernilai `—`:
+Tiket disetujui — tutup satu baris: `SPEC — READY · <ticketdir>/TICKET.md @<sidik> · <type> · <priority> · <n> AC · <n> BR · <commit <sha> | tanpa git> · nataflow <dibuat #<code> | diperbarui #<code> | dilewati | GAGAL: <sebab>> — serahkan ke engineer: backend:tech-lead dan/atau frontend:lead dengan ticket_source: <ticketdir>/TICKET.md (lihat README Serah Terima).` Segmen `nataflow` berasal dari Phase 5 butir 4; `GAGAL` tidak mengubah `READY` maupun serah terimanya. Selain itu sajikan blok berikut dan hapus baris bernilai `—`:
 
 ```markdown
 ### SPEC — <MENUNGGU KEPUTUSAN | TERTAHAN>
@@ -107,6 +109,7 @@ Tiket disetujui — tutup satu baris: `SPEC — READY · <ticketdir>/TICKET.md @
 3. **Validator kebocoran tidak kunjung `PASS`** karena istilah memang kosakata produk: dilarang menyunting catatan elisitasi atau `domain_terms` dari sini — panggil `analyst:elicit` dengan `reopen_reason` = `konfirmasi istilah domain: <istilah>`; sesudah istilah tercatat di `domain_terms` elisitasi, kembali ke Phase 0.
 4. **Dispatch reviewer gagal dua kali**: tiket tidak dapat di-`approve`; sajikan draft dengan status `TERTAHAN` dan minta user mengulang sesi.
 5. **`approve` gagal commit** (exit 3; hook, gpg, `.gitignore`): status `READY` sudah tertulis; sajikan baris `COMMIT GAGAL` apa adanya dan minta user meng-commit sendiri dengan perintah yang dicetak. Dilarang `--no-verify`.
+6. **Sinkron nataflow `GAGAL`** (server MCP tidak tersedia, tool galat, config `analyst/nataflow.json` rusak, task kembar): tiket tetap `READY` dan serah terima tetap berjalan. Sajikan segmen `GAGAL` apa adanya; sesudah sebabnya dibereskan, sinkron diulang lewat `analyst:intake` ("sinkron ulang tiket `<ticketdir>`"). Dilarang `reopen` hanya untuk mengulang sinkron.
 
 ## STYLE
 

@@ -25,6 +25,7 @@ BASH_STDIN = json.dumps({"hook_event_name": "PreToolUse", "tool_name": "Bash",
 # (path relatif src/plugins, argumen, stdout wajib JSON?, stdin)
 CASES = [
     ("analyst/skills/_common/ticket.py", ["state", "--all", "--json"], True, None),
+    ("analyst/skills/_common/ticket.py", ["sync-payload", "--ticketdir", AN_TD, "--json"], True, None),
     ("analyst/skills/_common/validate_doc.py", ["--kind", "elicit", "--ticketdir", AN_TD, "--json"], True, None),
 
     ("backend/hooks/detect.py", ["--plugin", "backend"], "hook", HOOK_STDIN),
@@ -86,7 +87,7 @@ NOT_UTF8 = b"\xff\xfe\x80 bukan utf-8 \xc3\x28\n"
 CORRUPT = [f"{td}/{doc}" for td in (BE_TD, FE_TD) for doc in
            ("TASK.md", "brief-01.md", "REVIEW.md", "REPORT.md")] + [
     f"{BE_TD}/BRD.md", f"{BE_TD}/PRD.md", f"{BE_TD}/HALT.md", f"{BE_TD}/RCA.md",
-    f"{FE_TD}/FLOW.md", f"{FE_TD}/UI.md", f"{FE_TD}/CONTRACT.md", f"{AN_TD}/TICKET.md",
+    f"{FE_TD}/FLOW.md", f"{FE_TD}/UI.md", f"{FE_TD}/CONTRACT.md", f"{AN_TD}/TICKET.md", "analyst/nataflow.json",
     "frontenddev/reviews/2609250000-smoke.md", "plan/smoke.md", "repo-profile.md",
     ".claude/profile/backenddev/index.json", ".claude/profile/backenddev/commands.md",
     ".claude/profile/frontenddev/index.json", ".claude/profile/frontenddev/commands.md",

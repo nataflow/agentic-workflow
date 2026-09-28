@@ -1,6 +1,6 @@
 # Alur Plugin `analyst`
 
-> Plugin `analyst` (v0.6.0) adalah jembatan antara pengguna/stakeholder dan engineer. Ia menerima permintaan,
+> Plugin `analyst` (v0.7.0) adalah jembatan antara pengguna/stakeholder dan engineer. Ia menerima permintaan,
 > keluhan, atau laporan bug dari sisi pengguna, menggali faktanya lewat tanya-jawab dengan peminta
 > non-engineer, lalu menerbitkan `TICKET.md`: kartu tiket non-teknis setara kartu Jira/Trello, berisi user
 > story, acceptance criteria, dan aturan bisnis. Tiket melewati review independen dan persetujuan user sebelum
@@ -14,13 +14,13 @@
 
 | Komponen | Jenis | Peran singkat | Berkas |
 |---|---|---|---|
-| `analyst:intake` | skill (satu-satunya yang muncul di menu `/`) | Gerbang: pulihkan ticketdir, tentukan wilayah, tipe, ukuran, cek duplikat, tetapkan slug. Tidak menulis berkas apa pun | `skills/intake/SKILL.md` |
+| `analyst:intake` | skill (satu-satunya yang muncul di menu `/`) | Gerbang: pulihkan ticketdir, tentukan wilayah, tipe, ukuran, cek duplikat, tetapkan slug, dan sinkron ulang tiket `READY` ke nataflow. Tidak menulis berkas apa pun | `skills/intake/SKILL.md` |
 | `analyst:elicit` | skill (`user-invocable: false`) | Tanya-jawab dengan peminta. Fakta direkam per pilar ke `## Catatan Elisitasi` setiap giliran, lalu elisitasi ditutup lewat `ticket.py close` (`CLOSED` + segel) | `skills/elicit/SKILL.md`, `references/elicitation-guide.md`, `templates/elicit-template.md` |
-| `analyst:spec` | skill (`user-invocable: false`) | Menyusun kartu di atas catatan elisitasi, dispatch reviewer, commit draft, minta persetujuan user, lalu `READY` | `skills/spec/SKILL.md`, `templates/ticket-template.md`, `dispatcher/reviewer.md` |
+| `analyst:spec` | skill (`user-invocable: false`) | Menyusun kartu di atas catatan elisitasi, dispatch reviewer, commit draft, minta persetujuan user, lalu `READY` dan sinkron nataflow opsional | `skills/spec/SKILL.md`, `templates/ticket-template.md`, `dispatcher/reviewer.md`, `references/nataflow-sync.md` |
 | `ticket-reviewer` | agent (read-only, model `sonnet`) | Memvonis draft kartu `PASS`/`BLOCKED` secara semantik terhadap catatan elisitasi | `agents/ticket-reviewer.md` |
-| `ticket.py` | script (CLI siklus hidup) | `state`, `new` (menulis `TICKET.md` awal), `check --gate elicit\|spec`, `close`, `review`, `revise`, `approve`, `reopen`, `cancel`, `ref` | `skills/_common/ticket.py` |
+| `ticket.py` | script (CLI siklus hidup) | `state`, `new` (menulis `TICKET.md` awal), `check --gate elicit\|spec`, `close`, `review`, `revise`, `approve`, `reopen`, `cancel`, `ref`, dan `sync-payload` (argumen tool MCP nataflow, read-only) | `skills/_common/ticket.py` |
 | `validate_doc.py` | script (validator) | `--kind elicit` menilai catatan elisitasi. `--kind ticket` menilai kartu, termasuk pemindai kebocoran teknis | `skills/_common/validate_doc.py` |
-| `analyst_lib.py` | script (pustaka) | Mencari root, parser frontmatter, pemecah kartu/catatan, sidik `content_hash`, `request_digest`, kerangka `ticket_skeleton`, segel `ticket_seal`, `scan_leaks`, dan commit git | `skills/_common/analyst_lib.py` |
+| `analyst_lib.py` | script (pustaka) | Mencari root, parser frontmatter, pemecah kartu/catatan, sidik `content_hash`, `request_digest`, kerangka `ticket_skeleton`, segel `ticket_seal`, `scan_leaks`, config sinkron `load_sync_config`, dan commit git | `skills/_common/analyst_lib.py` |
 
 ## Alur Utama
 
@@ -35,6 +35,7 @@ flowchart TD
     AREA -->|"kerja teknis murni"| ENGOUT["DI LUAR WILAYAH: backend:tech-lead / frontend:lead"]
     AREA -->|"tanya status tiket"| STATUS["Jawab dari ticket.py state --ready"]
     AREA -->|"ubah tiket READY"| SPEC
+    AREA -->|"sinkron ulang tiket READY"| SYNC
     AREA -->|"kebutuhan bisnis"| CLASSIFY["Phase 3-5: Tipe, Ukuran, Duplikat"]
     CLASSIFY -->|"lebih dari satu tujuan"| QUEUE["Antrian tiket untuk intake berikutnya"]
     CLASSIFY --> SLUG["Phase 6: slug + requester"]
@@ -56,7 +57,8 @@ flowchart TD
     ASK -->|"Kembali ke elisitasi"| ELICIT
     ASK -->|"Tahan"| HOLD2["Tetap DRAFT"]
     ASK -->|"Setujui, hanya bila review segar"| APPROVE["ticket.py approve: READY + commit"]
-    APPROVE --> HANDOFF["ticket_source ke backend:tech-lead / frontend:lead"]
+    APPROVE --> SYNC["Sinkron nataflow: sync-payload, list_task, lalu create_task / update_task"]
+    SYNC -->|"dibuat / diperbarui / dilewati / GAGAL, READY tetap"| HANDOFF["ticket_source ke backend:tech-lead / frontend:lead"]
 ```
 
 Semua pekerjaan masuk lewat `/analyst:intake`, termasuk melanjutkan tiket yang setengah jalan. Intake membaca
@@ -72,7 +74,8 @@ pun, sehingga `spec` dan reviewer selalu punya satu sumber kebenaran tertulis. `
 ### `analyst:intake`
 
 - **Pemicu / kapan dipakai**: permintaan, keluhan, atau laporan dari pengguna/stakeholder yang perlu dijadikan
-  tiket, atau tiket analyst yang sudah ada perlu dilanjutkan atau diubah. Dipanggil user lewat `/analyst:intake`.
+  tiket, tiket analyst yang sudah ada perlu dilanjutkan atau diubah, atau tiket `READY` perlu disinkron ulang
+  ke nataflow. Dipanggil user lewat `/analyst:intake`.
 - **Prasyarat**: `python3` tersedia. Ruang kerja berakar di root worktree git bila ada, selain itu di
   direktori kerja. Tiket tinggal di `analyst/tickets/`. Git tidak wajib. Parameter: `request` (wajib, apa
   adanya), `requester`, `force_type`.
@@ -84,8 +87,10 @@ pun, sehingga `spec` dan reviewer selalu punya satu sumber kebenaran tertulis. `
      dilaporkan ke user. Permintaan yang jelas menyambung ticketdir terbuka dirutekan ke sana. Bila
      hubungannya tidak jelas, intake bertanya ke user lewat `AskUserQuestion`.
   2. **Wilayah**: kebutuhan bisnis lanjut ke Phase 3. Perubahan tiket `READY` dirutekan ke `spec` dengan
-     `change_request`. Pertanyaan status dijawab dari `ticket.py state --ready`. Kerja teknis murni dijawab
-     `DI LUAR WILAYAH`.
+     `change_request`. Pertanyaan status dijawab dari `ticket.py state --ready`. Sinkron ulang tiket ke
+     nataflow (mis. sesudah segmen `nataflow GAGAL`) menjalankan prosedur `spec/references/nataflow-sync.md`
+     apa adanya atas tiket `READY` tanpa `reopen`; tiket `DRIFT` tetap dirutekan ke `spec`. Kerja teknis murni
+     dijawab `DI LUAR WILAYAH`.
   3. **Tipe**: `FEATURE` (kemampuan baru), `IMPROVEMENT` (memperluas kemampuan yang sudah bekerja), atau
      `BUG` (menyimpang dari yang seharusnya). Bila ragu antara IMPROVEMENT dan BUG, ajukan satu pertanyaan
      ke user.
@@ -99,10 +104,12 @@ pun, sehingga `spec` dan reviewer selalu punya satu sumber kebenaran tertulis. `
 - **Subagent yang didispatch**: tidak ada.
 - **Output / artefak**: tidak ada berkas. Serah terima bersih ditutup satu baris
   `INTAKE — <BARU | LANJUT | UBAH> · <type> · <slug> · next analyst:<elicit | spec>`. Di luar wilayah,
-  barisnya `INTAKE — DI LUAR WILAYAH · next <backend:tech-lead | frontend:lead>`. Keadaan lain memakai blok
-  `INTAKE — TERTAHAN | DILANJUTKAN DENGAN ANTRIAN`.
+  barisnya `INTAKE — DI LUAR WILAYAH · next <backend:tech-lead | frontend:lead>`. Sinkron ulang ditutup
+  `SINKRON — <ticketdir> · nataflow <dibuat #<code> | diperbarui #<code> | dilewati | GAGAL: <sebab>>`.
+  Keadaan lain memakai blok `INTAKE — TERTAHAN | DILANJUTKAN DENGAN ANTRIAN`.
 - **Gerbang & commit**: maksimal satu `AskUserQuestion` per phase. Intake tidak membaca kode dan tidak
-  membuat commit.
+  membuat commit. Satu-satunya tulisan keluarnya adalah task nataflow pada sinkron ulang, dengan isi dari
+  `ticket.py sync-payload`.
 - **Lanjut ke**: `analyst:elicit` atau `analyst:spec`. Kerja teknis murni diarahkan ke plugin engineer.
 
 ### `analyst:elicit`
@@ -199,12 +206,18 @@ flowchart TD
      `review_segar=ya`), *Revisi*, *Kembali ke elisitasi*, atau *Tahan*. *Setujui* menjalankan
      `ticket.py approve --answer "<jawaban user>"`. *Revisi* menjalankan `ticket.py revise`, lalu Phase 2–4
      diulang.
+     - **5.4 Sinkron nataflow**: sesudah `approve` exit 0 atau 3 (`READY` tertulis), sebelum baris penutup,
+       jalankan prosedur `references/nataflow-sync.md`. `ticket.py sync-payload --json` menyusun seluruh
+       argumen (`SKIP` tanpa `analyst/nataflow.json`, `FAIL` bila config rusak atau tiket bukan `READY`).
+       Model lalu memanggil `list_task` bersaring `{"source":"analyst","ticket_key":<ticketdir>}`: 0 hasil →
+       `create_task`, 1 → `update_task` dengan `task_id` hasil itu, lebih dari 1 → berhenti tanpa menulis.
+       Hasilnya satu segmen `nataflow …` di baris penutup; `GAGAL` tidak menurunkan `READY`.
 - **Subagent yang didispatch**: `analyst:ticket-reviewer`, langsung tanpa skill pembungkus. Vonisnya
   `PASS`/`BLOCKED`. Balikan kosong atau rusak dicatat `DISPATCH_FAILED` (tidak dihitung ronde) dan diulang
   maksimal sekali.
 - **Output / artefak**: kartu di `TICKET.md` (`status: DRAFT`, lalu `READY`) dan `<ticketdir>/review.md`
   (blok vonis terakhir, ditulis hanya oleh `ticket.py review`). Baris penutup:
-  `SPEC — READY · <ticketdir>/TICKET.md @<sidik> · <type> · <priority> · <n> AC · <n> BR · <commit> — serahkan ke engineer … ticket_source: <ticketdir>/TICKET.md`.
+  `SPEC — READY · <ticketdir>/TICKET.md @<sidik> · <type> · <priority> · <n> AC · <n> BR · <commit> · nataflow <dibuat #<code> | diperbarui #<code> | dilewati | GAGAL: <sebab>> — serahkan ke engineer … ticket_source: <ticketdir>/TICKET.md`.
   Selain itu dipakai blok `SPEC — MENUNGGU KEPUTUSAN | TERTAHAN`.
 - **Gerbang & commit**: `validate_doc.py --kind ticket` harus `PASS` sebelum dispatch. Plafon review 2
   ronde per revisi, dan ronde kembali ke 0 hanya bila catatan elisitasi disegel ulang lewat `close`. Plafon revisi 3 per basis fakta.
@@ -221,6 +234,7 @@ sequenceDiagram
     participant T as ticket.py
     participant R as ticket-reviewer
     participant U as User
+    participant N as nataflow MCP
     S->>T: check --gate spec (segel elisitasi, sidik, ronde)
     S->>S: tulis kartu DRAFT, validate_doc --kind ticket PASS
     S->>R: prompt terhidrasi (ticketdir, type, round, sidik)
@@ -235,6 +249,17 @@ sequenceDiagram
     alt Setujui
         S->>T: approve --answer jawaban user
         T-->>S: APPROVE PASS, READY dan commit kunci TICKET
+        S->>T: sync-payload --json
+        T-->>S: SKIP, FAIL, atau PASS (lookup, create, update)
+        opt PASS
+            S->>N: list_task (lookup apa adanya)
+            alt 0 task
+                S->>N: create_task (create apa adanya)
+            else 1 task
+                S->>N: update_task (task_id + update apa adanya)
+            end
+            N-->>S: task (code) atau galat, READY tetap
+        end
     else Revisi
         S->>T: revise (plafon 3)
         S->>S: kembali ke Phase 2
@@ -262,10 +287,16 @@ nama plugin engineer (mis. berisi `analyst`) agar hook kedua plugin engineer dia
 ## Artefak & Siklus Status
 
 ```
+./analyst/nataflow.json          opsional, ditulis user: mengaktifkan sinkron nataflow
 ./analyst/tickets/<YYMMDDhhmm>-<slug>/
   TICKET.md   satu-satunya artefak yang disunting skill (kartu di atas, ## Catatan Elisitasi sebagai H2 terakhir)
   review.md   blok ## Ticket Review terakhir, hanya ditulis ticket.py review --report
 ```
+
+`analyst/nataflow.json` (objek JSON, ter-commit) memuat `mcp_server` (default `nataflow-api`), `workspace_id`,
+dan `pic_id` (UUID, opsional). Berkas absen berarti sinkron dilewati; ada tetapi rusak berarti `sync-payload`
+`FAIL`. Plugin tidak pernah menulis berkas ini, dan sinkron tidak menulis apa pun ke `TICKET.md`: identitas
+task di nataflow adalah metadata `ticket_key` = path ticketdir, bukan field frontmatter.
 
 Frontmatter punya dua sumbu status dengan pemilik berbeda:
 
@@ -337,6 +368,9 @@ direktori tidak cocok dengan pola `<YYMMDDhhmm>-<slug>`.
 - **Kesepakatan aturan**: aktor, kondisi, dan `TBR-{n}` di tiket dihitung sudah disetujui. `backend:analyst`
   tidak menjadwalkan BRD hanya karena fakta itu. Bila BRD tetap terbit, `business-analysis` menyerap
   `TBR-{n}` tanpa menanyakannya ulang (`— Asal: TBR-{m}`).
+- **Cermin nataflow (opsional)**: bukan serah terima. Task nataflow hanya mencerminkan kartu tiket `READY`
+  (judul, kartu, metadata `ticket_key`), tidak pernah membawa status, dan tidak pernah dibaca balik oleh
+  analyst maupun engineer. Status, artefak engineer, dan pembatalan belum disinkronkan.
 - **Batas dengan plugin lain**: kontrak teknis dan brief milik `backend`, alur/bentuk layar milik
   `frontend`, perubahan kecil tanpa taskdir milik `quickdev`. Dua skill sengaja belum dibuat: `split`
   (pemecahan epic; untuk sementara intake memakai antrian tiket) dan `acceptance` (UAT atas `REPORT.md`
@@ -366,3 +400,4 @@ direktori tidak cocok dengan pola `<YYMMDDhhmm>-<slug>`.
 | `close`/`approve`/`ref`/`cancel` exit 3 (commit gagal karena hook, gpg, `.gitignore`) | spec / ticket.py | Isi sudah tertulis. Sajikan baris `COMMIT GAGAL`, lalu user meng-commit manual dengan perintah dan subjek persis yang dicetak. Dilarang `--no-verify` |
 | Tiket `READY` disunting (`DRIFT`) | intake, penerima engineer | Setujui ulang lewat `spec` (`reopen` → review → approve), atau pulihkan isi yang disetujui. `ticket.py ref` menolak tiket `DRIFT`. Bila suntingannya menyentuh catatan elisitasi, check 5 mengarahkan ke `elicit` dulu |
 | Membatalkan tiket `READY` | ticket.py | `cancel` ditolak tanpa `--force`, karena tiket mungkin sudah diserahkan ke engineer. `--force` hanya atas keputusan eksplisit user |
+| Sinkron nataflow `GAGAL` (server MCP tidak tersedia, tool galat, config rusak, task ber-`ticket_key` kembar) | spec, intake | Tiket tetap `READY` dan serah terima tetap berjalan. Bereskan sebabnya, lalu `/analyst:intake` "sinkron ulang tiket `<ticketdir>`". Dilarang `reopen` hanya demi sinkron, dan dilarang mengulang `create_task` tanpa `list_task` ulang |

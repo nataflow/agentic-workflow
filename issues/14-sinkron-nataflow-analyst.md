@@ -4,7 +4,20 @@ Sumber: diskusi desain 2026-09-28. Kontrak sisi server dirancang di repo `natafl
 `feat/task-mcp-metadata`: `backenddev/docs/2609280913-task-mcp-metadata/PRD.md` (APPROVED `e090e9d`) beserta
 6 brief READY (`e3e12ac`). Basis kode plugin: commit `a4cede4`.
 
-**Status (2026-09-28):** rencana; belum dikerjakan. Versi target: analyst 0.7.0.
+**Status (2026-09-28):** N1–N7 selesai. Test regresi di `tests/analyst/test_ticket_14.py` (21 test: N1, N2, N5)
+ditambah dua kasus smoke. Suite penuh 1816 test hijau, subset analyst hijau di Python 3.9, dan lint `--base HEAD`
+0 FAIL. Sisi server sudah diimplementasikan di `nataflow-api` branch `feat/task-mcp-metadata` (6 brief DONE,
+`1b76b97`), tetapi belum di-merge dan belum di-deploy. Versi: analyst 0.7.0.
+
+Selisih pelaksanaan terhadap Kontrak di bawah:
+
+- Keluaran `--json` selalu memuat `status` (`PASS`/`SKIP`/`FAIL`). `FAIL` berbentuk
+  `{"status":"FAIL","enabled":true,"problems":[…]}`, supaya `--json` tetap JSON pada jalur gagal (smoke).
+- Segmen `nataflow …` di baris `SPEC — READY` ditempatkan sesudah segmen commit, sebelum `— serahkan ke engineer`.
+- `approved_seal` di metadata dihitung ulang dari isi (`ticket_seal`). Nilainya sama dengan field tertulis karena
+  gerbang `READY` menolak segel yang berbeda, dan tiket lama tanpa field itu tetap mendapat nilai.
+- Smoke keadaan `rusak` ikut merusak `analyst/nataflow.json`, sehingga jalur `FAIL` teruji di keempat keadaan
+  repo, bukan hanya jalur `SKIP`.
 
 ## Tujuan
 
@@ -136,7 +149,7 @@ Segmen baru ditambahkan di akhir baris `SPEC — READY …`:
 ---
 
 ## N1 [Tinggi] Config sinkron belum ada
-- [ ] Belum
+- [x] Selesai
 
 Tidak ada tempat menyatakan bahwa repo memakai nataflow maupun workspace tujuannya. **Perubahan:**
 `analyst_lib.load_sync_config(root) -> (config | None, problems)` membaca `analyst/nataflow.json` (letaknya
@@ -146,7 +159,7 @@ bukan objek, kunci asing, nilai non-string, dan UUID tidak valid → masalah ter
 `nataflow-api`.
 
 ## N2 [Tinggi] Payload push dirangkai model
-- [ ] Belum
+- [x] Selesai
 
 Tanpa skrip, model menyusun judul, deskripsi, dan metadata sendiri, sehingga isinya bisa bergeser dari kartu
 yang di-approve. **Perubahan:** subperintah `ticket.py sync-payload` sesuai Kontrak. Deskripsi diambil dari
@@ -159,7 +172,7 @@ ensure_ascii=False)` agar byte-stabil. **Test:** `SKIP` tanpa config; `FAIL` unt
 identik pada dua pemanggilan berturut-turut.
 
 ## N3 [Tinggi] Tidak ada langkah push di `spec`
-- [ ] Belum
+- [x] Selesai
 
 `skills/spec/SKILL.md:71` (approve) langsung disusul baris penutup `:93`. **Perubahan:**
 
@@ -183,7 +196,7 @@ identik pada dua pemanggilan berturut-turut.
 **Test:** lint R-check atas rujukan `references/nataflow-sync.md`; tidak ada test perilaku model.
 
 ## N4 [Sedang] Push yang gagal tidak punya jalan ulang
-- [ ] Belum
+- [x] Selesai
 
 Server mati saat approve berarti tiket `READY` tanpa task, dan `spec` menolak tiket `READY` kecuali lewat
 `reopen`. **Perubahan:** `analyst:intake` menambah rute "sinkron ulang tiket `<ticketdir>`" untuk tiket
@@ -192,7 +205,7 @@ tutup dengan baris `SINKRON — <ticketdir> · nataflow <…>`. Tiket `DRIFT` te
 seperti sekarang. **Test:** lint R-check.
 
 ## N5 [Sedang] Idempotensi lintas `reopen` tidak terkunci test
-- [ ] Belum
+- [x] Selesai
 
 Keputusan K2 bergantung pada `ticket_key` yang stabil sepanjang `approve → reopen → review → approve`.
 **Test (tanpa perubahan kode):** siklus penuh memakai `ticket_review`; `ticket_key` dan `lookup` identik di
@@ -200,7 +213,7 @@ kedua `sync-payload`, sedangkan `approved_seal` dan `reopened` berubah. Tiket ba
 lama `READY` menghasilkan `ticket_key` berbeda.
 
 ## N6 [Rendah] Smoke dan lint untuk CLI baru
-- [ ] Belum
+- [x] Selesai
 
 `tests/test_smoke.py` hanya memuat `ticket.py state`. **Perubahan:** tambah
 `("analyst/skills/_common/ticket.py", ["sync-payload", "--ticketdir", AN_TD, "--json"], …)` ke `CASES`, agar
@@ -208,7 +221,7 @@ lama `READY` menghasilkan `ticket_key` berbeda.
 `python3 scripts/lint_plugins.py` hijau tanpa `LINT_IGNORE` baru.
 
 ## N7 [Rendah] Dokumen dan versi
-- [ ] Belum
+- [x] Selesai
 
 - `README.md` analyst: baris `sync-payload` di `## Penegakan Mekanis`, seksi baru `## Sinkron nataflow
   (opsional)` (config, prasyarat server MCP, perilaku gagal), dan `## Sengaja Belum Ada` menyebut sinkron
