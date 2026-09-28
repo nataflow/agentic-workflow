@@ -31,6 +31,9 @@
 | `verify_scope.py` | script | Vonis berkas yang berubah terhadap `files_touched` brief | `skills/_common/verify_scope.py` |
 | `precondition_lib.py` | script (lib) | Primitif bersama semua skrip prasyarat, validator, dan `chain.py` | `skills/_common/precondition_lib.py` |
 | `taskdir_state.py` | script | Memvonis keadaan tiap taskdir beserta satu rute berikutnya (pemulihan sesi) | `skills/lead/scripts/taskdir_state.py` |
+| `sync_payload.py` | script | Argumen tool MCP nataflow (task, workdir, dokumen) untuk satu taskdir atau dokumen repo; read-only, dua fase, ledger dibaca lewat `verify_chain_row` | `skills/_common/sync_payload.py` |
+| `nataflow_sync.py` | pustaka | Config `.claude/nataflow.json`, identitas repo, isi blob `HEAD`, dan diff manifest remote. Salinan identik di keempat plugin | `skills/_common/nataflow_sync.py` |
+| Prosedur sinkron nataflow | referensi | Urutan panggilan tool MCP dua fase dan tabel titik panggil | `skills/lead/references/nataflow-sync.md` |
 | `check_preconditions.py` | script (×9) | Prasyarat tiap skill kecuali `lead` | `skills/<skill>/scripts/check_preconditions.py` |
 | `validate_task.py` | script | Validator struktur akar `TASK.md` (`--amend` untuk amandemen) | `skills/task/scripts/validate_task.py` |
 | `validate_briefs.py` | script | 16 check brief: S N D L T F B R V K O E C P G M | `skills/plan/scripts/validate_briefs.py` |
@@ -107,7 +110,7 @@ Alurnya, secara ringkas:
 1. **Gate tunggal.** Hook `SessionStart` mengingatkan model bahwa tiap permintaan kerja lewat `frontend:lead` dulu (`hooks/gate_text.py`). Lead tidak menyentuh `src/`. Tugasnya menyapu lokasi fitur dengan kuota ketat, memindai taskdir terbuka, memilih lane dan `sections`, lalu memprovisi taskdir `frontenddev/docs/<YYMMDDhhmm>-<slug>/`.
 2. **Akar dulu.** Keempat lane yang berakar selalu mulai dari `frontend:task`, yang menulis `TASK.md` berisi `SC-{n}` terukur. `chain.py init` menulis ledger `## Chain` sesuai jadwal `sections`.
 3. **Gate kondisional.** `flow` menjadwalkan Gate Flow, `ui` menjadwalkan Gate Design, `sections` yang tidak kosong menjadwalkan Gate Contract, dan Gate Breakdown selalu jalan. `HOTFIX_MINOR` hanya punya hop BRIEF dan tidak melewati Plan Review (`README.md` § Workflow).
-4. **Pola tiap gate.** Draft `DRAFT` ditulis, lolos validator (dan ronde reviewer untuk CONTRACT/BRIEF), lalu di-commit. Setelah itu gate bertanya ke user lewat `AskUserQuestion`. Kalau disetujui, `chain.py approve` menulis `APPROVED` dan mencentang ledger dalam satu commit yang memuat `Konten disetujui: <sha>`, `Sidik:` (hash konten tanpa baris `status:`), `Review-Round:` untuk hop yang direview, dan `Hop: <ROW>`. Hilir menjangkarkan keutuhan pada commit approve itu, sehingga tahan rebase dan clone.
+4. **Pola tiap gate.** Draft `DRAFT` ditulis, lolos validator (dan ronde reviewer untuk CONTRACT/BRIEF), lalu di-commit. Setelah itu gate bertanya ke user lewat `AskUserQuestion`. Kalau disetujui, `chain.py approve` menulis `APPROVED` dan mencentang ledger dalam satu commit yang memuat `Konten disetujui: <sha>`, `Sidik:` (hash konten tanpa baris `status:`), `Review-Round:` untuk hop yang direview, dan `Hop: <ROW>`. Hilir menjangkarkan keutuhan pada commit approve itu, sehingga tahan rebase dan clone. Approve PASS diikuti sinkron nataflow (`lead/references/nataflow-sync.md`), yang hasilnya masuk baris penutup gate sebagai segmen `nataflow <…>`.
 5. **Eksekusi.** `architect` menjalankan brief satu per satu lewat `code-implementor`. Status unit divonis dari disk, dan lint, test, serta build hanya jalan sekali di penutup. Setelah itu `code-reviewer` menilai diff sejak akar, lalu `report` mengunci `REPORT.md`.
 6. **Cacat diperbaiki di taskdir yang sama.** Perbaikan selalu lewat `chain.py reopen`/`escalate` yang diputuskan di lead Phase 8, tidak pernah dengan membuka taskdir baru.
 7. **Plafon habis = rumuskan ulang.** Ronde reviewer, revisi, re-entry, dan eskalasi berplafon. Bila plafon habis, lead menanyakan user lewat `AskUserQuestion`: rumuskan ulang di taskdir baru (`chain.py abandon` taskdir lama) atau hentikan. Tidak ada jalan pintas yang me-reset plafon, termasuk amandemen akar dan `draft` ulang.
@@ -656,6 +659,8 @@ stateDiagram-v2
 
 ## Handoff Lintas Plugin
 
+- **Cermin nataflow (opsional).** Satu taskdir = satu workdir `frontenddev:<repo>:<path taskdir>`. Taskdir bertiket menempel ke task tiket analyst (metadata `ticket_key` = direktori `ticket_source`), sehingga taskdir frontend dan backend dari satu tiket bernaung di satu task. Isi dokumen diambil dari blob `HEAD`: `TASK.md`; `FLOW.md`/`UI.md`/`CONTRACT.md` bila baris ledger-nya `[x]` dan tidak DRIFT; brief dan `REVIEW-PLAN.md` sesudah hop BRIEF disetujui (atau brief `DONE`/`BLOCKED`); `report-NN.md`, `REVIEW.md`, dan `REPORT.md`. Hop yang dibuka ulang tercermin dengan status terbarunya; hop DRIFT tidak didorong ulang. Status workdir dari `taskdir_state.py` (`TUNTAS` → `done`, `DITUTUP` → `abandoned`, `TERHENTI`/`TEMUAN` → `blocked`). `frontenddev/reviews/` dan profil didorong ke workspace. Config `.claude/nataflow.json` dibaca bersama keempat plugin.
+
 - **Dari `analyst` (tiket).**
   - Tiket READY diserahkan ke `/frontend:lead` lewat parameter `ticket_source` = `analyst/tickets/<YYMMDDhhmm>-<slug>/TICKET.md`. Parameter ini tidak boleh disimpulkan dari isi prompt. Kalau user menempel sesuatu yang mirip kartu tiket tanpa path, lead menanyakan path-nya.
   - Kalau terisi, `prompt` diisi kartu tiket apa adanya (H1 sampai akhir `## Lampiran`).
@@ -705,3 +710,4 @@ stateDiagram-v2
 | Reopen melewati 3 per hop atau 6 per taskdir, eskalasi melewati 2 | `chain.py` | `AskUserQuestion`: rumuskan ulang di taskdir baru (`chain.py abandon` → `DITUTUP`) atau hentikan |
 | Materai approve tanpa `Sidik:` (rantai dari 0.8.0) | `chain.py verify` → `DRIFT` | `reopen --row <hop tercentang teratas>` lalu approve ulang tiap hop (1 kuota reopen, 1 ronde reviewer untuk CONTRACT/BRIEF) |
 | Commit gagal (hook, lock) di gate mana pun | git | Perbaiki penyebabnya dan ulangi. Dilarang `--no-verify`, dan dilarang mengajukan draft yang belum ter-commit |
+| `.claude/nataflow.json` rusak, server MCP mati, tool galat, sha ditolak, atau task beridentitas sama lebih dari satu | Prosedur `nataflow-sync.md` (main loop) | Segmen `nataflow GAGAL: <sebab>` di baris penutup; gate dan eksekusi tetap lanjut. Perbaiki sebabnya lalu `/frontend:lead` "sinkron ulang taskdir <slug>" |

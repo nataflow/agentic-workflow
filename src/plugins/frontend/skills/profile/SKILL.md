@@ -181,9 +181,11 @@ Tulis `<repo>/.claude/profile/frontenddev/` persis mengikuti skema, format, dan 
 
 Artefak `.claude/profile/frontenddev/` mengikuti skema `templates/profile-template.md` — bentuk `index.json`, urutan berkas, bentuk tabel, dan `## Tata Cara Anchor Bukti` diambil dari sana apa adanya, tidak disalin ulang ke sini.
 
-Mode PATCH → tutup satu baris: `### FRONTEND PROFILE REPORT — PATCH · drift +<n> baris · <k> dilewati (duplikat) · <m> bukti user` (ditambah alasan bila dihentikan di butir 3 Phase P).
+Sesudah commit profil mendarat (commit atomik penutup, MIGRATE, atau PATCH butir 7), jalankan prosedur `lead/references/nataflow-sync.md` (`--repo-docs profile`) di main loop; segmennya menutup baris judul laporan, dan `nataflow GAGAL` tidak mengubah vonis.
 
-Profil utuh dan baseline terverifikasi → tutup dua baris tanpa blok: judul `### FRONTEND PROFILE REPORT — <GENERATE | REFRESH> · stack <stack-id> · <framework> <version> · index.json + 9 berkas .md` plus baris serah-terima. Selain itu, sajikan:
+Mode PATCH → tutup satu baris: `### FRONTEND PROFILE REPORT — PATCH · drift +<n> baris · <k> dilewati (duplikat) · <m> bukti user · nataflow <segmen>` (ditambah alasan bila dihentikan di butir 3 Phase P).
+
+Profil utuh dan baseline terverifikasi → tutup dua baris tanpa blok: judul `### FRONTEND PROFILE REPORT — <GENERATE | REFRESH> · stack <stack-id> · <framework> <version> · index.json + 9 berkas .md · nataflow <segmen>` plus baris serah-terima. Selain itu, sajikan:
 
 ```markdown
 ### FRONTEND PROFILE REPORT — <GENERATE | REFRESH> TIDAK UTUH

@@ -83,7 +83,9 @@ Berkas yang muncul di diff unit, di galat kompilasi, atau di `REVIEW.md` sementa
 
 ## Output [REQUIRED]
 
-Rantai bersih — seluruh brief `DONE`, verifikasi hijau, review `PASS`/`WARNING`, `REPORT.md` terbit — tutup satu baris: `ARCHITECT — COMPLETED · <taskdir> · Brief <n>/<n> DONE · Verifikasi PASS · Review <PASS|WARNING> (P2 <n>) · REVIEW.md @ <sha> · REPORT.md @ <sha>`, ditambah baris `Umpan balik profil` bila ada. Selain itu sajikan blok berikut dan hapus baris bernilai `—`:
+Sebelum baris `ARCHITECT — …` atau blok di bawah, jalankan prosedur `lead/references/nataflow-sync.md` (`--taskdir <taskdir>`) satu kali per putaran di main loop: sesudah commit `REVIEW.md` (Phase 4) dan `REPORT.md` (Phase 5 butir 4), atau saat rantai berhenti lebih awal (unit `BLOCKED`, verifikasi merah, berkas yatim). Status unit, `report-NN.md`, dan review tercermin sekaligus; `nataflow GAGAL` tidak mengubah vonis.
+
+Rantai bersih — seluruh brief `DONE`, verifikasi hijau, review `PASS`/`WARNING`, `REPORT.md` terbit — tutup satu baris: `ARCHITECT — COMPLETED · <taskdir> · Brief <n>/<n> DONE · Verifikasi PASS · Review <PASS|WARNING> (P2 <n>) · REVIEW.md @ <sha> · REPORT.md @ <sha> · nataflow <segmen>`, ditambah baris `Umpan balik profil` bila ada. Selain itu sajikan blok berikut dan hapus baris bernilai `—`:
 
 ```markdown
 ### ARCHITECT — <BLOCKED | TERTAHAN>
@@ -94,6 +96,7 @@ Rantai bersih — seluruh brief `DONE`, verifikasi hijau, review `PASS`/`WARNING
 - **Review**: <PASS | WARNING | BLOCKED> · REVIEW.md @ <sha> | tidak dinilai (rantai terhenti)
 - **Rute**: <chain.py reopen --row BRIEF → plan APPEND (remedi | perbaikan) | chain.py reopen --row CONTRACT → contract → plan APPEND | MINOR: reopen BRIEF → escalate FAST_FORWARD>
 - **Umpan balik profil**: <file:baris — pola → pengganti> | —
+- **Nataflow**: <segmen>
 ```
 
 **Serah-terima.** `Rantai selesai — kembali ke frontend:lead di main loop.` Dilarang membuka rantai baru sendiri.

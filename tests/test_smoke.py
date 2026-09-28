@@ -58,6 +58,8 @@ CASES = [
     ("frontend/skills/_common/chain.py", ["status", "--taskdir", FE_TD], False, None),
     ("frontend/skills/_common/review_round.py", ["status", "--taskdir", FE_TD, "--gate", "plan"], False, None),
     ("frontend/skills/_common/run_verification.py", ["closing", "--taskdir", FE_TD, "--cmd", "test=true"], False, None),
+    ("frontend/skills/_common/sync_payload.py", ["--taskdir", FE_TD, "--json"], True, None),
+    ("frontend/skills/_common/sync_payload.py", ["--repo-docs", "review", "--json"], True, None),
     ("frontend/skills/_common/validate_doc.py", ["--kind", "flow", "--taskdir", FE_TD, "--json"], True, None),
     ("frontend/skills/_common/verify_scope.py", ["--brief", f"{FE_TD}/brief-01.md", "--worktree"], False, None),
     ("frontend/skills/architect/scripts/check_preconditions.py", ["--taskdir", FE_TD, "--json"], True, None),

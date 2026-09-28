@@ -43,7 +43,7 @@ Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/lead/scripts/taskdir_state.py`. T
 
 | Keadaan | Rute |
 |---|---|
-| `AKAR` | taskdir kosong → Phase 7 `frontend:task`; user batal → hapus direktori kosong itu (tidak ada yang di-commit). `TASK.md belum ter-commit` → lead menjalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/task/scripts/validate_task.py --taskdir <taskdir>`: `PASS` → commit `docs(<slug>): kunci TASK sebagai akar rantai`; `FAIL` → tanyakan user (task tidak menulis ulang akar) |
+| `AKAR` | taskdir kosong → Phase 7 `frontend:task`; user batal → hapus direktori kosong itu (tidak ada yang di-commit). `TASK.md belum ter-commit` → lead menjalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/task/scripts/validate_task.py --taskdir <taskdir>`: `PASS` → commit `docs(<slug>): kunci TASK sebagai akar rantai`, lalu prosedur `references/nataflow-sync.md`; `FAIL` → tanyakan user (task tidak menulis ulang akar) |
 | `GATE` | skill pemilik hop pertama yang belum `[x]` (mode `plan` disebut skrip); draft `DRAFT` tertunda → gate itu menanyakan keputusan user; batch brief ter-commit belum disetujui → `plan` menjalankan prasyarat mode REVISE lalu langsung Phase 5 tanpa menulis ulang |
 | `DRIFT` | konten hop tercentang atau `SC-{n}` TASK.md berubah sesudah disetujui → tanyakan user: `chain.py reopen --row <ROW>` atau pulihkan isi yang disetujui |
 | `EKSEKUSI` / `PENUTUP` | `frontend:architect`; `PENUTUP` juga untuk `REVIEW.md` basi (ada commit yang menyentuh `brief-*.md` sesudahnya) — review ulang menimpanya |
@@ -55,6 +55,8 @@ Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/lead/scripts/taskdir_state.py`. T
 | `RUSAK` | taskdir yang disebut tidak ada, nama direktori di luar pola `<YYMMDDhhmm>-<slug>`, artefak tanpa `TASK.md`, `status` akar selain `ACTIVE`/`ABANDONED`, pasangan lane/sections tidak sah, `lane`/`sections` berubah di luar commit akar (`kunci TASK`) atau `chain.py escalate`, atau ledger ≠ jadwal sections → Failure path 4; dilarang menambal akar atau ledger dengan tangan |
 
 Skrip keluar `[FAIL] ... bukan repo git` → hentikan; rantai frontend menuntut git.
+
+**Sinkron ulang taskdir.** Permintaan "sinkron ulang taskdir `<taskdir>`" (biasanya sesudah segmen `nataflow GAGAL`) tidak mengubah keadaan taskdir dan tidak melewati Phase lain: jalankan prosedur `references/nataflow-sync.md` atas taskdir itu (ditambah `--repo-docs review`/`profile` bila diminta), tutup satu baris `SINKRON — <taskdir> · nataflow <segmen>`, lalu selesai.
 
 Permintaan baru saat ada taskdir terbuka → tanyakan lewat `AskUserQuestion`: lanjutkan taskdir itu, atau buka taskdir baru (yang lama tetap terbuka dan akan muncul lagi di pemindaian berikutnya). Taskdir ber-brief `BLOCKED` dilarang ditinggal diam-diam.
 
@@ -130,6 +132,8 @@ Dijalankan ketika gate hilir mengembalikan kendali dengan temuan yang menggeser 
 
 Plafon ditegakkan skrip: ronde reviewer 2 per putaran dan 8 per taskdir; revisi 2 berturut per gate; eskalasi 2 per taskdir; re-entry 3 per hop (dihitung saat hop itu target `reopen`; kaskade tidak memakan kuota hop di bawahnya) dan 6 per taskdir (semua reopen). Plafon habis → cacatnya di lingkup, bukan di dokumen. Tidak ada jalan pintas yang me-reset plafon: amandemen akar, `draft` ulang, atau reopen tambahan tidak membuka kuota baru — satu-satunya jalan lanjut adalah taskdir baru dengan permintaan yang dirumuskan ulang.
 
+Sesudah tiap tindakan tabel di atas mendarat (`reopen`, `escalate`, `abandon`, atau commit amandemen akar), jalankan prosedur `references/nataflow-sync.md` atas taskdir itu: hop yang dibuka ulang tercermin dengan status terbarunya dan taskdir `DITUTUP` menutup workdir-nya (`abandoned`). Segmennya masuk baris `LEAD — …` berikutnya.
+
 ## Guardrails
 
 - **DILARANG MENGEDIT KODE DI GATE**: nol perubahan `src/` dari lead.
@@ -149,7 +153,7 @@ Plafon ditegakkan skrip: ronde reviewer 2 per putaran dan 8 per taskdir; revisi 
 
 ## Output [REQUIRED]
 
-Handoff ke gate berikutnya — tutup satu baris: `LEAD — <lane> · sections <nilai | -> · <taskdir> · akar TASK.md @ <sha | -> · next <skill (mode)> · stack <stack-id>`. Lane tanpa taskdir: `LEAD — <EXPLORE_FACT | REVIEW_AUDIT | PROFILE> · next <skill | jawaban langsung>`. Tertahan (monorepo ambigu, stack tak didukung, taskdir RUSAK, plafon habis) — sajikan blok berikut dan hapus baris bernilai `—`:
+Handoff ke gate berikutnya — tutup satu baris: `LEAD — <lane> · sections <nilai | -> · <taskdir> · akar TASK.md @ <sha | -> · next <skill (mode)> · stack <stack-id>`, ditambah ` · nataflow <segmen>` bila sinkron berjalan di giliran ini. Lane tanpa taskdir: `LEAD — <EXPLORE_FACT | REVIEW_AUDIT | PROFILE> · next <skill | jawaban langsung>`. Tertahan (monorepo ambigu, stack tak didukung, taskdir RUSAK, plafon habis) — sajikan blok berikut dan hapus baris bernilai `—`:
 
 ```markdown
 ### LEAD — TERTAHAN

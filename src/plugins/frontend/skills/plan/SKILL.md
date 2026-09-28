@@ -73,7 +73,7 @@ Brief `DONE`/`BLOCKED` tidak pernah disunting, jadi tidak pernah ikut di-stage.
 
 1. Sajikan tabel: Unit, Nama, `files_touched`, `depends_on`, `fulfills`, `covers`, verdict Plan Review.
 2. `AskUserQuestion` dengan opsi berkonsekuensi: *Setujui breakdown — lanjut eksekusi* · *Revisi (sebut poinnya)* · *Hentikan*.
-3. **Setuju** → `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py approve --taskdir <taskdir> --row BRIEF --answer "<jawaban user apa adanya>"`. Skrip memvonis ulang `validate_briefs.py`, `REVIEW-PLAN.md` `PASS` yang merupakan laporan ronde terakhir (bukan basi), dan ronde reviewer terakhir `PASS` atas konten final yang tidak didahului `reopen` hop BRIEF, lalu mencentang ledger dalam satu commit (badan: `Konten disetujui: <sha>`, `Sidik:`, `Review-Round:` bila direview, `Hop: BRIEF`). Pada BRIEF `[~]` skrip juga menolak brief `DONE`/`BLOCKED` yang status atau isinya berubah sejak reopen. Pada BRIEF `[~]` tanpa brief `READY` (kaskade/amandemen tanpa kerja baru) skrip hanya memvonis `validate_briefs.py` — approval ulang sah tanpa ronde Plan Review baru.
+3. **Setuju** → `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py approve --taskdir <taskdir> --row BRIEF --answer "<jawaban user apa adanya>"`. Skrip memvonis ulang `validate_briefs.py`, `REVIEW-PLAN.md` `PASS` yang merupakan laporan ronde terakhir (bukan basi), dan ronde reviewer terakhir `PASS` atas konten final yang tidak didahului `reopen` hop BRIEF, lalu mencentang ledger dalam satu commit (badan: `Konten disetujui: <sha>`, `Sidik:`, `Review-Round:` bila direview, `Hop: BRIEF`). Pada BRIEF `[~]` skrip juga menolak brief `DONE`/`BLOCKED` yang status atau isinya berubah sejak reopen. Pada BRIEF `[~]` tanpa brief `READY` (kaskade/amandemen tanpa kerja baru) skrip hanya memvonis `validate_briefs.py` — approval ulang sah tanpa ronde Plan Review baru. Approve PASS → jalankan prosedur `lead/references/nataflow-sync.md` (`--taskdir <taskdir>`); segmennya masuk baris penutup, dan `nataflow GAGAL` tidak membatalkan approval.
 4. **Revisi** → cek sisa plafon `chain.py revisions --taskdir <taskdir> --row BRIEF` (plafon 2; `draft` ulang dan amandemen akar tidak me-reset hitungan), lalu ulangi Phase 1–5 dengan mode `REVISE`. Plafon habis → hentikan, sajikan poin penolakan berurutan, serahkan ke `frontend:lead` Phase 8 (plafon habis: taskdir baru atau hentikan).
 
 ## Guardrails
@@ -97,7 +97,7 @@ Brief `DONE`/`BLOCKED` tidak pernah disunting, jadi tidak pernah ikut di-stage.
 
 ## Output [REQUIRED]
 
-Breakdown disetujui — tutup satu baris: `PLAN — BRIEF @ READY <sha> · <N> brief (<n> baru) · Plan Review <PASS ronde n | dilewati (MINOR)> — lanjut ke frontend:architect di main loop.` Selain itu sajikan blok berikut dan hapus baris bernilai `—`:
+Breakdown disetujui — tutup satu baris: `PLAN — BRIEF @ READY <sha> · <N> brief (<n> baru) · Plan Review <PASS ronde n | dilewati (MINOR)> · nataflow <segmen> — lanjut ke frontend:architect di main loop.` Selain itu sajikan blok berikut dan hapus baris bernilai `—`:
 
 ```markdown
 ### PLAN — <MENUNGGU REVISI | TERTAHAN>

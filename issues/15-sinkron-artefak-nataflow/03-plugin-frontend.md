@@ -1,7 +1,29 @@
 # Langkah 15 — Perubahan plugin `frontend` (frontenddev)
 
 Rujukan: `01-mcp-tools.md`, yaitu tool T1–T10, kontrak identitas, dan pola pemakaian tool.
-**Status:** PEMETAAN, belum dieksekusi.
+**Status:** SELESAI (tahap 4). F1–F15 terpasang; F11 lewat payload dua fase (E4). Tambahan di luar tabel F:
+`architect` Phase 5 butir 4 (commit `REPORT.md` tertunda oleh architect) ikut tertangkap aturan sinkron di pembuka
+`## Output` architect. Versi dinaikkan di commit rilis. Test: `tests/frontend/test_15_sync_payload.py` (12) + dua
+`CASES` smoke; suite penuh 1925 hijau, lint 0 FAIL.
+
+## Peta blast radius (sebelum kode)
+
+| Berkas | Perubahan | Yang bisa pecah |
+|---|---|---|
+| `skills/_common/sync_payload.py` (baru, CLI) | F2/F9/F11–F13: `--taskdir` \| `--repo-docs review\|profile`, `--remote -`, `--json`. Ledger dibaca lewat `read_chain` + `verify_chain_row`; keadaan lewat subproses `lead/scripts/taskdir_state.py --json` (pola lintas skill yang sudah ada, bukan impor) | `test_smoke` inventaris; `test_profile_paths` (pakai `PROFILE_DIR_REL`); lint R4/S1 |
+| `skills/lead/references/nataflow-sync.md` (baru) | Prosedur dua fase + varian dokumen repo | Lint R1 (skill lain merujuknya sebagai `lead/references/nataflow-sync.md`, preseden `lead/references/lane-routing-matrix.md`) dan R2 |
+| `skills/task/SKILL.md` Phase 4 | Butir sinkron sesudah commit akar (butir 6 baru, "Catat SHA" menjadi 7); segmen di `### TASK ROOT LOCKED` | Tidak ada rujukan "Phase 4 butir 6"; `validate_task.py` hanya merujuk butir 2 |
+| `skills/lead/SKILL.md` | Baris `AKAR` (commit akar tertinggal) + sinkron; rute sinkron ulang di samping tabel Phase 2; Phase 8 sesudah `reopen`/`escalate`/`abandon`/amandemen; segmen di baris `LEAD — …` | `test_j58f` (butir 1 Failure path tidak disentuh); `test_j43` (frasa terlarang); `test_j49`, `test_a1` parameter |
+| `skills/{ux-design,ui-design,contract,plan}/SKILL.md` | Butir "Setuju": sinkron sesudah `chain.py approve` PASS; segmen di baris penutup gate | `test_j58d` (`frontend:code-explorer`), `test_j42` (`hop di atasnya`), `test_j58g`; rujukan "Phase 4 butir 3" ux-design tidak terdampak |
+| `skills/architect/SKILL.md` | Satu aturan di pembuka `## Output`: sinkron sekali per putaran sebelum baris `ARCHITECT — …` atau blok `BLOCKED`/`TERTAHAN` (menangkap Phase 4 dan Phase 5 butir 4 tanpa menomori ulang); segmen/slot **Nataflow** | "Phase 5 butir 4" dikunci skrip dan 10 prosa → tidak disentuh; `test_j54` (Failure path 5/6), `test_j55`, `test_c9` (hindari "code-reviewer … tepat sekali"), `test_architects_use_runner_not_tail` |
+| `skills/report/SKILL.md` Phase 4 | Sinkron sesudah commit `REPORT.md`; segmen di `### REPORT LOCKED` | Tidak ada rujukan bernomor ke butir sesudahnya |
+| `skills/review/SKILL.md`, `skills/profile/SKILL.md` | F13: `--repo-docs review`/`profile` sesudah commit; segmen penutup | `test_j58e`, `test_j4_*` (profil) |
+| `README.md`, `flow/frontend.md` | Seksi sinkron terpisah dari tabel "Mechanical Enforcement" | `test_j58h` menghitung baris tabel penjaga → `sync_payload.py` tidak dimasukkan ke tabel itu; `test_flow_frontend_menyebut_perilaku_baru`; `test_versi_rilis` (commit rilis) |
+| `tests/frontend/test_15_sync_payload.py` (baru), `tests/test_smoke.py` | Kontrak skrip (F15) + dua `CASES` | — |
+
+Keputusan tambahan: hop yang DRIFT juga ditahan dari aturan E7, supaya cermin tidak pernah menampilkan isi yang belum
+disetujui berlabel `APPROVED`. Task sendiri: `TUNTAS` → `done`, `DITUTUP` → `cancelled`; task tiket hanya naik ke
+`in_progress` (E8). "Eksekusi dimulai" = ada brief `DONE`/`BLOCKED`, `report-NN.md`, `REVIEW.md`, atau `REPORT.md`.
 
 ## Ringkasan
 

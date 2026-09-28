@@ -50,7 +50,8 @@ user-invocable: false
 1. Tulis `{taskdir}/REPORT.md` mengikuti `templates/report-template.md` bagian 1.
 2. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/report/scripts/validate_report.py --taskdir <taskdir>`; `FAIL` → perbaiki berkasnya lalu ulangi, maksimal 2 putaran perbaikan; masih `FAIL` → hentikan tanpa commit, sajikan butir gagal di Output, dan serahkan ke user.
 3. Stage path eksplisit `{taskdir}/REPORT.md`, lalu commit `docs(<slug>): laporkan hasil rantai <slug>`. Dilarang `git add .` maupun `git add -A`.
-4. Catat SHA commit dan kembalikan kendali ke `frontend:architect`.
+4. Commit mendarat → jalankan prosedur `lead/references/nataflow-sync.md` (`--taskdir <taskdir>`) di main loop; segmennya masuk baris penutup, dan `nataflow GAGAL` tidak membatalkan laporan.
+5. Catat SHA commit dan kembalikan kendali ke `frontend:architect`.
 
 ## Guardrails
 
@@ -63,7 +64,7 @@ user-invocable: false
 
 ## Output [REQUIRED]
 
-Validasi `PASS` dan commit mendarat → tutup satu baris: `### REPORT LOCKED — <taskdir>/REPORT.md @ <sha> · <n> butir dari <n> berkas · SC <n> terbukti / <n> manual / <n> belum`. Commit gagal → sajikan:
+Validasi `PASS` dan commit mendarat → tutup satu baris: `### REPORT LOCKED — <taskdir>/REPORT.md @ <sha> · <n> butir dari <n> berkas · SC <n> terbukti / <n> manual / <n> belum · nataflow <segmen>`. Commit gagal → sajikan:
 
 ```markdown
 ### REPORT LOCKED — GAGAL

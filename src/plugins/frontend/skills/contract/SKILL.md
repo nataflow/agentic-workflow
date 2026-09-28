@@ -63,7 +63,7 @@ Tawarkan 2–3 opsi (Strict 5-Layer · Colocated Controller & View-Model · Shar
 
 1. Commit draft lewat skrip, bukan `git commit` langsung: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/review_round.py commit --taskdir <taskdir> --gate contract --subject "docs(<slug>): draft CONTRACT.md"` (revisi berikutnya: `docs(<slug>): revise CONTRACT.md`). Skrip menolak kecuali ronde terakhir `PASS` atas konten disk sekarang, lalu meng-commit dengan trailer `Review-Round` — jejak ronde yang bertahan walau laci `.explore/` hilang.
 2. Sajikan ringkasan keputusan — endpoint beserta DTO, strategi cache, layer shape, Files Touched, tabel AC beserta sumbernya, verdict reviewer — lalu `AskUserQuestion`: *Setujui kontrak* · *Revisi (sebut poinnya)* · *Hentikan*.
-3. **Setuju** → `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py approve --taskdir <taskdir> --row CONTRACT --answer "<jawaban user apa adanya>"`. Skrip memvonis ulang validator dan ronde reviewer terakhir — wajib `PASS` atas konten final (sidik sama, di luar baris `status:`) **dan** tidak didahului `reopen` hop CONTRACT sesudah ronde itu dibuka; commit `draft`/`revise` sesudah ronde tidak membatalkannya — menulis `APPROVED`, dan mencentang ledger dalam satu commit (badan: `Konten disetujui: <sha>`, `Sidik:`, `Review-Round:`, `Hop: CONTRACT`).
+3. **Setuju** → `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py approve --taskdir <taskdir> --row CONTRACT --answer "<jawaban user apa adanya>"`. Skrip memvonis ulang validator dan ronde reviewer terakhir — wajib `PASS` atas konten final (sidik sama, di luar baris `status:`) **dan** tidak didahului `reopen` hop CONTRACT sesudah ronde itu dibuka; commit `draft`/`revise` sesudah ronde tidak membatalkannya — menulis `APPROVED`, dan mencentang ledger dalam satu commit (badan: `Konten disetujui: <sha>`, `Sidik:`, `Review-Round:`, `Hop: CONTRACT`). Approve PASS → jalankan prosedur `lead/references/nataflow-sync.md` (`--taskdir <taskdir>`); segmennya masuk baris penutup, dan `nataflow GAGAL` tidak membatalkan approval.
 4. **Revisi** → `chain.py revisions --taskdir <taskdir> --row CONTRACT` (plafon 2; `draft` ulang dan amandemen akar tidak me-reset hitungan). Di bawah plafon → perbarui draft, lalu urutan tetap: `validate_doc.py` `PASS` → ronde reviewer atas konten final (Phase 5 butir 3; putaran baru, 2 ronde) → commit `docs(<slug>): revise CONTRACT.md` → ajukan ulang. Suntingan sesudah ronde `PASS` menuntut ronde baru. Plafon habis → hentikan, sajikan poin penolakan berurutan, serahkan ke `frontend:lead` Phase 8 (plafon habis: taskdir baru atau hentikan).
 
 ## Guardrails
@@ -85,7 +85,7 @@ Tawarkan 2–3 opsi (Strict 5-Layer · Colocated Controller & View-Model · Shar
 
 ## Output [REQUIRED]
 
-Kontrak disetujui — tutup satu baris: `CONTRACT — APPROVED @ <sha konten> · <n> endpoint · <n> berkas · <n> AC (SC <n>/<n>, DD <n>/<n>, ST <n>/<n> terpikul) · reviewer PASS ronde <n> — lanjut ke frontend:plan (mode sesuai `taskdir_state.py`: CONTRACT pada seri pertama, APPEND bila hop BRIEF `[~]`) di main loop.` Selain itu sajikan blok berikut dan hapus baris bernilai `—`:
+Kontrak disetujui — tutup satu baris: `CONTRACT — APPROVED @ <sha konten> · <n> endpoint · <n> berkas · <n> AC (SC <n>/<n>, DD <n>/<n>, ST <n>/<n> terpikul) · reviewer PASS ronde <n> · nataflow <segmen> — lanjut ke frontend:plan (mode sesuai `taskdir_state.py`: CONTRACT pada seri pertama, APPEND bila hop BRIEF `[~]`) di main loop.` Selain itu sajikan blok berikut dan hapus baris bernilai `—`:
 
 ```markdown
 ### CONTRACT — <MENUNGGU KEPUTUSAN | TERTAHAN>

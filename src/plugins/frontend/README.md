@@ -279,6 +279,32 @@ rantai dari situ.
 | Review penutup | `docs(<slug>): closing review <verdict>` | `architect` |
 | Laporan | `docs(<slug>): laporkan hasil rantai <slug>` | `report` |
 
+## Sinkron nataflow (opsional)
+
+Artefak taskdir dan dokumen repo dapat dicerminkan ke nataflow. Disk dan git tetap sumber kebenaran: sinkron
+tidak menulis berkas, tidak meng-commit, dan tidak menjalankan `chain.py`, sehingga ledger dan materai approve
+tidak tersentuh. Kegagalannya tidak menahan gate maupun eksekusi.
+
+- **Aktif per repo** lewat `.claude/nataflow.json` (ter-commit, dibaca juga oleh `analyst`, `backend`, dan
+  `quickdev`): `mcp_server` (default `nataflow-api`), `workspace_id` (UUID; wajib bila MCP key ber-scope
+  project), `pic_id`, dan `repo` (default: remote `origin` ternormalisasi). Berkas absen → dilewati; ada tetapi
+  rusak → `GAGAL`. Server MCP didaftarkan user di Claude Code; plugin tidak menyimpan key.
+- **Jangkar**: satu taskdir = satu workdir `frontenddev:<repo>:<path taskdir>`, tertaut ke task tiket analyst
+  bila `TASK.md` membawa `ticket_source` (taskdir backend dari tiket yang sama bernaung di task itu juga), atau
+  ke task baru dari `TASK.md`.
+- **Yang didorong** (isi blob `HEAD`, dipilih `skills/_common/sync_payload.py`): `TASK.md`; `FLOW.md`/`UI.md`/
+  `CONTRACT.md` hanya bila baris ledger-nya `[x]` dan tidak DRIFT; brief dan `REVIEW-PLAN.md` sesudah hop BRIEF
+  disetujui (atau brief `DONE`/`BLOCKED`); `report-NN.md`, `REVIEW.md`, `REPORT.md`. Hop yang dibuka ulang
+  tercermin dengan status terbarunya. `frontenddev/reviews/` dan profil didorong ke workspace.
+- **Kapan** (main loop saja): `task` sesudah commit akar, tiap gate sesudah `chain.py approve`, `architect` sekali
+  per putaran, `report` sesudah commit, `lead` sesudah `reopen`/`escalate`/`abandon`/amandemen akar, serta
+  `review`/`profile` sesudah commit. Prosedurnya di `skills/lead/references/nataflow-sync.md`.
+- **Status**: workdir dari `taskdir_state.py` (`TUNTAS` → `done`, `DITUTUP` → `abandoned`, `TERHENTI`/`TEMUAN` →
+  `blocked`). Task naik ke `in_progress` sejak eksekusi dimulai; task milik taskdir ini menjadi `done`/`cancelled`,
+  sedangkan task tiket tidak ditutup plugin ini.
+- **Gagal tidak memblokir**: baris penutup memuat segmen `nataflow <… | dilewati | GAGAL: <sebab>>`. Ulangi lewat
+  `/frontend:lead` ("sinkron ulang taskdir <slug>").
+
 ## Stack Adapters
 
 | `stack-id` | Cakupan | Penanda deteksi |

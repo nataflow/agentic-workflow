@@ -59,7 +59,7 @@ Tawarkan 2–3 opsi — Standard Card/List · Compact/Dense Table · Visual-Driv
 
 1. Sajikan mockup, hierarki P1–P3, enam cabang per layar, dan pemetaan data.
 2. `AskUserQuestion`: *Setujui desain* · *Revisi (sebut poinnya)* · *Hentikan*.
-3. **Setuju** → `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py approve --taskdir <taskdir> --row UI --answer "<jawaban user apa adanya>"`.
+3. **Setuju** → `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py approve --taskdir <taskdir> --row UI --answer "<jawaban user apa adanya>"`. Approve PASS → jalankan prosedur `lead/references/nataflow-sync.md` (`--taskdir <taskdir>`); segmennya masuk baris penutup, dan `nataflow GAGAL` tidak membatalkan approval.
 4. **Revisi** → `chain.py revisions --taskdir <taskdir> --row UI` (plafon 2; `draft` ulang dan amandemen akar tidak me-reset hitungan). Di bawah plafon → perbarui, validasi, commit `revise`, ajukan ulang. Plafon habis → hentikan, sajikan poin penolakan berurutan, serahkan ke `frontend:lead` Phase 8 (plafon habis: taskdir baru atau hentikan).
 
 ## Guardrails
@@ -80,7 +80,7 @@ Tawarkan 2–3 opsi — Standard Card/List · Compact/Dense Table · Visual-Driv
 
 ## Output [REQUIRED]
 
-Desain disetujui — tutup satu baris: `UI — APPROVED @ <sha konten> · <n> layar · <n> ST · akar SC <daftar> — lanjut ke frontend:contract di main loop.` Selain itu sajikan blok berikut dan hapus baris bernilai `—`:
+Desain disetujui — tutup satu baris: `UI — APPROVED @ <sha konten> · <n> layar · <n> ST · akar SC <daftar> · nataflow <segmen> — lanjut ke frontend:contract di main loop.` Selain itu sajikan blok berikut dan hapus baris bernilai `—`:
 
 ```markdown
 ### UI — <MENUNGGU KEPUTUSAN | TERTAHAN>

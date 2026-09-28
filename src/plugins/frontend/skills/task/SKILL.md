@@ -79,7 +79,8 @@ Susun 1–7 butir berformat `- [ ] **SC-{n}**: <hasil terukur> — verifikasi: <
 3. **Ledger**: jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py init --taskdir <taskdir>`; skrip menulis `## Chain` tepat sesuai `sections`. Dilarang mengetik baris ledger dengan tangan.
 4. **Self-test akar**: jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/task/scripts/validate_task.py --taskdir <taskdir>` untuk butir mekanis (1–4, 6, 7, 9), lalu nilai sendiri butir 5 dan 8 bagian 2 template. Satu butir gagal → perbaiki `TASK.md`, ulangi dari butir 2.
 5. Stage eksplisit `{taskdir}/TASK.md` — plus `<finding_source>` bila ada temuan yang ditandai `OBSOLETE` — lalu commit `docs(<slug>): kunci TASK sebagai akar rantai`.
-6. Catat SHA commit dan kembalikan kendali ke `frontend:lead`.
+6. Commit mendarat → jalankan prosedur `lead/references/nataflow-sync.md` (`--taskdir <taskdir>`) di main loop; segmennya masuk baris penutup. `nataflow GAGAL` tidak membatalkan akar.
+7. Catat SHA commit dan kembalikan kendali ke `frontend:lead`.
 
 ## Guardrails
 
@@ -92,7 +93,7 @@ Susun 1–7 butir berformat `- [ ] **SC-{n}**: <hasil terukur> — verifikasi: <
 
 ## Output [REQUIRED]
 
-Self-test 9/9 dan commit mendarat → tutup satu baris: `### TASK ROOT LOCKED — <taskdir>/TASK.md @ <sha> · status ACTIVE · lane <lane> · hop <daftar> · Uji Akar 9/9 lolos`. Selain itu, sajikan:
+Self-test 9/9 dan commit mendarat → tutup satu baris: `### TASK ROOT LOCKED — <taskdir>/TASK.md @ <sha> · status ACTIVE · lane <lane> · hop <daftar> · Uji Akar 9/9 lolos · nataflow <segmen>`. Selain itu, sajikan:
 
 ```markdown
 ### TASK ROOT LOCKED — TERTAHAN

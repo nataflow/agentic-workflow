@@ -65,7 +65,7 @@ Tawarkan 2–3 opsi mengacu `references/ux-patterns.md` — Direct/Modal · Mult
 
 1. Sajikan ringkasan: titik masuk, rute utama beserta parameternya, penanganan batal/dirty, cabang error, dan tabel Data Demands.
 2. `AskUserQuestion`: *Setujui alur* · *Revisi (sebut poinnya)* · *Hentikan*.
-3. **Setuju** → `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py approve --taskdir <taskdir> --row FLOW --answer "<jawaban user apa adanya>"`.
+3. **Setuju** → `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py approve --taskdir <taskdir> --row FLOW --answer "<jawaban user apa adanya>"`. Approve PASS → jalankan prosedur `lead/references/nataflow-sync.md` (`--taskdir <taskdir>`); segmennya masuk baris penutup, dan `nataflow GAGAL` tidak membatalkan approval.
 4. **Revisi** → `chain.py revisions --taskdir <taskdir> --row FLOW` (plafon 2; `draft` ulang dan amandemen akar tidak me-reset hitungan). Di bawah plafon → perbarui, validasi, commit `revise`, ajukan ulang. Plafon habis → hentikan, sajikan poin penolakan berurutan, serahkan ke `frontend:lead` Phase 8 (plafon habis: taskdir baru atau hentikan).
 
 ## Guardrails
@@ -86,7 +86,7 @@ Tawarkan 2–3 opsi mengacu `references/ux-patterns.md` — Direct/Modal · Mult
 
 ## Output [REQUIRED]
 
-Alur disetujui — tutup satu baris: `FLOW — APPROVED @ <sha konten> · <n> layar · <n> DD · akar SC <daftar> — lanjut ke frontend:ui-design (bila sections memuat ui) atau frontend:contract di main loop.` Selain itu sajikan blok berikut dan hapus baris bernilai `—`:
+Alur disetujui — tutup satu baris: `FLOW — APPROVED @ <sha konten> · <n> layar · <n> DD · akar SC <daftar> · nataflow <segmen> — lanjut ke frontend:ui-design (bila sections memuat ui) atau frontend:contract di main loop.` Selain itu sajikan blok berikut dan hapus baris bernilai `—`:
 
 ```markdown
 ### FLOW — <MENUNGGU KEPUTUSAN | TERTAHAN>
