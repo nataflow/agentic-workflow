@@ -190,7 +190,7 @@ flowchart TD
   0. **Orientasi**. Untuk `DRAFT` dengan `review_segar=ya`, langsung ke Phase 5. Bila `review_basi` memuat
      `elisitasi`, jalankan `ticket.py revise` lalu Phase 1. Bila `review_basi=kartu`, ke Phase 2. Bila
      `change_request` membawa fakta baru, panggil `elicit` dengan `reopen_reason`.
-  1. **Rumusan**: judul ≤ 12 kata. Prioritas dipetakan dari pilar `Urgensi` dengan rubrik HIGH/MEDIUM/LOW.
+  1. **Rumusan**: judul ≤ 12 kata; istilah domain berbahasa Inggris dari elisitasi tidak diterjemahkan. Prioritas dipetakan dari pilar `Urgensi` dengan rubrik HIGH/MEDIUM/LOW.
      Tulis latar belakang. Tulis user story (`BUG`: laporan bug). Setiap fakta aturan menjadi `BR-{n}`. AC
      Given/When/Then disapu dari jalur utama, sisi lolos dan tolak tiap BR, kasus khusus, dan peran
      terlarang. Lebih dari 10 AC berarti tiket harus dipecah. Isi juga Di Luar Cakupan dan Pertanyaan

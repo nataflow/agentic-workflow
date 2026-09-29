@@ -43,6 +43,13 @@ Peminta kadang memakai istilah teknis yang mereka dengar dari tim. Rekam apa ada
 
 Bila produk itu sendiri memang teknis (mis. layanan API untuk mitra), istilahnya kosakata bisnis: konfirmasi ke peminta — catat sebagai baris log `| n | <tanggal> | Apakah "API" nama produk? | Ya | <peminta> |` — lalu catat di frontmatter `domain_terms: [API]` `TICKET.md` agar kartu yang ditulis `spec` boleh memakainya. Validator menolak istilah `domain_terms` tanpa baris konfirmasi itu, sekalipun istilahnya muncul di permintaan asli. Nama merek bercampur huruf (mis. aplikasi `myPertamina`) diperlakukan sama.
 
+Menerjemahkan istilah **teknis** menjadi perilaku berbeda dengan menerjemahkan **bahasa**. Istilah domain, nama entitas, menu, layar, dan kolom yang dipakai peminta dalam Bahasa Inggris adalah kosakata bisnis mereka dan ditulis apa adanya di pilar, judul, dan kartu, lengkap dengan kapitalisasi seperti yang tampil di layar. Menerjemahkannya membuat tiket terdengar asing bagi peminta dan menyulitkan engineer mencocokkannya dengan layar:
+
+| Peminta berkata | Ditulis | Bukan |
+|---|---|---|
+| "created at di report order sampai detik" | *Created At* di *Report Order* tampil hingga detik | waktu dibuat di laporan pesanan |
+| "invoice yang overdue" | *Invoice* berstatus *Overdue* | tagihan yang jatuh tempo |
+
 ## 4. Rubrik Urgensi → Prioritas
 
 `spec` memetakan pilar `Urgensi` ke `priority` tiket dengan rubrik ini; user boleh menimpanya di persetujuan.

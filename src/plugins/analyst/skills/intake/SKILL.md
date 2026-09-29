@@ -71,7 +71,7 @@ Jalankan `ticket.py state --ready` dan bandingkan judul tiap baris dengan tujuan
 
 ### Phase 6 — Slug & Serah Terima
 
-- Slug kebab-case ≤ 40 karakter dari **kata benda bisnis** tujuan (`cicilan-pembayaran`, `bug-tombol-bayar-mati`), bukan istilah teknis.
+- Slug kebab-case ≤ 40 karakter dari **kata benda bisnis** tujuan (`cicilan-pembayaran`, `bug-tombol-bayar-mati`), bukan istilah teknis. Istilah domain berbahasa Inggris dari permintaan tidak diterjemahkan (`report-order-created-at-detik`, bukan `laporan-pesanan-waktu-dibuat`).
 - `requester` kosong → tanyakan sekali lewat `AskUserQuestion` (opsi: "Saya sendiri", peran yang disebut di permintaan).
 - Panggil `analyst:elicit` dengan `{ slug, type, request, requester }`. `request` diteruskan **apa adanya** — hanya bagian tujuan terpilih bila Phase 4 memecahnya, tanpa disunting atau diringkas.
 

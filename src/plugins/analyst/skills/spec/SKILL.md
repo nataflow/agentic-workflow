@@ -35,7 +35,7 @@ user-invocable: false
 
 ### Phase 1 — Rumusan
 
-1. **Judul**: hasil yang dirasakan pengguna, ≤ 12 kata, bukan nama fitur teknis.
+1. **Judul**: hasil yang dirasakan pengguna, ≤ 12 kata, bukan nama fitur teknis. Istilah domain, nama entitas, menu, layar, dan kolom dipakai persis seperti di elisitasi — yang berbahasa Inggris tidak diterjemahkan: "created at di report order hingga detik" → `Report Order menampilkan Created At hingga detik`, bukan `Laporan Pesanan menampilkan waktu dibuat hingga detik`. Hanya kata penghubungnya yang berbahasa Indonesia.
 2. **Prioritas**: pilar `Urgensi` dipetakan lewat rubrik bagian 4 panduan.
 3. **Latar Belakang**: 2–4 kalimat dari `Masalah` (BUG: `Dampak`) — siapa, seberapa sering atau mahal, kenapa sekarang.
 4. **User Story** (`FEATURE`/`IMPROVEMENT`): peran dari `Aktor`, kemampuan dari `Kondisi Diinginkan`, manfaat dari `Masalah`. **Laporan Bug** (`BUG`): salin pilar reproduksi, harapan, kejadian, dan dampak; teks layar dikutip dalam tanda kutip.

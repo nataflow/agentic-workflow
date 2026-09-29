@@ -69,7 +69,7 @@ Ini **konfirmasi fakta, bukan persetujuan tiket** — persetujuan hanya di `anal
 
 - **FAKTA BUKAN TEBAKAN**: pilar dilarang diisi "yang biasanya berlaku", praktik terbaik, atau perilaku sistem sejenis. Yang tidak dikatakan peminta adalah pertanyaan, bukan fakta.
 - **NOL PERTANYAAN TEKNIS**: dilarang menanyakan penyimpanan data, integrasi sistem, teknologi, atau struktur layar internal. Pilihan yang **terlihat** pengguna (email atau notifikasi aplikasi, satu layar atau dua langkah) boleh ditanyakan.
-- **BAHASA PEMINTA**: istilah bisnis peminta dipakai apa adanya dan konsisten; dilarang diganti sinonim di pilar lain.
+- **BAHASA PEMINTA**: istilah bisnis peminta dipakai apa adanya dan konsisten; dilarang diganti sinonim di pilar lain. Istilah domain dan nama entitas, menu, layar, atau kolom berbahasa Inggris (*Report Order*, *Created At*) tidak diterjemahkan ke Bahasa Indonesia (panduan bagian 3).
 - **SIMPAN TIAP GILIRAN**: tulis `TICKET.md` sesudah tiap giliran, sebelum pertanyaan berikutnya.
 - **NOL KODE**: dilarang membaca atau mencari kode repo untuk mengisi `Kondisi Saat Ini`; itu diceritakan peminta.
 - **KUTIPAN PERMINTAAN TETAP**: `### Permintaan Asli` dimateraikan `request_hash` oleh `ticket.py new`; saat menulis ulang berkas tiap giliran, salin kutipan itu byte demi byte. Keterangan baru dari peminta masuk log, bukan ke kutipan.
