@@ -10,7 +10,7 @@ prosedur `tech-lead/references/nataflow-sync.md` (D4); skrip ini satu-satunya pe
   `.explore/` tidak pernah. Status workdir dari disk: `REPORT.md` → `done`, `HALT.md` atau brief `BLOCKED` →
   `blocked`, selain itu `active`.
 - `--repo-docs audit|api|profile`: laporan `backenddev/issues/`, `docs/api/`, atau profil sebagai dokumen
-  `AUDIT`/`API_DOC`/`PROFILE` di bawah workspace, dengan key `<repo>/<path>` (T10).
+  `audit`/`api.doc`/`profile` di bawah workspace, dengan key `<repo>/<path>` (T10).
 
 Tanpa `--remote`: argumen task, workdir, dan manifest, tanpa isi dokumen. `--remote -`: dokumen yang berbeda dari
 teks balikan `list_document include_content=false` di stdin, ditambah key remote yang tidak lagi terpilih: berkasnya
@@ -42,21 +42,21 @@ from precondition_lib import (  # noqa: E402
 
 SOURCE = "backenddev"
 PREFIX = "SYNC-PAYLOAD"
-FIXED_TYPES = {"TASK.md": "TASK", "BRD.md": "BRD", "PRD.md": "PRD", "RCA.md": "RCA", "HALT.md": "HALT",
-               "REVIEW.md": "REVIEW", "REPORT.md": "REPORT"}
+FIXED_TYPES = {"TASK.md": "task", "BRD.md": "brd", "PRD.md": "prd", "RCA.md": "rca", "HALT.md": "halt",
+               "REVIEW.md": "review", "REPORT.md": "report"}
 BRIEF_NAME = re.compile(r"^brief-\d{2}-[^/]+\.md$")
 UNIT_REPORT = re.compile(r"^report-\d{2}\.md$")
-APPROVAL_DOCS = ("BRD", "PRD")                         # hanya APPROVED yang didorong (D2)
+APPROVAL_DOCS = ("brd", "prd")                         # hanya APPROVED yang didorong (D2)
 STARTED = ("DONE", "BLOCKED", "SUPERSEDED")            # brief yang sudah disentuh eksekusi
-REPO_DOCS = {"audit": ("backenddev/issues", "AUDIT"), "api": ("docs/api", "API_DOC"),
-             "profile": (PROFILE_DIR_REL, "PROFILE")}
+REPO_DOCS = {"audit": ("backenddev/issues", "audit"), "api": ("docs/api", "api.doc"),
+             "profile": (PROFILE_DIR_REL, "profile")}
 TASK_SECTIONS = ("Description", "Success Criteria", "Out of Scope")
 
 
 def doc_type(name: str) -> str:
     if name in FIXED_TYPES:
         return FIXED_TYPES[name]
-    return "BRIEF" if BRIEF_NAME.match(name) else "UNIT_REPORT" if UNIT_REPORT.match(name) else ""
+    return "brief" if BRIEF_NAME.match(name) else "unit.report" if UNIT_REPORT.match(name) else ""
 
 
 def doc_status(text: str) -> str:
@@ -119,7 +119,7 @@ def mirrored_extras(root: Path, table: str, remote: Dict[str, Dict[str, Any]], c
         rel = key_to_rel(key)
         if not rel:
             continue
-        kind = remote[key]["type"] or doc_type(posixpath.basename(rel)) or "DOC"
+        kind = ns.remote_type(remote[key]["type"]) or doc_type(posixpath.basename(rel)) or "doc"
         text, _ = ns.head_text(root, rel)
         if text is not None:
             extras.append(build_doc(root, table, key, rel, kind, text, repo))
@@ -175,11 +175,11 @@ def run_taskdir(args, root: Path, config: Dict[str, str]) -> int:
         return ns.emit_fail(args.json, PREFIX, [problem])
     key, name = f"{SOURCE}:{repo}:{td}", posixpath.basename(td)
     kinds = {d["key"]: d["type"] for d in docs}
-    briefs = [ns.frontmatter_value(texts[k], "status") for k, t in kinds.items() if t == "BRIEF"]
+    briefs = [ns.frontmatter_value(texts[k], "status") for k, t in kinds.items() if t == "brief"]
     done = "REPORT.md" in kinds
     blocked = "HALT.md" in kinds or "BLOCKED" in briefs
     started = done or any(s in STARTED for s in briefs) or any(
-        t in ("UNIT_REPORT", "HALT", "REVIEW") for t in kinds.values())
+        t in ("unit.report", "halt", "review") for t in kinds.values())
     status = "done" if done else "blocked" if blocked else "active"
     problems = ns.workdir_problems(key, name, status)
     if problems:

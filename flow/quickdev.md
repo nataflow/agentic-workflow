@@ -94,7 +94,7 @@ Semua panah antar-skill adalah **tawaran**. Skill berikutnya baru jalan setelah 
      - Catat Status, Durasi, dan Known issues (maksimal 10 baris penanda persis). `SKIPPED` membawa alasannya (`ditolak user: …` atau `skip_baseline_exec`) supaya `execute` meminta izin baru.
      - Bandingkan `git status` sesudahnya. Berkas baru dilaporkan sebagai "artefak build perlu di-ignore" dan tidak dihapus.
   4. **Fase 3: tulis profil.** Isi templat yang sesuai dengan keenam header persis. Ukuran total harus di bawah 10.000 karakter (`wc -m`). Bila lebih, ringkas daftar berkas dengan pola glob. Tulis ke `target_path`.
-  5. **Fase 4: validasi dan handoff.** Periksa bahwa berkas ada, keenam header lengkap, dan ukurannya di bawah kuota. Jalankan sinkron nataflow varian profil (`sync-payload --repo-profile`, dokumen `PROFILE` di bawah workspace). Set status `PROFILED`. Bila blok gerbang engineer ada di konteks sesi, tawarkan penanda `.claude/workflow`. Terakhir, tawarkan `explore`.
+  5. **Fase 4: validasi dan handoff.** Periksa bahwa berkas ada, keenam header lengkap, dan ukurannya di bawah kuota. Jalankan sinkron nataflow varian profil (`sync-payload --repo-profile`, dokumen `profile` di bawah workspace). Set status `PROFILED`. Bila blok gerbang engineer ada di konteks sesi, tawarkan penanda `.claude/workflow`. Terakhir, tawarkan `explore`.
 - **Subagent yang didispatch**: Tidak ada.
 - **Output / artefak**: `repo-profile.md` (atau `<workspace_dir>/repo-profile.md`; alternatif yang dikenali: `.dev/profile.md`) berisi 6 section, plus ringkasan terminal maksimal 17 baris. Status: `PROFILED`.
 - **Gerbang & commit**:
@@ -398,7 +398,7 @@ Tidak ada. README menyebutkan "semua kerja berlangsung di percakapan utama", dan
 | Penanda alur | `.claude/workflow` | `profile` Fase 4, atas persetujuan user | `quickdev` → hook backend/frontend diam. `frontend quickdev` → hanya hook frontend menyala |
 | Laporan explore / spesifikasi clarify / laporan review | Terminal | `explore`, `clarify`, `review` | Tidak menjadi berkas |
 | Perubahan kode | Working tree (uncommitted) | `execute` | Commit adalah keputusan user |
-| Cermin nataflow (opsional) | Server MCP nataflow | prosedur sinkron | Workdir `quickdev:<repo>:<path rencana>` + task; dokumen `QUICKDEV_PLAN` (isi disk) dan `PROFILE` (workspace). Status workdir: `COMPLETED*` → `done`, `BLOCKED` → `blocked`, selain itu `active`; task `in_progress` sejak eksekusi dimulai, `done` saat `COMPLETED*` |
+| Cermin nataflow (opsional) | Server MCP nataflow | prosedur sinkron | Workdir `quickdev:<repo>:<path rencana>` + task; dokumen `quickdev.plan` (isi disk) dan `profile` (workspace). Status workdir: `COMPLETED*` → `done`, `BLOCKED` → `blocked`, selain itu `active`; task `in_progress` sejak eksekusi dimulai, `done` saat `COMPLETED*` |
 
 Header keenam section profil per templat:
 

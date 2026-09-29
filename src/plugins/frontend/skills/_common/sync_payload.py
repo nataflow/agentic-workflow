@@ -11,7 +11,7 @@ Sengaja bukan subperintah `chain.py`: `chain.py` satu-satunya penulis ledger, se
   gerbang); brief dan `REVIEW-PLAN.md` bila hop BRIEF `[x]` sah, atau brief sudah `DONE`/`BLOCKED`;
   `report-NN.md`, `REVIEW.md`, dan `REPORT.md` bila ter-commit; `.explore/` tidak pernah. Status workdir dari
   `taskdir_state.py`: `TUNTAS` → `done`, `DITUTUP` → `abandoned`, `TERHENTI`/`TEMUAN` → `blocked`, selain itu `active`.
-- `--repo-docs review|profile`: `frontenddev/reviews/` atau profil sebagai dokumen `ADHOC_REVIEW`/`PROFILE` di bawah
+- `--repo-docs review|profile`: `frontenddev/reviews/` atau profil sebagai dokumen `adhoc.review`/`profile` di bawah
   workspace, dengan key `<repo>/<path>` (T10).
 
 Tanpa `--remote`: argumen task, workdir, dan manifest, tanpa isi dokumen. `--remote -`: dokumen yang berbeda dari
@@ -51,20 +51,20 @@ from precondition_lib import (  # noqa: E402
 SOURCE = "frontenddev"
 PREFIX = "SYNC-PAYLOAD"
 TASKDIR_STATE = Path(__file__).resolve().parents[1] / "lead" / "scripts" / "taskdir_state.py"
-FIXED_TYPES = {"TASK.md": "TASK", "FLOW.md": "FLOW", "UI.md": "UI", "CONTRACT.md": "CONTRACT",
-               "REVIEW-PLAN.md": "REVIEW_PLAN", "REVIEW.md": "REVIEW", "REPORT.md": "REPORT"}
+FIXED_TYPES = {"TASK.md": "task", "FLOW.md": "flow", "UI.md": "ui", "CONTRACT.md": "contract",
+               "REVIEW-PLAN.md": "review.plan", "REVIEW.md": "review", "REPORT.md": "report"}
 ROW_DOCS = {"FLOW": "FLOW.md", "UI": "UI.md", "CONTRACT": "CONTRACT.md"}
 BRIEF_NAME = re.compile(r"^brief-\d{2}-[a-z0-9-]+\.md$")
 UNIT_REPORT = re.compile(r"^report-\d{2}\.md$")
 WORKDIR_STATUS = {"TUNTAS": "done", "DITUTUP": "abandoned", "TERHENTI": "blocked", "TEMUAN": "blocked"}
-REPO_DOCS = {"review": ("frontenddev/reviews", "ADHOC_REVIEW"), "profile": (PROFILE_DIR_REL, "PROFILE")}
+REPO_DOCS = {"review": ("frontenddev/reviews", "adhoc.review"), "profile": (PROFILE_DIR_REL, "profile")}
 TASK_SECTIONS = ("Description", "Success Criteria", "Out of Scope")
 
 
 def doc_type(name: str) -> str:
     if name in FIXED_TYPES:
         return FIXED_TYPES[name]
-    return "BRIEF" if BRIEF_NAME.match(name) else "UNIT_REPORT" if UNIT_REPORT.match(name) else ""
+    return "brief" if BRIEF_NAME.match(name) else "unit.report" if UNIT_REPORT.match(name) else ""
 
 
 def doc_status(text: str) -> str:
@@ -112,10 +112,10 @@ def select_taskdir(root: Path, td: str, repo: str):
         row = next((r for r, doc in ROW_DOCS.items() if doc == name), "")
         if row and row not in stable:
             continue
-        if kind in ("BRIEF", "REVIEW_PLAN") and "BRIEF" not in stable and doc_status(text) not in ("DONE", "BLOCKED"):
+        if kind in ("brief", "review.plan") and "BRIEF" not in stable and doc_status(text) not in ("DONE", "BLOCKED"):
             continue
         docs.append(build_doc(root, "workdir", name, f"{td}/{name}", kind, text, repo))
-    held = drift | ({n for n in texts if doc_type(n) == "BRIEF"} if "BRIEF" in drift else set())
+    held = drift | ({n for n in texts if doc_type(n) == "brief"} if "BRIEF" in drift else set())
     return docs, texts, held, []
 
 
@@ -143,7 +143,7 @@ def mirrored_extras(root: Path, table: str, remote: Dict[str, Dict[str, Any]], c
         rel = key_to_rel(key)
         if not rel:
             continue
-        kind = remote[key]["type"] or doc_type(posixpath.basename(rel)) or "DOC"
+        kind = ns.remote_type(remote[key]["type"]) or doc_type(posixpath.basename(rel)) or "doc"
         text, _ = ns.head_text(root, rel)
         if text is not None:
             extras.append(build_doc(root, table, key, rel, kind, text, repo))
@@ -218,8 +218,8 @@ def run_taskdir(args, root: Path, config: Dict[str, str]) -> int:
     problems = ns.workdir_problems(key, name, status)
     if problems:
         return ns.emit_fail(args.json, PREFIX, problems)
-    started = any(doc_type(n) in ("UNIT_REPORT", "REVIEW", "REPORT") for n in texts) or any(
-        doc_status(t) in ("DONE", "BLOCKED") for n, t in texts.items() if doc_type(n) == "BRIEF")
+    started = any(doc_type(n) in ("unit.report", "review", "report") for n in texts) or any(
+        doc_status(t) in ("DONE", "BLOCKED") for n, t in texts.items() if doc_type(n) == "brief")
     ident = {"source": "analyst", "ticket_key": tkey} if tkey else {"source": SOURCE, "workdir_key": key}
     title = ns.h1_title(task_text) or name
     task = ns.task_args(config, ident, repo, title, ns.pick_sections(task_text, TASK_SECTIONS) or title)

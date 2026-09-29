@@ -161,6 +161,23 @@ def test_halt_dicabut_didorong_removed(repo):
     assert sp(repo, "--taskdir", TD)[1]["workdir"]["status"] == "active", "HALT dicabut → tidak lagi blocked"
 
 
+
+@pytest.mark.regression("15 E11")
+def test_type_mengikuti_format_server(repo):
+    write_files(repo, {f"{TD}/PRD.md": "---\nstatus: APPROVED\n---\n# PRD\n", f"{TD}/RCA.md": "# RCA\n",
+                       f"{TD}/HALT.md": "---\nverdict: SCOPE\n---\n# HALT\n", f"{TD}/report-01.md": "# r\n",
+                       f"{TD}/REVIEW.md": "# review\n", f"{TD}/REPORT.md": "# report\n"})
+    commit(repo, "docs: artefak lengkap")
+    docs = push(repo)["documents"]
+    assert {d["key"]: d["type"] for d in docs} == {
+        "PRD.md": "prd", "RCA.md": "rca", "HALT.md": "halt", "report-01.md": "unit.report",
+        "REVIEW.md": "review", "REPORT.md": "report", "TASK.md": "task"}
+    halt = next(d for d in docs if d["key"] == "HALT.md")
+    git(repo, "rm", "-q", f"{TD}/HALT.md")
+    git(repo, "commit", "-qm", "docs: cabut halt")
+    (doc,) = [d for d in push(repo, json.dumps([view(halt, type="HALT")]))["documents"] if d["key"] == "HALT.md"]
+    assert doc["type"] == "halt", "type remote bergaya lama dinormalkan sebelum dikirim ulang"
+
 def test_dokumen_tercermin_yang_kembali_draft_diperbarui(repo):
     write_files(repo, {f"{TD}/BRD.md": "---\nstatus: APPROVED\n---\n# BRD\n"})
     commit(repo, "docs: approve")
@@ -181,11 +198,11 @@ def test_dokumen_repo_ke_workspace(repo):
     assert json.loads(out["list_document"]["metadata"]) == {"source": "backenddev", "repo": "tim/api"}
     docs = push(repo, target=("--repo-docs", "audit"))["documents"]
     assert [d["key"] for d in docs] == ["tim/api/backenddev/issues/2609-order.md", "tim/api/backenddev/issues/README.md"]
-    assert {d["type"] for d in docs} == {"AUDIT"} and {d["reference_table"] for d in docs} == {"workspace"}
-    assert [d["type"] for d in push(repo, target=("--repo-docs", "api"))["documents"]] == ["API_DOC"]
+    assert {d["type"] for d in docs} == {"audit"} and {d["reference_table"] for d in docs} == {"workspace"}
+    assert [d["type"] for d in push(repo, target=("--repo-docs", "api"))["documents"]] == ["api.doc"]
     prof = push(repo, target=("--repo-docs", "profile"))["documents"]
     assert prof and all(d["key"].startswith("tim/api/.claude/profile/backenddev/") for d in prof)
-    assert {d["type"] for d in prof} == {"PROFILE"}
+    assert {d["type"] for d in prof} == {"profile"}
 
 
 def test_dokumen_repo_terhapus_hanya_di_cakupan_jenisnya(repo):

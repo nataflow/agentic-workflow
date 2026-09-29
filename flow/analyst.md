@@ -213,7 +213,7 @@ flowchart TD
        keduanya berbeda isi, atau tiket bukan `READY`).
        Model lalu memanggil `list_task` bersaring `{"source":"analyst","ticket_key":<ticketdir>}`: 0 hasil →
        `create_task`, 1 → `update_task` dengan `task_id` hasil itu, lebih dari 1 → berhenti tanpa menulis.
-       Sesudahnya `review.md` di-`upsert_document` ke task itu (`TICKET_REVIEW`). Hasilnya satu segmen `nataflow …` di baris penutup; `GAGAL` tidak menurunkan `READY`.
+       Sesudahnya `review.md` di-`upsert_document` ke task itu (`ticket.review`). Hasilnya satu segmen `nataflow …` di baris penutup; `GAGAL` tidak menurunkan `READY`.
 - **Subagent yang didispatch**: `analyst:ticket-reviewer`, langsung tanpa skill pembungkus. Vonisnya
   `PASS`/`BLOCKED`. Balikan kosong atau rusak dicatat `DISPATCH_FAILED` (tidak dihitung ronde) dan diulang
   maksimal sekali.

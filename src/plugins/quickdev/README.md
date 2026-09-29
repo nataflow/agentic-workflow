@@ -221,8 +221,8 @@ tidak menulis berkas apa pun, sehingga `Plan-Hash`, `Verified-Hash`, dan `Tree-H
   project), `pic_id` (UUID), dan `repo` (default: remote `origin` ternormalisasi). Berkas absen → dilewati; ada
   tetapi rusak → `GAGAL`. Server MCP nataflow didaftarkan user di Claude Code; plugin tidak menyimpan key.
 - **Jangkar**: satu rencana = satu workdir `quickdev:<repo>:<path rencana>` bernama `<task_name>`, tertaut ke task
-  yang dibuat dari H1 dan Section 1 rencana. Rencana didorong sebagai dokumen `QUICKDEV_PLAN`; `repo-profile.md`
-  sebagai dokumen `PROFILE` di bawah workspace.
+  yang dibuat dari H1 dan Section 1 rencana. Rencana didorong sebagai dokumen `quickdev.plan`; `repo-profile.md`
+  sebagai dokumen `profile` di bawah workspace.
 - **Kapan**: `plan` sesudah `LOCK PASS` dan sesudah `unlock` (cermin menjadi `DRAFT`); `execute` sesudah tiap
   `close`/`confirm`; `profile` sesudah profil tertulis. Rencana yang belum pernah dikunci tidak didorong.
 - **Status**: workdir `active`, `blocked` (`BLOCKED`), atau `done` (`COMPLETED`, `COMPLETED (manual)`); task naik

@@ -191,7 +191,7 @@ sumber kebenaran; task hanya cermin kartunya, dan tidak ada yang ditulis balik k
 - **Isi**: judul = H1 kartu; deskripsi = kartu (H1 sampai akhir `## Lampiran`) tanpa catatan elisitasi;
   metadata `source`, `ticket_key`, `repo`, `slug`, `type`, `priority`, `approved`, `approved_seal`, `reopened`,
   dan `external_ref` bila terisi (`repo` tidak ikut saringan pencarian, supaya task lama tetap ditemukan).
-  `review.md` (blok `## Ticket Review` terakhir) menempel ke task sebagai dokumen `TICKET_REVIEW`. Catatan
+  `review.md` (blok `## Ticket Review` terakhir) menempel ke task sebagai dokumen `ticket.review`. Catatan
   elisitasi dan `requester` tetap di disk.
 - **Pembatalan**: `/analyst:intake` ("batalkan tiket …") merutekan ke `analyst:spec`, yang menjalankan
   `ticket.py cancel` (`--force` untuk tiket `READY` atas konfirmasi eksplisit). Tiket yang pernah `READY` lalu

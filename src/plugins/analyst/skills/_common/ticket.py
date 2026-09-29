@@ -707,7 +707,7 @@ def _was_ready(fm: Dict[str, Any]) -> bool:
 
 
 def _review_document(root: Path, rel: str, fm: Dict[str, Any], repo: str) -> List[Dict[str, Any]]:
-    """`review.md` (blok `## Ticket Review` terakhir) sebagai dokumen `TICKET_REVIEW` di bawah task (15 A4).
+    """`review.md` (blok `## Ticket Review` terakhir) sebagai dokumen `ticket.review` di bawah task (15 A4).
 
     Hanya bila kepalanya sah terhadap frontmatter (`review_report`): blok basi tidak pernah dicerminkan. Isi diambil
     dari disk, karena analyst boleh berjalan tanpa git.
@@ -721,7 +721,7 @@ def _review_document(root: Path, rel: str, fm: Dict[str, Any], repo: str) -> Lis
     verdict = re.search(r"^- Verdict:\s*(\w+)", content, re.M)
     meta = ns.doc_meta("analyst", repo, f"{rel}/{REVIEW_FILE}", verdict.group(1) if verdict else "",
                        ns.last_commit(root, f"{rel}/{REVIEW_FILE}"))
-    return [ns.document("task", REVIEW_FILE, "TICKET_REVIEW", content, meta)]
+    return [ns.document("task", REVIEW_FILE, "ticket.review", content, meta)]
 
 
 def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:

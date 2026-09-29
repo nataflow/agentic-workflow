@@ -162,7 +162,7 @@ def test_frontmatter_dan_h1(ns):
 
 def test_document_sha_sama_dengan_server(ns):
     content = "baris satu\r\nbaris dua — ünïcode\n"
-    doc = ns.document("workdir", "TASK.md", "TASK", content, ns.doc_meta("backenddev", "r", "td/TASK.md", "ACTIVE", "abc"))
+    doc = ns.document("workdir", "TASK.md", "task", content, ns.doc_meta("backenddev", "r", "td/TASK.md", "ACTIVE", "abc"))
     assert doc["content_sha256"] == hashlib.sha256(content.encode("utf-8")).hexdigest()
     assert doc["metadata"] == '{"source":"backenddev","repo":"r","path":"td/TASK.md","status":"ACTIVE","commit":"abc"}'
     assert "reference_id" not in doc and doc["reference_table"] == "workdir"
@@ -188,13 +188,28 @@ def test_task_status_tidak_pernah_turun(ns):
 
 
 def test_batas_server_diperiksa_lebih_dulu(ns):
-    docs = [ns.document("workdir", "k" * 256, "T" * 51, "", {}), ns.document("workdir", "a", "T", "", {}),
-            ns.document("workdir", "a", "T", "", {})]
+    docs = [ns.document("workdir", "k" * 256, "t" * 51, "", {}), ns.document("workdir", "a", "t", "", {}),
+            ns.document("workdir", "a", "t", "", {})]
     problems = ns.check_documents(docs)
     assert len(problems) == 3
     assert ns.workdir_problems("k" * 256, "n", "active") and ns.workdir_problems("k", "n", "selesai")
     assert ns.workdir_problems("k", "n", "blocked") == []
 
+
+
+@pytest.mark.regression("15 E11")
+@pytest.mark.parametrize("value, ok", [("prd", True), ("unit.report", True), ("docs.api", True),
+                                       ("PRD", False), ("UNIT_REPORT", False), ("api-doc", False),
+                                       ("unit..report", False), (".prd", False), ("prd2", False), ("", False)])
+def test_format_type_server_diperiksa(ns, value, ok):
+    problems = ns.check_documents([ns.document("workdir", "a", value, "", {})])
+    assert (problems == []) is ok, problems
+
+
+@pytest.mark.regression("15 E11")
+def test_type_remote_lama_dinormalkan(ns):
+    assert [ns.remote_type(t) for t in ("UNIT_REPORT", " PRD ", "unit.report", None, "")] == [
+        "unit.report", "prd", "unit.report", "", ""]
 
 # ── Manifest remote ─────────────────────────────────────────────────────────
 
@@ -207,10 +222,10 @@ def _remote_view(doc, **over):
 
 
 def test_split_remote_aturan_unchanged(ns):
-    a = ns.document("workdir", "TASK.md", "TASK", "a", {"status": "ACTIVE"})
-    b = ns.document("workdir", "PRD.md", "PRD", "b", {"status": "APPROVED"})
-    c = ns.document("workdir", "brief-01-x.md", "BRIEF", "c", {"status": "READY"})
-    d = ns.document("workdir", "REPORT.md", "REPORT", "d", {})
+    a = ns.document("workdir", "TASK.md", "task", "a", {"status": "ACTIVE"})
+    b = ns.document("workdir", "PRD.md", "prd", "b", {"status": "APPROVED"})
+    c = ns.document("workdir", "brief-01-x.md", "brief", "c", {"status": "READY"})
+    d = ns.document("workdir", "REPORT.md", "report", "d", {})
     remote_text = json.dumps([_remote_view(a), _remote_view(b, metadata={"status": "DRAFT"}),
                               _remote_view(c, type="LAIN"), {"key": None, "content_sha256": "x"}])
     remote, problems = ns.read_remote("-", remote_text)
@@ -220,7 +235,7 @@ def test_split_remote_aturan_unchanged(ns):
 
 
 def test_remote_metadata_string_dan_bungkus(ns):
-    a = ns.document("workdir", "TASK.md", "TASK", "a", {"status": "ACTIVE"})
+    a = ns.document("workdir", "TASK.md", "task", "a", {"status": "ACTIVE"})
     wrapped = json.dumps({"documents": [_remote_view(a, metadata=a["metadata"])]})
     remote, _ = ns.read_remote("-", wrapped)
     assert ns.split_remote([a], remote) == ([], 1)

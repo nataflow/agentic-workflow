@@ -96,7 +96,7 @@ def test_review_md_sebagai_dokumen_task(repo):
     approve(repo)
     (doc,) = payload(repo)[1]["documents"]
     disk = (repo / TDIR / "review.md").read_bytes().decode("utf-8")
-    assert (doc["reference_table"], doc["key"], doc["type"]) == ("task", "review.md", "TICKET_REVIEW")
+    assert (doc["reference_table"], doc["key"], doc["type"]) == ("task", "review.md", "ticket.review")
     assert doc["content"] == disk and doc["content_sha256"] == hashlib.sha256(disk.encode("utf-8")).hexdigest()
     meta = json.loads(doc["metadata"])
     assert (meta["source"], meta["path"], meta["status"]) == ("analyst", f"{TDIR}/review.md", "PASS")

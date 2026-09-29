@@ -32,6 +32,8 @@ UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]
 BOM = "\ufeff"
 KEY_MAX = 255     # `key` workdir dan dokumen di server
 TYPE_MAX = 50     # `type` dokumen di server
+# Format `type` yang diterima server: huruf kecil a-z, titik di antara segmen tak kosong (mis. `prd`, `unit.report`).
+TYPE_RE = re.compile(r"^[a-z]+(\.[a-z]+)*$")
 MIMETYPE = "text/markdown"
 WORKDIR_STATUSES = ("active", "blocked", "done", "abandoned")
 # Status task yang boleh ditimpa per status tujuan (E8): status tidak pernah diturunkan dari `done`/`cancelled`.
@@ -251,6 +253,11 @@ def doc_meta(source: str, repo: str, path: str, status: str = "", commit: str = 
     return meta
 
 
+def remote_type(value: Any) -> str:
+    """`type` dari manifest remote dalam format server; baris lama bergaya `UNIT_REPORT` menjadi `unit.report`."""
+    return str(value or "").strip().lower().replace("_", ".")
+
+
 def document(reference_table: str, key: str, doc_type: str, content: str, meta: Dict[str, Any]) -> Dict[str, Any]:
     """Argumen `upsert_document` tanpa `reference_id` (diisi model dari balikan tool sebelumnya)."""
     return {"reference_table": reference_table, "key": key, "type": doc_type, "content": content,
@@ -258,13 +265,15 @@ def document(reference_table: str, key: str, doc_type: str, content: str, meta: 
 
 
 def check_documents(docs: List[Dict[str, Any]]) -> List[str]:
-    """Batas server yang bisa diperiksa sebelum dikirim: panjang `key`/`type` dan key ganda."""
+    """Batas server yang bisa diperiksa sebelum dikirim: panjang `key`, format dan panjang `type`, dan key ganda."""
     problems, seen = [], set()
     for d in docs:
         if len(d["key"]) > KEY_MAX:
             problems.append(f"key dokumen `{d['key'][:40]}…` lebih dari {KEY_MAX} karakter")
         if len(d["type"]) > TYPE_MAX:
             problems.append(f"type `{d['type']}` lebih dari {TYPE_MAX} karakter")
+        elif not TYPE_RE.match(d["type"]):
+            problems.append(f"type `{d['type']}` bukan huruf kecil a-z bersegmen titik")
         if d["key"] in seen:
             problems.append(f"key dokumen `{d['key']}` ganda")
         seen.add(d["key"])

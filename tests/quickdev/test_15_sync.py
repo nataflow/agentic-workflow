@@ -97,11 +97,11 @@ def test_fase_dua_isi_disk_dan_diff(repo):
     assert code == 0 and out["same"] == 0
     (doc,) = out["documents"]
     disk = (repo / "plan" / "t.md").read_text(encoding="utf-8")
-    assert doc["content"] == disk and doc["key"] == "t.md" and doc["type"] == "QUICKDEV_PLAN"
+    assert doc["content"] == disk and doc["key"] == "t.md" and doc["type"] == "quickdev.plan"
     assert doc["reference_table"] == "workdir" and "reference_id" not in doc
     meta = json.loads(doc["metadata"])
     assert (meta["status"], meta["commit"], meta["path"]) == ("APPROVED", "", "plan/t.md"), "belum ter-commit"
-    remote = [{"key": "t.md", "type": "QUICKDEV_PLAN", "mimetype": "text/markdown",
+    remote = [{"key": "t.md", "type": "quickdev.plan", "mimetype": "text/markdown",
                "content_sha256": doc["content_sha256"], "metadata": meta}]
     code, out = payload(repo, "--plan", "plan/t.md", "--remote", "-", stdin=json.dumps(remote))
     assert out["documents"] == [] and out["same"] == 1
@@ -155,7 +155,7 @@ def test_profil_ke_workspace(repo):
     assert out["list_document"]["reference_table"] == "workspace"
     assert json.loads(out["list_document"]["metadata"]) == {"source": "quickdev", "repo": "tim/app"}
     (doc,) = payload(repo, "--repo-profile", "repo-profile.md", "--remote", "-", stdin="[]")[1]["documents"]
-    assert (doc["reference_table"], doc["key"], doc["type"]) == ("workspace", "tim/app/repo-profile.md", "PROFILE")
+    assert (doc["reference_table"], doc["key"], doc["type"]) == ("workspace", "tim/app/repo-profile.md", "profile")
     assert doc["content"] == "# profil\n"
 
 

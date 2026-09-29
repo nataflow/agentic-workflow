@@ -76,19 +76,21 @@ Kontrak ini dipakai bersama oleh tool dan keempat plugin. Nilainya disusun skrip
 | Kunci task tiket | Metadata `{"source":"analyst","ticket_key":<ticketdir>}` dari langkah 14. Plugin engineer menurunkannya dari `ticket_source` di frontmatter `TASK.md` (dirname) | `analyst/tickets/2609231400-cicilan-pembayaran` |
 | Kunci task tanpa tiket | Metadata `{"source":<source>,"workdir_key":<kunci workdir>}` | — |
 
-**`type` dokumen** (teks bebas ≤50 karakter di server; nilainya ditetapkan plugin):
+**`type` dokumen** (server menerima huruf kecil `a-z` dengan titik di antara segmen tak kosong, ≤50 karakter —
+lihat E11; nilainya ditetapkan plugin):
 
 | `type` | Berkas | Plugin |
 |---|---|---|
-| `TASK` | `TASK.md` | backend, frontend |
-| `BRD`, `PRD`, `RCA`, `HALT` | berkas senama | backend |
-| `FLOW`, `UI`, `CONTRACT`, `REVIEW_PLAN` | `FLOW.md`, `UI.md`, `CONTRACT.md`, `REVIEW-PLAN.md` | frontend |
-| `BRIEF` | `brief-NN-<unit>.md` | backend, frontend |
-| `UNIT_REPORT` | `report-NN.md` | backend, frontend |
-| `REVIEW`, `REPORT` | berkas senama | backend, frontend |
-| `QUICKDEV_PLAN` | `plan/<task>.md` | quickdev |
-| `TICKET_REVIEW` | `review.md` tiket | analyst |
-| `PROFILE`, `AUDIT`, `API_DOC`, `ADHOC_REVIEW` | profil, `backenddev/issues/`, `docs/api/`, `frontenddev/reviews/` | P2, lihat T10 |
+| `task` | `TASK.md` | backend, frontend |
+| `brd`, `prd`, `rca`, `halt` | berkas senama | backend |
+| `flow`, `ui`, `contract`, `review.plan` | `FLOW.md`, `UI.md`, `CONTRACT.md`, `REVIEW-PLAN.md` | frontend |
+| `brief` | `brief-NN-<unit>.md` | backend, frontend |
+| `unit.report` | `report-NN.md` | backend, frontend |
+| `review`, `report` | berkas senama | backend, frontend |
+| `quickdev.plan` | `plan/<task>.md` | quickdev |
+| `ticket.review` | `review.md` tiket | analyst |
+| `profile`, `audit`, `api.doc`, `adhoc.review` | profil, `backenddev/issues/`, `docs/api/`, `frontenddev/reviews/` | P2, lihat T10 |
+| `doc` | cadangan untuk key remote yang tipenya kosong dan nama berkasnya tidak dikenali | backend, frontend |
 
 **Metadata dokumen** (objek JSON, diganti utuh tiap upsert seperti `update_task`): `source`, `repo`, `path`
 (relatif root repo), `status` (nilai frontmatter berkas: `APPROVED`, `READY`, `DONE`, dst.), `commit` (sha
@@ -320,6 +322,9 @@ Dibaca dari PRD dan REPORT keempat rantai di atas serta `internal/adapters/prima
   beririsan (OPEN).
 - **S7:** muatan 25 KB terbukti tiba utuh, dan tidak ada plafon `content`.
 - Semua argumen `metadata` (task, workdir, dokumen) berupa **teks** JSON, sama dengan langkah 14.
+- **`type` (E11):** sejak backend `d8bc1d6` (`document-type-format`) `type` wajib cocok `^[a-z]+(\.[a-z]+)*$`
+  di `create_document`, `upsert_document`, dan `upsert_documents`; nilai lain ditolak `invalid input data`. Filter
+  `type` `list_document` tetap kesamaan persis tanpa validasi.
 
 ### Keputusan pelaksanaan
 
@@ -335,6 +340,7 @@ Dibaca dari PRD dan REPORT keempat rantai di atas serta `internal/adapters/prima
 | E8 | Status task (T7) diturunkan skrip beserta syarat asalnya: `in_progress` hanya dari `todo`, sedangkan `done`/`cancelled` dari `todo`/`in_progress`. Plugin engineer hanya pernah menaikkan task tiket analyst ke `in_progress` | Satu task tiket bisa menaungi taskdir backend dan frontend, jadi satu taskdir selesai belum berarti tiket selesai. Status tidak pernah diturunkan dari `done`/`cancelled` |
 | E9 | Task tiket yang belum ada di nataflow dibuat plugin engineer dengan metadata `{"source":"analyst","ticket_key":…,"repo":…}` | `lookup` analyst menemukan task itu (containment), lalu `update_task` analyst menimpa judul, deskripsi, dan metadatanya. Tidak ada task kembar |
 | E10 | Dokumen tingkat repo (T10) memakai `workspace_id` config. Bila kosong, `list_workspace` harus mengembalikan tepat satu workspace | Key yang terkunci workspace tidak perlu `workspace_id` di config |
+| E11 | Nilai `type` dokumen memakai format server: huruf kecil, `_` lama menjadi `.` (`UNIT_REPORT` → `unit.report`). `check_documents` menolak `type` di luar pola sebelum dikirim. `type` remote bergaya lama yang dipakai ulang untuk key tercermin (E7) dinormalkan lewat `remote_type`, sehingga baris lama diperbarui ke format baru pada sinkron berikutnya | Server menolak huruf besar dan `_` sejak `d8bc1d6`; pemetaan mekanis membuat nilai lama dan baru bisa diturunkan satu arah tanpa tabel |
 
 ### Protokol (menggantikan § Pola pemakaian tool)
 

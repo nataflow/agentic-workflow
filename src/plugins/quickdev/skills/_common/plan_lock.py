@@ -641,7 +641,7 @@ def cmd_sync_payload(a) -> int:
     """Argumen tool MCP nataflow; read-only, tanpa commit (D4, D5). Model mengirim nilainya apa adanya.
 
     Rencana: satu workdir `quickdev:<repo>:<path rencana>` bernama `<task_name>`, task baru ber-`workdir_key`
-    (quickdev tidak mengenal tiket analyst), dan satu dokumen `QUICKDEV_PLAN` berisi berkas di disk (skill tidak
+    (quickdev tidak mengenal tiket analyst), dan satu dokumen `quickdev.plan` berisi berkas di disk (skill tidak
     meng-commit). Rencana yang belum pernah `lock` (tanpa `Approved-At`) → FAIL: DRAFT tidak didorong (D2).
     Profil: dokumen `PROFILE` di bawah workspace, `key` = `<repo>/<path>` (T10).
     """
@@ -662,7 +662,7 @@ def cmd_sync_payload(a) -> int:
     repo = ns.repo_identity(root, config)
     commit = ns.last_commit(root, rel)
     if a.repo_profile:
-        doc = ns.document("workspace", f"{repo}/{rel}", "PROFILE", content, ns.doc_meta("quickdev", repo, rel, "", commit))
+        doc = ns.document("workspace", f"{repo}/{rel}", "profile", content, ns.doc_meta("quickdev", repo, rel, "", commit))
         head = {"repo": repo, "workspace_id": config["workspace_id"],
                 "list_document": {"reference_table": "workspace", "include_content": False,
                                   "metadata": ns.compact({"source": "quickdev", "repo": repo})}}
@@ -690,7 +690,7 @@ def cmd_sync_payload(a) -> int:
     meta = {"source": "quickdev", "repo": repo, "path": rel, "plan_status": m.get("Status", ""),
             "plan_hash": m.get("Plan-Hash", ""), "base_commit": b.get("Base-Commit", ""), "execution": execution}
     workdir = ns.workdir_args(config, key, path.stem, status, {k: v for k, v in meta.items() if v})
-    doc = ns.document("workdir", path.name, "QUICKDEV_PLAN", content,
+    doc = ns.document("workdir", path.name, "quickdev.plan", content,
                       ns.doc_meta("quickdev", repo, rel, m.get("Status", ""), commit, execution=execution))
     head = {"repo": repo, "task": task, "workdir": workdir,
             "list_document": {"reference_table": "workdir", "include_content": False}}

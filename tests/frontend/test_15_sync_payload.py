@@ -1,5 +1,6 @@
 """15 F2, F9, F11–F13, F15 — `sync_payload.py` frontend: argumen tool MCP nataflow untuk taskdir dan dokumen repo."""
 import json
+import re
 
 import pytest
 
@@ -87,7 +88,7 @@ def test_hop_disetujui_ikut(repo):
     out = push(repo)
     assert {"TASK.md", "CONTRACT.md", "brief-01-orders-lacak-button.md"} <= set(keys(out))
     contract = next(d for d in out["documents"] if d["key"] == "CONTRACT.md")
-    assert json.loads(contract["metadata"])["status"] == "APPROVED" and contract["type"] == "CONTRACT"
+    assert json.loads(contract["metadata"])["status"] == "APPROVED" and contract["type"] == "contract"
     assert "REVIEW-PLAN.md" in keys(out) or not (repo / FE_TD / "REVIEW-PLAN.md").exists()
 
 
@@ -138,7 +139,8 @@ def test_rantai_tuntas_done(fe_minor_chain):
     assert out["task"]["status"]["status"] == "done"
     docs = push(repo, target=("--taskdir", FE_MINOR_TD))
     assert {"REPORT.md", "REVIEW.md", "report-01.md"} <= set(keys(docs))
-    assert {d["type"] for d in docs["documents"] if d["key"] == "report-01.md"} == {"UNIT_REPORT"}
+    assert {d["type"] for d in docs["documents"] if d["key"] == "report-01.md"} == {"unit.report"}
+    assert all(re.fullmatch(r"[a-z]+(\.[a-z]+)*", d["type"]) for d in docs["documents"]), "format type server (15 E11)"
 
 
 def test_taskdir_bertiket(repo):
@@ -157,10 +159,10 @@ def test_dokumen_repo(repo):
     commit(repo, "docs(review): audit orders", "frontenddev/reviews/2609250000-orders.md")
     docs = push(repo, target=("--repo-docs", "review"))["documents"]
     assert [(d["key"], d["type"]) for d in docs] == [("tim/web/frontenddev/reviews/2609250000-orders.md",
-                                                      "ADHOC_REVIEW")]
+                                                      "adhoc.review")]
     assert json.loads(docs[0]["metadata"])["status"] == "WARNING"
     prof = push(repo, target=("--repo-docs", "profile"))["documents"]
-    assert prof and {d["type"] for d in prof} == {"PROFILE"}
+    assert prof and {d["type"] for d in prof} == {"profile"}
 
 
 def test_byte_stabil_dan_read_only(repo):
