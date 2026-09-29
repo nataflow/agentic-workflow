@@ -1,6 +1,6 @@
 # Alur Plugin `quickdev`
 
-> `quickdev` (v0.6.0) adalah alur kerja ringan untuk repo backend, frontend, dan fullstack. Plugin ini punya enam skill, tanpa taskdir, tanpa subagent, tanpa hook, dan hanya satu skrip pengunci rencana (ditambah pustaka sinkron nataflow opsional). Setiap tugas punya **satu berkas rencana** (`plan/<task>.md`), sedangkan perubahan kodenya boleh menyentuh banyak berkas dan layer. Pakai plugin ini untuk perubahan kecil sampai menengah yang tidak butuh BRD/PRD, ledger approval, atau review subagent. Plugin ini juga cocok untuk stack yang tidak dilayani `backend`/`frontend` (Next.js, FastAPI, Django, Rails), atau untuk kerja yang sengaja dibuat ringan di repo yang sudah memakai kedua plugin itu. Kerja berisiko (kontrak API, migrasi skema, perubahan lintas modul yang butuh jejak keputusan) sebaiknya naik ke `backend:tech-lead` atau `frontend:lead`.
+> `quickdev` (v0.6.1) adalah alur kerja ringan untuk repo backend, frontend, dan fullstack. Plugin ini punya enam skill, tanpa taskdir, tanpa subagent, tanpa hook, dan hanya satu skrip pengunci rencana (ditambah pustaka sinkron nataflow opsional). Setiap tugas punya **satu berkas rencana** (`plan/<task>.md`), sedangkan perubahan kodenya boleh menyentuh banyak berkas dan layer. Pakai plugin ini untuk perubahan kecil sampai menengah yang tidak butuh BRD/PRD, ledger approval, atau review subagent. Plugin ini juga cocok untuk stack yang tidak dilayani `backend`/`frontend` (Next.js, FastAPI, Django, Rails), atau untuk kerja yang sengaja dibuat ringan di repo yang sudah memakai kedua plugin itu. Kerja berisiko (kontrak API, migrasi skema, perubahan lintas modul yang butuh jejak keputusan) sebaiknya naik ke `backend:tech-lead` atau `frontend:lead`.
 
 ## Peta Komponen
 
@@ -20,7 +20,7 @@ Path relatif terhadap `src/plugins/quickdev/`.
 | Templat profil backend | referensi | Enam section profil untuk repo backend | `skills/profile/references/backend-profile-template.md` |
 | Templat profil frontend | referensi | Enam section profil untuk repo frontend | `skills/profile/references/frontend-profile-template.md` |
 | Templat profil fullstack | referensi | Enam section profil untuk fullstack satu paket | `skills/profile/references/fullstack-profile-template.md` |
-| Manifest plugin | konfigurasi | Nama, versi 0.6.0, deskripsi | `.claude-plugin/plugin.json` |
+| Manifest plugin | konfigurasi | Nama, versi 0.6.1, deskripsi | `.claude-plugin/plugin.json` |
 
 Keenam skill memakai `disable-model-invocation: true`. Artinya, skill hanya jalan bila **user** mengetik `/quickdev:<skill>`. Model tidak memanggilnya sendiri, termasuk dari skill quickdev lain. Setiap skill ditutup dengan status terminal, lalu **menawarkan** langkah berikutnya dan menunggu user.
 

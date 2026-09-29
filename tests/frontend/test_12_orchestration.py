@@ -408,7 +408,7 @@ def test_readme_catatan_upgrade():
 def test_versi_rilis():
     fe = json.loads(read(FE / ".claude-plugin" / "plugin.json"))
     be = json.loads(read(PLUGINS / "backend" / ".claude-plugin" / "plugin.json"))
-    assert (fe["version"], be["version"]) == ("0.10.0", "0.11.0")
+    assert (fe["version"], be["version"]) == ("0.10.1", "0.11.1")
 
 
 def test_flow_frontend_menyebut_perilaku_baru():
