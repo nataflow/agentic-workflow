@@ -1,0 +1,86 @@
+# nataflow
+
+Skill untuk kerja langsung dengan server nataflow lewat MCP. Berbeda dari sinkron di `analyst`, `backend`,
+`frontend`, dan `quickdev` yang mencerminkan berkas repo ke nataflow, isi yang dibuat plugin ini hanya hidup di
+server: repo tidak disentuh dan tidak ada yang di-commit.
+
+Saat ini ada satu skill, `create-artifact`.
+
+## Instalasi
+
+```
+/plugin marketplace add <owner>/<repo>          # atau path lokal: ./path/ke/agentic-workflow
+/plugin install nataflow@nataflow
+```
+
+Prasyarat:
+
+- Server MCP nataflow terdaftar di Claude Code user beserta MCP key-nya (default bernama `nataflow-api`), dan
+  backend-nya berjalan. Plugin tidak mendeklarasikan server dan tidak menyimpan key.
+- `python3` ≥ 3.9 (hanya stdlib) untuk `skills/create-artifact/scripts/artifact.py`.
+- Repo git tidak wajib.
+
+## `create-artifact`
+
+Mirip Artifact claude.ai: model menulis satu halaman HTML mandiri (laporan, dashboard, diagram, prototipe), lalu
+menerbitkannya ke nataflow. Artifact disimpan sebagai `document` bermimetype `text/html` di bawah **project milik
+MCP key**, dan anggota project membukanya lewat endpoint render nataflow.
+
+Skill boleh dipicu model (tanpa `disable-model-invocation`), jadi "buatkan artifact nataflow berisi …" cukup.
+Pemanggilan eksplisit: `/nataflow:create-artifact <apa yang ditampilkan>`.
+
+```
+config (artifact.py)  →  get_project_info  →  [perbarui: list_artifacts / get_artifact]
+  →  draft HTML  →  check (artifact.py, maks 3 putaran)  →  cek tabrakan key  →  upsert_artifact
+  →  CREATED | UPDATED | UNCHANGED | DIBATALKAN | GAGAL
+```
+
+- **Server sumber kebenaran.** Draft ditulis ke direktori scratchpad sesi (atau `<tmp>/nataflow-artifacts/`)
+  sebagai bahan kerja sementara. Pembaruan selalu berangkat dari `get_artifact`, bukan dari draft lama.
+- **Selalu project.** `reference_table` = `project` dan `reference_id` = `id` balikan `get_project_info`.
+  Setiap MCP key terikat ke tepat satu project.
+- **Tidak menimpa diam-diam.** Artifact baru yang key-nya sudah dipakai memicu pertanyaan: timpa, pakai
+  `<key>-v2`, atau batal.
+- **Tidak menghapus.** Skill tidak pernah memanggil `delete_document`.
+
+### Gerbang `artifact.py`
+
+| Subperintah | Keluaran |
+|---|---|
+| `config [--json]` | `mcp_server` (dari `.claude/nataflow.json` root repo bila ada, default `nataflow-api`), `config_source`, `draft_dir` |
+| `check --file <draft> [--key <key>] [--json]` | `key` (dari `--key` atau slug `<title>`), `title`, `bytes`, `content_sha256`, `metadata` (`{"title","source"}`), `problems`, `warnings` |
+
+Exit 0 = `PASS`, 1 = `FAIL`. `check` gagal bila salah satu berikut terjadi:
+
+- berkas bukan UTF-8, ber-BOM, kosong, atau lebih dari 1 MiB;
+- tidak ada `<!doctype html>`, `<meta charset>`, `<meta name="viewport">`, atau `<title>` (maks 120 karakter);
+- ada `<script src>` di luar cdnjs, jsDelivr `/npm/`, unpkg, Tailwind CDN, atau jQuery CDN, atau stylesheet di
+  luar Google Fonts;
+- ada rujukan relatif yang dimuat browser (`<img src="a.png">`, `<link rel="stylesheet" href="a.css">`);
+- ada `<input type="password">`;
+- `--key` bukan kebab-case (maks 80 karakter), atau judul tidak menghasilkan slug.
+
+Peringatan (tidak menggagalkan): tanpa `prefers-color-scheme`, warna tanpa token `--*` di `:root`, browser
+storage tanpa `try/catch`, dan judul lebih dari 6 kata. Kontrak lengkapnya ada di
+`skills/create-artifact/references/page-contract.md`.
+
+### Kontrak tool MCP (asumsi)
+
+Tool artifact sedang dibangun di `nataflow-api` (taskdir `artifact-html-tools`) dan PRD-nya belum terkunci.
+Skill ini mengasumsikan bentuk yang meniru tool dokumen:
+
+| Tool | Argumen yang dipakai skill | Balikan yang dipakai |
+|---|---|---|
+| `get_project_info` | — | `id`, `name` |
+| `list_artifacts` | `reference_table`, `reference_id`, `include_content=false` | `key`, judul (`metadata.title`) |
+| `get_artifact` | `reference_table`, `reference_id`, `key` | `content`, `key`; galat "not found" bila tidak ada |
+| `upsert_artifact` | `reference_table`, `reference_id`, `key`, `content`, `content_sha256`, `metadata` | `action` (`created`/`updated`/`unchanged`), `id`, URL render bila ada |
+
+`type` dan `mimetype` tidak dikirim: tool artifact diharapkan memaksakan `text/html`. Bila PRD backend
+memutuskan lain, selaraskan `skills/create-artifact/SKILL.md`, tabel ini, dan `flow/nataflow.md` bersama-sama.
+
+## Keterbatasan yang Diketahui
+
+- **Artifact adalah potret.** Halaman tidak boleh memanggil API nataflow; datanya disematkan saat ditulis.
+- **Tanpa riwayat versi.** `upsert_artifact` menimpa isi; versi lama tidak tersimpan di server.
+- **Ukuran dibatasi 1 MiB** karena seluruh isi dikirim sebagai satu argumen tool dan ikut dihitung token.

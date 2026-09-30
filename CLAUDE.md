@@ -4,8 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-`nataflow` is a Claude Code **plugin marketplace**, not an application. It ships four plugins under
-`src/plugins/`: `analyst`, `backend`, `frontend`, and `quickdev`. Each plugin is a set of skills
+`nataflow` is a Claude Code **plugin marketplace**, not an application. It ships five plugins under
+`src/plugins/`: `analyst`, `backend`, `frontend`, `quickdev`, and `nataflow`. Each plugin is a set of skills
 (`SKILL.md` prose), subagents (`agents/*.md`), hooks, and stdlib-only Python scripts that skills call to
 enforce their gates mechanically. Everything under `src/plugins/<plugin>/` is copied into the user's
 plugin cache, so dev-only files (tests, `__pycache__`, `src/plugins` paths in prose) must not live there.
@@ -82,6 +82,9 @@ skeletons), `dispatcher/` (prompts used to dispatch subagents), `scripts/`, and 
   `_common/review_round.py` with a "sidik" (content fingerprint) that the reviewer must echo.
 - **quickdev** — lightweight, no taskdir and no subagents: `repo-profile.md` + one `plan/<task>.md`
   guarded by `_common/plan_lock.py`.
+- **nataflow** — direct work against the nataflow server over MCP, no repo artifacts. `create-artifact`
+  writes a self-contained HTML page, gates it with `skills/create-artifact/scripts/artifact.py check`, and
+  upserts it under the MCP key's project via the (assumed) `*_artifact` MCP tools. Model-invocable.
 
 Repo profiles are per plugin: `.claude/profile/backenddev/` and `.claude/profile/frontenddev/`
 (`index.json` + fixed set of `.md` files; see `BE_PROFILE_MD`/`FE_PROFILE_MD` in `tests/conftest.py`).

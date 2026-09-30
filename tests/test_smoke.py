@@ -29,6 +29,8 @@ CASES = [
     ("analyst/skills/_common/ticket.py", ["commit", "--ticketdir", AN_TD, "--stage", "draft"], False, None),
     ("analyst/skills/_common/validate_doc.py", ["--kind", "elicit", "--ticketdir", AN_TD, "--json"], True, None),
 
+    ("nataflow/skills/create-artifact/scripts/artifact.py", ["config", "--json"], True, None),
+
     ("backend/hooks/detect.py", ["--plugin", "backend"], "hook", HOOK_STDIN),
     ("backend/hooks/guard_bash.py", ["hook"], "hook", BASH_STDIN),
     ("backend/skills/_common/validate_doc.py", ["--kind", "task", "--taskdir", BE_TD, "--json"], True, None),

@@ -1,7 +1,7 @@
 # nataflow
 
-Marketplace plugin Claude Code `nataflow`: empat plugin untuk alur kerja rekayasa perangkat lunak,
-mulai dari tiket stakeholder sampai kode yang direview.
+Marketplace plugin Claude Code `nataflow`: lima plugin untuk alur kerja rekayasa perangkat lunak,
+mulai dari tiket stakeholder sampai kode yang direview, ditambah kerja langsung dengan server nataflow.
 
 | Plugin | Versi | Fungsi | Titik masuk |
 |---|---|---|---|
@@ -9,6 +9,7 @@ mulai dari tiket stakeholder sampai kode yang direview.
 | [`backend`](src/plugins/backend/README.md) | 0.13.0 | Kerja backend 7 stack (Java Spring, Go, Node, Bun, Rust, PHP, CodeIgniter 4): profil, TASK/BRD/PRD/brief, eksekusi, review, dan laporan | `/backend:tech-lead` |
 | [`frontend`](src/plugins/frontend/README.md) | 0.12.0 | Kerja frontend (React + Vite, React Native/Expo, SvelteKit, Svelte + Vite): alur layar, bentuk layar, kontrak, brief, eksekusi, review, dan laporan dengan ledger approval | `/frontend:lead` |
 | [`quickdev`](src/plugins/quickdev/README.md) | 0.8.0 | Alur ringan untuk stack apa pun: profil, explore, clarify, satu berkas rencana, execute, dan review, tanpa taskdir dan tanpa subagent | `/quickdev:profile`, `/quickdev:plan` |
+| [`nataflow`](src/plugins/nataflow/README.md) | 0.1.0 | Artifact nataflow: halaman HTML mandiri yang dinilai gerbang kontrak halaman lalu di-upsert ke project milik MCP key, tanpa berkas di repo | `/nataflow:create-artifact` |
 
 Skill internal (mis. `backend:plan`, `frontend:contract`, `analyst:spec`) tidak muncul di menu `/`.
 Model memanggilnya dari gerbang masing-masing.
@@ -21,6 +22,7 @@ Model memanggilnya dari gerbang masing-masing.
 /plugin install backend@nataflow
 /plugin install frontend@nataflow
 /plugin install quickdev@nataflow
+/plugin install nataflow@nataflow
 ```
 
 Untuk salinan lokal: `/plugin marketplace add ./path/ke/agentic-workflow`. Marketplace direktori lokal
@@ -29,10 +31,10 @@ Marketplace git memakai `version` di `plugin.json`: pengguna hanya mendapat peru
 
 ## Prasyarat
 
-- `python3` ≥ 3.9 di `PATH` untuk hook dan skrip `analyst`, `backend`, dan `frontend`. Semua skrip
+- `python3` ≥ 3.9 di `PATH` untuk hook dan skrip `analyst`, `backend`, `frontend`, dan `nataflow`. Semua skrip
   hanya memakai stdlib. Python 3.11+ disarankan untuk repo Rust ber-workspace (`tomllib`).
 - `git`. `backend` dan `frontend` mewajibkan repo git, sedangkan `analyst` bisa berjalan di folder
-  dokumen biasa.
+  dokumen biasa. `nataflow` tidak butuh repo, tetapi butuh server MCP nataflow yang berjalan.
 - Di Windows yang hanya punya `py`/`python` tanpa `python3`, hook SessionStart tidak jalan.
 
 ## Memilih Plugin
@@ -43,6 +45,7 @@ Marketplace git memakai `version` di `plugin.json`: pengguna hanya mendapat peru
 | Repo backend salah satu dari 7 stack; kerja berisiko atau butuh kontrak dan jejak keputusan | `backend` |
 | Repo React + Vite, React Native/Expo, SvelteKit, atau Svelte + Vite | `frontend` |
 | Perubahan kecil–menengah, stack lain (Next.js, FastAPI, …), tanpa taskdir | `quickdev` |
+| Laporan, dashboard, atau diagram HTML yang dibuka anggota project di nataflow | `nataflow` |
 
 Rantai `analyst` → engineer: tiket `READY` diserahkan dengan menempelkan isi `TICKET.md` sebagai permintaan
 ke `/backend:tech-lead` dan/atau `/frontend:lead`. Engineer lalu menerbitkan `TASK.md` teknisnya
@@ -50,7 +53,7 @@ sendiri.
 
 ## Hidup Berdampingan
 
-Keempat plugin biasanya dipasang user-wide. Yang menentukan perilaku di satu repo:
+Kelima plugin biasanya dipasang user-wide. Yang menentukan perilaku di satu repo:
 
 - **Hook SessionStart.** Hanya `backend` dan `frontend` yang punya hook. Keduanya berbagi
   `hooks/detect.py` yang identik byte-per-byte, dan masing-masing menyala bila profilnya ada atau
