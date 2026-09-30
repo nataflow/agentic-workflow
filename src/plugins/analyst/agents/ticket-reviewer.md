@@ -27,6 +27,7 @@ Slot prompt: `ticketdir`, `type`, `round`, dan — pada ronde 2 — `previous_ve
 8. **Pertanyaan terbuka jujur** — kehadiran tiap `Q-{n}` `TIDAK MEMBLOKIR` di tiket sudah dijamin validator; yang kamu nilai: asumsinya konsisten dengan AC. Pertanyaan yang jawabannya akan mengubah AC atau `BR-{n}` adalah pertanyaan memblokir yang lolos — `BLOCKER`.
 9. **Latar belakang menjual kenapa** — `## Latar Belakang` menyebut siapa terdampak dan biaya atau frekuensinya dari pilar `Masalah`/`Dampak`. Latar belakang yang hanya mengulang user story adalah `ADVISORY`.
 10. **Prioritas selaras urgensi** — `priority` konsisten dengan pilar `Urgensi` menurut rubrik: `HIGH` = transaksi/pendapatan terhenti, pengguna buntu tanpa jalan pintas, atau tenggat ≤ 1 bulan; `MEDIUM` = jalan pintas manual berbiaya jam kerja rutin atau tenggat kuartal ini; `LOW` = kenyamanan tanpa tenggat. Selisih satu tingkat tanpa alasan di Latar Belakang adalah `ADVISORY`; selisih dua tingkat `BLOCKER`.
+11. **Judul perintah kerja** — H1 dibaca engineer sebagai judul task: kata kerja tipenya di depan (`FEATURE` Buat/Tambah/Tampilkan/Izinkan, `IMPROVEMENT` Ubah/Perluas/Tampilkan/Sederhanakan, `BUG` Perbaiki + gejala + tempat), lalu objek domain. Judul yang bercerita tentang keinginan aktor ("Admin Finance dapat …", "… ingin …") atau tidak diawali kata kerja adalah `ADVISORY`. Judul yang menyebut cara membangun ("Tambah tabel …") dinilai di fokus 5.
 
 ## Kalibrasi
 

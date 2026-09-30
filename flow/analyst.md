@@ -190,7 +190,9 @@ flowchart TD
   0. **Orientasi**. Untuk `DRAFT` dengan `review_segar=ya`, langsung ke Phase 5. Bila `review_basi` memuat
      `elisitasi`, jalankan `ticket.py revise` lalu Phase 1. Bila `review_basi=kartu`, ke Phase 2. Bila
      `change_request` membawa fakta baru, panggil `elicit` dengan `reopen_reason`.
-  1. **Rumusan**: judul ≤ 12 kata; istilah domain berbahasa Inggris dari elisitasi tidak diterjemahkan. Prioritas dipetakan dari pilar `Urgensi` dengan rubrik HIGH/MEDIUM/LOW.
+  1. **Rumusan**: judul ≤ 12 kata berupa perintah kerja untuk engineer (`<kata kerja> <objek domain>
+     <kualifikasi>`, mis. `Tambah …`, `Tampilkan …`, `Perbaiki …`), menyasar hasil teramati, bukan keinginan
+     aktor atau cara membangun; istilah domain berbahasa Inggris dari elisitasi tidak diterjemahkan. Prioritas dipetakan dari pilar `Urgensi` dengan rubrik HIGH/MEDIUM/LOW.
      Tulis latar belakang. Tulis user story (`BUG`: laporan bug). Setiap fakta aturan menjadi `BR-{n}`. AC
      Given/When/Then disapu dari jalur utama, sisi lolos dan tolak tiap BR, kasus khusus, dan peran
      terlarang. Lebih dari 10 AC berarti tiket harus dipecah. Isi juga Di Luar Cakupan dan Pertanyaan
@@ -274,7 +276,7 @@ sequenceDiagram
 
 | Agent | Dipanggil oleh | Tools | Input | Output/vonis | Larangan |
 |---|---|---|---|---|---|
-| `ticket-reviewer` | `analyst:spec` Phase 3, lewat `skills/spec/dispatcher/reviewer.md` | Read, Grep, Glob (model `sonnet`) | Slot `ticketdir` (path absolut), `type`, `round` (1/2), `sidik` (`<12hex>/<12hex>`, diambil tepat sebelum dispatch). Ronde 2 menambah `previous_verdict` dan `changed_sections`. Isi tiket dibaca sendiri dari disk | Blok `## Ticket Review`: `Verdict: PASS\|BLOCKED`, `Sidik`, `Ronde`, hitungan BLOCKER `[MEKANIS]`/`[SEMANTIK]`, BLOCKER berjangkar `TICKET.md:<baris>`, dan ADVISORY. Ada 10 fokus pemeriksaan: hasil teramati, ukuran pasti, setia elisitasi maju dan mundur, kebocoran teknis semantik, satu tujuan, BUG dapat direproduksi, pertanyaan terbuka jujur, latar belakang, prioritas selaras urgensi | Dilarang mengedit berkas, menulis/menyarankan `READY`, menulis ulang tiket, menilai kelayakan teknis/estimasi, bertanya ke user, dan menghitung ulang cek mekanis `validate_doc.py` |
+| `ticket-reviewer` | `analyst:spec` Phase 3, lewat `skills/spec/dispatcher/reviewer.md` | Read, Grep, Glob (model `sonnet`) | Slot `ticketdir` (path absolut), `type`, `round` (1/2), `sidik` (`<12hex>/<12hex>`, diambil tepat sebelum dispatch). Ronde 2 menambah `previous_verdict` dan `changed_sections`. Isi tiket dibaca sendiri dari disk | Blok `## Ticket Review`: `Verdict: PASS\|BLOCKED`, `Sidik`, `Ronde`, hitungan BLOCKER `[MEKANIS]`/`[SEMANTIK]`, BLOCKER berjangkar `TICKET.md:<baris>`, dan ADVISORY. Ada 11 fokus pemeriksaan: hasil teramati, ukuran pasti, setia elisitasi maju dan mundur, kebocoran teknis semantik, satu tujuan, BUG dapat direproduksi, pertanyaan terbuka jujur, latar belakang, prioritas selaras urgensi, judul perintah kerja | Dilarang mengedit berkas, menulis/menyarankan `READY`, menulis ulang tiket, menilai kelayakan teknis/estimasi, bertanya ke user, dan menghitung ulang cek mekanis `validate_doc.py` |
 
 ## Hooks & Guard
 

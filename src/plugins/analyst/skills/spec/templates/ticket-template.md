@@ -13,7 +13,7 @@ Kartu setara kartu detail di Jira/Trello: dibaca peminta, product owner, QA, dan
 Tipe `FEATURE` dan `IMPROVEMENT`:
 
 ````markdown
-# <Judul hasil yang dirasakan pengguna, maksimal 12 kata>
+# <Kata kerja + objek domain + kualifikasi — kerja yang diselesaikan engineer, maksimal 12 kata>
 
 ## Latar Belakang
 
@@ -85,6 +85,7 @@ Field frontmatter `status`, `revision`, `revision_base`, `review`, `review_round
 13. Tiap fakta pilar `Aturan Bisnis`, `Kondisi Diinginkan`, `Kasus Khusus` (dan `Yang Diharapkan` untuk BUG) dipikul minimal satu AC atau dinyatakan di `## Di Luar Cakupan`.
 14. Satu tiket, satu tujuan pengguna. Dua user story yang dapat dirilis terpisah adalah dua tiket.
 15. Pertanyaan `TIDAK MEMBLOKIR` di `## Catatan Elisitasi` yang belum terjawab muncul di `## Pertanyaan Terbuka` beserta asumsi yang dipakai AC.
+16. Judul adalah perintah kerja: diawali kata kerja tipenya (`FEATURE` Buat/Tambah/Tampilkan/Izinkan, `IMPROVEMENT` Ubah/Perluas/Tampilkan/Sederhanakan, `BUG` Perbaiki), menyebut objek domain, dan menyasar hasil yang teramati — bukan keinginan aktor, bukan cara membangun.
 
 ---
 
@@ -93,7 +94,7 @@ Field frontmatter `status`, `revision`, `revision_base`, `review`, `review_round
 Lanjutan contoh bagian 3 `elicit-template.md`: `priority: -` menjadi `priority: HIGH`, H1 kerja diganti judul final, dan kartu disisipkan di atas catatan elisitasi yang tidak berubah.
 
 ````markdown
-# Admin Finance dapat mencatat pembayaran invoice korporat secara cicilan
+# Tambah jadwal pembayaran cicilan untuk invoice pelanggan korporat
 
 ## Latar Belakang
 
@@ -139,3 +140,5 @@ Sebagai Admin Finance, saya ingin memecah invoice korporat menjadi beberapa cici
 ````
 
 Pembanding AC yang **gugur**: `- **AC-1**: Given invoice cicilan, when disimpan, then data cicilan tersimpan di tabel installments` — `then` tidak dapat diamati pengguna (butir 11) dan membocorkan istilah teknis (butir 9).
+
+Pembanding judul yang **gugur**: `Admin Finance dapat mencatat pembayaran invoice korporat secara cicilan` — bercerita tentang keinginan aktor yang sudah dimuat User Story, bukan kerja yang diselesaikan (butir 16); `Tambah tabel installments untuk invoice korporat` — menyebut cara membangun (butir 9 dan 16).

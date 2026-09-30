@@ -35,7 +35,7 @@ user-invocable: false
 
 ### Phase 1 — Rumusan
 
-1. **Judul**: hasil yang dirasakan pengguna, ≤ 12 kata, bukan nama fitur teknis. Istilah domain, nama entitas, menu, layar, dan kolom dipakai persis seperti di elisitasi — yang berbahasa Inggris tidak diterjemahkan: "created at di report order hingga detik" → `Report Order menampilkan Created At hingga detik`, bukan `Laporan Pesanan menampilkan waktu dibuat hingga detik`. Hanya kata penghubungnya yang berbahasa Indonesia.
+1. **Judul**: perintah kerja yang dibaca engineer di papan task, ≤ 12 kata, berpola `<kata kerja> <objek domain> <kualifikasi>`. Kata kerja per tipe: `FEATURE` — Buat, Tambah, Tampilkan, Izinkan; `IMPROVEMENT` — Ubah, Perluas, Tampilkan, Sederhanakan; `BUG` — Perbaiki, diikuti gejala dan tempatnya. Kata kerjanya menyasar hasil yang teramati, bukan cara membangun: `Tampilkan QTY Received per produk di daftar Purchase Order`, bukan `Tambah kolom qty received di tabel PO`. Siapa dan kenapa milik User Story, bukan judul — judul yang bercerita tentang keinginan aktor (`Admin Finance dapat …`, `… ingin …`) mengulang User Story. Istilah domain, nama entitas, menu, layar, dan kolom dipakai persis seperti di elisitasi — yang berbahasa Inggris tidak diterjemahkan: "created at di report order hingga detik" → `Tampilkan Created At hingga detik di Report Order`, bukan `Tampilkan waktu dibuat hingga detik di Laporan Pesanan`. Hanya kata penghubungnya yang berbahasa Indonesia.
 2. **Prioritas**: pilar `Urgensi` dipetakan lewat rubrik bagian 4 panduan.
 3. **Latar Belakang**: 2–4 kalimat dari `Masalah` (BUG: `Dampak`) — siapa, seberapa sering atau mahal, kenapa sekarang.
 4. **User Story** (`FEATURE`/`IMPROVEMENT`): peran dari `Aktor`, kemampuan dari `Kondisi Diinginkan`, manfaat dari `Masalah`. **Laporan Bug** (`BUG`): salin pilar reproduksi, harapan, kejadian, dan dampak; teks layar dikutip dalam tanda kutip.
@@ -54,7 +54,7 @@ user-invocable: false
 
 1. Sunting `<ticketdir>/TICKET.md`: ganti H1 kerja dengan judul final dan tulis kartu persis bagian 1 `templates/ticket-template.md` untuk tipenya di antara H1 dan `## Catatan Elisitasi`; isi `priority` dan `external_ref`. Seksi `## Catatan Elisitasi` beserta field frontmatter lain dibiarkan byte demi byte.
 2. `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/validate_doc.py --kind ticket --ticketdir <ticketdir>` sampai `PASS`. Temuan kebocoran → rumuskan ulang sebagai perilaku yang terlihat; `domain_terms` hanya untuk istilah yang tercatat elisitasi.
-3. Self-test semantik butir 11–15 template.
+3. Self-test semantik butir 11–16 template.
 
 ### Phase 3 — Review Independen
 
