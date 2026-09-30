@@ -79,9 +79,9 @@ Teruskan `--file-scope` apa adanya dari parameter skill. Tanpa itu Check E turun
 
 Jalankan self-review kolektif lebih dulu, commit menyusul, dan tutup dengan laporan:
 
-1. **Self-Review Kolektif Dokumen**: baca state ronde lewat `python3 ${CLAUDE_PLUGIN_ROOT}/skills/plan/scripts/validate_briefs.py --taskdir <taskdir> --review-state`, buka ronde dengan `--open-round` tepat sebelum dispatch berangkat, lalu panggil subagent `brief-reviewer` lewat template `dispatcher/reviewer.md` mengikuti protokol dispatch di `references/review-and-commit.md` bagian 5 — hidrasi slot `taskdir`, `chain`, `ronde`, dan `target`; materaikan tiap ronde yang selesai dengan `--record-round`; plafon **2 ronde per generasi batch dan 4 per taskdir**; ronde 2 menyempit ke brief yang berubah; dan penanganan dispatch gagal ada di sana. Hanya temuan `BLOCKER` yang menahan commit — `ADVISORY` ikut ke laporan tanpa memicu ronde baru.
+1. **Self-Review Kolektif Dokumen**: baca state ronde lewat `python3 ${CLAUDE_PLUGIN_ROOT}/skills/plan/scripts/validate_briefs.py --taskdir <taskdir> --review-state`, buka ronde dengan `--open-round` tepat sebelum dispatch berangkat, lalu panggil subagent `brief-reviewer` lewat template `dispatcher/reviewer.md` mengikuti protokol dispatch di `references/review-and-commit.md` bagian 5 — hidrasi slot `taskdir`, `chain`, `ronde`, dan `target`; materaikan tiap ronde yang selesai dengan `--record-round`; plafon **2 ronde per generasi batch dan 4 per taskdir**; ronde 2 menyempit ke brief yang berubah; dan penanganan dispatch gagal ada di sana. Hanya temuan `BLOCKER` yang menahan commit — `ADVISORY` tercatat di `{taskdir}/.explore/review/brief.md` tanpa memicu ronde baru.
 2. **Commit Agregat**: eksekusi commit satu batch mengikuti `references/review-and-commit.md` bagian 6 — urutan wajib, staging path eksplisit, format `docs(plan): add <N> briefs for <slug>`, batas kewenangan git, dan mitigasi tiap mode kegagalan ada di sana. Status self-review bukan `Approved` → lewati commit dan laporkan brief `READY` belum terkunci di git.
-3. Tampilkan tabel ringkasan per brief, lalu tegaskan: *"Tidak ada kode di `src/` yang dimodifikasi."*
+3. Tutup dengan `## Output [REQUIRED]`, lalu tegaskan: *"Tidak ada kode di `src/` yang dimodifikasi."* Tabel per brief tidak dicetak: `backend:architect` Fase 2 menyajikannya tepat sebelum implementor pertama berangkat.
 
 ## Guardrails
 
@@ -92,7 +92,7 @@ Jalankan self-review kolektif lebih dulu, commit menyusul, dan tutup dengan lapo
 - **BATAS FILE SCOPE EKSPLISIT**: tiap file yang disentuh wajib tercantum di `## File scope`, kelas test terdampak termasuk.
 - **DAG LINEAR SATU ARAH**: dilarang dependensi melingkar atau `Consumes` yang menunjuk `NN` lebih besar.
 - **SUBAGENT DISPATCH**: panggil `brief-reviewer` langsung via template `dispatcher/reviewer.md` di Fase 5, dan `code-explorer` langsung via template `dispatcher/explorer.md` di Fase 2. Dilarang menyusun prompt dispatch di luar template resminya atau melanggar plafon ronde di `references/review-and-commit.md` bagian 5.
-- **VERDICT DITERUSKAN UTUH**: blok `## Brief Review` dari `brief-reviewer` diteruskan apa adanya ke laporan penutup, tanpa parafrase maupun penyaringan.
+- **VERDICT DITERUSKAN UTUH**: blok `## Brief Review` dari `brief-reviewer` ditulis apa adanya ke `{taskdir}/.explore/review/brief.md` tiap ronde, bukan dicetak di chat, tanpa parafrase maupun penyaringan.
 - **COMMIT TERBATAS PADA BRIEF**: commit skill ini hanya memuat `brief-*.md` taskdir aktif — brief baru **dan** brief yang baru ditandai `SUPERSEDED` — ditambah `git rm -q {taskdir}/HALT.md` bila baris `repairs` mencabutnya dan berkas `finding_source` di bawah `backenddev/issues/` bila Fase 2 menandainya `OBSOLETE`/`DROPPED`, dengan staging path eksplisit, satu-satunya mutasi git milik `plan`. Dilarang `git add .`/`-A`, `push`, `merge`, `rebase`, `branch`, maupun `checkout`.
 - **CUKUP ITU BERHENTI**: brief mengeksekusi kontrak yang sudah dikunci hulu, bukan kontrak yang seharusnya. Dilarang menambah langkah, berkas, abstraksi, interface, atau flag konfigurasi yang tak satu pun `AC-{n}`/`SC-{n}` tuntut ("nanti ada yang kedua" bukan akar); memecah satu permukaan jadi banyak brief demi terlihat atomik — itu kebalikan *God Brief* dengan ongkos gerbang yang sama; dan membawa perbaikan temuan Fase 2 ke dalam batch ini, karena rumahnya `backenddev/issues/`, bukan brief tambahan.
 - **KEPUTUSAN DEFINITIF SAAT INI**: seluruh isi dokumen berprinsip "Yang ditulis = Keputusan saat ini" tanpa memori temporal atau komparasi masa lalu.
@@ -100,17 +100,17 @@ Jalankan self-review kolektif lebih dulu, commit menyusul, dan tutup dengan lapo
 
 ## Output [REQUIRED]
 
-Brief mengikuti `templates/brief-template.md`. Self-review `Approved` dan batch ter-commit → tutup satu baris tanpa blok: `### BACKEND PLAN GENERATION REPORT — <n> BRIEF READY @ <sha> · <taskdir> · Entry <PRD | RCA | LANGSUNG> · Check 15/15 · ronde <n>/2 · ADVISORY <n>`. Selain itu, sajikan:
+Brief mengikuti `templates/brief-template.md`. Self-review `Approved` dan batch ter-commit → tutup satu baris tanpa blok: `### BACKEND PLAN GENERATION REPORT — <n> BRIEF READY @ <sha> · <taskdir> · Entry <PRD | RCA | LANGSUNG> · Check 15/15 · ronde <n>/2 · ADVISORY <n> · review <taskdir>/.explore/review/brief.md`. Selain itu, sajikan:
 
 ```markdown
 ### BACKEND PLAN GENERATION REPORT — BELUM TERKUNCI
 - **Rantai**: <taskdir> · Entry <PRD | RCA | LANGSUNG> · <n> brief ditulis
 - **Commit**: tidak dijalankan (<alasan>) — brief `READY` belum terkunci di git
-- **Self-Review**: tidak tuntas (<alasan>) · BLOCKER <n> tersisa — <daftar>
+- **Self-Review**: tidak tuntas (<alasan>) · BLOCKER <n> tersisa — <daftar> · backenddev/docs/<taskdir>/.explore/review/brief.md
 - **Check** : <n>/15 PASS · TERDEGRADASI <daftar id | nihil> · LOCKED <n brief DONE/BLOCKED | nihil> · Coverage AC <n>/<n> · SC <n>/<n>
 ```
 
-Lampirkan verdict `brief-reviewer` apa adanya tepat di bawahnya — predikat E menuntutnya utuh, dilarang diparafrase. Status commit dibaca gerbang di Fase 5-nya: batch yang belum terkunci menahan keberangkatan `architect`. Alokasi `Covers:`/`Fulfills:`, risk per unit, dan `## File scope` tiap brief hidup di berkas brief yang baru saja di-commit — dilarang menyalinnya jadi tabel di laporan.
+Verdict `brief-reviewer` dirujuk lewat path berkasnya, bukan dilampirkan: blok utuh hidup di `{taskdir}/.explore/review/brief.md`, dan predikat E `analyst` membacanya dari sana — dilarang mencetaknya di chat maupun memparafrasenya. Status commit dibaca gerbang di Fase 5-nya: batch yang belum terkunci menahan keberangkatan `architect`. Alokasi `Covers:`/`Fulfills:`, risk per unit, dan `## File scope` tiap brief hidup di berkas brief yang baru saja di-commit — dilarang menyalinnya jadi tabel di laporan.
 
 **Serah-terima.** `Kembali ke backend:analyst` — Fase 6 skill itu satu-satunya titik yang memverifikasi ledger `## Chain` tercentang penuh. Dilarang mendispatch implementor sendiri; orkestrasi eksekusi milik `backend:architect` lewat gerbang. Hanya jalur `RCA` yang pulang ke `backend:tech-lead`.
 

@@ -55,4 +55,4 @@ Tanpa satu pun isu dan tanpa rekomendasi → baris status ditulis persis `**Stat
 
 **Contoh kalibrasi.** Issue yang sah: `- [AC-2]: kolom Akar kosong - SC-2 TASK.md tidak diangkut AC mana pun, predikat G2 gerbang analyst gagal dan brief tidak punya kriteria untuk menutupnya`. Yang hanya `Recommendations`: `- [API contract]: pesan error 409 sebaiknya menyebut status order saat ini` — memperjelas, tidak mengubah kontrak. Yang dilarang ditulis sama sekali: saran menambah field `reason` pada request cancel yang tak satu pun BR/SC tuntut.
 
-Laporan ini diteruskan `system-analysis` **apa adanya** ke `backend:analyst` sebagai predikat masuk gerbang dokumen. Tulis verdict yang sebenarnya: verdict `Approved` yang dikarang menghapus satu-satunya gerbang kualitas PRD dalam rantai.
+Laporan ini ditulis `system-analysis` **apa adanya** ke `{taskdir}/.explore/review/prd.md`, dan `backend:analyst` membacanya dari sana sebagai predikat masuk gerbang dokumen. Tulis verdict yang sebenarnya: verdict `Approved` yang dikarang menghapus satu-satunya gerbang kualitas PRD dalam rantai.

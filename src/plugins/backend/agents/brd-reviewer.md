@@ -51,4 +51,4 @@ Tanpa satu pun isu dan tanpa rekomendasi → baris status ditulis persis `**Stat
 
 **Contoh kalibrasi.** Issue yang sah: `- [Actors]: tidak ada peran berjenis terlarang - system-analysis tidak dapat menurunkan larangan ke tabel Permission & scope, permission negatif hilang dari PRD`. Yang hanya `Recommendations`: `- [BR-2]: "sebelum stok dikurangi" lebih presisi ditulis "sebelum fulfilment"` — redaksional, kontraknya tidak berubah. Yang dilarang ditulis sama sekali: saran menambah `BR-{n}` audit trail pembatalan yang tak satu pun akar tuntut.
 
-Laporan ini diteruskan `business-analysis` **apa adanya** ke `backend:analyst` sebagai predikat masuk gerbang dokumen. Tulis verdict yang sebenarnya: verdict `Approved` yang dikarang menghapus satu-satunya gerbang kualitas BRD dalam rantai.
+Laporan ini ditulis `business-analysis` **apa adanya** ke `{taskdir}/.explore/review/brd.md`, dan `backend:analyst` membacanya dari sana sebagai predikat masuk gerbang dokumen. Tulis verdict yang sebenarnya: verdict `Approved` yang dikarang menghapus satu-satunya gerbang kualitas BRD dalam rantai.

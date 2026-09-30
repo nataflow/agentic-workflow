@@ -29,4 +29,4 @@ Ronde > 1 — `{previous_report}` adalah daftar temuan yang wajib dipastikan ter
 | `{ronde}` | Nomor ronde self-review skill pemanggil | `1` pada dispatch pertama, `2` pada dispatch ulang. Ronde 3 dilarang berangkat |
 | `{previous_report}` | Laporan reviewer ronde sebelumnya | Diisi hanya pada ronde > 1; ronde 2 tanpa slot ini dilarang berangkat |
 
-**Reviewer mengembalikan:** Laporan `## BRD Review` dengan status `Approved` atau `Issues Found`. Balikan itu diteruskan pemanggil **apa adanya** ke laporan penutupnya; memparafrase atau menyaringnya menghapus predikat masuk gerbang hilir.
+**Reviewer mengembalikan:** Laporan `## BRD Review` dengan status `Approved` atau `Issues Found`. Balikan itu ditulis pemanggil **apa adanya** ke `{taskdir}/.explore/review/brd.md` (menimpa ronde sebelumnya) dan dirujuk laporan penutupnya lewat path itu, bukan dicetak di chat; memparafrase atau menyaringnya menghapus predikat masuk gerbang hilir. `{previous_report}` ronde 2 diisi dari berkas itu sebelum balikan ronde 2 menimpanya.

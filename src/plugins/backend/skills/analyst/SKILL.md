@@ -81,7 +81,7 @@ Jalankan hop belum tercentang paling atas pada ledger `## Chain`, satu hop per g
    **Plafon dua re-entry per taskdir**, dihitung terpisah dari eskalasi chain Fase 5 dan amandemen akar Fase 4a, dan dimateraikan `chain_counters.py` di `## Counters` `TASK.md` — bukan di ingatan sesi. Permintaan ketiga → `## Failure path` butir 9.
 
 1. Serahkan `taskdir`, `chain`, dan `risk` ke tiap skill hop tanpa kecuali; `system-analysis` menerima `risk` bernama `risk_level`, `plan` menerima `entry_mode`, `file_scope`, beserta `finding_source`, dan `business-analysis` menerima `ticket_source` bila terisi, menurut bagian 2.1 `references/chain-rules.md`. Dilarang membiarkan hop menyimpulkan `chain` dari keberadaan berkas.
-2. Tangkap laporan penutup skill hop **beserta blok `## <BRD|PRD|Brief> Review` reviewer-nya apa adanya**. Laporan menyatakan artefaknya tidak terbit, commit-nya gagal, verdict reviewer bukan `Approved`, atau blok review-nya tidak dilampirkan → `## Failure path` butir 3.
+2. Tangkap laporan penutup skill hop, lalu baca blok `## <BRD|PRD|Brief> Review` reviewer-nya dari `{taskdir}/.explore/review/<brd|prd|brief>.md` — hop menulisnya di sana apa adanya, bukan mencetaknya di chat. Laporan menyatakan artefaknya tidak terbit, commit-nya gagal, verdict reviewer bukan `Approved`, atau berkas review-nya absen → `## Failure path` butir 3.
 3. Evaluasi Fase 5 lebih dulu tiap kali laporan hop menyebut pemicu eskalasi; hop dianggap belum tuntas sampai evaluasi itu selesai.
 4. Jalankan Fase 4a lebih dulu tiap kali laporan hop meminta amandemen `## Success Criteria` atau `## Out of Scope` `TASK.md`; hop ditahan apa adanya sampai keputusan user turun.
 5. Hop `BRIEF` tuntas → langsung ke Fase 6. Hop `BRD` dan `PRD` tuntas → Fase 4.
@@ -90,7 +90,7 @@ Jalankan hop belum tercentang paling atas pada ledger `## Chain`, satu hop per g
 
 Dijalankan atas tiap `BRD.md` dan `PRD.md` sebelum hop berikutnya berangkat, mengikuti bagian 4 `references/chain-rules.md`:
 
-0. Predikat masuk: laporan hop menyatakan self-review lolos dan melampirkan blok review reviewer-nya. Verifikasi klaim itu lewat jejak yang penulis tidak dapat karang — `git log --oneline -1 -- {taskdir}/<artefak>` wajib menunjukkan commit draft berformat pesan penulisnya, karena penulis dilarang meng-commit sebelum verdict `Approved`. Salah satu tidak terpenuhi → fase ini tidak berangkat sama sekali; rutekan ke `## Failure path` butir 3. Artefak yang tertahan karena verdict gagal bukan draft yatim.
+0. Predikat masuk: laporan hop menyatakan self-review lolos, dan `{taskdir}/.explore/review/<brd|prd>.md` memuat blok review reviewer-nya berverdict `Approved`. Verifikasi klaim itu lewat jejak yang penulis tidak dapat karang — `git log --oneline -1 -- {taskdir}/<artefak>` wajib menunjukkan commit draft berformat pesan penulisnya, karena penulis dilarang meng-commit sebelum verdict `Approved`. Salah satu tidak terpenuhi → fase ini tidak berangkat sama sekali; rutekan ke `## Failure path` butir 3. Artefak yang tertahan karena verdict gagal bukan draft yatim.
 1. Kunci draft yatim: periksa `git status --porcelain` atas artefak hop; belum terkunci → commit seketika memakai format pesan penulisnya, tanpa menunggu persetujuan siapa pun.
 2. Verifikasi `## Open questions` artefak: maksimal tiga entri dan tidak satu pun memblokir menurut predikat rumah kanoniknya. Ada yang memblokir → jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/analyst/scripts/chain_counters.py --taskdir <taskdir> --bump oq_return:<HOP>` lebih dulu (`FAIL` → `## Failure path` butir 7), lalu kembalikan poin revisinya ke skill hop, pertahankan `DRAFT`, ulangi Fase 3 pada hop yang sama. Plafon dua pengembalian per hop. Bump itu sekaligus menolkan `review_round:<HOP>`: revisi yang dikembalikan mendapat ronde reviewer baru, dan loopnya dibatasi plafon `oq_return`.
 3. Sajikan ringkasan eksekutif artefak — ringkasan gerbang 3–4 kalimat beserta path-nya, bukan salinan isi artefak — lalu satu `AskUserQuestion`: tiap `BR-DISANGGAH: BR-{n}` PRD dan tiap asumsi aktif `sementara dipakai:` sebagai pertanyaan tersendiri, ditambah pertanyaan persetujuan eksplisit (`references/chain-rules.md` bagian 4 butir 3–4).
@@ -125,9 +125,9 @@ Ini satu-satunya titik yang memeriksa rantai sebagai satu kesatuan. Tiap skill h
    |---|---|
    | A | `TASK.md` `status: ACTIVE`, self-test akar 9/9 lolos, ter-commit |
    | B | Ledger `## Chain` tercentang penuh, tiap centang membawa sha |
-   | C | `BRD.md` `APPROVED` bila `chain: BRD_PRD_BRIEF`, verdict `brd-reviewer` `Approved` terlampir apa adanya |
-   | D | `PRD.md` `APPROVED` bila `chain` ber-PRD, verdict `prd-reviewer` `Approved` terlampir apa adanya |
-   | E | Tiap `brief-*.md` berstatus `READY`, `DONE`, atau `SUPERSEDED` bertaut (Check C `validate_briefs.py` tanpa pelanggaran tautan); yang `READY` ter-commit satu batch; verdict `brief-reviewer` `Approved` terlampir apa adanya. `BLOCKED` tetap gagal — ia wajib sudah digantikan brief ber-`supersedes` |
+   | C | `BRD.md` `APPROVED` bila `chain: BRD_PRD_BRIEF`, verdict `brd-reviewer` `Approved` apa adanya di `{taskdir}/.explore/review/brd.md` |
+   | D | `PRD.md` `APPROVED` bila `chain` ber-PRD, verdict `prd-reviewer` `Approved` apa adanya di `{taskdir}/.explore/review/prd.md` |
+   | E | Tiap `brief-*.md` berstatus `READY`, `DONE`, atau `SUPERSEDED` bertaut (Check C `validate_briefs.py` tanpa pelanggaran tautan); yang `READY` ter-commit satu batch; verdict `brief-reviewer` `Approved` apa adanya di `{taskdir}/.explore/review/brief.md`. `BLOCKED` tetap gagal — ia wajib sudah digantikan brief ber-`supersedes` |
    | F | Tiap `SC-{n}` `TASK.md` disebut minimal satu baris `Fulfills:` — **hanya `chain: BRIEF`**; rantai ber-PRD melewatinya (jalurnya `Akar` PRD → `Covers:`, predikat G2 dan G) |
    | G | Tiap `AC-{n}` `PRD.md` disebut minimal satu baris `Covers:` (chain ber-PRD) |
    | G2 | Tiap `SC-{n}` `TASK.md` disebut minimal satu kolom `Akar` PRD (chain ber-PRD) |

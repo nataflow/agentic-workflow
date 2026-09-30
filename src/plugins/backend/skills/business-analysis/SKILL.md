@@ -72,9 +72,9 @@ Tulis tepat satu `{taskdir}/BRD.md` mengikuti `templates/brd-template.md`; tulis
 ### Fase 5 — Self-Review, Commit & Serah Terima
 
 1. **Self-test mekanis**: jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/validate_doc.py --kind brd --taskdir <taskdir>`. `FAIL` → perbaiki seluruh pelanggaran satu keluaran, lalu jalankan sekali lagi; `WARN` (B3, B9) diperiksa dan diperbaiki bila benar. Butir `MANUAL` (B7b, B12) dinilai sendiri memakai `## Self-test struktural` `templates/brd-template.md`.
-2. Sebelum tiap ronde, jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/analyst/scripts/chain_counters.py --taskdir <taskdir> --bump review_round:BRD`; `FAIL` → plafon ronde habis, jalankan `## Failure path` butir 6. Lalu muat `dispatcher/reviewer.md`, hidrasi slot `taskdir`, `chain`, dan `ronde` (nilai dari keluaran `--bump`), panggil `brd-reviewer`. Tangkap `## BRD Review`, perbaiki isu, tahan `DRAFT` tanpa commit selama isu kritis terbuka. Gagal: `## Failure path` butir 6.
+2. Sebelum tiap ronde, jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/analyst/scripts/chain_counters.py --taskdir <taskdir> --bump review_round:BRD`; `FAIL` → plafon ronde habis, jalankan `## Failure path` butir 6. Lalu muat `dispatcher/reviewer.md`, hidrasi slot `taskdir`, `chain`, dan `ronde` (nilai dari keluaran `--bump`), panggil `brd-reviewer`. Tulis balikan `## BRD Review` apa adanya ke `{taskdir}/.explore/review/brd.md` seketika, sebelum satu suntingan pun — menimpa ronde sebelumnya, direktorinya dibuat bila belum ada. Lalu perbaiki isu, tahan `DRAFT` tanpa commit selama isu kritis terbuka. Gagal: `## Failure path` butir 6.
 3. Verdict `Approved`: `git add {taskdir}/BRD.md` lalu `git commit -m "docs(spec): draft BRD <slug>"`. Verdict lain: lewati commit, laporkan `BRD.md` belum terkunci di git.
-4. Sajikan `## Output [REQUIRED]` **beserta blok `## BRD Review` reviewer apa adanya**, lalu kembalikan rute ke `backend:analyst`. Approval user diminta di gerbang dokumennya, bukan di sini.
+4. Sajikan `## Output [REQUIRED]` **tanpa mencetak ulang blok `## BRD Review`** — `analyst` membacanya dari `{taskdir}/.explore/review/brd.md` — lalu kembalikan rute ke `backend:analyst`. Approval user diminta di gerbang dokumennya, bukan di sini.
 
 ## Guardrails
 
@@ -83,19 +83,19 @@ Tulis tepat satu `{taskdir}/BRD.md` mengikuti `templates/brd-template.md`; tulis
 - **LARANGAN DESAIN TEKNIS**: endpoint HTTP, DTO, dan skema tabel dilarang muncul di `BRD.md` (wewenang `system-analysis`).
 - **COMMIT TERBATAS DRAFT**: commit hanya `{taskdir}/BRD.md` DRAFT, staging path eksplisit. Dilarang `status: APPROVED`, commit approval, `git add .`/`-A`, `push`, `merge`, `rebase`, pindah branch (wewenang gerbang). Commit berangkat tanpa menunggu persetujuan user.
 - **NOL PERMINTAAN APPROVAL**: `status: APPROVED` dan persetujuan user atas BRD adalah wewenang tunggal `backend:analyst` (`analyst/references/chain-rules.md` bagian 4). Dilarang menanyakan "setuju dokumen ini?" dalam bentuk apa pun, termasuk sebagai opsi `AskUserQuestion` Fase 2 atau kalimat penutup laporan.
-- **VERDICT DITERUSKAN UTUH**: blok `## BRD Review` dari `brd-reviewer` diteruskan apa adanya ke laporan penutup. Dilarang memparafrase, meringkas, menyaring `Issues Found` jadi "sudah diperbaiki", atau menutup tanpa melampirkannya — `analyst` memakai blok itu sebagai predikat masuk gerbang dokumennya.
+- **VERDICT DITERUSKAN UTUH**: blok `## BRD Review` dari `brd-reviewer` ditulis apa adanya ke `{taskdir}/.explore/review/brd.md` tiap ronde, bukan dicetak di chat. Dilarang memparafrase, meringkas, menyaring `Issues Found` jadi "sudah diperbaiki", menulis isi selain balikan ronde terakhir, atau menutup tanpa berkas itu — `analyst` memakai blok itu sebagai predikat masuk gerbang dokumennya.
 - **DISPATCH RESMI**: `brd-reviewer` via `dispatcher/reviewer.md`, `code-explorer` via `dispatcher/explorer.md`; keduanya didispatch langsung, tanpa skill pembungkus. Dilarang prompt di luar kedua template itu, mengubah `Kedalaman` explorer dari `ringkas`, memberangkatkan dispatch explorer ke-3 dalam satu taskdir, meneruskan sapuan sesudah kuota Fase 1 habis, membaca ulang berkas yang diringkas, masuk ronde self-review ke-3, atau dispatch ulang atas temuan `ADVISORY`/tanpa `previous_report`.
 - **CUKUP ITU BERHENTI**: BRD merekam aturan yang berlaku, bukan aturan yang sebaiknya berlaku. Dilarang merumuskan `BR-{n}` yang tak satu pun `SC-{n}` gerakkan maupun user sebutkan — termasuk yang lahir dari "praktik terbaiknya begitu" atau "sekalian" — memperluas elisitasi ke domain tetangga yang tidak diminta, dan menaikkan pilar opsional (`Edge Cases`, `Business Metrics`) jadi sumbu kerja baru; keduanya melengkapi aturan yang ada, bukan menambah aturan.
 - **RATIONALIZATION PREVENTION**: dilarang menganggap kode lama benar karena lama di produksi; menyerap laporan explorer `confidence: low` sebagai `Observasi kode`; menambal celah observasi dengan asumsi alur; meloloskan pertanyaan memblokir ke draft; melewati konfirmasi Fase 3; mengubah urutan 9 seksi; membuat >1 BRD per taskdir; menafsirkan keheningan sebagai persetujuan; atau menyatakan BRD ter-commit saat `git commit` gagal.
 
 ## Output [REQUIRED]
 
-Artefak `{taskdir}/BRD.md` (DRAFT) mengikuti `templates/brd-template.md`. Verdict `Approved`, Open Qs 0, dan draft ter-commit → tutup satu baris tanpa blok: `### BUSINESS ANALYSIS SUMMARY — BRD.md DRAFT @ <sha> · <n> BR · Open Qs 0 · Self-review Approved`. Selain itu, sajikan:
+Artefak `{taskdir}/BRD.md` (DRAFT) mengikuti `templates/brd-template.md`. Verdict `Approved`, Open Qs 0, dan draft ter-commit → tutup satu baris tanpa blok: `### BUSINESS ANALYSIS SUMMARY — BRD.md DRAFT @ <sha> · <n> BR · Open Qs 0 · Self-review Approved · review <taskdir>/.explore/review/brd.md`. Selain itu, sajikan:
 
 ```markdown
 ### BUSINESS ANALYSIS SUMMARY — TERTAHAN
 - **Artefak** : backenddev/docs/<taskdir>/BRD.md (DRAFT) · belum di-commit (<alasan>)
-- **Self-review**: Issues Found (<n> isu terbuka) | tidak tuntas (<alasan>)
+- **Self-review**: Issues Found (<n> isu terbuka) · backenddev/docs/<taskdir>/.explore/review/brd.md | tidak tuntas (<alasan>)
 - **Open Qs** : <n> tersisa — <pertanyaan yang menahan>
 - **Aturan**  : <n> BR (BR-1..BR-N) · pensiun <BR-lama -> BR-baru> | —
 - **Explorasi**: <n> dispatch · <kendala dispatch/confidence low> | —
@@ -103,7 +103,7 @@ Artefak `{taskdir}/BRD.md` (DRAFT) mengikuti `templates/brd-template.md`. Verdic
 
 Ada kendala eksplorasi pada bentuk satu baris → tambahkan ` · Explorasi: <kendala>` di ujung baris.
 
-Kedua bentuk melampirkan blok `## BRD Review` `brd-reviewer` apa adanya tepat di bawahnya — predikat C `analyst` menuntutnya utuh, dilarang diparafrase maupun diringkas. Aktor, masalah, dan tiap `BM-{n}` hidup di `BRD.md` yang gerbang dokumen baca sendiri; dilarang menyalinnya ke laporan.
+Kedua bentuk merujuk blok `## BRD Review` `brd-reviewer` lewat path berkasnya, bukan melampirkannya: blok utuh hidup di `{taskdir}/.explore/review/brd.md`, dan predikat masuk gerbang dokumen serta predikat C `analyst` membacanya dari sana — dilarang mencetaknya di chat, memparafrase, maupun meringkasnya. Aktor, masalah, dan tiap `BM-{n}` hidup di `BRD.md` yang gerbang dokumen baca sendiri; dilarang menyalinnya ke laporan.
 
 **Serah-terima.** `Kembali ke backend:analyst`; `system-analysis` dilarang jalan sebelum `analyst` menulis `status: APPROVED`.
 

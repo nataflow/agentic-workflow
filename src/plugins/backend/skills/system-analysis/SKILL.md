@@ -79,9 +79,9 @@ Fase ini berdiri **sesudah** PRD ditulis, bukan sebelumnya. Ditempatkan sebelum 
 ### Fase 8 — Self-Review, Commit Draft & Serah Terima
 
 1. **Self-test mekanis**: sebelum butir 2 berangkat, jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/validate_doc.py --kind prd --taskdir <taskdir>`. `FAIL` → perbaiki seluruh pelanggaran satu keluaran, lalu jalankan sekali lagi. Butir `MANUAL` (P4, P10b) dinilai sendiri memakai `## Self-test pra-reviewer` `templates/prd-template.md`.
-2. **Self-review**: sebelum tiap ronde, jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/analyst/scripts/chain_counters.py --taskdir <taskdir> --bump review_round:PRD`; `FAIL` → plafon ronde habis, jalankan `## Failure path` butir 2. Lalu muat `dispatcher/reviewer.md`, hidrasi slot `taskdir`, `chain`, dan `ronde` (nilai dari keluaran `--bump`), panggil `prd-reviewer`. Perbaiki isu `## PRD Review`; pertahankan `DRAFT` tanpa commit selama isu kritis terbuka. Gagal: `## Failure path` butir 2.
+2. **Self-review**: sebelum tiap ronde, jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/analyst/scripts/chain_counters.py --taskdir <taskdir> --bump review_round:PRD`; `FAIL` → plafon ronde habis, jalankan `## Failure path` butir 2. Lalu muat `dispatcher/reviewer.md`, hidrasi slot `taskdir`, `chain`, dan `ronde` (nilai dari keluaran `--bump`), panggil `prd-reviewer`. Tulis balikan `## PRD Review` apa adanya ke `{taskdir}/.explore/review/prd.md` seketika, sebelum satu suntingan pun — menimpa ronde sebelumnya, direktorinya dibuat bila belum ada. Lalu perbaiki isunya; pertahankan `DRAFT` tanpa commit selama isu kritis terbuka. Gagal: `## Failure path` butir 2.
 3. **Commit draft**, bukan approval. `Approved`: `git add {taskdir}/PRD.md` lalu `git commit -m "docs(spec): draft PRD <slug>"`. Selain itu lewati commit dan laporkan PRD belum terkunci di git. Exit code bukan nol: butir 3.
-4. Sajikan `## Output [REQUIRED]` **beserta blok `## PRD Review` reviewer apa adanya**, lalu kembalikan rute ke `backend:analyst`. Dilarang meminta persetujuan user: approval dan penulisan `status: APPROVED` adalah wewenang tunggal `analyst` di gerbang dokumennya.
+4. Sajikan `## Output [REQUIRED]` **tanpa mencetak ulang blok `## PRD Review`** — `analyst` membacanya dari `{taskdir}/.explore/review/prd.md` — lalu kembalikan rute ke `backend:analyst`. Dilarang meminta persetujuan user: approval dan penulisan `status: APPROVED` adalah wewenang tunggal `analyst` di gerbang dokumennya.
 
 ## Guardrails
 
@@ -91,18 +91,18 @@ Fase ini berdiri **sesudah** PRD ditulis, bukan sebelumnya. Ditempatkan sebelum 
 - **NOL PENETAPAN BERKAS**: dilarang menulis path berkas `src/` konkret, urutan berkas, atau nama kelas test di `## Task breakdown` maupun `## Acceptance criteria`. PRD mengunci kontrak dan permukaan; pemilihan berkas beserta penamaannya milik `plan`.
 - **SKEMA DIBACA READ-ONLY & BERKUOTA**: pembacaan skema database sah hanya di bawah batas bagian A `references/analysis-protocol.md` — introspeksi dan agregat saja, nol DML dan nol DDL, terbatas pada permukaan Fase 1, maksimal 5 panggilan per taskdir, dan tiap fakta hasilnya memikul penanda sumbernya. Dilarang menjalankan migrasi, menyentuh tabel di luar permukaan, atau memakai jalur ini untuk fakta yang sebenarnya terbaca dari berkas migrasi maupun definisi entity.
 - **CUKUP ITU BERHENTI**: PRD mengunci kontrak yang dituntut akar, bukan kontrak yang ideal. Dilarang menambah field, endpoint, nilai enum, tabel, index, atau migrasi yang tak satu pun `BR-{n}`, `EC-{n}`, `SC-{n}`, maupun permukaan Fase 1 tuntut lalu mengisi kolom `Dasar`-nya dengan rujukan terdekat yang kebetulan bersinggungan; memakai vonis `terdampak` sebagai izin merancang ulang modul yang disentuhnya — ia menuntut dampaknya mendarat di satu baris breakdown, bukan modulnya ikut digarap; dan memecah `## Task breakdown` lebih halus daripada permukaan yang benar-benar berbeda.
-- **VERDICT DITERUSKAN UTUH**: blok `## PRD Review` dari `prd-reviewer` diteruskan apa adanya ke laporan penutup, tanpa parafrase maupun penyaringan. `analyst` memakainya sebagai predikat masuk gerbang dokumen.
+- **VERDICT DITERUSKAN UTUH**: blok `## PRD Review` dari `prd-reviewer` ditulis apa adanya ke `{taskdir}/.explore/review/prd.md` tiap ronde, bukan dicetak di chat, tanpa parafrase maupun penyaringan. `analyst` memakainya sebagai predikat masuk gerbang dokumen.
 - **DISPATCH RESMI**: `prd-reviewer` via `dispatcher/reviewer.md`, `code-explorer` via `dispatcher/explorer-surface.md` (Profil S) dan `dispatcher/explorer-blast.md` (Profil B); keduanya didispatch langsung, tanpa skill pembungkus. Dilarang prompt di luar kedua template itu, mengubah `Kedalaman` explorer dari `menyeluruh`, mencampur Profil S dan Profil B dalam satu prompt, menyapu sendiri permukaan yang harus didispatch, masuk ronde self-review ke-3, atau dispatch ulang atas `ADVISORY`/tanpa `previous_report`.
 - **RATIONALIZATION PREVENTION**: dilarang mengisi kolom `Pesan` tabel `## Error` dengan parafrase atau terjemahan alih-alih literal `### Error Surface`, menuliskan tipe kolom atau daftar index yang tidak pernah dibaca dari kode maupun skema, mengasumsikan scoping tenant aman tanpa bukti filter security, memvonis dimensi `Tidak terdampak` di atas baris `### Blast Map` berstatus `belum disisir`, di atas baris yang kolom `Disisir`-nya nol atau kosong, di atas dimensi yang tidak muncul di tabel itu, atau di atas `### Gaps` explorer yang berbunyi "belum disisir", memvonis dimensi 11 `tidak relevan` tanpa menyebut jumlah berkas test yang disisir, mengunci tabel kontrak Fase 3 di atas balikan `confidence: medium` tanpa konfirmasi Fase 2, mengubah urutan sembilan seksi PRD, melewati penahanan koreksi Fase 7 atau meng-commit PRD yang koreksinya belum mendarat, menganggap keheningan sebagai persetujuan, mengarang verdict `Approved`, atau menyatakan PRD ter-commit saat `git commit` gagal.
 
 ## Output [REQUIRED]
 
-Artefak `{taskdir}/PRD.md` (DRAFT) mengikuti `templates/prd-template.md`. Verdict `Approved`, Open Qs 0, dan draft ter-commit → tutup satu baris tanpa blok: `### SYSTEM ANALYSIS SUMMARY — PRD.md DRAFT @ <sha> · <n> endpoint terkunci · <n> langkah breakdown · Open Qs 0 · Self-review Approved`, ditambah baris `BR Disanggah` bila ada. Selain itu, sajikan:
+Artefak `{taskdir}/PRD.md` (DRAFT) mengikuti `templates/prd-template.md`. Verdict `Approved`, Open Qs 0, dan draft ter-commit → tutup satu baris tanpa blok: `### SYSTEM ANALYSIS SUMMARY — PRD.md DRAFT @ <sha> · <n> endpoint terkunci · <n> langkah breakdown · Open Qs 0 · Self-review Approved · review <taskdir>/.explore/review/prd.md`, ditambah baris `BR Disanggah` bila ada. Selain itu, sajikan:
 
 ```markdown
 ### SYSTEM ANALYSIS SUMMARY — TERTAHAN
 - **Artefak** : backenddev/docs/<taskdir>/PRD.md (DRAFT) · belum di-commit (<alasan>)
-- **Self-review**: tidak tuntas (<alasan>)
+- **Self-review**: tidak tuntas (<alasan>) · backenddev/docs/<taskdir>/.explore/review/prd.md
 - **Open Qs** : <n> tersisa — <pertanyaan yang menahan>
 - **BR Disanggah**: <BR-{n} yang ditulis sebagai entri `BR-DISANGGAH:` di `## Open questions`> | —
 - **Explorasi**: Profil S <n> · Profil B <n> · <permukaan tak tertutup> | —
@@ -110,7 +110,7 @@ Artefak `{taskdir}/PRD.md` (DRAFT) mengikuti `templates/prd-template.md`. Verdic
 
 Ada penyimpangan eksplorasi pada bentuk satu baris → tambahkan ` · Explorasi: <penyimpangan>` di ujung baris.
 
-Kedua bentuk melampirkan blok `## PRD Review` `prd-reviewer` apa adanya tepat di bawahnya — predikat D `analyst` menuntutnya utuh, dilarang diparafrase. `BR Disanggah` bertahan sekalipun PRD bersih: sanggahan atas `BR-{n}` yang sudah `APPROVED` diputuskan user di gerbang dokumen, bukan di sini. Kontrak endpoint, lifecycle status, permission boundary, migrasi, dan impact map hidup di `PRD.md`.
+Kedua bentuk merujuk blok `## PRD Review` `prd-reviewer` lewat path berkasnya, bukan melampirkannya: blok utuh hidup di `{taskdir}/.explore/review/prd.md`, dan predikat masuk gerbang dokumen serta predikat D `analyst` membacanya dari sana — dilarang mencetaknya di chat maupun memparafrasenya. `BR Disanggah` bertahan sekalipun PRD bersih: sanggahan atas `BR-{n}` yang sudah `APPROVED` diputuskan user di gerbang dokumen, bukan di sini. Kontrak endpoint, lifecycle status, permission boundary, migrasi, dan impact map hidup di `PRD.md`.
 
 **Serah-terima.** `Kembali ke backend:analyst`; `plan` menunggu `analyst` menulis `status: APPROVED`.
 
