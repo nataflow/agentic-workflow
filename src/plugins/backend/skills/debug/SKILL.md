@@ -75,8 +75,8 @@ Jalankan maksimal tiga siklus. Tuntaskan tiap siklus secara penuh sebelum memula
 
 ### Fase 5 — Approval Root Cause & Penerbitan Artefak
 
-1. Sajikan ringkasan ke user: rantai kausal, bukti `file:line`, hipotesis yang gugur, dan arah perbaikan kandidat.
-2. Tangani respons user:
+1. Sajikan ringkasan gerbang 3–4 kalimat, bukan rantai kausal utuh: proposisi root cause beserta `file:line` utamanya, jumlah hipotesis yang gugur, arah perbaikan kandidat, dan regression guard-nya. Rantai kausal lengkap mendarat di `RCA.md` sesudah disetujui. User meminta rincian → sajikan rantai kausal atau hipotesis yang diminta, lalu ajukan ulang pertanyaan butir 2.
+2. `AskUserQuestion`: *Setujui root cause* · *Tolak (sebut arah lain)*. Tangani respons user:
    - User menyetujui root cause: Tulis `{taskdir}/RCA.md` mengikuti `templates/rca-template.md` sebagai satu aksi tuntas.
    - User menolak atau menunjuk arah lain: Kembali ke Fase 3 butir 1 dengan hipotesis baru tanpa menambah sisa siklus.
 3. Serahkan hasil ke pemanggil tanpa mengeksekusi langkah berikutnya sendiri.

@@ -87,12 +87,8 @@ User meminta sinkron ulang rencana yang sudah ada ("sinkron ulang `<plan_path>`"
 
 ### Fase 3 — Presentasi Draf & Permintaan Review User (Approval Gate)
 
-1. Sajikan ringkasan rencana implementasi kepada user secara transparan dan terstruktur:
-   - Tampilkan daftar urutan langkah atomik beserta path file target yang akan dimodifikasi.
-   - Sorot keputusan desain kunci, perubahan skema database, atau penambahan dependensi baru yang memerlukan perhatian khusus.
-   - Informasikan tautan path berkas lengkap pada `<plan_dir>/<task_name>.md` agar user dapat melakukan inspeksi mandiri.
-2. Minta persetujuan eksplisit user (Approval Gate):
-   - Minta user memberikan persetujuan eksplisit ("approve" / "setuju") atau memberikan poin revisi.
+1. Sajikan **ringkasan gerbang**, bukan isi rencana: baris `PLAN — DRAFT · <plan_dir>/<task_name>.md · <n> langkah · <n> berkas`, lalu 3–4 kalimat — pendekatan yang dipilih, keputusan desain kunci, perubahan skema database atau dependensi baru bila ada, dan risiko terbesarnya. `task_name` hasil turunan dan `Gates: … DILEWATI` (Failure path 5) masing-masing disebut dalam satu frasa. Daftar langkah atomik dan path berkas target tetap di rencana; dilarang menyalinnya ke chat. User meminta rincian → sajikan section yang diminta saja, lalu ajukan ulang pertanyaan butir 2.
+2. Minta persetujuan eksplisit lewat `AskUserQuestion` (Approval Gate): *Setujui rencana* · *Revisi (sebut poinnya)*. Diam atau jawaban ambigu bukan persetujuan.
 3. Tangani evaluasi respons balik user:
    - **Jika user meminta revisi atau penyesuaian**: Perbarui dokumen `<plan_dir>/<task_name>.md` sesuai feedback, pertahankan `Status: DRAFT`, dan ajukan draf pembaruan untuk review ulang. Rencana yang sudah memuat `## Execution Status`: revisi hanya Section 1–5 lewat Edit terarah; blok itu dan checkbox langkah yang teksnya tidak berubah dipertahankan, sedangkan langkah yang teksnya berubah dikembalikan ke `- [ ]` supaya `quickdev:execute` mengerjakannya ulang.
    - **Jika user menyatakan persetujuan eksplisit**: jalankan perintah di bawah dengan jawaban user apa adanya lewat stdin. Heredoc berkutip mencegah shell mengekspansi `` ` `` dan `$` di jawaban; dilarang memakai kutip ganda. `LOCK FAIL` → perbaiki sebabnya; dilarang menulis `Status: APPROVED` dengan tangan.

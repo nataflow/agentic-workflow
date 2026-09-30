@@ -63,7 +63,7 @@ Tawarkan 2–3 opsi mengacu `references/ux-patterns.md` — Direct/Modal · Mult
 
 ### Phase 5 — Approval User
 
-1. Sajikan ringkasan: titik masuk, rute utama beserta parameternya, penanganan batal/dirty, cabang error, dan tabel Data Demands.
+1. Sajikan **ringkasan gerbang**, bukan isi dokumen: baris `FLOW.md DRAFT @ <sha> · <taskdir>/FLOW.md`, lalu 3–4 kalimat — opsi alur terpilih beserta titik masuk dan rute utamanya, penanganan batal/dirty, cabang error paling berisiko, dan asumsi default yang dipakai. Tabel rute, cabang error, dan Data Demands tetap di berkas; dilarang menyalinnya ke chat. User meminta rincian → sajikan seksi yang diminta saja, lalu ajukan ulang pertanyaan butir 2.
 2. `AskUserQuestion`: *Setujui alur* · *Revisi (sebut poinnya)* · *Hentikan*.
 3. **Setuju** → `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py approve --taskdir <taskdir> --row FLOW --answer "<jawaban user apa adanya>"`. Approve PASS → jalankan prosedur `lead/references/nataflow-sync.md` (`--taskdir <taskdir>`); segmennya masuk baris penutup, dan `nataflow GAGAL` tidak membatalkan approval.
 4. **Revisi** → `chain.py revisions --taskdir <taskdir> --row FLOW` (plafon 2; `draft` ulang dan amandemen akar tidak me-reset hitungan). Di bawah plafon → perbarui, validasi, commit `revise`, ajukan ulang. Plafon habis → hentikan, sajikan poin penolakan berurutan, serahkan ke `frontend:lead` Phase 8 (plafon habis: taskdir baru atau hentikan).

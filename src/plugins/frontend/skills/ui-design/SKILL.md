@@ -57,7 +57,7 @@ Tawarkan 2–3 opsi — Standard Card/List · Compact/Dense Table · Visual-Driv
 
 ### Phase 6 — Approval User
 
-1. Sajikan mockup, hierarki P1–P3, enam cabang per layar, dan pemetaan data.
+1. Sajikan **ringkasan gerbang**, bukan isi dokumen: baris `UI.md DRAFT @ <sha> · <taskdir>/UI.md · <n> layar · <n> ST`, lalu 3–4 kalimat — opsi tata letak terpilih, isi P1 layar utama, cabang state yang menyimpang dari default (mis. kosong atau error khusus), dan asumsi default yang dipakai. Mockup, hierarki P1–P3, enam cabang per layar, dan pemetaan data tetap di berkas; dilarang menyalinnya ke chat. User meminta rincian → sajikan seksi atau layar yang diminta saja, lalu ajukan ulang pertanyaan butir 2.
 2. `AskUserQuestion`: *Setujui desain* · *Revisi (sebut poinnya)* · *Hentikan*.
 3. **Setuju** → `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py approve --taskdir <taskdir> --row UI --answer "<jawaban user apa adanya>"`. Approve PASS → jalankan prosedur `lead/references/nataflow-sync.md` (`--taskdir <taskdir>`); segmennya masuk baris penutup, dan `nataflow GAGAL` tidak membatalkan approval.
 4. **Revisi** → `chain.py revisions --taskdir <taskdir> --row UI` (plafon 2; `draft` ulang dan amandemen akar tidak me-reset hitungan). Di bawah plafon → perbarui, validasi, commit `revise`, ajukan ulang. Plafon habis → hentikan, sajikan poin penolakan berurutan, serahkan ke `frontend:lead` Phase 8 (plafon habis: taskdir baru atau hentikan).
