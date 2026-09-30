@@ -122,6 +122,30 @@ def test_approve_tanpa_review_ditolak(make_repo):
     assert state_of(root) == "DRAFT"
 
 
+def test_commit_draft_revise_dan_tertunda(make_repo):
+    root = repo_with(make_repo, ticket_md())
+    assert ticket_review(root, TD, "PASS").returncode == 0
+    r = ticket(root, "commit", "--ticketdir", TD, "--stage", "draft")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert git(root, "log", "-1", "--format=%s").strip() == "docs(ticket): draft TICKET cicilan-pembayaran"
+    assert sorted(git(root, "show", "--name-only", "--format=", "HEAD").split()) == [f"{TD}/TICKET.md", f"{TD}/review.md"]
+    assert ticket(root, "revise", "--ticketdir", TD).returncode == 0
+    assert ticket(root, "commit", "--ticketdir", TD, "--stage", "draft").returncode == 0
+    assert git(root, "log", "-1", "--format=%s").strip() == "docs(ticket): revise TICKET cicilan-pembayaran"
+    (root / TD / "TICKET.md").write_text(ticket_md().replace("elicitation: CLOSED", "elicitation: OPEN"), encoding="utf-8")
+    assert ticket(root, "commit", "--ticketdir", TD, "--stage", "tertunda").returncode == 0
+    assert git(root, "log", "-1", "--format=%s").strip() == "docs(ticket): elisitasi cicilan-pembayaran (tertunda)"
+    assert git(root, "status", "--porcelain") == ""
+
+
+def test_commit_menolak_tiket_ready(make_repo):
+    root = repo_with(make_repo, ticket_md())
+    assert ticket_review(root, TD, "PASS").returncode == 0
+    assert ticket(root, "approve", "--ticketdir", TD, "--answer", "ya").returncode == 0
+    r = ticket(root, "commit", "--ticketdir", TD, "--stage", "draft")
+    assert r.returncode == 1 and "bukan DRAFT" in r.stdout, r.stdout
+
+
 def test_new_di_luar_repo_git(make_repo):
     """E1: tanpa git, `new` tetap jalan dan melaporkan git=tidak."""
     root = make_repo(git_init=False)

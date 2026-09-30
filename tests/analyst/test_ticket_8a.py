@@ -270,13 +270,15 @@ def test_a10_cancel_direktori_tanpa_ticket_berisi_berkas_lain_ditolak(plain):
 
 @pytest.mark.regression("A11")
 def test_a11_commit_gagal_informatif_dan_exit_3(repo):
-    git(repo, "rm", "-rq", "--cached", "analyst")
-    (repo / ".gitignore").write_text("analyst/\n", encoding="utf-8")
-    git(repo, "add", ".gitignore")
-    git(repo, "commit", "-qm", "chore: ignore analyst")
+    # Pemicunya hook yang menolak: path yang diabaikan `.gitignore` bukan lagi kegagalan (test_ticket_gitignore.py).
+    hook = repo / ".git" / "hooks" / "pre-commit"
+    hook.parent.mkdir(exist_ok=True)
+    hook.write_text("#!/bin/sh\necho 'hint: periksa hook'\necho 'error: hook menolak commit' >&2\nexit 1\n",
+                    encoding="utf-8")
+    hook.chmod(0o755)
     assert review(repo, "PASS").code == 0
     r = tk(repo, "approve", "--ticketdir", TDIR, "--answer", "ok")
-    assert r.code == 3 and "ignored" in r.out and "hint:" not in r.out
+    assert r.code == 3 and "COMMIT GAGAL: error: hook menolak commit" in r.out and "hint:" not in r.out
 
 
 @pytest.mark.regression("A11")

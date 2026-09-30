@@ -13,7 +13,7 @@ description: Gunakan ketika ada permintaan, keluhan, atau laporan dari pengguna/
 ## Precondition [REQUIRED]
 
 1. `python3` tersedia. Skrip: `ticket.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py`.
-2. Ruang kerja: root worktree git bila ada, selain itu direktori kerja sekarang. Tiket tinggal di `analyst/tickets/`; repo git **tidak** wajib — tanpa git, artefak tetap ditulis dan hanya commit yang dilewati.
+2. Ruang kerja: root worktree git bila ada, selain itu direktori kerja sekarang. Tiket tinggal di `analyst/tickets/`; repo git **tidak** wajib — tanpa git, artefak tetap ditulis dan hanya commit yang dilewati. Repo bersinkron nataflow (`.claude/nataflow.json` ada): `ticket.py new` menulis `analyst/tickets/.gitignore` bila belum ada, sehingga ticketdir tetap di disk tetapi tidak di-commit.
 
 ## Parameter [REQUIRED]
 

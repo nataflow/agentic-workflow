@@ -16,6 +16,7 @@ Satu-satunya jalan mutasi status yang punya konsekuensi di luar penulisnya:
 - `review`  — catat vonis `ticket-reviewer` beserta sidik konten yang dinilainya (dan bloknya).
 - `revise`  — buka putaran revisi draft atas permintaan user (plafon 3 per siklus persetujuan).
 - `approve` — materai `TICKET.md` `READY` sesudah jawaban eksplisit user; commit bila repo git.
+- `commit`  — commit draft `DRAFT` (`--stage draft`: spec Phase 4; `--stage tertunda`: elisitasi tertahan).
 - `reopen`  — buka ulang tiket `READY` menjadi `DRAFT` untuk perubahan permintaan.
 - `cancel`  — tutup ticketdir atas keputusan user.
 - `ref`     — isi `external_ref` (kunci kartu Jira/Trello) pada DRAFT maupun READY.
@@ -28,8 +29,11 @@ sama dengan segel `close`, **dan** vonis review `PASS` atas sidik `<kartu>/<cata
 persis dengan sekarang: draft yang disunting sesudah direview, atau elisitasi yang dibuka dan berubah
 sesudahnya, tidak dapat disetujui.
 
-Kontrak exit `close`/`approve`/`ref`/`cancel`: 0 = tertulis dan ter-commit (atau tanpa git/`--no-commit`;
-`ref` pada DRAFT tidak meng-commit), 1 = ditolak, 3 = tertulis tetapi commit gagal.
+Kontrak exit `close`/`approve`/`ref`/`cancel`/`commit`: 0 = tertulis dan ter-commit (atau tanpa git/`--no-commit`, atau
+diabaikan `.gitignore`; `ref` pada DRAFT tidak meng-commit), 1 = ditolak, 3 = tertulis tetapi commit gagal.
+
+Repo bersinkron nataflow (`.claude/nataflow.json` atau `analyst/nataflow.json` ada): `new` menulis
+`analyst/tickets/.gitignore` berisi `*` bila belum ada, sehingga ticketdir tetap di disk tanpa di-commit.
 
 Zero external dependencies (Python Standard Library only).
 """
@@ -50,6 +54,8 @@ from analyst_lib import (  # noqa: E402
     TICKET_FILE,
     TICKETDIR_RE,
     TICKETS_DIR,
+    TICKETS_IGNORE,
+    TICKETS_IGNORE_TEXT,
     TYPES,
     Checker,
     clean_value,
@@ -58,6 +64,7 @@ from analyst_lib import (  # noqa: E402
     format_report,
     git_commit,
     git_error_line,
+    git_mode,
     is_git_repo,
     load_sync_config,
     log_rows,
@@ -66,8 +73,10 @@ from analyst_lib import (  # noqa: E402
     set_frontmatter_field,
     split_frontmatter,
     split_parts,
+    sync_configured,
     ticket_seal,
     ticket_skeleton,
+    tracked_files,
 )
 from validate_doc import DocValidator  # noqa: E402
 import nataflow_sync as ns  # noqa: E402
@@ -316,9 +325,30 @@ def cmd_new(root: Path, args: argparse.Namespace) -> int:
     text = ticket_skeleton(args.type, args.slug, args.requester, dt.date.today().isoformat(), title, request)
     (root / rel).mkdir(parents=True, exist_ok=True)
     (root / rel / TICKET_FILE).write_text(text, encoding="utf-8")
-    print(f"NEW PASS: {rel} · root={root} · git={'ya' if is_git_repo(root) else 'tidak'} · type={args.type}"
-          + (" · ticketdir KOSONG dipakai ulang" if reuse else ""))
+    notes = _ignore_tickets(root)
+    mode = git_mode(root, f"{rel}/{TICKET_FILE}")
+    if mode == "diabaikan" and not sync_configured(root):
+        notes += " · PERINGATAN: ticketdir diabaikan git tanpa sinkron nataflow — tiket hanya ada di disk ini"
+    print(f"NEW PASS: {rel} · root={root} · git={mode} · type={args.type}"
+          + (" · ticketdir KOSONG dipakai ulang" if reuse else "") + notes)
     return 0
+
+
+def _ignore_tickets(root: Path) -> str:
+    """Repo git bersinkron nataflow → tulis `TICKETS_IGNORE` bila belum ada; sesudahnya isinya milik user.
+
+    Hanya berkas yang belum ter-track yang terabaikan: tiket lama yang sudah ter-commit tetap di-commit sampai user
+    melepasnya. Segmen keluaran `new`, kosong bila tidak ada yang ditulis.
+    """
+    if not sync_configured(root) or not is_git_repo(root) or (root / TICKETS_IGNORE).exists():
+        return ""
+    (root / TICKETS_IGNORE).write_text(TICKETS_IGNORE_TEXT, encoding="utf-8")
+    note = f" · {TICKETS_IGNORE} ditulis (sinkron nataflow aktif: ticketdir tidak di-commit)"
+    old = tracked_files(root, TICKETS_DIR)
+    if old:
+        note += (f" · {len(old)} berkas tiket lama tetap ter-track dan tetap di-commit (lepas atas keputusan user: "
+                 f"`git rm -r --cached {TICKETS_DIR}` lalu commit)")
+    return note
 
 
 def cmd_check(root: Path, args: argparse.Namespace) -> int:
@@ -335,7 +365,7 @@ def cmd_check(root: Path, args: argparse.Namespace) -> int:
     missing = [f for f in needed if not (PLUGIN_ROOT / "skills" / f).is_file()]
     c.add(2, "Berkas plugin", not missing, "lengkap" if not missing else ", ".join(missing),
           "Instalasi plugin rusak — pasang ulang plugin analyst.")
-    resolved: Dict[str, str] = {"root": str(root), "git": "ya" if is_git_repo(root) else "tidak"}
+    resolved: Dict[str, str] = {"root": str(root), "git": git_mode(root, f"{rel}/{TICKET_FILE}")}
     if ok:
         state = classify(root, rel)
         resolved["keadaan"] = state["state"]
@@ -580,8 +610,44 @@ def cmd_approve(root: Path, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_commit(root: Path, args: argparse.Namespace) -> int:
+    """Commit draft `DRAFT`: `draft` (spec Phase 4) atau `tertunda` (elisitasi tertahan, elicit).
+
+    Lewat `git_commit` yang sama dengan `close`/`approve`: staging path eksplisit, path yang diabaikan `.gitignore`
+    tidak di-stage, dan tiket lama ter-track di direktori yang diabaikan tetap ter-commit tanpa keluhan git.
+    """
+    path = _ticket_path(root, args)
+    rel = str(path.parent.relative_to(root))
+    if not path.is_file():
+        print(f"COMMIT FAIL: {rel}/{TICKET_FILE} tidak ada — alokasikan lewat `ticket.py new`")
+        return 1
+    fm = read(path)
+    if fm.get("status") != "DRAFT":
+        print(f"COMMIT FAIL: TICKET.md berstatus `{fm.get('status', '-')}`, bukan DRAFT — tiket READY di-commit "
+              f"`approve`/`ref`, pembatalan oleh `cancel`")
+        return 1
+    slug = rel.split("-", 1)[-1]
+    paths = [f"{rel}/{TICKET_FILE}"]
+    if args.stage == "draft":
+        paths += [f"{rel}/{REVIEW_FILE}"] if (path.parent / REVIEW_FILE).is_file() else []
+        subject = f"docs(ticket): {'revise' if int_field(fm, 'revision') else 'draft'} TICKET {slug}"
+    else:
+        subject = f"docs(ticket): elisitasi {slug} (tertunda)"
+    msg = f"COMMIT PASS: {' '.join(paths)}"
+    if not is_git_repo(root):
+        print(msg + " · tanpa git")
+        return 0
+    ok, out = git_commit(root, paths, subject)
+    if not ok:
+        return _commit_failed(msg, root, paths, out, subject)
+    print(msg + f" · commit {out}")
+    return 0
+
+
 def _commit_failed(msg: str, root: Path, paths: List[str], out: str, subject: str) -> int:
-    """Isi sudah tertulis tetapi commit gagal (hook, gpg, `.gitignore`) → exit 3 beserta sebab git.
+    """Isi sudah tertulis tetapi commit gagal (hook, gpg, index terkunci) → exit 3 beserta sebab git.
+
+    Path yang diabaikan `.gitignore` bukan kegagalan: `git_commit` tidak men-stage-nya.
 
     Perintah pemulihan memuat subjek yang sama persis: tiket tanpa `approved_seal` (format lama)
     dinilai penerima dari subjek commit terakhirnya, jadi commit manual bersubjek lain = DRIFT.
@@ -836,6 +902,10 @@ def main() -> None:
     s.add_argument("--ticketdir", required=True)
     s.add_argument("--answer", required=True, help="jawaban user apa adanya")
     s.add_argument("--no-commit", action="store_true", dest="no_commit")
+    s = sub.add_parser("commit")
+    s.add_argument("--ticketdir", required=True)
+    s.add_argument("--stage", required=True, choices=("draft", "tertunda"),
+                   help="draft: TICKET.md + review.md (spec Phase 4); tertunda: elisitasi tertahan (elicit)")
     s = sub.add_parser("reopen")
     s.add_argument("--ticketdir", required=True)
     s.add_argument("--reason", required=True)
@@ -854,7 +924,7 @@ def main() -> None:
     args = p.parse_args()
     root = (Path(args.root) if args.root else find_root()).resolve()
     handler = {"state": cmd_state, "new": cmd_new, "check": cmd_check, "close": cmd_close, "review": cmd_review,
-               "revise": cmd_revise, "approve": cmd_approve, "reopen": cmd_reopen,
+               "revise": cmd_revise, "approve": cmd_approve, "commit": cmd_commit, "reopen": cmd_reopen,
                "cancel": cmd_cancel, "ref": cmd_ref, "sync-payload": cmd_sync_payload}[args.cmd]
     sys.exit(handler(root, args))
 

@@ -2,7 +2,7 @@
 
 Dimuat `analyst:spec` Phase 5 butir 4 sesudah `ticket.py approve` menulis `READY`, `analyst:spec` sesudah `ticket.py cancel` atas tiket yang pernah `READY`, dan `analyst:intake` pada rute sinkron ulang. Hasilnya tepat satu segmen baris penutup: `nataflow <dibuat #<code> | diperbarui #<code> | dibatalkan #<code> | dilewati | GAGAL: <sebab>>`, ditambah ` · review.md <baru | diperbarui | sama>` bila dokumen review ikut terkirim.
 
-`TICKET.md` di disk dan git tetap satu-satunya sumber kebenaran; task nataflow hanya cermin kartunya. Karena itu prosedur ini tidak pernah menulis `TICKET.md`, tidak pernah menurunkan `READY`, dan kegagalannya tidak menahan serah terima ke engineer. Task yang sama menjadi induk workdir taskdir backend/frontend yang berangkat dari tiket ini (`ticket_source`): plugin engineer menurunkan `ticket_key` yang sama persis.
+`TICKET.md` di disk tetap satu-satunya sumber kebenaran; task nataflow hanya cermin kartunya. Di repo bersinkron, ticketdir diabaikan git (`analyst/tickets/.gitignore` tulisan `ticket.py new`), sehingga cermin inilah satu-satunya salinan kartu di luar disk lokal. Karena itu prosedur ini tidak pernah menulis `TICKET.md`, tidak pernah menurunkan `READY`, dan kegagalannya tidak menahan serah terima ke engineer. Task yang sama menjadi induk workdir taskdir backend/frontend yang berangkat dari tiket ini (`ticket_source`): plugin engineer menurunkan `ticket_key` yang sama persis.
 
 ## Langkah
 
@@ -35,7 +35,7 @@ Dimuat `analyst:spec` Phase 5 butir 4 sesudah `ticket.py approve` menulis `READY
 ## Prasyarat di luar plugin
 
 - Server MCP nataflow terdaftar di Claude Code user beserta MCP key-nya. Plugin tidak mendeklarasikan server dan tidak menyimpan key.
-- `.claude/nataflow.json` di root repo (ter-commit) mengaktifkan sinkron; berkas yang sama dibaca plugin `backend`, `frontend`, dan `quickdev`. `analyst/nataflow.json` lama tetap diterima; bila keduanya ada dengan isi berbeda → `FAIL`. Berkas ada tetapi rusak → `FAIL`, bukan dilewati.
+- `.claude/nataflow.json` di root repo (ter-commit) mengaktifkan sinkron; berkas yang sama dibaca plugin `backend`, `frontend`, dan `quickdev`. `analyst/nataflow.json` lama tetap diterima; bila keduanya ada dengan isi berbeda → `FAIL`. Berkas ada tetapi rusak → `FAIL`, bukan dilewati. Kehadiran salah satunya (sah maupun rusak) juga membuat `ticket.py new` menulis `analyst/tickets/.gitignore` bila belum ada.
 
 | Field | Wajib | Aturan |
 |---|---|---|

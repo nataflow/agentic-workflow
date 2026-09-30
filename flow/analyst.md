@@ -18,9 +18,9 @@
 | `analyst:elicit` | skill (`user-invocable: false`) | Tanya-jawab dengan peminta. Fakta direkam per pilar ke `## Catatan Elisitasi` setiap giliran, lalu elisitasi ditutup lewat `ticket.py close` (`CLOSED` + segel) | `skills/elicit/SKILL.md`, `references/elicitation-guide.md`, `references/literasi-teknis.md`, `templates/elicit-template.md` |
 | `analyst:spec` | skill (`user-invocable: false`) | Menyusun kartu di atas catatan elisitasi, dispatch reviewer, commit draft, minta persetujuan user, lalu `READY` dan sinkron nataflow opsional | `skills/spec/SKILL.md`, `templates/ticket-template.md`, `dispatcher/reviewer.md`, `references/nataflow-sync.md` |
 | `ticket-reviewer` | agent (read-only, model `sonnet`) | Memvonis draft kartu `PASS`/`BLOCKED` secara semantik terhadap catatan elisitasi | `agents/ticket-reviewer.md` |
-| `ticket.py` | script (CLI siklus hidup) | `state`, `new` (menulis `TICKET.md` awal), `check --gate elicit\|spec`, `close`, `review`, `revise`, `approve`, `reopen`, `cancel`, `ref`, dan `sync-payload` (argumen tool MCP nataflow, read-only) | `skills/_common/ticket.py` |
+| `ticket.py` | script (CLI siklus hidup) | `state`, `new` (menulis `TICKET.md` awal, dan `analyst/tickets/.gitignore` di repo bersinkron), `check --gate elicit\|spec`, `close`, `review`, `revise`, `approve`, `commit --stage draft\|tertunda` (commit draft), `reopen`, `cancel`, `ref`, dan `sync-payload` (argumen tool MCP nataflow, read-only) | `skills/_common/ticket.py` |
 | `validate_doc.py` | script (validator) | `--kind elicit` menilai catatan elisitasi. `--kind ticket` menilai kartu, termasuk pemindai kebocoran teknis | `skills/_common/validate_doc.py` |
-| `analyst_lib.py` | script (pustaka) | Mencari root, parser frontmatter, pemecah kartu/catatan, sidik `content_hash`, `request_digest`, kerangka `ticket_skeleton`, segel `ticket_seal`, `scan_leaks`, config sinkron `load_sync_config`, dan commit git | `skills/_common/analyst_lib.py` |
+| `analyst_lib.py` | script (pustaka) | Mencari root, parser frontmatter, pemecah kartu/catatan, sidik `content_hash`, `request_digest`, kerangka `ticket_skeleton`, segel `ticket_seal`, `scan_leaks`, config sinkron `load_sync_config`, dan commit git yang melewati path diabaikan `.gitignore` | `skills/_common/analyst_lib.py` |
 
 ## Alur Utama
 
@@ -121,7 +121,8 @@ pun, sehingga `spec` dan reviewer selalu punya satu sumber kebenaran tertulis. `
   - Tiket baru (juga ticketdir `KOSONG`): `ticket.py new --slug <slug> --type <type> --requester … --request -`
     (permintaan asli lewat stdin) harus mengembalikan `NEW PASS: <ticketdir> · root=… · git=… · type=…`.
     Skrip menulis `TICKET.md` awal. Slug kembar yang masih terbuka ditolak; ticketdir `KOSONG` ber-slug sama
-    dipakai ulang.
+    dipakai ulang. Repo git bersinkron nataflow → skrip juga menulis `analyst/tickets/.gitignore` (`*`) bila
+    belum ada, dan `git=diabaikan` (lihat Artefak & Siklus Status).
   - Ticketdir sudah ada: `ticket.py check --gate elicit --ticketdir <ticketdir>` (dengan `--reopen` bila
     dibuka ulang). Skrip memeriksa ticketdir sah, berkas template/panduan plugin ada, dan keadaan
     `ELISITASI` (plus `SPEC`/`DRAFT` bila `--reopen`).
@@ -157,7 +158,8 @@ pun, sehingga `spec` dan reviewer selalu punya satu sumber kebenaran tertulis. `
   heading sekali, permintaan asli sama dengan `request_hash`). Saat `CLOSED`, validator menagih nol pilar
   kosong, nol `MEMBLOKIR`, nol `Asumsi:` di mana pun dalam baris, dan setiap `domain_terms` punya baris
   konfirmasi berjawaban *Ya*. `ticket.py close` meng-commit `docs(ticket): elisitasi <slug>`; draft tertahan
-  di-commit tangan `… (tertunda)` dengan staging path eksplisit.
+  di-commit lewat `ticket.py commit --stage tertunda` (`… (tertunda)`). Ticketdir yang diabaikan git tidak
+  di-commit keduanya (`commit diabaikan git`).
 - **Lanjut ke**: `analyst:spec`. Bila tertahan, lanjutkan lewat `analyst:intake` pada sesi berikutnya.
 
 ```mermaid
@@ -208,8 +210,9 @@ flowchart TD
      `dispatcher/reviewer.md` dan dispatch `analyst:ticket-reviewer`. Vonisnya segera dicatat lewat
      `ticket.py review --verdict … --report -` dengan blok balikan apa adanya. Blok yang tidak konsisten
      (hitungan BLOCKER ≠ butir, `PASS` ber-BLOCKER, `- Ronde:` salah) ditolak dan dispatch diulang.
-  4. **Commit draft**: `docs(ticket): draft TICKET <slug>` (revisi: `revise TICKET <slug>`) atas
-     `TICKET.md` dan `review.md`.
+  4. **Commit draft**: `ticket.py commit --stage draft` meng-commit `TICKET.md` dan `review.md` dengan subjek
+     `docs(ticket): draft TICKET <slug>` (sesudah `revise`: `revise TICKET <slug>`). Ticketdir yang diabaikan
+     git dilewati.
   5. **Persetujuan user**: sajikan tiket beserta blok `## Ticket Review`. Pilihan: *Setujui* (hanya bila
      `review_segar=ya`), *Revisi*, *Kembali ke elisitasi*, atau *Tahan*. *Setujui* menjalankan
      `ticket.py approve --answer "<jawaban user>"`. *Revisi* menjalankan `ticket.py revise`, lalu Phase 2–4
@@ -233,7 +236,8 @@ flowchart TD
   `approve` menulis `READY`, `approved_hash`, `approved_seal`, dan `approval`, lalu meng-commit
   `docs(ticket): kunci TICKET <slug> READY`. `external_ref` sesudah `READY` diisi lewat `ticket.py ref`
   (commit `docs(ticket): ref TICKET <slug>`) tanpa membuka ulang tiket; `ref` menolak `DRIFT` dan tidak
-  meng-commit `DRAFT`.
+  meng-commit `DRAFT`. Semua commit itu dilewati untuk ticketdir yang diabaikan git; bila sinkron juga
+  `GAGAL`/`dilewati`, baris penutup menandai `(tiket hanya di disk ini)`.
 - **Lanjut ke**: engineer (`backend:tech-lead` dan/atau `frontend:lead`) dengan `ticket_source`. Bila fakta
   perlu digali ulang, kembali ke `analyst:elicit`.
 
@@ -298,6 +302,7 @@ nama plugin engineer (mis. berisi `analyst`) agar hook kedua plugin engineer dia
 ```
 ./.claude/nataflow.json          opsional, ditulis user: config sinkron nataflow bersama keempat plugin
 ./analyst/nataflow.json          opsional, format lama yang tetap diterima
+./analyst/tickets/.gitignore     ditulis ticket.py new di repo git bersinkron nataflow bila belum ada: `*`
 ./analyst/tickets/<YYMMDDhhmm>-<slug>/
   TICKET.md   satu-satunya artefak yang disunting skill (kartu di atas, ## Catatan Elisitasi sebagai H2 terakhir)
   review.md   blok ## Ticket Review terakhir, hanya ditulis ticket.py review --report
@@ -308,6 +313,15 @@ berbeda isi berarti `FAIL`) memuat `mcp_server` (default `nataflow-api`), `works
 opsional), dan `repo` (identitas repo di metadata task). Berkas absen berarti sinkron dilewati; ada tetapi rusak
 berarti `sync-payload` `FAIL`. Plugin tidak pernah menulis berkas ini, dan sinkron tidak menulis apa pun ke `TICKET.md`: identitas
 task di nataflow adalah metadata `ticket_key` = path ticketdir, bukan field frontmatter.
+
+Kehadiran config itu (sah maupun rusak) juga membuat `ticket.py new` menulis `analyst/tickets/.gitignore` berisi
+`*` bila belum ada. Berkas itu mengabaikan dirinya sendiri, jadi ticketdir tetap di disk, tidak pernah di-commit,
+dan tidak mengotori working tree yang ditagih gerbang engineer. `git_commit` melewati path yang diabaikan
+(`commit diabaikan git`, exit 0) dan men-stage berkas lama yang masih ter-track dengan `git add -u`, sehingga tiket
+yang di-commit sebelum `.gitignore` ada tetap di-commit sampai user melepasnya (`git rm -r --cached
+analyst/tickets`). Serah terima tetap sah karena `approved_seal` dibaca dari disk; yang hilang adalah riwayat git
+tiket, dan `ticket_source` hanya berlaku di clone yang sama. Isi `.gitignore` itu milik user sesudah ditulis:
+menggantinya lalu meng-commit berkasnya mengembalikan commit tiket.
 
 Frontmatter punya dua sumbu status dengan pemilik berbeda:
 
@@ -410,7 +424,7 @@ direktori tidak cocok dengan pola `<YYMMDDhhmm>-<slug>`.
 | Plafon 3 revisi habis | spec | Lingkup belum jelas. Tawarkan *Kembali ke elisitasi* atau `ticket.py cancel` |
 | Dispatch reviewer gagal dua kali | spec | Tiket tidak dapat di-approve. Sajikan `TERTAHAN` dan minta user mengulang sesi |
 | `APPROVE FAIL` (status bukan DRAFT, validator FAIL, elisitasi bukan CLOSED atau berbeda dari segelnya, review bukan `PASS @<sidik sekarang>`, jawaban kosong) | spec | Ikuti sebab di keluaran. Bila review basi dan ronde tersisa, jalankan ronde berikut |
-| `close`/`approve`/`ref`/`cancel` exit 3 (commit gagal karena hook, gpg, `.gitignore`) | spec / ticket.py | Isi sudah tertulis. Sajikan baris `COMMIT GAGAL`, lalu user meng-commit manual dengan perintah dan subjek persis yang dicetak. Dilarang `--no-verify` |
+| `close`/`approve`/`ref`/`cancel`/`commit` exit 3 (commit gagal karena hook, gpg, index terkunci) | elicit, spec / ticket.py | Isi sudah tertulis. Sajikan baris `COMMIT GAGAL`, lalu user meng-commit manual dengan perintah dan subjek persis yang dicetak. Dilarang `--no-verify` dan `git add -f`. Path yang diabaikan `.gitignore` bukan kegagalan: skrip melewati commit-nya |
 | Tiket `READY` disunting (`DRIFT`) | intake, penerima engineer | Setujui ulang lewat `spec` (`reopen` → review → approve), atau pulihkan isi yang disetujui. `ticket.py ref` menolak tiket `DRIFT`. Bila suntingannya menyentuh catatan elisitasi, check 5 mengarahkan ke `elicit` dulu |
 | Membatalkan tiket `READY` | ticket.py, spec (`cancel_request`) | `cancel` ditolak tanpa `--force`, karena tiket mungkin sudah diserahkan ke engineer. `--force` hanya atas keputusan eksplisit user, lalu sinkron membuat task cerminnya `cancelled` |
 | Sinkron nataflow `GAGAL` (server MCP tidak tersedia, tool galat, config rusak, task ber-`ticket_key` kembar) | spec, intake | Tiket tetap `READY` dan serah terima tetap berjalan. Bereskan sebabnya, lalu `/analyst:intake` "sinkron ulang tiket `<ticketdir>`". Dilarang `reopen` hanya demi sinkron, dan dilarang mengulang `create_task` tanpa `list_task` ulang |

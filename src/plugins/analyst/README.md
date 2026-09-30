@@ -102,19 +102,20 @@ Kerangka kanonik dan contoh terisi: `skills/elicit/templates/elicit-template.md`
 | Skrip | Memvonis |
 |---|---|
 | `_common/ticket.py state` | keadaan tiap ticketdir: `KOSONG`, `ELISITASI`, `SPEC`, `DRAFT`, `READY`, `DRIFT`, `RUSAK`, `NAMA_TIDAK_SAH`, `DIBATALKAN` |
-| `_common/ticket.py new` | ticketdir baru beserta `TICKET.md` awal: kerangka persis bagian 1 `elicit-template.md`, permintaan asli dari `--request` sebagai blockquote, dan `request_hash`; ticketdir `KOSONG` ber-slug sama dipakai ulang |
+| `_common/ticket.py new` | ticketdir baru beserta `TICKET.md` awal: kerangka persis bagian 1 `elicit-template.md`, permintaan asli dari `--request` sebagai blockquote, dan `request_hash`; ticketdir `KOSONG` ber-slug sama dipakai ulang; repo git bersinkron nataflow → `analyst/tickets/.gitignore` (`*`) ditulis bila belum ada; `git=ya\|tidak\|diabaikan` |
 | `_common/ticket.py close` | satu-satunya penulis `elicitation: CLOSED`: hanya bila `validate_doc.py --kind elicit` `PASS` (bila tidak, berkas dikembalikan); menyegel catatan (`elicit_hash`, `elicit_log`) dan commit `docs(ticket): elisitasi <slug>`; menutup ulang catatan yang berubah sejak segel menuntut baris log baru `Dibuka ulang`; tiket lama tanpa segel diadopsi sekali |
 | `_common/ticket.py check --gate elicit\|spec` | prasyarat gate atas satu ticketdir; gate `spec` menolak catatan elisitasi yang berbeda dari segelnya; mencetak `root=` (path ticketdir relatif root, bukan cwd) dan, untuk draft, `ronde` dan `sidik` (slot prompt reviewer), `review_basi` (bagian yang berubah sesudah review), serta `review_report` |
 | `_common/validate_doc.py --kind elicit` | `## Catatan Elisitasi`: struktur, pilar per tipe, log bernomor, tiap heading sekali, permintaan asli sama dengan `request_hash`; `CLOSED` ⇒ nol pilar kosong, nol pertanyaan memblokir, nol `Asumsi:` di mana pun dalam baris, dan tiap `domain_terms` punya baris konfirmasi berjawaban `Ya` di log |
 | `_common/validate_doc.py --kind ticket` | kartu: struktur per tipe (tiap heading sekali), AC Given/When/Then, BR terpikul AC, ID `Q-{n}` sama dengan `TIDAK MEMBLOKIR` di catatan, nol placeholder, **nol kebocoran teknis** |
 | `_common/ticket.py review` | vonis `PASS`/`BLOCKED` **wajib** membawa blok reviewer (`--report`): `- Verdict:` sama dengan `--verdict`, dan `- Sidik:` (disalin reviewer dari prompt) sama dengan sidik `<kartu>/<catatan elisitasi>` di disk — draft yang berubah sesudah dispatch ditolak; blok wajib konsisten (`- BLOCKER:` = jumlah butir, `PASS` ⇔ nol BLOCKER, `- Ronde:` = ronde yang dicatat); blok disimpan ke `review.md`; ditolak bila salah satu validator `FAIL` atau catatan berbeda dari segelnya; plafon 2 ronde per revisi, dibuka ulang hanya bila catatan elisitasi disegel ulang |
 | `_common/ticket.py approve` | `READY` hanya bila kedua validator (`ticket`, `elicit`) `PASS`, `elicitation: CLOSED` dengan catatan sama dengan segelnya, **dan** vonis review `PASS` atas sidik kartu dan catatan elisitasi sekarang; menulis `approved_hash` dan `approved_seal` (segel yang dibaca engineer) |
+| `_common/ticket.py commit --stage draft\|tertunda` | satu-satunya jalan commit draft `DRAFT`: `draft` (spec Phase 4, `TICKET.md` + `review.md`, subjek `draft TICKET <slug>` atau `revise TICKET <slug>` sesudah `revise`) dan `tertunda` (elisitasi tertahan, subjek `elisitasi <slug> (tertunda)`); tiket `READY` ditolak |
 | `_common/ticket.py revise` / `reopen` / `cancel` | plafon 3 revisi per basis fakta; buka ulang tiket `READY`; tutup ticketdir (direktori kosong dihapus; tiket `READY` hanya dengan `--force`; di-commit `docs(ticket): batalkan TICKET <slug>`) |
 | `_common/ticket.py ref` | isi `external_ref` pada `DRAFT`/`READY`; `DRIFT`/`RUSAK` ditolak (subjek `ref TICKET` dibaca penerima tiket lama sebagai tanda terkunci); `READY` di-commit `docs(ticket): ref TICKET <slug>`, `DRAFT` tidak di-commit |
 | `_common/ticket.py sync-payload` | argumen tool MCP nataflow untuk tiket `READY` (bukan `DRIFT`/`RUSAK`): `lookup` (`list_task`), `create`, `update` — judul dari H1, deskripsi = kartu tanpa catatan elisitasi, `metadata` teks JSON byte-stabil berkunci `ticket_key`; `documents` (`review.md`); tiket pernah-`READY` yang dibatalkan → `lookup` + `task_status` `cancelled`; `SKIP` tanpa `.claude/nataflow.json` maupun `analyst/nataflow.json`, `FAIL` bila config rusak atau keduanya berbeda isi; read-only, tanpa commit |
 
-Kontrak exit `close`/`approve`/`ref`/`cancel`: 0 = tertulis dan ter-commit (atau tanpa git, atau isinya sudah sama
-dengan HEAD), 1 = ditolak, 3 = tertulis tetapi commit gagal — baris `COMMIT GAGAL` memuat sebab git dan perintah commit manualnya, lengkap dengan subjeknya.
+Kontrak exit `close`/`approve`/`ref`/`cancel`/`commit`: 0 = tertulis dan ter-commit (atau tanpa git, isinya sudah sama
+dengan HEAD, atau diabaikan `.gitignore`), 1 = ditolak, 3 = tertulis tetapi commit gagal (hook, gpg, index terkunci) — baris `COMMIT GAGAL` memuat sebab git dan perintah commit manualnya, lengkap dengan subjeknya.
 
 Pemindai kebocoran teknis menolak istilah sistem (endpoint, database, query, nama framework, `API`, …), path
 berkas, `file:baris`, metode dan kode status HTTP, identifier `snake_case`/`camelCase`, dan blok kode di kartu, di luar
@@ -133,8 +134,26 @@ dari `/analyst:intake`, yang merutekan ke `analyst:spec` (reopen) untuk mengulan
 ## Git
 
 Repo git **tidak** wajib — plugin dapat dipakai di folder dokumen biasa. Ruang kerja berakar di root worktree
-git bila ada, selain itu di direktori kerja. Di repo git, tiap artefak di-commit atomik dengan staging path
-eksplisit (`docs(ticket): ...`); di luar git, commit dilewati dan disebut di Output.
+git bila ada, selain itu di direktori kerja. Di repo git, tiap artefak di-commit atomik oleh `ticket.py` dengan
+staging path eksplisit (`docs(ticket): ...`); di luar git, commit dilewati dan disebut di Output.
+
+**Ticketdir yang diabaikan git.** Repo bersinkron nataflow (`.claude/nataflow.json` atau `analyst/nataflow.json`
+ada, sah maupun rusak) tidak meng-commit tiketnya: `ticket.py new` menulis `analyst/tickets/.gitignore` berisi `*`
+bila belum ada. Berkas itu ikut mengabaikan dirinya sendiri, jadi root `.gitignore` tidak tersentuh dan working tree
+yang ditagih gerbang `backend:tech-lead`/`frontend:lead` tetap bersih. `TICKET.md` dan `review.md` tetap ditulis ke
+disk; tiap commit atas path yang diabaikan dilewati (`commit diabaikan git`, exit 0), dan `check`/`new` melaporkan
+`git=diabaikan`. Aturan yang sama berlaku bila user sendiri mengabaikan `analyst/tickets/` di `.gitignore`; tanpa
+sinkron, `new` memperingatkan bahwa tiket hanya ada di disk itu.
+
+- **Yang tetap berjalan**: serah terima dinilai dari `approved_seal` di disk, bukan dari riwayat git, dan
+  `sync-payload` membaca disk.
+- **Yang hilang**: riwayat git tiket. Catatan elisitasi, `requester`, dan tiket yang belum `READY` hanya ada di disk
+  lokal, karena nataflow hanya menerima kartu `READY` dan `review.md`. `ticket_source` hanya dapat dipakai engineer
+  di clone yang sama.
+- **Tiket lama**: berkas yang sudah ter-track tetap ter-track dan tetap di-commit (`new` menyebut jumlahnya).
+  Melepasnya keputusan user: `git rm -r --cached analyst/tickets` lalu commit.
+- **Kembali meng-commit**: ganti isi `analyst/tickets/.gitignore` lalu commit berkasnya. `new` hanya menulis berkas
+  itu bila belum ada, jadi menghapusnya saja membuatnya ditulis lagi.
 
 ## Serah Terima ke Engineer
 
@@ -172,8 +191,9 @@ Untuk repo yang hanya memakai analyst, tulis `.claude/workflow` tanpa nama plugi
 
 ## Sinkron nataflow (opsional)
 
-Tiket `READY` dapat dicerminkan sebagai task di nataflow. `TICKET.md` di disk dan git tetap satu-satunya
-sumber kebenaran; task hanya cermin kartunya, dan tidak ada yang ditulis balik ke `TICKET.md`.
+Tiket `READY` dapat dicerminkan sebagai task di nataflow. `TICKET.md` di disk tetap satu-satunya sumber
+kebenaran; task hanya cermin kartunya, dan tidak ada yang ditulis balik ke `TICKET.md`. Repo yang mengaktifkan
+sinkron tidak meng-commit tiketnya (lihat Git), sehingga task inilah satu-satunya salinan kartu di luar disk lokal.
 
 - **Aktif per repo** lewat `.claude/nataflow.json` (ter-commit, dibaca juga oleh `backend`, `frontend`, dan
   `quickdev`): `mcp_server` (default `nataflow-api`), `workspace_id` (UUID; wajib bila MCP key ber-scope

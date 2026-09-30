@@ -26,6 +26,7 @@ BASH_STDIN = json.dumps({"hook_event_name": "PreToolUse", "tool_name": "Bash",
 CASES = [
     ("analyst/skills/_common/ticket.py", ["state", "--all", "--json"], True, None),
     ("analyst/skills/_common/ticket.py", ["sync-payload", "--ticketdir", AN_TD, "--json"], True, None),
+    ("analyst/skills/_common/ticket.py", ["commit", "--ticketdir", AN_TD, "--stage", "draft"], False, None),
     ("analyst/skills/_common/validate_doc.py", ["--kind", "elicit", "--ticketdir", AN_TD, "--json"], True, None),
 
     ("backend/hooks/detect.py", ["--plugin", "backend"], "hook", HOOK_STDIN),

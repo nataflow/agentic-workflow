@@ -175,9 +175,11 @@ def test_di_luar_git_suntingan_sesudah_ready_drift(make_repo, check):
 
 @pytest.mark.regression("E7")
 def test_pesan_commit_gagal_memuat_subjek_kunci(repo):
-    git(repo, "rm", "-rq", "--cached", "analyst")
-    (repo / ".gitignore").write_text("analyst/\n", encoding="utf-8")
-    commit(repo, "chore: ignore analyst", ".gitignore")
+    # Hook yang menolak: path yang diabaikan `.gitignore` tidak lagi menggagalkan commit (dilewati).
+    hook = repo / ".git" / "hooks" / "pre-commit"
+    hook.parent.mkdir(exist_ok=True)
+    hook.write_text("#!/bin/sh\necho 'error: hook menolak commit' >&2\nexit 1\n", encoding="utf-8")
+    hook.chmod(0o755)
     assert ticket_review(repo, TDIR, "PASS").returncode == 0
     r = run_script(TICKET_PY, "approve", "--ticketdir", TDIR, "--answer", "ok", cwd=repo)
     assert r.returncode == 3 and 'commit -m "docs(ticket): kunci TICKET cicilan READY"' in r.stdout, r.stdout

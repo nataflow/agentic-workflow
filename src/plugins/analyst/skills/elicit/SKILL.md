@@ -14,7 +14,7 @@ user-invocable: false
 ## Precondition [REQUIRED]
 
 1. Skrip: `ticket.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py`; `validate_doc.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/validate_doc.py`.
-2. **Tiket baru** (dari intake dengan `slug`, `type`, `request`, `requester`; juga ticketdir `KOSONG`): `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py new --slug <slug> --type <type> --requester "<requester>" --request - <<'EOF'`, lalu `request` apa adanya, lalu `EOF` → `NEW PASS: <ticketdir> · root=<root> · git=<ya|tidak> · type=<type>`. Skrip menulis `TICKET.md` persis bagian 1 `templates/elicit-template.md` — permintaan asli sebagai blockquote beserta `request_hash`, seluruh pilar `_(belum terjawab)_` — dan memakai ulang ticketdir `KOSONG` ber-slug sama. `FAIL` slug kembar → kembali ke `analyst:intake` Phase 1.
+2. **Tiket baru** (dari intake dengan `slug`, `type`, `request`, `requester`; juga ticketdir `KOSONG`): `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py new --slug <slug> --type <type> --requester "<requester>" --request - <<'EOF'`, lalu `request` apa adanya, lalu `EOF` → `NEW PASS: <ticketdir> · root=<root> · git=<ya|tidak|diabaikan> · type=<type>`. `git=diabaikan`: ticketdir diabaikan `.gitignore` — tetap di disk, tidak pernah di-commit (repo bersinkron nataflow: `new` menulis `analyst/tickets/.gitignore` bila belum ada); segmen tambahan keluaran `new` disampaikan ke user apa adanya. Skrip menulis `TICKET.md` persis bagian 1 `templates/elicit-template.md` — permintaan asli sebagai blockquote beserta `request_hash`, seluruh pilar `_(belum terjawab)_` — dan memakai ulang ticketdir `KOSONG` ber-slug sama. `FAIL` slug kembar → kembali ke `analyst:intake` Phase 1.
 3. **Ticketdir ada** (`ELISITASI` atau buka ulang): `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py check --gate elicit --ticketdir <ticketdir>` (tambah `--reopen` bila `reopen_reason` terisi). `PASS` → catat `root=` dan `git=` dari baris `Terselesaikan:` lalu lanjut. `FAIL` → remediasi per baris `Tindakan`; tiket `READY` dibuka ulang hanya lewat `analyst:spec`.
 
 ## Parameter [REQUIRED]
@@ -43,7 +43,7 @@ Baca `references/elicitation-guide.md` dan `references/literasi-teknis.md`. Isi 
 2. `AskUserQuestion`: satu pertanyaan per pilar, 2–4 opsi konkret beserta konsekuensi bisnisnya (aturan bertanya: panduan bagian 2). Pertanyaan pilar `Aktor`, `Aturan Bisnis`, `Kondisi Diinginkan`, dan `Kasus Khusus` dipilih dari `references/literasi-teknis.md` — hanya konsep yang disentuh permintaan dan bentuk hasilnya.
 3. **Sesudah tiap giliran**: tambahkan baris log per jawaban (sumber = `requester` atau nama yang disebut user), perbarui pilar, tulis `TICKET.md`, jalankan `validate_doc.py --kind elicit --ticketdir <ticketdir>` — `elicitation: OPEN` boleh menyisakan pilar belum terjawab, tetapi struktur wajib `PASS`.
 4. Jawaban "tidak tahu" atau "tanya si X" → `- **Q-{n}** [MEMBLOKIR | TIDAK MEMBLOKIR]: <pertanyaan> — menunggu: <siapa>` (butir 12 template menentukan labelnya), lanjut ke pilar lain.
-5. Ulangi sampai seluruh pilar wajib terisi atau yang tersisa hanya pertanyaan `menunggu`. **Plafon 5 giliran per sesi**: habis → simpan, commit, dan sajikan blok `TERTAHAN`.
+5. Ulangi sampai seluruh pilar wajib terisi atau yang tersisa hanya pertanyaan `menunggu`. **Plafon 5 giliran per sesi**: habis → simpan, commit tertunda (Phase 5 butir 3), dan sajikan blok `TERTAHAN`.
 6. Jawaban memunculkan tujuan pengguna kedua yang dapat dirilis terpisah → panduan bagian 5: tanyakan mana yang dikerjakan, catat sisanya di `Batas Cakupan` `— tiket terpisah`.
 
 ### Phase 3 — Pilar Opsional
@@ -61,8 +61,8 @@ Ini **konfirmasi fakta, bukan persetujuan tiket** — persetujuan hanya di `anal
 ### Phase 5 — Tutup & Serah Terima
 
 1. Pertanyaan `MEMBLOKIR` masih ada → dilarang menutup; blok `TERTAHAN` beserta daftar pertanyaan siap diteruskan.
-2. Self-test semantik butir 10–15 template, lalu `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py close --ticketdir <ticketdir>`. Skrip menulis `elicitation: CLOSED` hanya bila `validate_doc.py --kind elicit` `PASS` (bila tidak, berkas dikembalikan apa adanya dan laporan validator dicetak), menyegel catatan (`elicit_hash`, `elicit_log`), dan di repo git meng-commit `docs(ticket): elisitasi <slug>`. Dilarang menulis `elicitation: CLOSED` dengan tangan: `analyst:spec` menolak catatan tanpa segel.
-3. Exit 3 (`COMMIT GAGAL`) → `CLOSED` sudah tertulis; sajikan barisnya apa adanya (Failure path 5). Draft yang **tertahan** di-commit dengan tangan: `git -C <root> add <ticketdir>/TICKET.md` lalu `git -C <root> commit -m "docs(ticket): elisitasi <slug> (tertunda)" -- <ticketdir>/TICKET.md` — `<root>` dari keluaran `new` atau `check`; path ticketdir relatif root, bukan relatif cwd. Bukan repo git → lewati, sebut di Output.
+2. Self-test semantik butir 10–15 template, lalu `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py close --ticketdir <ticketdir>`. Skrip menulis `elicitation: CLOSED` hanya bila `validate_doc.py --kind elicit` `PASS` (bila tidak, berkas dikembalikan apa adanya dan laporan validator dicetak), menyegel catatan (`elicit_hash`, `elicit_log`), dan di repo git meng-commit `docs(ticket): elisitasi <slug>` (`commit diabaikan git` bila ticketdir diabaikan `.gitignore`). Dilarang menulis `elicitation: CLOSED` dengan tangan: `analyst:spec` menolak catatan tanpa segel.
+3. Exit 3 (`COMMIT GAGAL`) → `CLOSED` sudah tertulis; sajikan barisnya apa adanya (Failure path 5). Draft yang **tertahan** di-commit lewat `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py commit --ticketdir <ticketdir> --stage tertunda` (subjek `docs(ticket): elisitasi <slug> (tertunda)`, staging path eksplisit); dilarang `git add`/`git commit` dengan tangan. Bukan repo git (`tanpa git`) atau ticketdir diabaikan `.gitignore` (`commit diabaikan git`) → skrip melewati commit; sebut di Output.
 4. Panggil `analyst:spec` dengan `{ ticketdir }`.
 
 ## Guardrails
@@ -83,11 +83,11 @@ Ini **konfirmasi fakta, bukan persetujuan tiket** — persetujuan hanya di `anal
 
 ## Output [REQUIRED]
 
-Elisitasi tertutup → tutup satu baris: `ELICIT — CLOSED · <ticketdir> · <n> pilar · <n> log · <n> Q tidak memblokir · <commit <sha> | tanpa git> — lanjut ke analyst:spec.` Selain itu sajikan blok berikut dan hapus baris bernilai `—`:
+Elisitasi tertutup → tutup satu baris: `ELICIT — CLOSED · <ticketdir> · <n> pilar · <n> log · <n> Q tidak memblokir · <commit <sha> | tanpa git | diabaikan git> — lanjut ke analyst:spec.` Selain itu sajikan blok berikut dan hapus baris bernilai `—`:
 
 ```markdown
 ### ELICIT — TERTAHAN
-- **Ticketdir**: <path> · elicitation OPEN · <commit <sha> | tanpa git>
+- **Ticketdir**: <path> · elicitation OPEN · <commit <sha> | tanpa git | diabaikan git>
 - **Pilar terjawab**: <n>/<n wajib> — belum: <daftar>
 - **Menunggu jawaban**:
   - Q-<n> (<siapa>): <pertanyaan dalam kalimat siap diteruskan lewat chat/email>
@@ -100,7 +100,7 @@ Elisitasi tertutup → tutup satu baris: `ELICIT — CLOSED · <ticketdir> · <n
 2. **Peminta tidak dapat dihubungi / menjawab "terserah"**: "terserah" bukan fakta — tawarkan opsi rekomendasi dengan konsekuensinya dan minta dipilih; tetap tidak memilih → `Q-{n}` `MEMBLOKIR`, tahan.
 3. **Jawaban bertentangan** dengan fakta sebelumnya: sajikan keduanya berdampingan lewat `AskUserQuestion`, catat yang dipilih, tandai yang lama di log `(dikoreksi di #n)`.
 4. **Validator `FAIL`** (termasuk `CLOSE FAIL` yang mencetak laporan validator): perbaiki sesuai baris `Tindakan`; dilarang menutup sebelum `PASS`. `CLOSE FAIL` karena tanpa baris `Dibuka ulang` → catat pembukaan ulang yang benar-benar terjadi beserta alasannya; `Permintaan Asli berubah` → pulihkan kutipan aslinya dari git.
-5. **Commit gagal** (`close` exit 3, atau commit tertunda: hook, gpg, index terkunci): biarkan berkas tertulis, sertakan galat mentah di Output; dilarang `--no-verify`/`--no-gpg-sign` atau `git add .`.
+5. **Commit gagal** (`close` atau `commit --stage tertunda` exit 3: hook, gpg, index terkunci): biarkan berkas tertulis, sertakan galat mentah di Output; dilarang `--no-verify`/`--no-gpg-sign`, `git add .`, atau `git add -f` atas path yang diabaikan `.gitignore`.
 
 ## STYLE
 

@@ -6,7 +6,8 @@ parser frontmatter, pemecah seksi, sidik konten, pemindai kebocoran teknis, dan
 format laporan baku. Check itu sendiri tetap tinggal di skripnya masing-masing.
 
 Plugin ini tidak menuntut repo git: ticketdir berakar di root worktree git bila
-ada, selain itu di cwd. Git hanya dipakai untuk commit opsional.
+ada, selain itu di cwd. Git hanya dipakai untuk commit opsional; berkas yang
+diabaikan `.gitignore` tetap di disk tanpa commit.
 
 Zero external dependencies (Python Standard Library only).
 """
@@ -24,6 +25,15 @@ import nataflow_sync as ns  # noqa: E402
 
 TICKETS_DIR = "analyst/tickets"
 SYNC_CONFIG = "analyst/nataflow.json"  # config sinkron lama (14 N1); yang bersama `.claude/nataflow.json` (15 A1)
+# Repo bersinkron nataflow: `new` menulis berkas ini (`*` ikut mengabaikan dirinya), jadi ticketdir tetap di disk
+# tanpa pernah di-commit dan tanpa mengotori working tree yang ditagih gerbang engineer.
+TICKETS_IGNORE = f"{TICKETS_DIR}/.gitignore"
+TICKETS_IGNORE_TEXT = (
+    "# Ditulis analyst `ticket.py new` karena repo ini menyinkronkan tiket ke nataflow: ticketdir tetap di disk,\n"
+    "# tetapi tidak di-commit. Tiket mau di-commit lagi → ganti isi berkas ini, lalu commit berkasnya.\n"
+    "*\n"
+)
+IGNORED = "diabaikan git"   # hasil `git_commit` bila seluruh path diabaikan `.gitignore`
 TICKETDIR_RE = re.compile(r"^analyst/tickets/\d{10}-[a-z0-9]+(?:-[a-z0-9]+)*$")
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 TYPES = ("FEATURE", "IMPROVEMENT", "BUG")
@@ -75,15 +85,67 @@ def is_git_repo(root: Path) -> bool:
         return False
 
 
+def ignored_paths(root: Path, paths: List[str]) -> List[str]:
+    """Anggota `paths` (relatif root) yang diabaikan `.gitignore`; berkas ter-track tidak pernah terhitung.
+
+    Git gagal atau bukan repo git → `[]`: commit tetap dicoba dan kegagalannya dilaporkan apa adanya.
+    """
+    if not paths:
+        return []
+    try:
+        proc = subprocess.run(["git", "-C", str(root), "check-ignore", "--", *paths],
+                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, universal_newlines=True)
+    except (OSError, subprocess.SubprocessError):
+        return []
+    if proc.returncode != 0:           # 1 = tidak satu pun diabaikan, 128 = git gagal
+        return []
+    hits = set(proc.stdout.splitlines())
+    return [p for p in paths if p in hits]
+
+
+def tracked_files(root: Path, *paths: str) -> List[str]:
+    """Berkas ter-track pada atau di bawah `paths` (relatif root); git gagal atau bukan repo git → `[]`."""
+    try:
+        out = subprocess.check_output(["git", "-C", str(root), "ls-files", "--", *paths],
+                                      stderr=subprocess.DEVNULL, universal_newlines=True)
+    except (OSError, subprocess.SubprocessError):
+        return []
+    return [l for l in out.splitlines() if l]
+
+
+def git_mode(root: Path, rel: str) -> str:
+    """Nilai `git=` keluaran `new`/`check` untuk berkas `rel`: `ya` (di-commit), `tidak` (bukan repo git), atau
+    `diabaikan` (diabaikan `.gitignore`: tetap di disk, tidak pernah di-commit)."""
+    if not is_git_repo(root):
+        return "tidak"
+    return "diabaikan" if ignored_paths(root, [rel]) else "ya"
+
+
+def sync_configured(root: Path) -> bool:
+    """Repo memilih sinkron nataflow: berkas config ada, sah maupun rusak (selaras `nataflow_sync.load_config`)."""
+    return any((root / rel).is_file() for rel in (ns.CONFIG_FILE, SYNC_CONFIG))
+
+
 def git_commit(root: Path, paths: List[str], message: str) -> Tuple[bool, str]:
     """Commit hanya `paths` (staging eksplisit, `--only`), tanpa menyentuh index lain.
 
     Isi yang sudah sama dengan HEAD (mis. `close` ulang tanpa perubahan, `ref` dengan kunci yang sama)
-    bukan kegagalan: `(True, "tanpa perubahan")`, tanpa commit kosong.
+    bukan kegagalan: `(True, "tanpa perubahan")`, tanpa commit kosong. Path yang diabaikan `.gitignore`
+    tidak di-stage; bila seluruhnya diabaikan → `(True, IGNORED)`, juga tanpa commit.
     """
+    ignored = ignored_paths(root, paths)
+    paths = [p for p in paths if p not in ignored]
+    if not paths:
+        return True, IGNORED
+    tracked = set(tracked_files(root, *paths))
+    # Berkas ter-track di direktori yang diabaikan (tiket lama sesudah `TICKETS_IGNORE` ditulis) ditolak
+    # `git add` biasa walau tetap ter-stage; `add -u` memperbaruinya tanpa keluhan.
+    groups = ((["-u"], [p for p in paths if p in tracked]), ([], [p for p in paths if p not in tracked]))
     try:
-        subprocess.check_output(["git", "-C", str(root), "add", "--", *paths],
-                                stderr=subprocess.STDOUT, universal_newlines=True)
+        for flags, group in groups:
+            if group:
+                subprocess.check_output(["git", "-C", str(root), "add", *flags, "--", *group],
+                                        stderr=subprocess.STDOUT, universal_newlines=True)
         if subprocess.call(["git", "-C", str(root), "diff", "--cached", "--quiet", "--", *paths],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0:
             return True, "tanpa perubahan"
