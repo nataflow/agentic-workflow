@@ -101,6 +101,7 @@ Kepemilikan frontmatter: `type`, `slug`, `requester`, `created`, `request_hash`,
 12. Pertanyaan `MEMBLOKIR` ⇔ jawabannya mengubah `Aturan Bisnis`, `Kondisi Diinginkan`, `Batas Cakupan`, atau (BUG) `Yang Diharapkan`. Selain itu `TIDAK MEMBLOKIR` dan akan dibawa `spec` sebagai asumsi.
 13. Nomor `Q-{n}` tidak dipakai ulang sesudah terjawab; jawabannya pindah ke log.
 14. Nol istilah teknis rekaan analis. Istilah teknis yang **diucapkan** peminta boleh terekam di log apa adanya, tetapi pilar merumuskannya ulang sebagai perilaku yang dilihat pengguna.
+15. `Kondisi Diinginkan` (`FEATURE`/`IMPROVEMENT`) diawali `Bentuk hasil: <layar | API | proses otomatis | laporan>` (panduan bagian 6). Pada bentuk API, `Aktor` menyebut pemanggilnya, dan peran bisnis yang datanya dibatasi tercatat di `Aturan Bisnis`, bukan sebagai pemakai.
 
 ---
 
@@ -123,7 +124,7 @@ revision: 0
 review: -
 review_round: 0
 request_hash: a20e9c1ffc3c
-elicit_hash: 1b0cbb4c40c4
+elicit_hash: cd31728655d6
 elicit_log: 3
 ---
 
@@ -149,6 +150,7 @@ Invoice korporat di atas Rp 50 juta sering dibayar bertahap; tim Finance mencata
 Invoice hanya berstatus Belum Bayar atau Lunas. Pembayaran sebagian dicatat Finance di spreadsheet; portal pelanggan tetap menampilkan Belum Bayar.
 
 #### Kondisi Diinginkan
+Bentuk hasil: layar — invoice di aplikasi Finance dan portal pelanggan.
 Admin Finance dapat memecah satu invoice menjadi beberapa cicilan bertanggal jatuh tempo; tiap pembayaran mengurangi sisa tagihan dan invoice berstatus Lunas saat sisa nol.
 
 #### Aturan Bisnis

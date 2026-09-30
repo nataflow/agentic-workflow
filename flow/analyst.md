@@ -131,6 +131,7 @@ pun, sehingga `spec` dan reviewer selalu punya satu sumber kebenaran tertulis. `
      `Q-{n}` yang `menunggu:` sudah terjawab. Buka ulang: set `OPEN`, tambah baris log "Dibuka ulang" (wajib: `close`
      menolak menutup ulang catatan yang berubah tanpa baris ini), lalu gali hanya pilar yang disebut alasannya.
   1. **Isi dari permintaan**: fakta tersurat ditulis langsung. Fakta tersirat ditulis sebagai `Asumsi:`.
+     `Kondisi Diinginkan` diawali `Bentuk hasil:` (layar, API, proses otomatis, laporan; panduan bagian 6).
      Istilah teknis dari peminta dirumuskan ulang sebagai perilaku. Istilah yang memang kosakata produk
      dikonfirmasi, dicatat di log sebagai baris berjawaban *Ya*, lalu dimasukkan ke `domain_terms`.
   2. **Giliran tanya-jawab**: tiap giliran menyasar ≤ 3 pilar wajib, diurutkan menurut dampak. Tiap
@@ -193,7 +194,8 @@ flowchart TD
   1. **Rumusan**: judul ≤ 12 kata berupa perintah kerja untuk engineer (`<kata kerja> <objek domain>
      <kualifikasi>`, mis. `Tambah …`, `Tampilkan …`, `Perbaiki …`), menyasar hasil teramati, bukan keinginan
      aktor atau cara membangun; istilah domain berbahasa Inggris dari elisitasi tidak diterjemahkan. Prioritas dipetakan dari pilar `Urgensi` dengan rubrik HIGH/MEDIUM/LOW.
-     Tulis latar belakang. Tulis user story (`BUG`: laporan bug). Setiap fakta aturan menjadi `BR-{n}`. AC
+     Tulis latar belakang. Tulis user story (`BUG`: laporan bug); subjeknya, objek judul, dan bunyi `then` AC
+     mengikuti bentuk hasil (bentuk API: pemanggilnya, bukan peran bisnis yang datanya dibatasi). Setiap fakta aturan menjadi `BR-{n}`. AC
      Given/When/Then disapu dari jalur utama, sisi lolos dan tolak tiap BR, kasus khusus, dan peran
      terlarang. Lebih dari 10 AC berarti tiket harus dipecah. Isi juga Di Luar Cakupan dan Pertanyaan
      Terbuka beserta asumsinya.

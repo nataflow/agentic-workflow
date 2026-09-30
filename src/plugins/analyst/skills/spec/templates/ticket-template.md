@@ -80,7 +80,7 @@ Field frontmatter `status`, `revision`, `revision_base`, `review`, `review_round
 
 **Semantik** — self-test penulis sebelum dispatch `ticket-reviewer`, dan fokus reviewer:
 
-11. Tiap `then` adalah hasil yang **dapat diamati** pengguna atau QA tanpa membuka sistem: teks, tombol, status, angka, email yang diterima — bukan "data tersimpan" atau "sistem memproses".
+11. Tiap `then` adalah hasil yang **dapat diamati** pengguna atau QA tanpa membuka sistem: teks, tombol, status, angka, email yang diterima, atau — untuk bentuk hasil API — data yang dikembalikan kepada aplikasi pemanggil beserta penolakannya; bukan "data tersimpan" atau "sistem memproses".
 12. Tiap AC dan `BR-{n}` berakar pada fakta `## Catatan Elisitasi` (pilar atau baris log). Aturan yang tidak pernah dikatakan peminta adalah rancangan analis, bukan isi tiket.
 13. Tiap fakta pilar `Aturan Bisnis`, `Kondisi Diinginkan`, `Kasus Khusus` (dan `Yang Diharapkan` untuk BUG) dipikul minimal satu AC atau dinyatakan di `## Di Luar Cakupan`.
 14. Satu tiket, satu tujuan pengguna. Dua user story yang dapat dirilis terpisah adalah dua tiket.
@@ -140,5 +140,7 @@ Sebagai Admin Finance, saya ingin memecah invoice korporat menjadi beberapa cici
 ````
 
 Pembanding AC yang **gugur**: `- **AC-1**: Given invoice cicilan, when disimpan, then data cicilan tersimpan di tabel installments` — `then` tidak dapat diamati pengguna (butir 11) dan membocorkan istilah teknis (butir 9).
+
+Pembanding AC bentuk hasil API (panduan elisitasi bagian 6), dari tiket daftar Purchase Order: `Given Admin meminta daftar tanpa filter, when daftar diterima, then daftar memuat Purchase Order semua Tenant` **gugur** — peran bisnis ditulis sebagai pemanggil, dan tidak jelas siapa yang menerima daftar. Yang lolos: `Given ada Purchase Order milik Tenant A dan Tenant B, when aplikasi gudang meminta daftar atas nama pengguna berperan Tenant A, then data yang dikembalikan hanya memuat Purchase Order milik Tenant A (BR-3)`.
 
 Pembanding judul yang **gugur**: `Admin Finance dapat mencatat pembayaran invoice korporat secara cicilan` — bercerita tentang keinginan aktor yang sudah dimuat User Story, bukan kerja yang diselesaikan (butir 16); `Tambah tabel installments untuk invoice korporat` — menyebut cara membangun (butir 9 dan 16).

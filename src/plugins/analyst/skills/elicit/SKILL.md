@@ -35,7 +35,7 @@ user-invocable: false
 
 ### Phase 1 — Isi dari Permintaan
 
-Baca `references/elicitation-guide.md`. Isi tiap pilar yang sudah dijawab permintaan asli. Fakta tersurat ditulis langsung; fakta tersirat ditulis `Asumsi: <...>`. Istilah teknis yang diucapkan peminta dirumuskan ulang sebagai perilaku (panduan bagian 3); istilah yang memang kosakata produk dikonfirmasi ke peminta — konfirmasinya dicatat sebagai baris log (`| n | <tanggal> | Apakah "<istilah>" nama produk? | Ya | <peminta> |`) — lalu dicatat di frontmatter `domain_terms`. `CLOSED` menuntut tiap istilah `domain_terms` punya baris konfirmasi berjawaban *Ya* yang mengutip istilahnya; kemunculan di permintaan asli saja tidak cukup. Tulis `TICKET.md`.
+Baca `references/elicitation-guide.md`. Isi tiap pilar yang sudah dijawab permintaan asli. Fakta tersurat ditulis langsung; fakta tersirat ditulis `Asumsi: <...>`. `Kondisi Diinginkan` diawali baris `Bentuk hasil:` (panduan bagian 6). Istilah teknis yang diucapkan peminta dirumuskan ulang sebagai perilaku (panduan bagian 3); istilah yang memang kosakata produk dikonfirmasi ke peminta — konfirmasinya dicatat sebagai baris log (`| n | <tanggal> | Apakah "<istilah>" nama produk? | Ya | <peminta> |`, atau untuk bentuk hasil API baris panduan bagian 6) — lalu dicatat di frontmatter `domain_terms`. `CLOSED` menuntut tiap istilah `domain_terms` punya baris konfirmasi berjawaban *Ya* yang mengutip istilahnya; kemunculan di permintaan asli saja tidak cukup. Tulis `TICKET.md`.
 
 ### Phase 2 — Giliran Tanya-Jawab
 
@@ -54,14 +54,14 @@ Satu giliran untuk pilar opsional tipe itu. User menolak atau tidak relevan → 
 
 Ini **konfirmasi fakta, bukan persetujuan tiket** — persetujuan hanya di `analyst:spec`.
 
-1. Sajikan ringkas per pilar: aktor beserta larangannya, angka dan ambang tiap aturan, batas cakupan, urgensi, tiap baris `Asumsi:`, dan pertanyaan terbuka yang tersisa.
+1. Sajikan ringkas per pilar: bentuk hasil, aktor beserta larangannya, angka dan ambang tiap aturan, batas cakupan, urgensi, tiap baris `Asumsi:`, dan pertanyaan terbuka yang tersisa.
 2. `AskUserQuestion`: *Fakta sudah benar* · *Ada koreksi (sebut)* · *Tunda — tunggu jawaban pihak lain*.
 3. Koreksi → catat di log, perbarui pilar, ulangi Phase 4. Asumsi yang dikonfirmasi → hapus label `Asumsi:` (validator menolak `CLOSED` selama `Asumsi:` masih muncul di mana pun dalam `### Fakta`, termasuk di tengah kalimat); yang ditolak → kembali ke Phase 2 untuk pilar itu. Tunda → blok `TERTAHAN`.
 
 ### Phase 5 — Tutup & Serah Terima
 
 1. Pertanyaan `MEMBLOKIR` masih ada → dilarang menutup; blok `TERTAHAN` beserta daftar pertanyaan siap diteruskan.
-2. Self-test semantik butir 10–14 template, lalu `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py close --ticketdir <ticketdir>`. Skrip menulis `elicitation: CLOSED` hanya bila `validate_doc.py --kind elicit` `PASS` (bila tidak, berkas dikembalikan apa adanya dan laporan validator dicetak), menyegel catatan (`elicit_hash`, `elicit_log`), dan di repo git meng-commit `docs(ticket): elisitasi <slug>`. Dilarang menulis `elicitation: CLOSED` dengan tangan: `analyst:spec` menolak catatan tanpa segel.
+2. Self-test semantik butir 10–15 template, lalu `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py close --ticketdir <ticketdir>`. Skrip menulis `elicitation: CLOSED` hanya bila `validate_doc.py --kind elicit` `PASS` (bila tidak, berkas dikembalikan apa adanya dan laporan validator dicetak), menyegel catatan (`elicit_hash`, `elicit_log`), dan di repo git meng-commit `docs(ticket): elisitasi <slug>`. Dilarang menulis `elicitation: CLOSED` dengan tangan: `analyst:spec` menolak catatan tanpa segel.
 3. Exit 3 (`COMMIT GAGAL`) → `CLOSED` sudah tertulis; sajikan barisnya apa adanya (Failure path 5). Draft yang **tertahan** di-commit dengan tangan: `git -C <root> add <ticketdir>/TICKET.md` lalu `git -C <root> commit -m "docs(ticket): elisitasi <slug> (tertunda)" -- <ticketdir>/TICKET.md` — `<root>` dari keluaran `new` atau `check`; path ticketdir relatif root, bukan relatif cwd. Bukan repo git → lewati, sebut di Output.
 4. Panggil `analyst:spec` dengan `{ ticketdir }`.
 
