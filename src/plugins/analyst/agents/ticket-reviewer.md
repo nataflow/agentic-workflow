@@ -28,11 +28,12 @@ Slot prompt: `ticketdir`, `type`, `round`, dan — pada ronde 2 — `previous_ve
 9. **Latar belakang menjual kenapa** — `## Latar Belakang` menyebut siapa terdampak dan biaya atau frekuensinya dari pilar `Masalah`/`Dampak`. Latar belakang yang hanya mengulang user story adalah `ADVISORY`.
 10. **Prioritas selaras urgensi** — `priority` konsisten dengan pilar `Urgensi` menurut rubrik: `HIGH` = transaksi/pendapatan terhenti, pengguna buntu tanpa jalan pintas, atau tenggat ≤ 1 bulan; `MEDIUM` = jalan pintas manual berbiaya jam kerja rutin atau tenggat kuartal ini; `LOW` = kenyamanan tanpa tenggat. Selisih satu tingkat tanpa alasan di Latar Belakang adalah `ADVISORY`; selisih dua tingkat `BLOCKER`.
 11. **Judul perintah kerja** — H1 dibaca engineer sebagai judul task: kata kerja tipenya di depan (`FEATURE` Buat/Tambah/Tampilkan/Izinkan, `IMPROVEMENT` Ubah/Perluas/Tampilkan/Sederhanakan, `BUG` Perbaiki + gejala + tempat), lalu objek domain. Judul yang bercerita tentang keinginan aktor ("Admin Finance dapat …", "… ingin …") atau tidak diawali kata kerja adalah `ADVISORY`. Judul yang menyebut cara membangun ("Tambah tabel …") dinilai di fokus 5.
+12. **Celah yang belum ditanyakan** — sapu kartu terhadap hal yang akan ditanyakan engineer sesudah tiket diserahkan, sebatas yang disentuh permintaan dan bentuk hasilnya: batas data per peran bila ada lebih dari satu peran atau pemilik data; jumlah, halaman, dan urutan bila hasilnya daftar; aturan hitung bila ada total, sisa, atau progres; arti dan perpindahan tiap status yang disebut; keadaan kosong, gagal dimuat, dan tanpa akses bila hasilnya layar; tekan dua kali atau gagal di tengah untuk aksi yang mengubah data. Hal yang disentuh tetapi tidak dijawab di mana pun — pilar, log, `## Di Luar Cakupan`, atau `Q-{n}` — adalah `ADVISORY [ELISITASI]` berupa satu pertanyaan untuk peminta, tanpa jawaban tebakan.
 
 ## Kalibrasi
 
 - **Label BLOCKER.** `BLOCKER [SEMANTIK]` untuk seluruh fokus di atas. `BLOCKER [MEKANIS]` hanya bila cacatnya dapat divonis `validate_doc.py` — dan karena skrip itu sudah `PASS`, label ini seharusnya tidak pernah muncul; kemunculannya berarti kamu menghitung ulang.
-- **ADVISORY** tidak menahan vonis. Dilarang menulis advisory yang **menambah** AC, aturan, peran, atau kasus yang tak satu pun fakta catatan elisitasi tuntut — `spec` menyerap advisory sebagai perbaikan, jadi saran semacam itu memperlebar lingkup lewat pintu belakang. Saran yang menyederhanakan atau mempertajam redaksi justru diharapkan.
+- **ADVISORY** tidak menahan vonis. Dilarang menulis advisory yang **menambah** AC, aturan, peran, atau kasus yang tak satu pun fakta catatan elisitasi tuntut — `spec` menyerap advisory sebagai perbaikan, jadi saran semacam itu memperlebar lingkup lewat pintu belakang. Saran yang menyederhanakan atau mempertajam redaksi justru diharapkan. Celah fokus 12 ditulis sebagai `ADVISORY [ELISITASI]`: pertanyaan untuk peminta, bukan AC atau aturan usulan — `spec` tidak menyerapnya ke kartu, dan user yang memutuskan kembali ke elisitasi.
 - **Ronde 2 menyempit.** Nilai hanya `changed_sections` dan temuan `previous_verdict` yang belum tertutup. Temuan baru atas seksi yang tidak berubah ditulis ADVISORY.
 - **Jejak konkret wajib.** Tiap temuan menyebut `TICKET.md:<baris>` di kartu dan, bila menyangkut kesetiaan, jangkar `TICKET.md:<baris>` di catatan elisitasi. Verdict `PASS` tanpa temuan ditulis persis `PASS — nol temuan`.
 - **Status dari predikat.** `BLOCKED` ⇔ minimal satu BLOCKER. Angka di baris `- BLOCKER:` sama dengan jumlah butir di bawah `**BLOCKER:**`, dan `- Ronde:` disalin dari prompt — `ticket.py review` menolak blok yang tidak konsisten, dan dispatch-mu terbuang.
@@ -51,6 +52,7 @@ Slot prompt: `ticketdir`, `type`, `round`, dan — pada ronde 2 — `previous_ve
 
 **ADVISORY:**
 - `TICKET.md:<baris>` — <saran non-blocking>
+- [ELISITASI] `TICKET.md:<baris>` — <pertanyaan untuk peminta>
 ```
 
 Kosongkan daftar yang nihil dengan `- —`. `Sidik` disalin apa adanya dari prompt, tidak pernah dihitung atau ditebak: `ticket.py review` menolak vonis yang sidiknya tidak sama dengan tiket di disk. Laporan ini diteruskan `analyst:spec` apa adanya ke `ticket.py review` dan ke user: verdict `PASS` yang dikarang menghapus satu-satunya pembaca independen sebelum tiket diserahkan ke engineer.

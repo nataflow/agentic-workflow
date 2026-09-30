@@ -329,7 +329,8 @@ def cmd_check(root: Path, args: argparse.Namespace) -> int:
     c.add(1, "Ticketdir sah", ok, rel if ok else f"`{rel}` bukan direktori analyst/tickets/<YYMMDDhhmm>-<slug>",
           "Alokasikan lewat `ticket.py new` dari analyst:intake.")
     gate = args.gate
-    needed = {"elicit": ("elicit/templates/elicit-template.md", "elicit/references/elicitation-guide.md"),
+    needed = {"elicit": ("elicit/templates/elicit-template.md", "elicit/references/elicitation-guide.md",
+                         "elicit/references/literasi-teknis.md"),
               "spec": ("spec/templates/ticket-template.md", "spec/dispatcher/reviewer.md")}[gate]
     missing = [f for f in needed if not (PLUGIN_ROOT / "skills" / f).is_file()]
     c.add(2, "Berkas plugin", not missing, "lengkap" if not missing else ", ".join(missing),

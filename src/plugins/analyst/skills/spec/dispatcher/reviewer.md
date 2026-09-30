@@ -52,6 +52,7 @@ Catat tiap balikan sebelum melangkah — `ticket.py review --ticketdir {ticketdi
 | --- | --- |
 | `Verdict: PASS` | catat `PASS`; serap ADVISORY yang mempertajam redaksi, abaikan yang menambah lingkup. Menyerap advisory berarti menyunting draft → sidik berubah → ronde 2 wajib bila plafon ada; plafon habis → abaikan advisory itu |
 | `Verdict: BLOCKED` | catat `BLOCKED`; perbaiki tiap BLOCKER di draft, `validate_doc.py` sampai `PASS`, lalu ronde 2 menyempit bila plafon masih ada |
+| `ADVISORY [ELISITASI]` muncul | jangan diserap ke kartu — jawabannya fakta baru yang belum ada di catatan elisitasi. Blok vonis sampai ke user apa adanya di Phase 5, dan jawabannya ditempuh lewat *Kembali ke elisitasi* |
 | `BLOCKER [MEKANIS]` muncul | catat vonis apa adanya; periksa ulang `validate_doc.py`: `FAIL` → perbaiki; `PASS` → perlakukan temuan itu sebagai ADVISORY. Vonis `BLOCKED` tetap menuntut ronde `PASS` sesudahnya |
 | Payload kosong, format rusak, error, atau `REVIEW FAIL: blok reviewer tidak konsisten` (hitungan BLOCKER ≠ butir, `PASS` ber-BLOCKER, `BLOCKED` tanpa BLOCKER, `- Ronde:` salah) | catat `DISPATCH_FAILED` (tidak dihitung ronde), ulangi maksimal sekali; dilarang menyunting blok balikan agar lolos |
 
