@@ -1,6 +1,6 @@
 # Alur Plugin `quickdev`
 
-> `quickdev` (v0.6.1) adalah alur kerja ringan untuk repo backend, frontend, dan fullstack. Plugin ini punya enam skill, tanpa taskdir, tanpa subagent, tanpa hook, dan hanya satu skrip pengunci rencana (ditambah pustaka sinkron nataflow opsional). Setiap tugas punya **satu berkas rencana** (`plan/<task>.md`), sedangkan perubahan kodenya boleh menyentuh banyak berkas dan layer. Pakai plugin ini untuk perubahan kecil sampai menengah yang tidak butuh BRD/PRD, ledger approval, atau review subagent. Plugin ini juga cocok untuk stack yang tidak dilayani `backend`/`frontend` (Next.js, FastAPI, Django, Rails), atau untuk kerja yang sengaja dibuat ringan di repo yang sudah memakai kedua plugin itu. Kerja berisiko (kontrak API, migrasi skema, perubahan lintas modul yang butuh jejak keputusan) sebaiknya naik ke `backend:tech-lead` atau `frontend:lead`.
+> `quickdev` (v0.8.0) adalah alur kerja ringan untuk repo backend, frontend, dan fullstack. Plugin ini punya enam skill, tanpa taskdir, tanpa subagent, tanpa hook, dan hanya satu skrip pengunci rencana (ditambah pustaka sinkron nataflow opsional). Setiap tugas punya **satu berkas rencana** (`plan/<task>.md`), sedangkan perubahan kodenya boleh menyentuh banyak berkas dan layer. Pakai plugin ini untuk perubahan kecil sampai menengah yang tidak butuh BRD/PRD, ledger approval, atau review subagent. Plugin ini juga cocok untuk stack yang tidak dilayani `backend`/`frontend` (Next.js, FastAPI, Django, Rails), atau untuk kerja yang sengaja dibuat ringan di repo yang sudah memakai kedua plugin itu. Kerja berisiko (kontrak API, migrasi skema, perubahan lintas modul yang butuh jejak keputusan) sebaiknya naik ke `backend:tech-lead` atau `frontend:lead`.
 
 ## Peta Komponen
 
@@ -137,7 +137,7 @@ Semua panah antar-skill adalah **tawaran**. Skill berikutnya baru jalan setelah 
   - `AskUserQuestion` tersedia.
 - **Langkah**:
   1. **Fase 0: uji fast-path.** Bandingkan laporan explore dengan permintaan user dari sisi scope, kompatibilitas arsitektur, dan trade-off desain.
-     - Nol ambiguitas → `SKIPPED`. Bila `skip_if_clear=false`, ajukan dulu satu konfirmasi ringkasan.
+     - Nol ambiguitas → `SKIPPED`. Bila `skip_if_clear=false`, ajukan dulu satu konfirmasi ringkasan spesifikasi 3–4 kalimat.
      - Ada celah → lanjut ke Fase 1.
   2. **Fase 1: pilih domain pertanyaan.**
      - Backend: routing dan HTTP verb, skema payload, status code, dampak DB/migrasi, auth/RBAC.
@@ -173,7 +173,7 @@ Semua panah antar-skill adalah **tawaran**. Skill berikutnya baru jalan setelah 
   3. **Fase 2: tulis `<plan_dir>/<task_name>.md`.**
      - Metadata: `Status: DRAFT`, `Author`, `Date`, `Profile`, dan `Gates: explore=… clarify=…`.
      - Isi: Section 1 Overview & Objectives (termasuk keputusan clarify), 2 Architecture & Layer Impact, 3 Atomic Implementation Steps (checkbox `- [ ]`), 4 Verification & Testing Strategy, 5 Rollback & Contingency (bila `include_rollback`).
-  4. **Fase 3: approval gate.** Sajikan ringkasan rencana, lalu minta persetujuan eksplisit.
+  4. **Fase 3: approval gate.** Sajikan ringkasan gerbang 3–4 kalimat beserta path rencana (bukan daftar langkah dan path berkas), lalu `AskUserQuestion`: *Setujui rencana* atau *Revisi (sebut poinnya)*.
      - User minta revisi → perbarui rencana, tetap `DRAFT`, ajukan ulang.
      - User minta revisi pada rencana yang sudah dieksekusi → langkah yang teksnya berubah dikembalikan ke `- [ ]`.
      - User setuju → jalankan `plan_lock.py lock --plan … --profile … --answer -` dengan jawaban user apa adanya lewat heredoc berkutip (`<<'QD_EOF'`), supaya shell tidak mengekspansi backtick atau `$`.

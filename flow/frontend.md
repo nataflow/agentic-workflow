@@ -1,6 +1,6 @@
 # Alur Plugin `frontend`
 
-> Plugin `frontend` (v0.10.1, `src/plugins/frontend/.claude-plugin/plugin.json`) menangani kerja frontend di beberapa stack: React + Vite SPA, React Native/Expo, SvelteKit, dan Svelte + Vite. Next.js sengaja tidak dilayani. Isinya sepuluh skill dan lima subagent yang membawa permintaan kerja lewat rantai dokumen: akar `TASK.md` → `FLOW.md`/`UI.md` → `CONTRACT.md` → brief → eksekusi → `REVIEW.md` → `REPORT.md`. Tiap gate dikunci persetujuan user yang dimateraikan skrip `chain.py`, dan tiap hal yang dapat dicek mesin divonis validator, bukan diingat model. Plugin ini dipakai di repo frontend yang terdeteksi hook `SessionStart`. Pintu masuknya selalu `/frontend:lead`. Hanya `lead`, `profile`, dan `review` yang muncul di menu `/`. Tujuh skill lainnya `user-invocable: false` dan dipanggil model lewat tool Skill (`README.md` § Ten Skills).
+> Plugin `frontend` (v0.12.0, `src/plugins/frontend/.claude-plugin/plugin.json`) menangani kerja frontend di beberapa stack: React + Vite SPA, React Native/Expo, SvelteKit, dan Svelte + Vite. Next.js sengaja tidak dilayani. Isinya sepuluh skill dan lima subagent yang membawa permintaan kerja lewat rantai dokumen: akar `TASK.md` → `FLOW.md`/`UI.md` → `CONTRACT.md` → brief → eksekusi → `REVIEW.md` → `REPORT.md`. Tiap gate dikunci persetujuan user yang dimateraikan skrip `chain.py`, dan tiap hal yang dapat dicek mesin divonis validator, bukan diingat model. Plugin ini dipakai di repo frontend yang terdeteksi hook `SessionStart`. Pintu masuknya selalu `/frontend:lead`. Hanya `lead`, `profile`, dan `review` yang muncul di menu `/`. Tujuh skill lainnya `user-invocable: false` dan dipanggil model lewat tool Skill (`README.md` § Ten Skills).
 
 ## Peta Komponen
 
@@ -265,7 +265,7 @@ flowchart TD
   3. **Lima dimensi.** Entry Points, Forward, Back & Cancel (dirty guard), Branches, dan Data Demands `DD-{n}`.
   4. **Opsi alur.** Tawarkan 2–3 opsi: Direct/Modal, Multi-Step/Wizard, atau Seamless In-Place. User memilih lewat `AskUserQuestion`.
   5. **Draft.** Tulis `FLOW.md` `DRAFT` dari template, jalankan `validate_doc.py --kind flow` sampai PASS, lalu commit.
-  6. **Approval.** Tanyakan ke user: *Setujui*, *Revisi*, atau *Hentikan*.
+  6. **Approval.** Sajikan ringkasan gerbang 3–4 kalimat beserta path `FLOW.md` (bukan tabel rute dan Data Demands), lalu tanyakan ke user: *Setujui*, *Revisi*, atau *Hentikan*.
 - **Subagent yang didispatch**: `code-explorer` saat kuota habis atau relasi lintas berkas.
 - **Output / artefak**: `FLOW.md` (`DRAFT` → `APPROVED`). Baris penutupnya `FLOW — APPROVED @ <sha> · <n> layar · <n> DD …`.
 - **Gerbang & commit**:
@@ -287,7 +287,7 @@ flowchart TD
   4. **Opsi tata letak.** Standard Card/List, Compact/Dense Table, atau Visual-Driven/Hero Metric.
   5. **Prioritas dan state.** Susun prioritas P1–P3 dan enam cabang state per layar (`ST-1..6` layar 1, `ST-7..12` layar 2, dan seterusnya): normal, loading (skeleton), kosong, error + *Coba Lagi*, idle, dan stale/mutating.
   6. **Draft.** Tulis `UI.md` `DRAFT`, jalankan `validate_doc.py --kind ui`, lalu commit.
-  7. **Approval.** Tanyakan ke user.
+  7. **Approval.** Sajikan ringkasan gerbang 3–4 kalimat beserta path `UI.md` (bukan mockup dan enam cabang per layar), lalu tanyakan ke user.
 - **Subagent yang didispatch**: `code-explorer` bila perlu.
 - **Output / artefak**: `UI.md` (`DRAFT` → `APPROVED`).
 - **Gerbang & commit**: commit `docs(<slug>): draft UI.md` / `revise UI.md`, lalu `chain.py approve --row UI`. Plafon revisi 2.
@@ -307,7 +307,7 @@ flowchart TD
   4. **Layer shape 5-tier.** DTO → Service → API layer → View-Model → Controller → Presentation, dengan penamaan dari adapter.
   5. **Opsi arsitektur.** Strict 5-Layer, Colocated Controller & View-Model, atau Shared Service/Store yang sudah ada. User memilih lewat `AskUserQuestion`.
   6. **Draft dan review.** Tulis `CONTRACT.md` `DRAFT`. Tiap AC punya kolom *Sumber* berisi `SC`/`DD`/`ST`. Jalankan `validate_doc.py --kind contract` (keterlacakan dua arah), `review_round.py open`, dispatch `contract-reviewer`, lalu `review_round.py record`.
-  7. **Commit dan approval.** Commit lewat `review_round.py commit` dengan trailer `Review-Round`, lalu tanyakan ke user dan jalankan `chain.py approve --row CONTRACT`.
+  7. **Commit dan approval.** Commit lewat `review_round.py commit` dengan trailer `Review-Round`. Sajikan ringkasan gerbang 3–4 kalimat beserta path `CONTRACT.md` (bukan tabel DTO, Files Touched, dan AC), lalu tanyakan ke user dan jalankan `chain.py approve --row CONTRACT`.
 - **Subagent yang didispatch**:
   - `code-explorer`.
   - `contract-reviewer`: vonis `PASS` atau `BLOCKED`, dengan `BLOCKER [MEKANIS]`/`[SEMANTIK]` dan `ADVISORY`, serta baris `- Sidik:` yang menggemakan sidik ronde dari `review_round.py open`. Maksimal 2 ronde per putaran dan 8 per taskdir; putaran baru sesudah draft PASS di-commit, sesudah reopen hop ini atau hop di atasnya, atau sesudah `escalate`. Ronde 2 menyempit ke `changed_sections`.
@@ -361,7 +361,7 @@ sequenceDiagram
   3. **Pemecahan unit dan DAG.** Unit 01 data & transport, 02 logic, 03 presentasi. Tiap brief kompilabel mandiri, dan `depends_on` hanya menunjuk nomor yang lebih kecil. Remedi tidak boleh bergantung pada unit asalnya (Check D).
   4. **Tulis brief dan Gate Plan Review.** Tulis `brief-<NN>-<unit>.md` `READY`, jalankan `validate_briefs.py [--contract]` sampai PASS. Pada lane non-MINOR, lanjutkan dengan `review_round.py open`, dispatch `doc-reviewer`, lalu `record`.
   5. **Batch commit.** Satu commit untuk seluruh brief baru ditambah `REVIEW-PLAN.md`.
-  6. **Approval.** Sajikan tabel unit, tanyakan ke user, lalu `chain.py approve --row BRIEF`. Revisi (plafon 2) diulang dengan mode REVISE.
+  6. **Approval.** Sajikan ringkasan gerbang 3–4 kalimat beserta path brief dan `REVIEW-PLAN.md` (tabel unit baru dicetak `architect` sebelum eksekusi), tanyakan ke user, lalu `chain.py approve --row BRIEF`. Revisi (plafon 2) diulang dengan mode REVISE.
 - **Subagent yang didispatch**:
   - `code-explorer` lewat `dispatcher/explorer.md` dengan `{laci}` = `<taskdir>/.explore/`.
   - `doc-reviewer` (non-MINOR): audit D1 Blast Radius, D2 Traceability, D3 Coverage & DAG, D4 Verification Baseline. Verdict `PASS` hanya kalau nol `BLOCKER`. Plafon ronde sama dengan contract.

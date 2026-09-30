@@ -1,6 +1,6 @@
 # Alur Plugin `backend`
 
-> Plugin `backend` (v0.11.1, `src/plugins/backend/.claude-plugin/plugin.json`) menyediakan 12 skill dan 6 subagent untuk kerja backend lintas-stack: Java Spring, Go, Node, Bun, Rust, PHP, dan CodeIgniter 4. Plugin ini dipakai untuk tiap permintaan kerja di repo backend, yaitu fitur, bugfix, audit, dokumentasi API, maupun pertanyaan tentang kode. Semua permintaan masuk lewat satu gerbang, `backend:tech-lead`. Gerbang itu memutuskan lane, risk level, dan taskdir dari kode aktual sebelum satu brief ditulis atau satu berkas `src/` disentuh. Plugin sengaja dibuat generic: pengetahuan spesifik-repo disimpan di `.claude/profile/backenddev/`, sedangkan pengetahuan spesifik-stack disimpan di adapter `skills/profile/stacks/<stack>.md`.
+> Plugin `backend` (v0.13.0, `src/plugins/backend/.claude-plugin/plugin.json`) menyediakan 12 skill dan 6 subagent untuk kerja backend lintas-stack: Java Spring, Go, Node, Bun, Rust, PHP, dan CodeIgniter 4. Plugin ini dipakai untuk tiap permintaan kerja di repo backend, yaitu fitur, bugfix, audit, dokumentasi API, maupun pertanyaan tentang kode. Semua permintaan masuk lewat satu gerbang, `backend:tech-lead`. Gerbang itu memutuskan lane, risk level, dan taskdir dari kode aktual sebelum satu brief ditulis atau satu berkas `src/` disentuh. Plugin sengaja dibuat generic: pengetahuan spesifik-repo disimpan di `.claude/profile/backenddev/`, sedangkan pengetahuan spesifik-stack disimpan di adapter `skills/profile/stacks/<stack>.md`.
 
 Semua path berkas di dokumen ini relatif terhadap `src/plugins/backend/`.
 
@@ -209,8 +209,8 @@ flowchart TD
   1. **Fase 0 (resume)**: bila `TASK.md` sudah ada, `task` tidak dipanggil lagi. Chain dan risk dibaca dari frontmatter, dan hop teratas yang `[ ]`/`[~]` dilanjutkan. Bila ledger sudah tercentang penuh, skill butuh `reentry_reason`.
   2. **Fase 1 (derivasi chain)**: vonis sumbu bisnis (5 butir) dan sumbu kontrak (3 butir) dari `references/chain-rules.md`, lalu terapkan matriks. Bisnis aktif + kontrak aktif → `BRD_PRD_BRIEF`. Bisnis nol + kontrak aktif → `PRD_BRIEF`. Keduanya nol → `BRIEF`. Bisnis aktif + kontrak nol tidak sah dan dinaikkan ke `BRD_PRD_BRIEF`. Pasangan `(risk, chain)` diverifikasi: `BREAKING` hanya ber-PRD, dan `MINOR` hanya `BRIEF`. `MINOR` yang sumbu kontraknya aktif dinaikkan ke `MAJOR`.
   3. **Fase 2**: panggil `backend:task`, lalu verifikasi `### TASK ROOT LOCKED` (uji akar 9/9, commit) dan isi ledger `## Chain`. Akar yang terkunci di giliran ini langsung disinkron ke nataflow.
-  4. **Fase 3**: jalankan hop teratas yang belum tercentang, satu per giliran. `BRD` → `business-analysis`, `PRD` → `system-analysis`, `BRIEF` → `plan`. Butir 0 menangani re-entry dengan membuka hop pemilik kegagalan menjadi `[~]` sesudah `chain_counters.py --bump reentry` dan `--reset-hop`.
-  5. **Fase 4 (gerbang dokumen BRD/PRD)**: jangkar commit draft `docs(spec): draft <BRD|PRD> <slug>`, cek `## Open questions` (≤3, tidak memblokir), ringkasan eksekutif, lalu `AskUserQuestion`. Bila user setuju, tulis `status: APPROVED`, commit `docs(spec): approve …`, lalu centang ledger dengan sha dan commit `TASK.md`, lalu sinkron nataflow sehingga dokumen `APPROVED` tercermin seketika. Bila user menolak, jalankan `--bump reject:<HOP>` (sekaligus menolkan `review_round:<HOP>`) dan ulangi hop. Prasyarat hop berikutnya hanya menerima `APPROVED` yang commit terakhirnya `docs(spec): approve …`.
+  4. **Fase 3**: jalankan hop teratas yang belum tercentang, satu per giliran. `BRD` → `business-analysis`, `PRD` → `system-analysis`, `BRIEF` → `plan`. Verdict reviewer hop dibaca dari `{taskdir}/.explore/review/<brd|prd|brief>.md`, bukan dari chat. Butir 0 menangani re-entry dengan membuka hop pemilik kegagalan menjadi `[~]` sesudah `chain_counters.py --bump reentry` dan `--reset-hop`.
+  5. **Fase 4 (gerbang dokumen BRD/PRD)**: jangkar commit draft `docs(spec): draft <BRD|PRD> <slug>`, cek `## Open questions` (≤3, tidak memblokir), ringkasan eksekutif 3–4 kalimat beserta path artefak (bukan salinan isinya), lalu satu `AskUserQuestion`: tiap `BR-DISANGGAH` dan asumsi aktif `sementara dipakai:` sebagai pertanyaan tersendiri, ditambah pertanyaan persetujuan. Bila user setuju, tulis `status: APPROVED`, commit `docs(spec): approve …`, lalu centang ledger dengan sha dan commit `TASK.md`, lalu sinkron nataflow sehingga dokumen `APPROVED` tercermin seketika. Bila user menolak, jalankan `--bump reject:<HOP>` (sekaligus menolkan `review_round:<HOP>`) dan ulangi hop. Prasyarat hop berikutnya hanya menerima `APPROVED` yang commit terakhirnya `docs(spec): approve …`.
   6. **Fase 4a (kanal amandemen akar)**: bila hop menyentuh `## Success Criteria`/`## Out of Scope`, hop ditahan dan user memilih antara amandemen (diserahkan ke gerbang) atau membuang butir hilir.
   7. **Fase 5 (eskalasi)**: ada 4 pemicu. (1) `plan` LANGSUNG menemukan kontrak baru: `BRIEF → PRD_BRIEF`. (2) risk brief melampaui plafon: `BRIEF → PRD_BRIEF`. (3) sumbu bisnis ternyata aktif: `PRD_BRIEF → BRD_PRD_BRIEF`. (4) kontrak pecah: risk naik dari `MAJOR` ke `BREAKING`. Chain hanya bisa naik.
   8. **Fase 6**: tutup ledger (`docs(<slug>): tutup ledger chain <enum>`), lalu vonis 15 predikat A–M (TASK ACTIVE, ledger penuh, BRD/PRD APPROVED, brief READY ter-commit, keterlacakan SC/AC/BR/EC, nol rujukan hantu, `BR-DISANGGAH` diputuskan, nol Open questions memblokir, Out of Scope dan plafon risk dipatuhi, asumsi mendarat di `## Objective`).
@@ -271,9 +271,9 @@ flowchart TD
   3. **Fase 2**: elisitasi 1–3 pertanyaan per giliran atas 6 pilar wajib (Problem, Actors, Current/Target State, Business Rules, Out of Scope) plus 2 pilar opsional. Mode serap tiket tidak menanyakan ulang isi `TICKET.md`.
   4. **Fase 3**: konfirmasi fakta sebelum menulis. Ini bukan gerbang keputusan.
   5. **Fase 4**: tulis `BRD.md` berisi 9 seksi (`status: DRAFT`), dengan `BR-{n}`/`EC-{n}`/`BM-{n}` bernomor permanen. Mode serap tiket menambah `— Asal: TBR-{m}`.
-  6. **Fase 5**: jalankan `validate_doc.py --kind brd`, `chain_counters.py --bump review_round:BRD`, dan `brd-reviewer`. Commit hanya bila `Approved`.
+  6. **Fase 5**: jalankan `validate_doc.py --kind brd`, `chain_counters.py --bump review_round:BRD`, dan `brd-reviewer`. Balikan tiap ronde ditulis apa adanya ke `{taskdir}/.explore/review/brd.md`. Commit hanya bila `Approved`.
 - **Subagent yang didispatch**: `code-explorer` (opsional) dan `brd-reviewer` (vonis `Approved — nol temuan` | `Approved` | `Issues Found`, maksimal 2 ronde).
-- **Output / artefak**: `{taskdir}/BRD.md` DRAFT dan `### BUSINESS ANALYSIS SUMMARY`, dengan blok `## BRD Review` dilampirkan apa adanya.
+- **Output / artefak**: `{taskdir}/BRD.md` DRAFT, `{taskdir}/.explore/review/brd.md` (blok `## BRD Review` apa adanya, tidak di-commit), dan `### BUSINESS ANALYSIS SUMMARY` yang merujuk path berkas review itu alih-alih mencetak bloknya.
 - **Gerbang & commit**: commit `docs(spec): draft BRD <slug>` hanya sesudah verdict `Approved`. Skill ini dilarang meminta approval user atau menulis `APPROVED`.
 - **Lanjut ke**: `backend:analyst` Fase 4 (gerbang dokumen).
 
@@ -290,9 +290,9 @@ flowchart TD
   6. **Fase 5**: `## Task breakdown` per unit/modul (bukan path berkas) dan `## Acceptance criteria` Given/When/Then dengan kolom `Dasar` dan `Akar`.
   7. **Fase 6**: tulis `PRD.md` DRAFT.
   8. **Fase 7**: koreksi fakta sebelum commit.
-  9. **Fase 8**: jalankan `validate_doc.py --kind prd`, `--bump review_round:PRD`, dan `prd-reviewer`, lalu commit.
+  9. **Fase 8**: jalankan `validate_doc.py --kind prd`, `--bump review_round:PRD`, dan `prd-reviewer` (balikan tiap ronde ditulis apa adanya ke `{taskdir}/.explore/review/prd.md`), lalu commit.
 - **Subagent yang didispatch**: `code-explorer` (Profil S/B) dan `prd-reviewer` (maksimal 2 ronde).
-- **Output / artefak**: `{taskdir}/PRD.md` DRAFT dan `### SYSTEM ANALYSIS SUMMARY` beserta `## PRD Review`. Slot `BR Disanggah` bila ada.
+- **Output / artefak**: `{taskdir}/PRD.md` DRAFT, `{taskdir}/.explore/review/prd.md` (blok `## PRD Review` apa adanya, tidak di-commit), dan `### SYSTEM ANALYSIS SUMMARY` yang merujuk path berkas review itu. Slot `BR Disanggah` bila ada.
 - **Gerbang & commit**: commit `docs(spec): draft PRD <slug>` hanya bila `Approved`. Bila field wajib atau transisi terekspos berubah, skill kembali ke analyst dengan pemicu eskalasi #4. Bila ada pilar bisnis yang tak terjawab, kembali dengan pemicu #3.
 - **Lanjut ke**: `backend:analyst` Fase 4.
 
@@ -305,9 +305,9 @@ flowchart TD
   2. **Fase 2**: pemetaan 12 dimensi per unit (`references/slicing-and-scan.md`). Unit yang melebihi kuota didelegasikan ke fan-out `code-explorer` (≤4 serentak). Jalur non-PRD juga menjalankan sapuan 7 dimensi residual.
   3. **Fase 3**: tulis `brief-spec.json`, lalu jalankan `scaffold_brief.py --write-matrix` (atau `--append` untuk taskdir ber-brief lama) yang mengunci matriks alokasi `covers`/`fulfills`. Sesudah itu `scaffold_brief.py --nn <NN>` menulis kerangka 10 seksi: Objective, Interfaces, File scope, Out of scope, Steps, Migration, Mirrored paths, Risk & rollback, Work status, dan Analysis trace. Tiap kerangka diisi, lalu `validate_briefs.py --brief <NN>` dijalankan per brief.
   4. **Fase 4**: `validate_briefs.py` atas seluruh batch (predikat mekanis). Check A (source coverage) dan arah baliknya (kecukupan unit) dinilai main loop.
-  5. **Fase 5**: `--review-state` → `--open-round` → `brief-reviewer` → `--record-round`, dengan plafon 2 ronde per generasi batch dan 4 per taskdir. Lalu commit agregat.
+  5. **Fase 5**: `--review-state` → `--open-round` → `brief-reviewer` → `--record-round`, dengan plafon 2 ronde per generasi batch dan 4 per taskdir. Balikan tiap ronde ditulis apa adanya ke `{taskdir}/.explore/review/brief.md`. Lalu commit agregat dan laporan satu baris; tabel per brief tidak dicetak karena `architect` Fase 2 menyajikannya sebelum eksekusi.
 - **Subagent yang didispatch**: `code-explorer` (Fase 2) dan `brief-reviewer` (vonis `Approved`/`Issues Found`, temuan `BLOCKER [MEKANIS|SEMANTIK]` atau `ADVISORY`. Hanya `BLOCKER` yang menahan commit).
-- **Output / artefak**: `brief-<NN>-<unit>.md` berstatus `READY`, laci `.explore/brief-matrix.md`, dan `### BACKEND PLAN GENERATION REPORT — <n> BRIEF READY @ <sha> … Check 15/15`.
+- **Output / artefak**: `brief-<NN>-<unit>.md` berstatus `READY`, laci `.explore/brief-matrix.md` dan `.explore/review/brief.md`, dan `### BACKEND PLAN GENERATION REPORT — <n> BRIEF READY @ <sha> … Check 15/15 · … · review <path>`.
 - **Gerbang & commit**: satu commit agregat `docs(plan): add <N> briefs for <slug>` yang berisi brief baru, brief yang di-`SUPERSEDED`, `git rm HALT.md` bila ada baris `repairs`, dan berkas `finding_source` yang ditandai `OBSOLETE`/`DROPPED`. `src/` tidak disentuh sama sekali.
 - **Lanjut ke**: `backend:analyst` Fase 6 (lane planning), atau `backend:tech-lead` (jalur RCA).
 
@@ -409,7 +409,7 @@ flowchart TD
   3. **Fase 2**: lokalisasi permukaan kegagalan, dengan `code-explorer` via `dispatcher/explorer.md` bila lintas package.
   4. **Fase 3**: siklus hipotesis dan falsifikasi, maksimal 3. Root cause wajib punya minimal satu hipotesis alternatif yang sudah terfalsifikasi.
   5. **Fase 4**: blast radius, `## Arah perbaikan` (kandidat File scope), dan `## Regression guard` (spesifikasi test).
-  6. **Fase 5**: approval root cause oleh user, lalu tulis `RCA.md`.
+  6. **Fase 5**: ringkasan root cause 3–4 kalimat, lalu `AskUserQuestion` *Setujui root cause* · *Tolak (sebut arah lain)*. Disetujui → tulis `RCA.md` yang memuat rantai kausal lengkap.
 - **Subagent yang didispatch**: `code-explorer` (opsional).
 - **Output / artefak**: `{taskdir}/RCA.md` berstatus `ROOT_CAUSE_CONFIRMED` atau `INCONCLUSIVE`, dan `### ROOT CAUSE ANALYSIS REPORT`.
 - **Gerbang & commit**: skill ini tidak meng-commit. `RCA.md` di-commit gerbang di Fase 5. Menyentuh `src/`, membuat branch, dan menulis brief dilarang.
@@ -455,9 +455,9 @@ flowchart TD
 | `code-explorer` | `tech-lead` (Fase 1), `business-analysis` (Fase 1), `system-analysis` (Profil S/B), `plan` (Fase 2), `debug` (Fase 2) | Read, Grep, Glob, Write | Objective, Slug, Kedalaman `ringkas`/`menyeluruh`, Berkas laporan, Format laporan, konteks, dan batas cakupan dari template `dispatcher/*.md` | Laporan `.explore/<slug>.md` berfrontmatter (`confidence`, `permukaan_diminta`, `permukaan_tertutup`, `gaps_terbuka`), isinya identik dengan balikan ke context | Mengedit kode, menjalankan git/bash, merancang solusi, berdialog; Write hanya ke satu path `Berkas laporan` |
 | `code-implementor` | `architect` Fase 3 (satu per brief, sekuensial) | Read, Grep, Glob, Edit, Write, Bash | `brief_path`, `taskdir`, `unit_name`, `adapter_path` | `## Implementor Report — brief-NN-unit`: `DONE` + commit `commit_message`, atau `BLOCKED` + `report-NN.md` + commit `wip(<domain>): … [BLOCKED]` | Menyentuh berkas di luar `## File scope`, build/test, bertanya ke user, `git add .`, amend, push, reset, rantai perintah (ditegakkan hook) |
 | `code-reviewer` | `architect` Fase 4 (sekali per putaran) | Read, Grep, Glob, Bash, Write | `taskdir`, `base_branch`, `adapter_path`, `findings_contract` | `REVIEW.md` + baris `backenddev/issues/README.md` di-commit sendiri (`docs(<slug>): add final review report`), dengan severity tertinggi `CLEAN`/`P3`/`P2`/`P1` | Mengedit `src/`, build/test, bertanya ke user. Menilai rentang `merge-base..HEAD` terhadap union File scope lewat 5 pemeriksaan: scope, koherensi lintas-brief, kelengkapan Steps, migrasi & mirrored paths, dan 6 dimensi |
-| `brd-reviewer` | `business-analysis` Fase 5 via `dispatcher/reviewer.md` | Read, Grep, Glob | `taskdir`, `chain`, `ronde` | `## BRD Review`: `Approved — nol temuan` / `Approved` / `Issues Found` | Mengedit dokumen, menulis `APPROVED`, berdialog, memberi rekomendasi yang menambah aturan |
-| `prd-reviewer` | `system-analysis` Fase 8 via `dispatcher/reviewer.md` | Read, Grep, Glob | `taskdir`, `chain`, `ronde` | `## PRD Review`: `Approved — nol temuan` / `Approved` / `Issues Found` | Sama dengan `brd-reviewer`; tidak boleh menuntut path berkas `src/` di breakdown |
-| `brief-reviewer` | `plan` Fase 5 via `dispatcher/reviewer.md` | Read, Grep, Glob | `taskdir`, `chain`, `ronde`, `target`, `previous_report` | `## Brief Review`: `Approved`/`Issues Found`, dengan `BLOCKER [MEKANIS|SEMANTIK]` dan `ADVISORY` | Menghitung ulang predikat mekanis `validate_briefs.py`, advisory yang menambah kerja |
+| `brd-reviewer` | `business-analysis` Fase 5 via `dispatcher/reviewer.md` | Read, Grep, Glob | `taskdir`, `chain`, `ronde` | `## BRD Review`: `Approved — nol temuan` / `Approved` / `Issues Found`, ditulis pemanggil ke `.explore/review/brd.md` | Mengedit dokumen, menulis `APPROVED`, berdialog, memberi rekomendasi yang menambah aturan |
+| `prd-reviewer` | `system-analysis` Fase 8 via `dispatcher/reviewer.md` | Read, Grep, Glob | `taskdir`, `chain`, `ronde` | `## PRD Review`: `Approved — nol temuan` / `Approved` / `Issues Found`, ditulis pemanggil ke `.explore/review/prd.md` | Sama dengan `brd-reviewer`; tidak boleh menuntut path berkas `src/` di breakdown |
+| `brief-reviewer` | `plan` Fase 5 via `dispatcher/reviewer.md` | Read, Grep, Glob | `taskdir`, `chain`, `ronde`, `target`, `previous_report` | `## Brief Review`: `Approved`/`Issues Found`, dengan `BLOCKER [MEKANIS|SEMANTIK]` dan `ADVISORY`, ditulis pemanggil ke `.explore/review/brief.md` | Menghitung ulang predikat mekanis `validate_briefs.py`, advisory yang menambah kerja |
 
 Semua dispatch memakai template `skills/<skill>/dispatcher/*.md` yang dihidrasi penuh. Prompt yang masih memuat slot `{...}` mentah atau tidak punya blok `Format laporan` dibatalkan.
 
@@ -495,7 +495,8 @@ backenddev/
       report-NN.md                 laporan brief yang gagal (BLOCKED)
       HALT.md  REVIEW.md  REPORT.md
       .explore/                    scratch skill hilir: gate-*.md, brief-spec.json, brief-matrix.md,
-                                   verification-baseline.json, closing-verification.md (tidak di-commit)
+                                   verification-baseline.json, closing-verification.md,
+                                   review/<brd|prd|brief>.md (balikan reviewer ronde terakhir) (tidak di-commit)
   issues/
     README.md                      indeks temuan audit dan review
     <yyyy-mm-dd>-<NNN>-issues.md

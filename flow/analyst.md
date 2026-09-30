@@ -1,6 +1,6 @@
 # Alur Plugin `analyst`
 
-> Plugin `analyst` (v0.8.1) adalah jembatan antara pengguna/stakeholder dan engineer. Ia menerima permintaan,
+> Plugin `analyst` (v0.12.0) adalah jembatan antara pengguna/stakeholder dan engineer. Ia menerima permintaan,
 > keluhan, atau laporan bug dari sisi pengguna, menggali faktanya lewat tanya-jawab dengan peminta
 > non-engineer, lalu menerbitkan `TICKET.md`: kartu tiket non-teknis setara kartu Jira/Trello, berisi user
 > story, acceptance criteria, dan aturan bisnis. Tiket melewati review independen dan persetujuan user sebelum
@@ -213,7 +213,9 @@ flowchart TD
   4. **Commit draft**: `ticket.py commit --stage draft` meng-commit `TICKET.md` dan `review.md` dengan subjek
      `docs(ticket): draft TICKET <slug>` (sesudah `revise`: `revise TICKET <slug>`). Ticketdir yang diabaikan
      git dilewati.
-  5. **Persetujuan user**: sajikan tiket beserta blok `## Ticket Review`. Pilihan: *Setujui* (hanya bila
+  5. **Persetujuan user**: sajikan ringkasan gerbang 3–4 kalimat (judul, tipe, prioritas, inti user story atau
+     bug, jumlah AC/BR, vonis reviewer) beserta path `TICKET.md` dan `review.md`, bukan salinan kartu maupun
+     blok `## Ticket Review`. Pilihan: *Setujui* (hanya bila
      `review_segar=ya`), *Revisi*, *Kembali ke elisitasi*, atau *Tahan*. *Setujui* menjalankan
      `ticket.py approve --answer "<jawaban user>"`. *Revisi* menjalankan `ticket.py revise`, lalu Phase 2–4
      diulang.
