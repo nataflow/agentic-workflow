@@ -644,6 +644,10 @@ def cmd_sync_payload(a) -> int:
     (quickdev tidak mengenal tiket analyst), dan satu dokumen `quickdev.plan` berisi berkas di disk (skill tidak
     meng-commit). Rencana yang belum pernah `lock` (tanpa `Approved-At`) → FAIL: DRAFT tidak didorong (D2).
     Profil: dokumen `PROFILE` di bawah workspace, `key` = `<repo>/<path>` (T10).
+
+    Workspace (`--workspace <alias>`, dari `workspaces` config) hanya dibutuhkan untuk task baru dan induk profil:
+    `task.lookup` menjangkau seluruh project key dan workdir mengikuti workspace task induknya. Config berisi lebih
+    dari satu workspace tanpa `--workspace` → `workspace_choices`; user memilih, lalu skrip dijalankan ulang.
     """
     root = sync_root()
     config, problems = ns.load_config(root)
@@ -651,6 +655,10 @@ def cmd_sync_payload(a) -> int:
         return ns.emit_fail(a.json, SYNC, problems)
     if config is None:
         return ns.emit_skip(a.json, SYNC)
+    workspace_id, choices, problems = ns.choose_workspace(config, a.workspace)
+    if problems:
+        return ns.emit_fail(a.json, SYNC, problems)
+    where = ("pilih: " + ", ".join(c["alias"] for c in choices)) if choices else workspace_id or "-"
     path, rel = root_relative(root, a.repo_profile or a.plan)
     if path is None:
         return ns.emit_fail(a.json, SYNC, [rel])
@@ -663,10 +671,10 @@ def cmd_sync_payload(a) -> int:
     commit = ns.last_commit(root, rel)
     if a.repo_profile:
         doc = ns.document("workspace", f"{repo}/{rel}", "profile", content, ns.doc_meta("quickdev", repo, rel, "", commit))
-        head = {"repo": repo, "workspace_id": config["workspace_id"],
+        head = {"repo": repo, **ns.workspace_fields(workspace_id, choices),
                 "list_document": {"reference_table": "workspace", "include_content": False,
                                   "metadata": ns.compact({"source": "quickdev", "repo": repo})}}
-        return _sync_documents(a, config, [doc], head, f"{rel} → workspace {config['workspace_id'] or '-'}")
+        return _sync_documents(a, config, [doc], head, f"{rel} → workspace {where}")
     try:
         p = Plan(path)
         m, b = p.meta(), p.block()
@@ -685,14 +693,14 @@ def cmd_sync_payload(a) -> int:
     problems = ns.workdir_problems(key, path.stem, status)
     if problems:
         return ns.emit_fail(a.json, SYNC, problems)
-    task = ns.task_args(config, {"source": "quickdev", "workdir_key": key}, repo, title, body)
+    task = ns.task_args(config, workspace_id, {"source": "quickdev", "workdir_key": key}, repo, title, body)
     task["status"] = ns.task_status("done" if done else "in_progress" if execution else "")
     meta = {"source": "quickdev", "repo": repo, "path": rel, "plan_status": m.get("Status", ""),
             "plan_hash": m.get("Plan-Hash", ""), "base_commit": b.get("Base-Commit", ""), "execution": execution}
-    workdir = ns.workdir_args(config, key, path.stem, status, {k: v for k, v in meta.items() if v})
+    workdir = ns.workdir_args(key, path.stem, status, {k: v for k, v in meta.items() if v})
     doc = ns.document("workdir", path.name, "quickdev.plan", content,
                       ns.doc_meta("quickdev", repo, rel, m.get("Status", ""), commit, execution=execution))
-    head = {"repo": repo, "task": task, "workdir": workdir,
+    head = {"repo": repo, **ns.workspace_fields(workspace_id, choices), "task": task, "workdir": workdir,
             "list_document": {"reference_table": "workdir", "include_content": False}}
     return _sync_documents(a, config, [doc], head,
                            f"{rel} · workdir {path.stem} ({status}) · server {config['mcp_server']}")
@@ -736,6 +744,8 @@ def main() -> None:
     target = s.add_mutually_exclusive_group(required=True)
     target.add_argument("--plan", help="rencana yang pernah dikunci")
     target.add_argument("--repo-profile", dest="repo_profile", help="profil repo (dokumen tingkat workspace)")
+    s.add_argument("--workspace", default="", help="alias `workspaces` tujuan task baru atau induk profil; wajib "
+                                                   "dipilih user bila config berisi lebih dari satu workspace")
     s.add_argument("--remote", default=None, help="balikan list_document include_content=false (`-` = stdin)")
     s.add_argument("--json", action="store_true")
     a = ap.parse_args()

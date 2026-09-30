@@ -196,10 +196,13 @@ kebenaran; task hanya cermin kartunya, dan tidak ada yang ditulis balik ke `TICK
 sinkron tidak meng-commit tiketnya (lihat Git), sehingga task inilah satu-satunya salinan kartu di luar disk lokal.
 
 - **Aktif per repo** lewat `.claude/nataflow.json` (ter-commit, dibaca juga oleh `backend`, `frontend`, dan
-  `quickdev`): `mcp_server` (default `nataflow-api`), `workspace_id` (UUID; wajib bila MCP key ber-scope
-  project), `pic_id` (UUID; kosong → pemilik key), dan `repo` (default: remote `origin` ternormalisasi). Berkas
+  `quickdev`): `mcp_server` (default `nataflow-api`), `workspaces` (objek alias → UUID workspace;
+  kosong → workspace milik key, satu entri → otomatis, lebih dari satu → user memilih saat tiket pertama kali
+  disinkron), `pic_id` (UUID; kosong → pemilik key), dan `repo` (default: remote `origin` ternormalisasi). Berkas
   lama `analyst/nataflow.json` tetap diterima; bila keduanya ada dengan isi berbeda → `GAGAL`. Berkas absen →
-  sinkron dilewati; ada tetapi rusak (kunci asing, nilai bukan string, UUID tidak sah) → `GAGAL`.
+  sinkron dilewati; ada tetapi rusak (kunci asing termasuk `workspace_id` tunggal lama, nilai bukan string, alias atau UUID tidak
+  sah) → `GAGAL`. Workspace pilihan tidak ditulis ke `TICKET.md`; task yang sudah ada ditemukan di workspace mana
+  pun dalam jangkauan key, dan taskdir engineer dari tiket itu menaruh workdir-nya di workspace yang sama.
 - **Prasyarat di luar plugin**: server MCP nataflow terdaftar di Claude Code beserta MCP key-nya. Plugin tidak
   mendeklarasikan server dan tidak menyimpan key.
 - **Kapan**: `analyst:spec` sesudah `approve` (`READY` tertulis, termasuk bila commit-nya gagal). Prosedurnya

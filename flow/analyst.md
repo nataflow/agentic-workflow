@@ -309,8 +309,9 @@ nama plugin engineer (mis. berisi `analyst`) agar hook kedua plugin engineer dia
 ```
 
 `.claude/nataflow.json` (objek JSON, ter-commit; `analyst/nataflow.json` lama tetap diterima, dan dua berkas yang
-berbeda isi berarti `FAIL`) memuat `mcp_server` (default `nataflow-api`), `workspace_id`, `pic_id` (UUID,
-opsional), dan `repo` (identitas repo di metadata task). Berkas absen berarti sinkron dilewati; ada tetapi rusak
+berbeda isi berarti `FAIL`) memuat `mcp_server` (default `nataflow-api`), `workspaces` (objek alias → UUID; lebih
+dari satu entri → user memilih saat task tiket pertama kali dibuat, lewat `sync-payload --workspace <alias>`),
+`pic_id` (UUID, opsional), dan `repo` (identitas repo di metadata task). Berkas absen berarti sinkron dilewati; ada tetapi rusak
 berarti `sync-payload` `FAIL`. Plugin tidak pernah menulis berkas ini, dan sinkron tidak menulis apa pun ke `TICKET.md`: identitas
 task di nataflow adalah metadata `ticket_key` = path ticketdir, bukan field frontmatter.
 

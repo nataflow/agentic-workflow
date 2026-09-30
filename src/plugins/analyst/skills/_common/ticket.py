@@ -800,6 +800,12 @@ def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:
     tidak memuat `repo`, supaya task langkah 14 tetap ditemukan; plugin engineer menurunkan `ticket_key` yang sama
     dari `ticket_source` untuk menautkan workdir-nya ke task ini. Status task hanya dikirim untuk tiket pernah-READY
     yang dibatalkan (`task_status` `cancelled`, A6).
+
+    `lookup` menjangkau seluruh project key (tanpa `workspace_id`), sehingga task yang sudah ada ditemukan di
+    workspace mana pun ia dibuat. Workspace hanya menentukan `create`: `workspaces` config berisi lebih dari satu
+    entri tanpa `--workspace` → `create` tanpa `workspace_id` beserta `workspace_choices`; user memilih alias saat
+    task belum ada, lalu skrip dijalankan ulang dengan `--workspace`. Pilihan tidak ditulis ke `TICKET.md`: sesudah
+    task dibuat, nataflow sendiri yang mencatat workspace-nya.
     """
     config, problems = load_sync_config(root)
     if problems:
@@ -814,12 +820,14 @@ def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:
     rel = normalize_ticketdir(args.ticketdir, root)
     if not TICKETDIR_RE.match(rel) or not (root / rel).is_dir():
         return _sync_fail(args, [f"`{rel}` bukan direktori {TICKETS_DIR}/<YYMMDDhhmm>-<slug>"])
+    workspace_id, choices, problems = ns.choose_workspace(config, args.workspace)
+    if problems:
+        return _sync_fail(args, problems)
     state = classify(root, rel)          # non-UTF-8 → RUSAK, bukan traceback
     key = {"source": "analyst", "ticket_key": rel}
-    scope = {"workspace_id": config["workspace_id"]} if config["workspace_id"] else {}
     if state["state"] == "DIBATALKAN" and _was_ready(read(root / rel / TICKET_FILE)):
         payload = {"status": "PASS", "enabled": True, "mcp_server": config["mcp_server"], "ticket_key": rel,
-                   "lookup": dict(scope, metadata=_compact(key)), "task_status": ns.task_status("cancelled")}
+                   "lookup": {"metadata": _compact(key)}, "task_status": ns.task_status("cancelled")}
         if args.json:
             print(json.dumps(payload, indent=2, ensure_ascii=False))
         else:
@@ -850,13 +858,15 @@ def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:
         meta["external_ref"] = ref
     card = split_parts(body)[0].strip()   # kartu saja: `## Catatan Elisitasi` tetap di disk (K5, 15 A5 tidak diambil)
     create: Dict[str, Any] = {"title": title, "description": card}
-    create.update(scope)
+    if workspace_id:
+        create["workspace_id"] = workspace_id
     if config["pic_id"]:
         create["pic_id"] = config["pic_id"]
     create["metadata"] = _compact(meta)
     payload = {
         "status": "PASS", "enabled": True, "mcp_server": config["mcp_server"], "ticket_key": rel,
-        "lookup": dict(scope, metadata=_compact(key)),
+        **ns.workspace_fields(workspace_id, choices),
+        "lookup": {"metadata": _compact(key)},
         "create": create,
         "update": {"title": title, "description": card, "metadata": create["metadata"]},
         "documents": _review_document(root, rel, fm, repo),
@@ -864,9 +874,9 @@ def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:
     if args.json:
         print(json.dumps(payload, indent=2, ensure_ascii=False))
     else:
-        print(f"SYNC-PAYLOAD PASS: {rel} · server {config['mcp_server']} · workspace "
-              f"{config['workspace_id'] or '-'} · pic {config['pic_id'] or '-'} · {len(payload['documents'])} dokumen "
-              f"— argumen tool lewat `--json`")
+        where = ("pilih: " + ", ".join(c["alias"] for c in choices)) if choices else workspace_id or "-"
+        print(f"SYNC-PAYLOAD PASS: {rel} · server {config['mcp_server']} · workspace {where} · pic "
+              f"{config['pic_id'] or '-'} · {len(payload['documents'])} dokumen — argumen tool lewat `--json`")
     return 0
 
 
@@ -920,6 +930,8 @@ def main() -> None:
     s.add_argument("--no-commit", action="store_true", dest="no_commit")
     s = sub.add_parser("sync-payload")
     s.add_argument("--ticketdir", required=True)
+    s.add_argument("--workspace", default="", help="alias `workspaces` tujuan task baru; wajib dipilih user bila "
+                                                   "config berisi lebih dari satu workspace")
     s.add_argument("--json", action="store_true")
     args = p.parse_args()
     root = (Path(args.root) if args.root else find_root()).resolve()

@@ -9,6 +9,8 @@ Isinya hanya primitif yang tidak bergantung pada artefak plugin mana pun:
 - config `.claude/nataflow.json` (plus berkas lama per plugin) → `load_config`;
 - identitas repo: `repo` config, `git remote origin` ternormalisasi, atau nama direktori root → `repo_identity`;
 - isi berkas di `HEAD`, commit terakhir, dan versi terakhir berkas yang sudah dihapus dari git;
+- workspace tujuan dari `workspaces` config (`choose_workspace`): nol entri → workspace key, satu → otomatis,
+  lebih dari satu → user memilih alias saat sinkron;
 - argumen tool MCP: task (`lookup`/`create`/`status`), workdir, dokumen (`upsert_document` tanpa `reference_id`);
 - diff dokumen terhadap manifest remote (balikan `list_document include_content=false`).
 
@@ -27,7 +29,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 CONFIG_FILE = ".claude/nataflow.json"
 DEFAULT_SERVER = "nataflow-api"
-CONFIG_KEYS = ("mcp_server", "workspace_id", "pic_id", "repo")
+CONFIG_KEYS = ("mcp_server", "workspaces", "pic_id", "repo")
+ALIAS_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$")
 UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 BOM = "\ufeff"
 KEY_MAX = 255     # `key` workdir dan dokumen di server
@@ -47,11 +50,33 @@ def compact(obj: Any) -> str:
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-def parse_config(path: Path) -> Tuple[Optional[Dict[str, str]], List[str]]:
+def parse_workspaces(value: Any) -> Tuple[Dict[str, str], List[str]]:
+    """Nilai `workspaces` → `({alias: UUID}, masalah)`, urutan entri berkas dipertahankan."""
+    if not isinstance(value, dict):
+        return {}, [f"`workspaces` harus objek alias → UUID, bukan {type(value).__name__}"]
+    workspaces: Dict[str, str] = {}
+    problems: List[str] = []
+    for alias, uuid in value.items():
+        if not ALIAS_RE.match(alias):
+            problems.append(f"alias workspace `{alias}` harus huruf/angka/`.`/`_`/`-`, diawali huruf/angka, "
+                            f"paling panjang 63")
+        elif not isinstance(uuid, str):
+            problems.append(f"`workspaces.{alias}` harus string, bukan {type(uuid).__name__}")
+        elif not UUID_RE.match(uuid.strip()):
+            problems.append(f"`workspaces.{alias}` `{uuid.strip()}` bukan UUID")
+        elif uuid.strip().lower() in (u.lower() for u in workspaces.values()):
+            problems.append(f"`workspaces.{alias}` mengulang UUID alias lain")
+        else:
+            workspaces[alias] = uuid.strip()
+    return workspaces, problems
+
+
+def parse_config(path: Path) -> Tuple[Optional[Dict[str, Any]], List[str]]:
     """Satu berkas config → `(config, masalah)`. Config sah selalu memuat keempat `CONFIG_KEYS`.
 
-    `mcp_server` default `nataflow-api`; `workspace_id`, `pic_id`, dan `repo` string kosong bila tidak diisi.
-    Pesan masalah tanpa nama berkas; pemanggil yang menyebutnya.
+    `mcp_server` default `nataflow-api`; `pic_id` dan `repo` string kosong, `workspaces` objek kosong bila tidak
+    diisi. `workspace_id` tunggal lama ditolak dengan petunjuk penggantinya. Pesan masalah tanpa nama berkas;
+    pemanggil yang menyebutnya.
     """
     try:
         data = json.loads(path.read_text(encoding="utf-8").lstrip(BOM))
@@ -63,17 +88,23 @@ def parse_config(path: Path) -> Tuple[Optional[Dict[str, str]], List[str]]:
         return None, [f"tidak terbaca ({exc.strerror or exc})"]
     if not isinstance(data, dict):
         return None, [f"harus objek JSON, bukan {type(data).__name__}"]
-    problems = [f"kunci `{k}` tidak dikenal (sah: {', '.join(CONFIG_KEYS)})" for k in data if k not in CONFIG_KEYS]
-    config = {"mcp_server": DEFAULT_SERVER, "workspace_id": "", "pic_id": "", "repo": ""}
+    problems = [f"kunci `workspace_id` sudah diganti `workspaces` — tulis "
+                f"`\"workspaces\": {{\"<alias>\": \"<uuid>\"}}`" if k == "workspace_id"
+                else f"kunci `{k}` tidak dikenal (sah: {', '.join(CONFIG_KEYS)})" for k in data if k not in CONFIG_KEYS]
+    config: Dict[str, Any] = {"mcp_server": DEFAULT_SERVER, "workspaces": {}, "pic_id": "", "repo": ""}
     for key in CONFIG_KEYS:
         if key not in data:
             continue
         value = data[key]
+        if key == "workspaces":
+            config[key], found = parse_workspaces(value)
+            problems.extend(found)
+            continue
         if not isinstance(value, str):
             problems.append(f"`{key}` harus string, bukan {type(value).__name__}")
             continue
         value = value.strip()
-        if key in ("workspace_id", "pic_id") and value and not UUID_RE.match(value):
+        if key == "pic_id" and value and not UUID_RE.match(value):
             problems.append(f"`{key}` `{value}` bukan UUID")
         elif key == "repo" and re.search(r"\s", value):
             problems.append(f"`repo` `{value}` memuat spasi")
@@ -82,14 +113,14 @@ def parse_config(path: Path) -> Tuple[Optional[Dict[str, str]], List[str]]:
     return (None, problems) if problems else (config, [])
 
 
-def load_config(root: Path, legacy: str = "") -> Tuple[Optional[Dict[str, str]], List[str]]:
+def load_config(root: Path, legacy: str = "") -> Tuple[Optional[Dict[str, Any]], List[str]]:
     """`.claude/nataflow.json` (dan `legacy`, berkas lama relatif root) → `(config, masalah)`.
 
     Tanpa berkas → `(None, [])`: sinkron tidak aktif. Berkas yang ada tetapi rusak tidak pernah dianggap absen,
     karena repo yang sudah memilih sinkron tidak boleh berhenti sinkron diam-diam akibat salah ketik. Kedua berkas
     ada dengan isi efektif berbeda → masalah, supaya tidak ada config yang diam-diam kalah.
     """
-    found: List[Tuple[str, Dict[str, str]]] = []
+    found: List[Tuple[str, Dict[str, Any]]] = []
     for rel in (CONFIG_FILE, legacy):
         if not rel or not (root / rel).is_file():
             continue
@@ -132,7 +163,7 @@ def normalize_remote(url: str) -> str:
     return value.rstrip("/")
 
 
-def repo_identity(root: Path, config: Dict[str, str]) -> str:
+def repo_identity(root: Path, config: Dict[str, Any]) -> str:
     """`repo` config bila diisi; selain itu remote `origin` ternormalisasi; tanpa remote → nama direktori root."""
     if config.get("repo"):
         return config["repo"]
@@ -280,25 +311,48 @@ def check_documents(docs: List[Dict[str, Any]]) -> List[str]:
     return problems
 
 
-def workspace_scope(config: Dict[str, str]) -> Dict[str, str]:
-    return {"workspace_id": config["workspace_id"]} if config["workspace_id"] else {}
+def choose_workspace(config: Dict[str, Any], alias: str) -> Tuple[str, List[Dict[str, str]], List[str]]:
+    """`--workspace <alias>` terhadap `workspaces` config → `(workspace_id, pilihan, masalah)`.
+
+    Alias terisi → UUID-nya. Tanpa alias: nol entri → `""` (workspace milik key), satu entri → UUID-nya, lebih dari
+    satu → `""` beserta `pilihan` `[{alias, workspace_id}]`: user memilih salah satu, lalu skrip dijalankan ulang
+    dengan `--workspace`. Pilihan hanya dibutuhkan saat membuat task atau menentukan induk dokumen repo; task yang
+    sudah ada ditemukan lewat `lookup` seluruh project dan workdir-nya mengikuti workspace task itu.
+    """
+    workspaces = config["workspaces"]
+    if alias:
+        if alias in workspaces:
+            return workspaces[alias], [], []
+        valid = ", ".join(workspaces) or "tidak ada — `workspaces` kosong"
+        return "", [], [f"--workspace `{alias}` tidak ada di `workspaces` {CONFIG_FILE} (sah: {valid})"]
+    if len(workspaces) == 1:
+        return next(iter(workspaces.values())), [], []
+    return "", [{"alias": a, "workspace_id": u} for a, u in workspaces.items()], []
 
 
-def task_args(config: Dict[str, str], ident: Dict[str, str], repo: str, title: str,
+def workspace_fields(workspace_id: str, choices: List[Dict[str, str]]) -> Dict[str, Any]:
+    """Field payload penentu workspace: `workspace_id` terpilih, ditambah `workspace_choices` bila user harus memilih."""
+    return {"workspace_id": workspace_id, "workspace_choices": choices} if choices else {"workspace_id": workspace_id}
+
+
+def task_args(config: Dict[str, Any], workspace_id: str, ident: Dict[str, str], repo: str, title: str,
               description: str) -> Dict[str, Any]:
-    """`lookup` (saringan containment identitas saja) dan `create` untuk task sebuah taskdir atau rencana.
+    """`lookup` (saringan containment identitas saja, seluruh jangkauan key) dan `create` untuk task sebuah taskdir
+    atau rencana.
 
     `ident` = `{"source":"analyst","ticket_key":…}` untuk taskdir bertiket (E9), atau
     `{"source":<plugin>,"workdir_key":…}` untuk yang tanpa tiket. `repo` hanya di metadata `create`, supaya task
-    lama tanpa `repo` tetap ditemukan.
+    lama tanpa `repo` tetap ditemukan. `lookup` tanpa `workspace_id`, supaya task yang dibuat di workspace mana pun
+    (termasuk task tiket analyst di workspace pilihan user) tetap ditemukan dan tidak dibuat kembar. `workspace_id`
+    kosong → `create` tanpa workspace (workspace milik key, atau user memilih dulu bila ada `workspace_choices`).
     """
-    scope = workspace_scope(config)
     create: Dict[str, Any] = {"title": title, "description": description}
-    create.update(scope)
+    if workspace_id:
+        create["workspace_id"] = workspace_id
     if config["pic_id"]:
         create["pic_id"] = config["pic_id"]
     create["metadata"] = compact(dict(ident, repo=repo))
-    return {"lookup": dict(scope, metadata=compact(ident)), "create": create}
+    return {"lookup": {"metadata": compact(ident)}, "create": create}
 
 
 def task_status(target: str) -> Optional[Dict[str, Any]]:
@@ -308,10 +362,10 @@ def task_status(target: str) -> Optional[Dict[str, Any]]:
     return {"status": target, "from": list(TASK_STATUS_FROM[target])}
 
 
-def workdir_args(config: Dict[str, str], key: str, name: str, status: str, meta: Dict[str, Any]) -> Dict[str, Any]:
-    """Argumen `upsert_workdir` tanpa `task_id` (diisi model dari langkah task)."""
+def workdir_args(key: str, name: str, status: str, meta: Dict[str, Any]) -> Dict[str, Any]:
+    """Argumen `upsert_workdir` tanpa `task_id` dan `workspace_id`: keduanya diisi model dari task langkah task,
+    supaya workdir selalu berada di workspace task induknya."""
     args: Dict[str, Any] = {"key": key, "name": name}
-    args.update(workspace_scope(config))
     args["status"] = status
     args["metadata"] = compact(meta)
     return args

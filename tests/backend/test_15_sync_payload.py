@@ -12,7 +12,7 @@ TICKET = "analyst/tickets/2609231400-cicilan-pembayaran"
 
 @pytest.fixture
 def repo(chain_repo):
-    write_files(chain_repo, {".claude/nataflow.json": json.dumps({"workspace_id": WS, "repo": "tim/api"})})
+    write_files(chain_repo, {".claude/nataflow.json": json.dumps({"workspaces": {"utama": WS}, "repo": "tim/api"})})
     commit(chain_repo, "chore: aktifkan sinkron nataflow")
     return chain_repo
 
@@ -63,7 +63,7 @@ def test_fase_satu_task_sendiri(repo):
     code, out = sp(repo, "--taskdir", TD)
     assert code == 0 and out["status"] == "PASS"
     key = f"backenddev:tim/api:{TD}"
-    assert out["task"]["lookup"] == {"workspace_id": WS, "metadata": json.dumps(
+    assert out["task"]["lookup"] == {"metadata": json.dumps(
         {"source": "backenddev", "workdir_key": key}, separators=(",", ":"))}
     create = out["task"]["create"]
     assert create["title"] == "Order fix" and create["description"].startswith("## Success Criteria")

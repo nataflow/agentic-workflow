@@ -14,6 +14,11 @@ Sengaja bukan subperintah `chain.py`: `chain.py` satu-satunya penulis ledger, se
 - `--repo-docs review|profile`: `frontenddev/reviews/` atau profil sebagai dokumen `adhoc.review`/`profile` di bawah
   workspace, dengan key `<repo>/<path>` (T10).
 
+Workspace (`--workspace <alias>`, dari `workspaces` config): `task.lookup` menjangkau seluruh project key, sehingga task
+tiket analyst ditemukan di workspace mana pun user memilihnya; workdir mengikuti workspace task induknya (diisi model
+dari balikan tool). Pilihan hanya dibutuhkan untuk task baru dan induk dokumen repo: config berisi lebih dari satu
+workspace tanpa `--workspace` → `workspace_choices`, user memilih, lalu skrip dijalankan ulang dengan `--workspace`.
+
 Tanpa `--remote`: argumen task, workdir, dan manifest, tanpa isi dokumen. `--remote -`: dokumen yang berbeda dari
 teks balikan `list_document include_content=false` di stdin, ditambah key remote yang tidak lagi terpilih (E7): hop
 yang dibuka ulang didorong dengan status terbarunya (F9), berkas yang dihapus dari git dengan `removed: true`. Hop
@@ -154,7 +159,7 @@ def mirrored_extras(root: Path, table: str, remote: Dict[str, Dict[str, Any]], c
     return extras
 
 
-def diff_phase(args, config: Dict[str, str], docs: List[Dict[str, Any]], extras_fn) -> int:
+def diff_phase(args, config: Dict[str, Any], docs: List[Dict[str, Any]], extras_fn) -> int:
     remote, problems = ns.read_remote(args.remote, sys.stdin.read() if args.remote == "-" else "")
     if problems:
         return ns.emit_fail(args.json, PREFIX, problems)
@@ -193,7 +198,7 @@ def ticket_key(task_text: str) -> Tuple[Optional[str], str]:
     return posixpath.dirname(path), ""
 
 
-def run_taskdir(args, root: Path, config: Dict[str, str]) -> int:
+def run_taskdir(args, root: Path, config: Dict[str, Any]) -> int:
     td = normalize_taskdir(args.taskdir)
     if not TASKDIR_PATTERN.match(td) or not (root / td).is_dir():
         return ns.emit_fail(args.json, PREFIX, [f"`{td}` bukan taskdir frontenddev/docs/<YYMMDDhhmm>-<slug> yang ada"])
@@ -222,7 +227,7 @@ def run_taskdir(args, root: Path, config: Dict[str, str]) -> int:
         doc_status(t) in ("DONE", "BLOCKED") for n, t in texts.items() if doc_type(n) == "brief")
     ident = {"source": "analyst", "ticket_key": tkey} if tkey else {"source": SOURCE, "workdir_key": key}
     title = ns.h1_title(task_text) or name
-    task = ns.task_args(config, ident, repo, title, ns.pick_sections(task_text, TASK_SECTIONS) or title)
+    task = ns.task_args(config, args.workspace_id, ident, repo, title, ns.pick_sections(task_text, TASK_SECTIONS) or title)
     # Task tiket bisa menaungi taskdir backend juga: plugin ini hanya menaikkannya ke `in_progress` (E8).
     target = "in_progress" if started else ""
     if not tkey and status == "done":
@@ -232,8 +237,9 @@ def run_taskdir(args, root: Path, config: Dict[str, str]) -> int:
     task["status"] = ns.task_status(target)
     meta = {"source": SOURCE, "repo": repo, "path": td, "lane": ns.frontmatter_value(task_text, "lane"),
             "sections": ns.frontmatter_value(task_text, "sections"), "state": state, "ticket_key": tkey or ""}
-    payload = {"status": "PASS", "enabled": True, "mcp_server": config["mcp_server"], "repo": repo, "task": task,
-               "workdir": ns.workdir_args(config, key, name, status, {k: v for k, v in meta.items() if v}),
+    payload = {"status": "PASS", "enabled": True, "mcp_server": config["mcp_server"], "repo": repo,
+               **ns.workspace_fields(args.workspace_id, args.workspace_choices), "task": task,
+               "workdir": ns.workdir_args(key, name, status, {k: v for k, v in meta.items() if v}),
                "list_document": {"reference_table": "workdir", "include_content": False},
                "documents_total": len(docs)}
     ns.emit(payload, args.json, f"{PREFIX} PASS: {td} · workdir {name} ({status}, {state}) · {len(docs)} dokumen · "
@@ -241,7 +247,13 @@ def run_taskdir(args, root: Path, config: Dict[str, str]) -> int:
     return 0
 
 
-def run_repo_docs(args, root: Path, config: Dict[str, str]) -> int:
+def workspace_label(args) -> str:
+    if args.workspace_choices:
+        return "pilih: " + ", ".join(c["alias"] for c in args.workspace_choices)
+    return args.workspace_id or "-"
+
+
+def run_repo_docs(args, root: Path, config: Dict[str, Any]) -> int:
     repo = ns.repo_identity(root, config)
     rel_dir, docs, problems = select_repo_docs(root, args.repo_docs, repo)
     if problems:
@@ -252,12 +264,12 @@ def run_repo_docs(args, root: Path, config: Dict[str, str]) -> int:
             root, "workspace", remote, docs, lambda key: key[len(repo) + 1:] if key.startswith(prefix) else "",
             repo, set()))
     payload = {"status": "PASS", "enabled": True, "mcp_server": config["mcp_server"], "repo": repo,
-               "workspace_id": config["workspace_id"],
+               **ns.workspace_fields(args.workspace_id, args.workspace_choices),
                "list_document": {"reference_table": "workspace", "include_content": False,
                                  "metadata": ns.compact({"source": SOURCE, "repo": repo})},
                "documents_total": len(docs)}
     ns.emit(payload, args.json, f"{PREFIX} PASS: {rel_dir}/ · {len(docs)} dokumen → workspace "
-                                f"{config['workspace_id'] or '-'} — argumen tool lewat `--json`")
+                                f"{workspace_label(args)} — argumen tool lewat `--json`")
     return 0
 
 
@@ -267,6 +279,8 @@ def main() -> int:
     target.add_argument("--taskdir", help="frontenddev/docs/<YYMMDDhhmm>-<slug>")
     target.add_argument("--repo-docs", dest="repo_docs", choices=sorted(REPO_DOCS),
                         help="dokumen tingkat repo: review atau profile")
+    ap.add_argument("--workspace", default="", help="alias `workspaces` tujuan task baru atau induk dokumen repo; "
+                                                    "wajib dipilih user bila config berisi lebih dari satu workspace")
     ap.add_argument("--remote", default=None, help="teks balikan list_document include_content=false (`-` = stdin)")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
@@ -276,6 +290,9 @@ def main() -> int:
         return ns.emit_fail(args.json, PREFIX, problems)
     if config is None:
         return ns.emit_skip(args.json, PREFIX)
+    args.workspace_id, args.workspace_choices, problems = ns.choose_workspace(config, args.workspace)
+    if problems:
+        return ns.emit_fail(args.json, PREFIX, problems)
     return run_taskdir(args, root, config) if args.taskdir else run_repo_docs(args, root, config)
 
 

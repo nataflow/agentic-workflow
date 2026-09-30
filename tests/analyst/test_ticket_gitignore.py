@@ -40,7 +40,7 @@ def committed(root, *files):
 
 def synced(make_repo):
     """Repo git bersinkron nataflow, config ter-commit, belum ada ticketdir."""
-    root = make_repo({".claude/nataflow.json": json.dumps({"workspace_id": WS})})
+    root = make_repo({".claude/nataflow.json": json.dumps({"workspaces": {"utama": WS}})})
     committed(root, ".claude/nataflow.json")
     return root
 

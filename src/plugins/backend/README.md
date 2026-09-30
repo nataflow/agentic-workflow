@@ -242,8 +242,9 @@ Artefak taskdir dan dokumen repo dapat dicerminkan ke nataflow. Disk dan git tet
 tidak menulis berkas dan tidak meng-commit, dan kegagalannya tidak menahan rantai.
 
 - **Aktif per repo** lewat `.claude/nataflow.json` (ter-commit, dibaca juga oleh `analyst`, `frontend`, dan
-  `quickdev`): `mcp_server` (default `nataflow-api`), `workspace_id` (UUID; wajib bila MCP key ber-scope
-  project), `pic_id`, dan `repo` (default: remote `origin` ternormalisasi). Berkas absen → dilewati; ada tetapi
+  `quickdev`): `mcp_server` (default `nataflow-api`), `workspaces` (objek alias → UUID workspace;
+  kosong → workspace milik key, satu entri → otomatis, lebih dari satu → user memilih saat task baru atau
+  dokumen repo disinkron), `pic_id`, dan `repo` (default: remote `origin` ternormalisasi). Berkas absen → dilewati; ada tetapi
   rusak → `GAGAL`. Server MCP didaftarkan user di Claude Code; plugin tidak menyimpan key.
 - **Jangkar**: satu taskdir = satu workdir `backenddev:<repo>:<path taskdir>`, tertaut ke task tiket analyst
   bila `TASK.md` membawa `ticket_source` (taskdir frontend dari tiket yang sama bernaung di task itu juga),

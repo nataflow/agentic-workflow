@@ -217,8 +217,9 @@ Rencana dan profil dapat dicerminkan ke nataflow. Berkas di disk tetap satu-satu
 tidak menulis berkas apa pun, sehingga `Plan-Hash`, `Verified-Hash`, dan `Tree-Hash` tidak basi.
 
 - **Aktif per repo** lewat `.claude/nataflow.json` (ter-commit, dibaca juga oleh `analyst`, `backend`, dan
-  `frontend`): `mcp_server` (default `nataflow-api`), `workspace_id` (UUID; wajib bila MCP key ber-scope
-  project), `pic_id` (UUID), dan `repo` (default: remote `origin` ternormalisasi). Berkas absen → dilewati; ada
+  `frontend`): `mcp_server` (default `nataflow-api`), `workspaces` (objek alias → UUID workspace;
+  kosong → workspace milik key, satu entri → otomatis, lebih dari satu → user memilih saat task baru atau
+  dokumen repo disinkron), `pic_id` (UUID), dan `repo` (default: remote `origin` ternormalisasi). Berkas absen → dilewati; ada
   tetapi rusak → `GAGAL`. Server MCP nataflow didaftarkan user di Claude Code; plugin tidak menyimpan key.
 - **Jangkar**: satu rencana = satu workdir `quickdev:<repo>:<path rencana>` bernama `<task_name>`, tertaut ke task
   yang dibuat dari H1 dan Section 1 rencana. Rencana didorong sebagai dokumen `quickdev.plan`; `repo-profile.md`

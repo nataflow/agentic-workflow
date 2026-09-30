@@ -38,10 +38,10 @@ def test_config_absen_berarti_nonaktif(ns, tmp_path):
 
 
 def test_config_sah_diisi_default(ns, tmp_path):
-    write_files(tmp_path, {".claude/nataflow.json": json.dumps({"workspace_id": WS, "repo": "x/y"})})
+    write_files(tmp_path, {".claude/nataflow.json": json.dumps({"workspaces": {"utama": WS}, "repo": "x/y"})})
     config, problems = ns.load_config(tmp_path)
     assert problems == []
-    assert config == {"mcp_server": "nataflow-api", "workspace_id": WS, "pic_id": "", "repo": "x/y"}
+    assert config == {"mcp_server": "nataflow-api", "workspaces": {"utama": WS}, "pic_id": "", "repo": "x/y"}
 
 
 @pytest.mark.parametrize("raw,needle", [
@@ -67,9 +67,9 @@ def test_config_bukan_utf8(ns, tmp_path):
 
 def test_config_lama_diterima_dan_konflik_ditolak(ns, tmp_path):
     legacy = "analyst/nataflow.json"
-    write_files(tmp_path, {legacy: json.dumps({"workspace_id": WS})})
-    assert ns.load_config(tmp_path, legacy)[0]["workspace_id"] == WS
-    write_files(tmp_path, {".claude/nataflow.json": json.dumps({"workspace_id": WS, "mcp_server": "nataflow-api"})})
+    write_files(tmp_path, {legacy: json.dumps({"workspaces": {"utama": WS}})})
+    assert ns.load_config(tmp_path, legacy)[0]["workspaces"] == {"utama": WS}
+    write_files(tmp_path, {".claude/nataflow.json": json.dumps({"workspaces": {"utama": WS}, "mcp_server": "nataflow-api"})})
     assert ns.load_config(tmp_path, legacy)[1] == [], "isi efektif sama → bukan konflik"
     write_files(tmp_path, {".claude/nataflow.json": json.dumps({"mcp_server": "lain"})})
     config, problems = ns.load_config(tmp_path, legacy)
@@ -174,9 +174,9 @@ def test_doc_meta_removed_dan_commit_kosong(ns):
 
 
 def test_task_args_repo_hanya_di_create(ns):
-    config = {"mcp_server": "nataflow-api", "workspace_id": WS, "pic_id": "", "repo": ""}
-    args = ns.task_args(config, {"source": "analyst", "ticket_key": "analyst/tickets/2609231400-x"}, "r", "T", "D")
-    assert args["lookup"] == {"workspace_id": WS, "metadata": '{"source":"analyst","ticket_key":"analyst/tickets/2609231400-x"}'}
+    config = {"mcp_server": "nataflow-api", "workspaces": {"utama": WS}, "pic_id": "", "repo": ""}
+    args = ns.task_args(config, WS, {"source": "analyst", "ticket_key": "analyst/tickets/2609231400-x"}, "r", "T", "D")
+    assert args["lookup"] == {"metadata": '{"source":"analyst","ticket_key":"analyst/tickets/2609231400-x"}'}
     assert list(args["create"]) == ["title", "description", "workspace_id", "metadata"]
     assert json.loads(args["create"]["metadata"])["repo"] == "r"
 

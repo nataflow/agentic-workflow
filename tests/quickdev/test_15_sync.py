@@ -25,7 +25,7 @@ Tambah validasi kuota.
 @pytest.fixture
 def repo(make_repo):
     root = make_repo({"app.js": "a\n", "repo-profile.md": "# profil\n",
-                      ".claude/nataflow.json": json.dumps({"workspace_id": WS, "repo": "tim/app"})})
+                      ".claude/nataflow.json": json.dumps({"workspaces": {"utama": WS}, "repo": "tim/app"})})
     commit(root, "init")
     write_files(root, {"plan/t.md": PLAN})
     return root
@@ -52,7 +52,7 @@ def test_skip_tanpa_config_walau_rencana_tidak_ada(make_repo):
 
 
 def test_config_rusak_fail(repo):
-    write_files(repo, {".claude/nataflow.json": '{"workspace_id": "x"}'})
+    write_files(repo, {".claude/nataflow.json": '{"workspaces": {"utama": "x"}}'})
     code, out = payload(repo, "--plan", "plan/t.md")
     assert code == 1 and out["status"] == "FAIL" and "bukan UUID" in out["problems"][0]
 
@@ -75,7 +75,7 @@ def test_fase_satu_tanpa_isi(repo):
     code, out = payload(repo, "--plan", "plan/t.md")
     assert code == 0 and out["status"] == "PASS" and out["mcp_server"] == "nataflow-api"
     key = "quickdev:tim/app:plan/t.md"
-    assert out["task"]["lookup"] == {"workspace_id": WS, "metadata": json.dumps(
+    assert out["task"]["lookup"] == {"metadata": json.dumps(
         {"source": "quickdev", "workdir_key": key}, separators=(",", ":"))}
     create = out["task"]["create"]
     assert create["title"] == "Implementation Plan — t"
@@ -83,7 +83,8 @@ def test_fase_satu_tanpa_isi(repo):
     assert "## 3." not in create["description"]
     assert out["task"]["status"] is None, "belum dieksekusi → status task tidak disentuh"
     wd = out["workdir"]
-    assert (wd["key"], wd["name"], wd["status"], wd["workspace_id"]) == (key, "t", "active", WS)
+    assert (wd["key"], wd["name"], wd["status"]) == (key, "t", "active") and "workspace_id" not in wd
+    assert out["workspace_id"] == WS and out["task"]["create"]["workspace_id"] == WS
     meta = json.loads(wd["metadata"])
     assert meta["plan_status"] == "APPROVED" and meta["plan_hash"].startswith("sha256:")
     assert out["list_document"] == {"reference_table": "workdir", "include_content": False}

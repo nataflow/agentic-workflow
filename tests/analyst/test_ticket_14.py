@@ -74,8 +74,12 @@ def test_config_absen_berarti_tidak_aktif(tmp_path):
     ("{", "bukan JSON"),
     ("[]", "harus objek"),
     ('{"server": "nataflow-api"}', "`server` tidak dikenal"),
-    ('{"workspace_id": 5}', "`workspace_id` harus string"),
-    ('{"workspace_id": "ws-1"}', "`workspace_id` `ws-1` bukan UUID"),
+    ('{"workspace_id": "%s"}' % WS, "`workspace_id` sudah diganti `workspaces`"),
+    ('{"workspaces": "ws-1"}', "`workspaces` harus objek"),
+    ('{"workspaces": {"web": 5}}', "`workspaces.web` harus string"),
+    ('{"workspaces": {"web": "ws-1"}}', "`workspaces.web` `ws-1` bukan UUID"),
+    ('{"workspaces": {"web app": "%s"}}' % WS, "alias workspace `web app`"),
+    ('{"workspaces": {"a": "%s", "b": "%s"}}' % (WS, WS), "`workspaces.b` mengulang UUID"),
     ('{"pic_id": "bukan-uuid"}', "`pic_id` `bukan-uuid` bukan UUID"),
     (b'{"mcp_server": "\xff"}', "bukan UTF-8"),
 ])
@@ -89,10 +93,10 @@ def test_config_rusak_terlapor(tmp_path, raw, needle):
 def test_config_default_dan_nilai_eksplisit(tmp_path):
     config(tmp_path, {})
     assert lib.load_sync_config(tmp_path) == (
-        {"mcp_server": "nataflow-api", "workspace_id": "", "pic_id": "", "repo": ""}, [])
-    config(tmp_path, {"mcp_server": "nataflow-staging", "workspace_id": WS, "pic_id": PIC})
+        {"mcp_server": "nataflow-api", "workspaces": {}, "pic_id": "", "repo": ""}, [])
+    config(tmp_path, {"mcp_server": "nataflow-staging", "workspaces": {"utama": WS}, "pic_id": PIC})
     assert lib.load_sync_config(tmp_path) == (
-        {"mcp_server": "nataflow-staging", "workspace_id": WS, "pic_id": PIC, "repo": ""}, [])
+        {"mcp_server": "nataflow-staging", "workspaces": {"utama": WS}, "pic_id": PIC, "repo": ""}, [])
 
 
 # --- N2: sync-payload --------------------------------------------------------------------------
@@ -139,7 +143,7 @@ def test_bukan_ready_ditolak(repo, keadaan):
 
 @pytest.mark.regression("N2")
 def test_pass_isi_payload_dari_kartu(repo):
-    config(repo, {"workspace_id": WS, "pic_id": PIC})
+    config(repo, {"workspaces": {"utama": WS}, "pic_id": PIC})
     approve(repo)
     code, out = payload(repo)
     assert code == 0 and out["status"] == "PASS" and out["enabled"] is True, out
@@ -162,7 +166,7 @@ def test_pass_isi_payload_dari_kartu(repo):
     assert meta["approved"] == fm["approved"] and meta["approved_seal"] == fm["approved_seal"]
     assert create["metadata"] == json.dumps(meta, separators=(",", ":"), ensure_ascii=False)
 
-    assert out["lookup"] == {"workspace_id": WS, "metadata": json.dumps(
+    assert out["lookup"] == {"metadata": json.dumps(
         {"source": "analyst", "ticket_key": TDIR}, separators=(",", ":"))}
     assert out["update"] == {"title": TITLE, "description": card, "metadata": create["metadata"]}
     assert "status" not in create and "status" not in out["update"]

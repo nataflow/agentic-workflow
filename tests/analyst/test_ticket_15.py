@@ -58,18 +58,18 @@ def payload(root):
 def test_config_bersama_mengaktifkan_sinkron(repo):
     approve(repo)
     assert payload(repo)[1]["status"] == "SKIP"
-    shared(repo, {"workspace_id": WS})
+    shared(repo, {"workspaces": {"utama": WS}})
     code, out = payload(repo)
-    assert code == 0 and out["lookup"]["workspace_id"] == WS
+    assert code == 0 and out["create"]["workspace_id"] == WS and "workspace_id" not in out["lookup"]
 
 
 @pytest.mark.regression("15 A1")
 def test_config_lama_sama_isi_diterima_berbeda_ditolak(repo):
     approve(repo)
-    legacy(repo, {"workspace_id": WS})
-    shared(repo, {"workspace_id": WS})
+    legacy(repo, {"workspaces": {"utama": WS}})
+    shared(repo, {"workspaces": {"utama": WS}})
     assert payload(repo)[0] == 0
-    shared(repo, {"workspace_id": WS, "mcp_server": "nataflow-staging"})
+    shared(repo, {"workspaces": {"utama": WS}, "mcp_server": "nataflow-staging"})
     code, out = payload(repo)
     assert code == 1 and "berbeda isi" in out["problems"][0]
 
@@ -118,7 +118,7 @@ def test_elisitasi_tetap_tidak_dikirim(repo):
 
 @pytest.mark.regression("15 A6")
 def test_tiket_ready_dibatalkan_menjadi_cancelled(repo):
-    shared(repo, {"workspace_id": WS})
+    shared(repo, {"workspaces": {"utama": WS}})
     approve(repo)
     lookup = payload(repo)[1]["lookup"]
     assert tk(repo, "cancel", "--ticketdir", TDIR, "--reason", "tidak jadi", "--force").returncode == 0
@@ -151,7 +151,7 @@ def test_lookup_tiket_sama_di_analyst_backend_frontend(repo):
     """Taskdir backend dan frontend dari tiket yang sama wajib menemukan task analyst yang sama: `lookup`
     ketiganya byte-identik. Bila salah satu sisi mengubah turunan `ticket_key`, workdir menempel ke task lain
     atau melahirkan task kembar."""
-    shared(repo, {"workspace_id": WS})
+    shared(repo, {"workspaces": {"utama": WS}})
     approve(repo)
     source = f"ticket_source: {TDIR}/TICKET.md\n"
     be_td, fe_td = "backenddev/docs/2609241000-cicilan-api", "frontenddev/docs/2609241000-cicilan-ui"
