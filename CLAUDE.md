@@ -84,7 +84,7 @@ skeletons), `dispatcher/` (prompts used to dispatch subagents), `scripts/`, and 
   guarded by `_common/plan_lock.py`.
 - **nataflow** — direct work against the nataflow server over MCP, no repo artifacts. `create-artifact`
   writes a self-contained HTML page, gates it with `skills/create-artifact/scripts/artifact.py check`, and
-  upserts it under the MCP key's project via the (assumed) `*_artifact` MCP tools. Model-invocable.
+  upserts it under the MCP key's project via the `nataflow-api` `*_artifact` MCP tools. Model-invocable.
 
 Repo profiles are per plugin: `.claude/profile/backenddev/` and `.claude/profile/frontenddev/`
 (`index.json` + fixed set of `.md` files; see `BE_PROFILE_MD`/`FE_PROFILE_MD` in `tests/conftest.py`).

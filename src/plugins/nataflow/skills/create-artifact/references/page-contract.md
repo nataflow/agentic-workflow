@@ -1,8 +1,9 @@
 # Kontrak Halaman Artifact
 
 Dimuat `nataflow:create-artifact` Fase 2 sebelum draft ditulis. Artifact adalah **satu berkas HTML mandiri** yang
-disajikan endpoint render nataflow apa adanya sebagai `text/html` kepada user login project. Tidak ada berkas
-pendukung, tidak ada kerangka yang dibungkuskan server, dan tidak ada build step.
+disajikan endpoint render nataflow (`GET /api/v1/documents/{id}/render`) apa adanya sebagai
+`text/html; charset=utf-8` kepada user login yang berhak atas project. Tidak ada berkas pendukung, tidak ada
+kerangka yang dibungkuskan server, dan tidak ada build step.
 
 Aturan bertanda **[gerbang]** ditagih `artifact.py check` (FAIL). Aturan bertanda **[peringatan]** dicetak
 sebagai `WARN` dan tetap wajib diperbaiki kecuali user memintanya lain. Sisanya tanggung jawab penulis.
@@ -43,11 +44,24 @@ sebagai `WARN` dan tetap wajib diperbaiki kecuali user memintanya lain. Sisanya 
 - Lebar baca teks panjang dibatasi (`max-width` sekitar 72ch).
 - Grafik diberi label sumbu, satuan, dan keterangan; jangan hanya mengandalkan warna untuk membedakan seri.
 
-## Perilaku
+## Sandbox Render
 
-- **[peringatan]** `localStorage`/`sessionStorage` hanya untuk kenyamanan per penonton (tab terakhir, filter),
-  setiap akses dibungkus `try/catch`, dan halaman tetap benar tanpa storage.
-- Tidak ada state yang harus tersimpan bersama antar-penonton: artifact nataflow tidak punya database.
+Endpoint render mengirim `Content-Security-Policy: sandbox allow-scripts`, dan konsumennya mengambil HTML lewat
+fetch ber-header `Authorization` lalu menampilkannya di `<iframe sandbox srcdoc>`. Akibatnya halaman berjalan
+dengan origin opaque:
+
+- **[gerbang]** Tidak memakai `localStorage`, `sessionStorage`, `indexedDB`, atau `document.cookie` di skrip
+  maupun atribut `on*`: semuanya melempar `SecurityError`. State (tab aktif, filter) disimpan di variabel
+  memori dan hilang saat halaman dimuat ulang.
+- **[peringatan]** `alert`/`confirm`/`prompt` diblokir diam-diam. Tampilkan pesan dan konfirmasi di dalam
+  halaman.
+- **[peringatan]** Tautan `target="_blank"` tidak terbuka (tanpa `allow-popups`), dan `<form action>` tidak bisa
+  dikirim (tanpa `allow-forms`). Form hanya untuk interaksi lokal yang ditangani JS dengan `preventDefault`.
+- Navigasi ke luar halaman (`window.top`, `location` induk) diblokir. Tautan eksternal tetap boleh ditulis
+  sebagai teks atau URL yang bisa disalin.
+- Skrip CDN dan Google Fonts tetap termuat; `fetch` ke layanan lain berjalan sebagai origin `null` dan tanpa
+  kredensial.
+- Tidak ada state yang tersimpan bersama antar-penonton: artifact nataflow tidak punya database.
 
 ## Larangan Isi
 

@@ -43,6 +43,10 @@ STYLE_HOSTS = ("https://fonts.googleapis.com/",)
 INLINE_SCHEMES = ("data:", "blob:", "#", "about:", "javascript:", "mailto:", "tel:")
 SLOW_RELS = {"stylesheet", "modulepreload", "preload"}
 LOADING_TAGS = ("img", "script", "iframe", "source", "video", "audio")
+# Endpoint render mengirim `Content-Security-Policy: sandbox allow-scripts`: origin halaman opaque, jadi API
+# penyimpanan melempar SecurityError, sedangkan dialog, popup, dan submit form diam-diam diblokir.
+STORAGE_RE = re.compile(r"\b(?:localStorage|sessionStorage|indexedDB)\b|\bdocument\s*\.\s*cookie\b")
+DIALOG_RE = re.compile(r"(?<![\w.])(?:window\s*\.\s*)?(?:alert|confirm|prompt)\s*\(")
 
 
 def compact(obj: Any) -> str:
@@ -122,6 +126,10 @@ class PageScan(HTMLParser):
         self.scripts: List[str] = []
         self.styles: List[str] = []
         self.relative: List[str] = []
+        self.in_script = False
+        self.code: List[str] = []          # isi <script> inline dan atribut on* — tempat API browser dipanggil
+        self.blank_links = 0
+        self.form_actions = 0
 
     def handle_starttag(self, tag: str, attrs: List[Tuple[str, Optional[str]]]) -> None:
         a = {k.lower(): (v or "").strip() for k, v in attrs}
@@ -135,8 +143,15 @@ class PageScan(HTMLParser):
                 self.viewport = True
         elif tag == "input" and a.get("type", "").lower() == "password":
             self.password = True
-        elif tag == "script" and a.get("src"):
-            self.scripts.append(a["src"])
+        elif tag == "script":
+            self.in_script = True
+            if a.get("src"):
+                self.scripts.append(a["src"])
+        elif tag == "a" and a.get("target", "").lower() == "_blank":
+            self.blank_links += 1
+        elif tag == "form" and a.get("action"):
+            self.form_actions += 1
+        self.code.extend(v for k, v in a.items() if k.startswith("on") and v)
         rels = set(a.get("rel", "").lower().split())
         if tag == "link" and a.get("href") and rels & SLOW_RELS:
             self.styles.append(a["href"])
@@ -150,10 +165,14 @@ class PageScan(HTMLParser):
     def handle_endtag(self, tag: str) -> None:
         if tag == "title":
             self.in_title = False
+        elif tag == "script":
+            self.in_script = False
 
     def handle_data(self, data: str) -> None:
         if self.in_title:
             self.title_parts.append(data)
+        elif self.in_script:
+            self.code.append(data)
 
     @property
     def title(self) -> str:
@@ -204,13 +223,24 @@ def audit(text: str) -> Tuple[PageScan, List[str], List[str]]:
     for ref in scan.relative:
         problems.append(f"rujukan relatif {ref}: artifact satu berkas tanpa berkas pendukung; "
                         "sematkan inline atau pakai data: URI")
+    code = "\n".join(scan.code)
+    used = sorted({" ".join(m.group(0).split()) for m in STORAGE_RE.finditer(code)})
+    if used:
+        problems.append(f"{', '.join(used)} tidak tersedia di sandbox render (origin opaque, melempar "
+                        "SecurityError); simpan state di memori")
 
     if "prefers-color-scheme" not in text:
         warnings.append("tidak ada `@media (prefers-color-scheme: dark)`; halaman hanya bertema terang")
     if not re.search(r":root\s*(?:\[[^\]]*\]\s*)?\{[^}]*--", text):
         warnings.append("warna tidak didefinisikan sebagai token `--*` di `:root`")
-    if re.search(r"\b(?:localStorage|sessionStorage)\b", text) and "catch" not in text:
-        warnings.append("browser storage dipakai tanpa try/catch; bisa melempar di mode privat")
+    if DIALOG_RE.search(code):
+        warnings.append("`alert`/`confirm`/`prompt` diblokir sandbox render; tampilkan pesan di halaman")
+    if scan.blank_links:
+        warnings.append(f"{scan.blank_links} tautan `target=\"_blank\"` tidak terbuka di sandbox render "
+                        "(tanpa allow-popups)")
+    if scan.form_actions:
+        warnings.append("`<form action>` tidak bisa dikirim di sandbox render (tanpa allow-forms); "
+                        "tangani di JS dengan preventDefault")
     if len(scan.title.split()) > 6:
         warnings.append("`<title>` lebih dari 6 kata; judul artifact sebaiknya 2–4 kata")
     return scan, problems, warnings

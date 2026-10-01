@@ -12,7 +12,8 @@ ARTIFACT HANYA HIDUP DI SERVER NATAFLOW DAN SELALU MENEMPEL KE PROJECT MILIK MCP
 
 1. Server MCP nataflow terdaftar di Claude Code user beserta MCP key-nya, dan backend-nya berjalan. Plugin tidak
    mendeklarasikan server dan tidak menyimpan key.
-2. Server itu menyediakan `get_project_info`, `list_artifacts`, `get_artifact`, dan `upsert_artifact`.
+2. Server itu menyediakan `get_project_info`, `list_artifacts`, `get_artifact`, `upsert_artifact`, dan
+   `get_document`.
 3. `python3` ≥ 3.9 untuk `${CLAUDE_PLUGIN_ROOT}/skills/create-artifact/scripts/artifact.py`.
 
 Repo git tidak wajib. Bila skill dipanggil di dalam repo, `.claude/nataflow.json` di root repo (berkas yang sama
@@ -43,9 +44,9 @@ dengan sinkron plugin lain) hanya dibaca untuk field `mcp_server`.
 
 1. `<artifact.py> config --json`. `FAIL` → status `GAGAL: <isi problems apa adanya>`; selesai. `PASS` → pegang
    `mcp_server` dan `draft_dir`.
-2. Muat lewat ToolSearch (`select:`) keempat tool `mcp__<mcp_server>__get_project_info`, `…__list_artifacts`,
-   `…__get_artifact`, dan `…__upsert_artifact`. Salah satu tidak tersedia → `GAGAL: tool artifact tidak
-   tersedia di server MCP <mcp_server>`; selesai.
+2. Muat lewat ToolSearch (`select:`) kelima tool `mcp__<mcp_server>__get_project_info`, `…__list_artifacts`,
+   `…__get_artifact`, `…__upsert_artifact`, dan `…__get_document`. Salah satu tidak tersedia → `GAGAL: tool
+   artifact tidak tersedia di server MCP <mcp_server>`; selesai.
 3. `get_project_info` tanpa argumen. Pegang `id` dan `name` project balikannya: `id` itulah `reference_id`
    untuk setiap panggilan artifact, dengan `reference_table` = `project`. Tool galat → `GAGAL: <pesan tool apa
    adanya>`; selesai.
@@ -54,11 +55,12 @@ dengan sinkron plugin lain) hanya dibaca untuk field `mcp_server`.
 
 - **baru** → lanjut ke Fase 2 dengan draft kosong.
 - **perbarui** → tentukan artifact sasaran:
-  - `key` diketahui → `get_artifact` dengan `reference_table`, `reference_id`, dan `key`.
+  - `key` diketahui → `get_artifact` dengan `reference_table`, `reference_id`, dan `key`. Galat `document not
+    found` → tanyakan: *Buat artifact baru* · *Batal*.
   - Hanya judul atau deskripsi → `list_artifacts` dengan `reference_table`, `reference_id`, dan
-    `include_content` = `false`. Tepat satu yang cocok → `get_artifact` untuknya. Lebih dari satu →
-    `AskUserQuestion` (satu opsi per kandidat, label `key`, deskripsi judul). Nol → tanyakan: *Buat artifact
-    baru* · *Batal*.
+    `include_content` = `false`; cocokkan dengan `key` dan `metadata.title` tiap entri. Tepat satu yang cocok →
+    `get_artifact` untuknya. Lebih dari satu → `AskUserQuestion` (satu opsi per kandidat, label `key`,
+    deskripsi `metadata.title`). Nol → tanyakan: *Buat artifact baru* · *Batal*.
   - Tulis `content` balikan `get_artifact` apa adanya ke berkas draft (Fase 2 langkah 2), lalu pegang `key`-nya.
     Server, bukan draft lama di disk, selalu menjadi titik awal pembaruan.
 
@@ -82,22 +84,29 @@ dengan sinkron plugin lain) hanya dibaca untuk field `mcp_server`.
 
 ### Fase 4 — Terbit
 
-1. **Tabrakan key (mode `baru`).** `get_artifact` dengan `reference_table`, `reference_id`, dan `key`.
-   - Tidak ditemukan → lanjut.
-   - Ditemukan → `AskUserQuestion`: *Timpa artifact `<key>` (<judul lama>)* · *Pakai key `<key>-v2`* · *Batal*.
-     `-v2` → jalankan ulang Fase 3 dengan `--key <key>-v2` (naikkan angkanya bila masih bertabrakan). Batal →
-     status `DIBATALKAN`; selesai.
+1. **Tabrakan key (mode `baru`).** `get_document` dengan `reference_table`, `reference_id`, dan `key`. Pakai
+   `get_document`, bukan `get_artifact`: `upsert_artifact` menimpa dokumen **apa pun** ber-key sama di induk itu
+   dan mengubahnya jadi artifact, sedangkan `get_artifact` menjawab `document not found` untuk dokumen
+   non-artifact.
+   - Galat `document not found` → lanjut.
+   - Ditemukan dengan `type` = `artifact` dan `mimetype` = `text/html` → `AskUserQuestion`: *Timpa artifact
+     `<key>` (<metadata.title lama>)* · *Pakai key `<key>-v2`* · *Batal*.
+   - Ditemukan dengan `type`/`mimetype` lain → jangan tawarkan timpa. `AskUserQuestion`: *Pakai key
+     `<key>-v2`* · *Batal*, dengan keterangan bahwa key itu sudah dipakai dokumen `<type>`.
+   - `-v2` → jalankan ulang Fase 3 dengan `--key <key>-v2` lalu langkah ini lagi (naikkan angkanya bila masih
+     bertabrakan). Batal → status `DIBATALKAN`; selesai. Galat tool lain → `GAGAL: <pesan tool apa adanya>`.
 2. `upsert_artifact` dengan `reference_table` = `project`, `reference_id` = `id` project Fase 0, `key`,
    `content` = isi berkas draft apa adanya, `content_sha256`, dan `metadata` (teks JSON persis seperti tercetak).
-3. Tool menolak karena sha256 tidak cocok → baca ulang berkas draft dan kirim sekali lagi tanpa mengubah isinya.
-   Gagal lagi, atau galat lain → `GAGAL: <pesan tool apa adanya>`.
-4. Pegang `action` (`created`, `updated`, `unchanged`), `id`, dan URL render bila balikan memuatnya.
+3. Galat `content_sha256 does not match content` → baca ulang berkas draft dan kirim sekali lagi tanpa mengubah
+   isinya. Gagal lagi, atau galat lain → `GAGAL: <pesan tool apa adanya>`.
+4. Pegang `action` (`created`, `updated`, `unchanged`) dan `id` balikan. Balikan tidak memuat isi maupun URL.
 
 ## Larangan
 
 - Dilarang memakai `reference_table` selain `project` atau `reference_id` selain `id` dari `get_project_info`.
-- Dilarang memakai `upsert_document`/`create_document` untuk artifact, dan dilarang memanggil `delete_document`:
-  skill ini tidak pernah menghapus artifact.
+- Dilarang memakai `upsert_document`/`create_document`/`create_artifact` untuk artifact (`create_artifact` tidak
+  ber-key dan memangkas spasi isi sehingga sha256 berubah), dan dilarang memanggil `delete_document`: skill ini
+  tidak pernah menghapus artifact. `get_document` hanya untuk cek tabrakan key di Fase 4.
 - Dilarang menyunting `key`, `content_sha256`, atau `metadata` keluaran `check`, atau mengetik ulang isi HTML
   dari ingatan saat memanggil `upsert_artifact`.
 - Dilarang menyalin draft ke repo, menambah berkas ke `.gitignore`, atau meng-commit. Bila user ingin salinan
@@ -114,7 +123,7 @@ ARTIFACT: <key> · <title>
 STATUS: CREATED | UPDATED | UNCHANGED | DIBATALKAN | GAGAL: <sebab>
 PROJECT: <nama project> (<id project>)
 ID: <id artifact | ->
-BUKA: <URL render dari balikan tool | ->
+RENDER: GET /api/v1/documents/<id>/render (butuh header Authorization) | -
 UKURAN: <bytes> byte · sha256 <12 hex pertama>
 PERINGATAN: <sisa warnings | ->
 ```

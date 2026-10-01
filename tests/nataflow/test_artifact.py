@@ -106,11 +106,39 @@ def test_non_loading_links_are_not_relative_refs(tmp_path):
 def test_warnings_do_not_fail(tmp_path):
     html = GOOD.replace("@media (prefers-color-scheme: dark)", "@media print")
     html = html.replace(":root { --bg: #fff; --fg: #111; }", "body { margin: 0 }")
-    html = html.replace("</main>", "<script>localStorage.setItem('a', 1)</script></main>")
+    html = html.replace("</main>", '<a href="https://x.example" target="_blank">x</a>'
+                                   '<form action="/kirim"></form>'
+                                   "<script>if (window.confirm('ok?')) {}</script></main>")
     proc, out = _check(tmp_path, html)
     assert proc.returncode == 0 and out["status"] == "PASS"
     text = " ".join(out["warnings"])
-    assert "prefers-color-scheme" in text and ":root" in text and "try/catch" in text
+    for needle in ("prefers-color-scheme", ":root", "confirm", "_blank", "<form action>"):
+        assert needle in text, (needle, out["warnings"])
+
+
+@pytest.mark.parametrize("snippet,needle", [
+    ("<script>try { localStorage.setItem('a', 1) } catch (e) {}</script>", "localStorage"),
+    ("<script>sessionStorage.clear()</script>", "sessionStorage"),
+    ("<script>indexedDB.open('x')</script>", "indexedDB"),
+    ("<script>document . cookie = 'a=1'</script>", "document . cookie"),
+    ('<button onclick="localStorage.clear()">x</button>', "localStorage"),
+], ids=["local-walau-try", "session", "indexeddb", "cookie", "atribut-on"])
+def test_storage_fails_in_sandbox(tmp_path, snippet, needle):
+    proc, out = _check(tmp_path, GOOD.replace("</main>", snippet + "</main>"))
+    assert proc.returncode == 1
+    assert any(needle in p and "SecurityError" in p for p in out["problems"]), out["problems"]
+
+
+def test_storage_words_in_prose_pass(tmp_path):
+    html = GOOD.replace("<h1>Ringkasan</h1>", "<h1>Ringkasan</h1><p>localStorage dan alert() dibahas di sini.</p>")
+    proc, out = _check(tmp_path, html)
+    assert proc.returncode == 0 and out["warnings"] == [], out
+
+
+def test_dialog_regex_ignores_methods(tmp_path):
+    html = GOOD.replace("</main>", "<script>toast.alert('x'); customConfirm(1)</script></main>")
+    _, out = _check(tmp_path, html)
+    assert not any("confirm" in w for w in out["warnings"]), out["warnings"]
 
 
 @pytest.mark.parametrize("raw,needle", [
@@ -182,10 +210,18 @@ def test_skill_model_invocable():
 
 def test_skill_names_all_tools_and_project_parent():
     text = _skill()
-    for tool in ("get_project_info", "list_artifacts", "get_artifact", "upsert_artifact"):
+    for tool in ("get_project_info", "list_artifacts", "get_artifact", "upsert_artifact", "get_document"):
         assert tool in text, tool
     assert "`reference_table` = `project`" in text
     assert "content_sha256" in text
+
+
+def test_skill_collision_check_uses_get_document():
+    """upsert_artifact menimpa dokumen non-artifact ber-key sama; get_artifact tidak melihatnya."""
+    text = _skill()
+    fase4 = text.split("### Fase 4", 1)[1].split("## Larangan", 1)[0]
+    assert "`get_document` dengan `reference_table`, `reference_id`, dan `key`" in fase4
+    assert "jangan tawarkan timpa" in fase4
 
 
 def test_page_contract_hosts_match_script():
