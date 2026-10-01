@@ -1,6 +1,6 @@
 # Alur Plugin `frontend`
 
-> Plugin `frontend` (v0.12.0, `src/plugins/frontend/.claude-plugin/plugin.json`) menangani kerja frontend di beberapa stack: React + Vite SPA, React Native/Expo, SvelteKit, dan Svelte + Vite. Next.js sengaja tidak dilayani. Isinya sepuluh skill dan lima subagent yang membawa permintaan kerja lewat rantai dokumen: akar `TASK.md` → `FLOW.md`/`UI.md` → `CONTRACT.md` → brief → eksekusi → `REVIEW.md` → `REPORT.md`. Tiap gate dikunci persetujuan user yang dimateraikan skrip `chain.py`, dan tiap hal yang dapat dicek mesin divonis validator, bukan diingat model. Plugin ini dipakai di repo frontend yang terdeteksi hook `SessionStart`. Pintu masuknya selalu `/frontend:lead`. Hanya `lead`, `profile`, dan `review` yang muncul di menu `/`. Tujuh skill lainnya `user-invocable: false` dan dipanggil model lewat tool Skill (`README.md` § Ten Skills).
+> Plugin `frontend` (v0.12.1, `src/plugins/frontend/.claude-plugin/plugin.json`) menangani kerja frontend di beberapa stack: React + Vite SPA, React Native/Expo, SvelteKit, dan Svelte + Vite. Next.js sengaja tidak dilayani. Isinya sepuluh skill dan lima subagent yang membawa permintaan kerja lewat rantai dokumen: akar `TASK.md` → `FLOW.md`/`UI.md` → `CONTRACT.md` → brief → eksekusi → `REVIEW.md` → `REPORT.md`. Tiap gate dikunci persetujuan user yang dimateraikan skrip `chain.py`, dan tiap hal yang dapat dicek mesin divonis validator, bukan diingat model. Plugin ini dipakai di repo frontend yang terdeteksi hook `SessionStart`. Pintu masuknya selalu `/frontend:lead`. Hanya `lead`, `profile`, dan `review` yang muncul di menu `/`. Tujuh skill lainnya `user-invocable: false` dan dipanggil model lewat tool Skill (`README.md` § Ten Skills).
 
 ## Peta Komponen
 
@@ -666,6 +666,7 @@ stateDiagram-v2
   - Kalau terisi, `prompt` diisi kartu tiket apa adanya (H1 sampai akhir `## Lampiran`).
   - Prasyarat `task` check 8 (`ticket_source_verdict` di `precondition_lib.py`) menuntut tiket `status: READY` dan `elicitation: CLOSED`, serta terkunci. Tiket bersegel dicek lewat `approved_seal` yang cocok dengan isi. Tiket lama dicek dari commit terakhir bersubjek `docs(ticket): kunci TICKET <slug> READY` atau `docs(ticket): ref TICKET <slug>`. Suntingan sesudah kunci = DRIFT, dan tiket dikembalikan ke `analyst:spec`.
   - `AC-{n}`/`BR-{n}` kartu dirujuk sebagai `TAC-{n}`/`TBR-{n}` supaya tidak bertabrakan dengan `AC-{n}` CONTRACT. Tiap `TAC-{n}` wajib dipikul `SC-{n}` atau dicatat di `## Out of Scope` (misalnya "porsi backend"). `validate_task.py` check 7 menagihnya. `code-reviewer` tidak menerima test yang hanya menyebut `TAC-3` sebagai bukti `AC-3`.
+  - Tiket `type: TECH` (kartu teknis lead engineer) berangkat dari lane `REFACTOR_ARCH`, atau `FAST_FORWARD` bila kartu menuntut endpoint, DTO, atau query key baru. `D-{n}`/`C-{n}` dirujuk `TD-{n}`/`TC-{n}` dan dihitung disepakati; tiap `TC-{n}` dijaga SC atau dinyatakan di `## Out of Scope`.
 - **Dengan `backend`.**
   - `hooks/detect.py` dan `verify_scope.py` identik dengan milik backend.
   - Di repo fullstack, kedua hook menyala dan masing-masing menyuntik bloknya sendiri.

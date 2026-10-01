@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "analyst",
-      "description": "Skill dan subagent jembatan antara pengguna/stakeholder dan engineer: klasifikasi permintaan, elisitasi terarah dengan peminta non-engineer, dan penulisan TICKET.md non-teknis (user story, acceptance criteria, aturan bisnis) setara kartu Jira/Trello — dengan review independen dan persetujuan user. Tiket READY diserahkan ke backend:tech-lead / frontend:lead lewat parameter ticket_source",
+      "description": "Skill dan subagent jembatan antara pengguna/stakeholder dan engineer: klasifikasi permintaan, elisitasi terarah dengan peminta non-engineer, dan penulisan TICKET.md non-teknis (user story, acceptance criteria, aturan bisnis) setara kartu Jira/Trello — ditambah tiket teknis TECH dari lead engineer (refaktor, relasi data, arsitektur, kinerja, dependensi) berbukti file:baris yang mengunci kondisi target — dengan review independen dan persetujuan user. Tiket READY diserahkan ke backend:tech-lead / frontend:lead lewat parameter ticket_source",
       "source": "./src/plugins/analyst",
       "author": {
         "name": "Fakhrul Nugroho",

@@ -5,9 +5,9 @@ mulai dari tiket stakeholder sampai kode yang direview, ditambah kerja langsung 
 
 | Plugin | Versi | Fungsi | Titik masuk |
 |---|---|---|---|
-| [`analyst`](src/plugins/analyst/README.md) | 0.12.0 | Permintaan pengguna/stakeholder menjadi `TICKET.md` non-teknis (user story, acceptance criteria, aturan bisnis) lewat elisitasi, review independen, dan persetujuan | `/analyst:intake` |
-| [`backend`](src/plugins/backend/README.md) | 0.13.0 | Kerja backend 7 stack (Java Spring, Go, Node, Bun, Rust, PHP, CodeIgniter 4): profil, TASK/BRD/PRD/brief, eksekusi, review, dan laporan | `/backend:tech-lead` |
-| [`frontend`](src/plugins/frontend/README.md) | 0.12.0 | Kerja frontend (React + Vite, React Native/Expo, SvelteKit, Svelte + Vite): alur layar, bentuk layar, kontrak, brief, eksekusi, review, dan laporan dengan ledger approval | `/frontend:lead` |
+| [`analyst`](src/plugins/analyst/README.md) | 0.13.0 | Permintaan pengguna/stakeholder menjadi `TICKET.md` non-teknis (user story, acceptance criteria, aturan bisnis), atau perubahan struktur dari lead engineer menjadi tiket `TECH` berbukti `file:baris`, lewat elisitasi, review independen, dan persetujuan | `/analyst:intake` |
+| [`backend`](src/plugins/backend/README.md) | 0.13.1 | Kerja backend 7 stack (Java Spring, Go, Node, Bun, Rust, PHP, CodeIgniter 4): profil, TASK/BRD/PRD/brief, eksekusi, review, dan laporan | `/backend:tech-lead` |
+| [`frontend`](src/plugins/frontend/README.md) | 0.12.1 | Kerja frontend (React + Vite, React Native/Expo, SvelteKit, Svelte + Vite): alur layar, bentuk layar, kontrak, brief, eksekusi, review, dan laporan dengan ledger approval | `/frontend:lead` |
 | [`quickdev`](src/plugins/quickdev/README.md) | 0.8.0 | Alur ringan untuk stack apa pun: profil, explore, clarify, satu berkas rencana, execute, dan review, tanpa taskdir dan tanpa subagent | `/quickdev:profile`, `/quickdev:plan` |
 | [`nataflow`](src/plugins/nataflow/README.md) | 0.1.0 | Artifact nataflow: halaman HTML mandiri yang dinilai gerbang kontrak halaman lalu di-upsert ke project milik MCP key, tanpa berkas di repo | `/nataflow:create-artifact` |
 

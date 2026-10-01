@@ -3,7 +3,9 @@
 Plugin Claude Code yang menjadi jembatan antara **pengguna/stakeholder** dan **engineer**. Perannya gabungan
 business analyst, system analyst di level perilaku, dan product owner: menerima permintaan mentah, menggali
 faktanya lewat tanya-jawab dengan peminta non-engineer, lalu menerbitkan `TICKET.md` — kartu tiket non-teknis
-setara detail kartu Jira/Trello — yang siap diambil tim developer. `TICKET.md` adalah satu-satunya artefak
+setara detail kartu Jira/Trello — yang siap diambil tim developer. Untuk perubahan teknis dari lead engineer
+(refaktor, relasi data, arsitektur, kinerja, dependensi) ada tipe `TECH`: kartu teknis berbukti `file:baris`
+yang mengunci kondisi target sebelum dikerjakan (lihat **Tiket Teknis `TECH`**). `TICKET.md` adalah satu-satunya artefak
 yang disunting skill: catatan elisitasi tinggal di dalamnya sebagai seksi terakhir. `review.md` di sebelahnya
 adalah jejak vonis reviewer terakhir, hanya ditulis `ticket.py`.
 
@@ -39,7 +41,7 @@ kartu `PASS`/`BLOCKED` terhadap catatan elisitasi di berkas yang sama sebelum di
 ## Workflow
 
 ```
-permintaan ──► intake ──┬─► di luar wilayah (kerja teknis murni) ──► backend:tech-lead / frontend:lead
+permintaan ──► intake ──┬─► di luar wilayah (kerja teknis kecil) ─► backend:tech-lead / frontend:lead
                         ├─► status tiket ──────────────────────────► jawaban, berhenti
                         │
                         └─► elicit ─► ticket.py new ─► TICKET.md (kerangka + permintaan asli, elicitation: OPEN)
@@ -91,11 +93,33 @@ elicitation: OPEN → CLOSED     ← ticket.py new / close (analyst:elicit)
   bernomor, dan pertanyaan terbuka `Q-{n}` berlabel `MEMBLOKIR`/`TIDAK MEMBLOKIR` beserta siapa yang
   ditunggu. Pilar per tipe: `FEATURE`/`IMPROVEMENT` — Masalah, Aktor, Kondisi Saat Ini, Kondisi Diinginkan,
   Aturan Bisnis, Batas Cakupan, Urgensi (+ Kasus Khusus, Ukuran Keberhasilan); `BUG` — Langkah Reproduksi,
-  Yang Diharapkan, Yang Terjadi, Dampak, Urgensi (+ Lingkungan, Batas Cakupan). Selama elisitasi berjalan,
+  Yang Diharapkan, Yang Terjadi, Dampak, Urgensi (+ Lingkungan, Batas Cakupan); `TECH` — Masalah Teknis,
+  Kondisi Saat Ini, Kondisi Target, Batasan, Batas Cakupan, Urgensi (+ Keputusan, Rollout, Ukuran
+  Keberhasilan). Selama elisitasi berjalan,
   berkas hanya berisi H1 kerja dan seksi ini; `spec` menyisipkan kartu di atasnya tanpa menyentuhnya.
 
 Kerangka kanonik dan contoh terisi: `skills/elicit/templates/elicit-template.md` dan
 `skills/spec/templates/ticket-template.md`.
+
+## Tiket Teknis `TECH`
+
+Untuk perubahan struktur yang diminta lead engineer dan perlu disepakati sebelum dikerjakan. Kerja teknis
+kecil, stacktrace, dan pertanyaan letak kode tetap langsung ke gerbang engineer.
+
+- **Category** (`ticket.py new --category`, wajib): `REFACTOR`, `DATA_MODEL`, `ARCHITECTURE`, `PERFORMANCE`,
+  atau `DEPENDENCY`. Category menentukan apa yang wajib tergali dan dipikul AC (mis. `DATA_MODEL` → migrasi
+  naik-turun dan nasib data lama).
+- **Elisitasi ringkas** (`skills/elicit/references/elicitation-tech.md`): brief lead engineer dipetakan ke pilar,
+  tiap klaim kondisi sekarang dibuktikan di kode (kuota 8 `Read`/`Grep`/`Glob`) dan dicatat sebagai `path:baris`,
+  lalu hanya celahnya yang ditanyakan.
+- **Kartu**: Latar Belakang, Kondisi Saat Ini (berbukti `path:baris`), Kondisi Target (struktur akhir, bukan
+  langkah), Keputusan `D-{n}` (alasan + alternatif), Batasan `C-{n}`, Acceptance Criteria `AC-{n}` dengan
+  `— verifikasi:`, Dampak & Rollout, Di Luar Cakupan, Pertanyaan Terbuka, Lampiran.
+- **Penegakan**: validator memeriksa tiap `path:baris` ada di disk, tiap `C-{n}` dipikul AC, dan AC berbukti
+  verifikasi; pemindai kebocoran teknis tidak berlaku. `ticket-reviewer` membuka sendiri buktinya dan menolak
+  langkah implementasi di kartu.
+- **Satu repo**: tiket `TECH` tinggal dan diserahkan di repo yang diubah. Perubahan lintas repo menjadi satu tiket
+  per repo yang saling merujuk di `## Lampiran`.
 
 ## Penegakan Mekanis
 
@@ -172,6 +196,9 @@ Tiket `READY` diserahkan lewat parameter `ticket_source` = path `<ticketdir>/TIC
   tidak bertabrakan dengan `AC-{n}` PRD/CONTRACT dan `BR-{n}` BRD.
 - **Keterlacakan**: tiap `TAC-{n}` dipikul minimal satu `SC-{n}` di `TASK.md` engineer, atau tercatat di
   `## Out of Scope` beralasan (mis. porsi frontend). Validator `TASK.md` kedua plugin menagihnya.
+- **Tiket `TECH`**: `D-{n}`/`C-{n}` dirujuk `TD-{n}`/`TC-{n}` dan dihitung disepakati; BRD tidak dijadwalkan;
+  bukti `path:baris` kartu adalah titik awal yang dibuktikan ulang gerbang engineer. Hanya gerbang repo tempat
+  tiket tinggal yang menerimanya.
 - **Kesepakatan aturan**: aktor, kondisi, dan `TBR-{n}` yang tertulis di tiket dihitung sudah disetujui.
   `backend:analyst` tidak menjadwalkan BRD hanya karena fakta itu; bila BRD tetap terbit karena fakta di
   luar tiket, `business-analysis` menyerap `TBR-{n}` tanpa menanyakannya ulang (`— Asal: TBR-{m}`).
@@ -213,7 +240,7 @@ sinkron tidak meng-commit tiketnya (lihat Git), sehingga task inilah satu-satuny
   menjadi task baru karena ticketdir-nya berbeda.
 - **Isi**: judul = H1 kartu; deskripsi = kartu (H1 sampai akhir `## Lampiran`) tanpa catatan elisitasi;
   metadata `source`, `ticket_key`, `repo`, `slug`, `type`, `priority`, `approved`, `approved_seal`, `reopened`,
-  dan `external_ref` bila terisi (`repo` tidak ikut saringan pencarian, supaya task lama tetap ditemukan).
+  `category` (tiket `TECH`), dan `external_ref` bila terisi (`repo` tidak ikut saringan pencarian, supaya task lama tetap ditemukan).
   `review.md` (blok `## Ticket Review` terakhir) menempel ke task sebagai dokumen `ticket.review`. Catatan
   elisitasi dan `requester` tetap di disk.
 - **Pembatalan**: `/analyst:intake` ("batalkan tiket …") merutekan ke `analyst:spec`, yang menjalankan
@@ -230,10 +257,11 @@ sinkron tidak meng-commit tiketnya (lihat Git), sehingga task inilah satu-satuny
 | Kebutuhan | Pakai |
 |---|---|
 | Menulis tiket dari permintaan pengguna/stakeholder | `analyst` |
+| Mengunci perubahan struktur dari lead engineer sebelum dikerjakan | `analyst` (tipe `TECH`) |
 | Kontrak teknis, BRD/PRD berjangkar kode, brief implementasi | `backend` |
 | Alur layar, bentuk layar, kontrak layer frontend | `frontend` |
 | Perubahan kecil–menengah dengan satu berkas rencana (`plan/<task>.md`), tanpa taskdir | `quickdev` |
-| Refaktor, upgrade pustaka, stacktrace dari developer | gerbang engineer, bukan `analyst` |
+| Refaktor kecil, stacktrace dari developer, pertanyaan letak kode | gerbang engineer, bukan `analyst` |
 
 ## Sengaja Belum Ada
 
