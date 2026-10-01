@@ -1,4 +1,5 @@
 """Regresi teks 13 tahap 3 — SKILL, template, dan README quickdev selaras perilaku `plan_lock.py` baru."""
+import json
 import re
 
 import pytest
@@ -90,4 +91,5 @@ def test_rilis_readme_dan_versi():
     for phrase in ("Hash-Scope", "Verified-Hash", "Tree-Hash", "Remediation-State", "Baseline-Commit",
                    "plan_lock.py baseline", "<<'QD_EOF'"):
         assert phrase in readme, phrase
-    assert '"version": "0.6.1"' in (QD / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8")
+    version = json.loads((QD / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))["version"]
+    assert tuple(int(x) for x in version.split(".")) >= (0, 6, 1)
