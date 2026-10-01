@@ -232,7 +232,7 @@ def test_t7_contoh_tech_kedua_template_lolos_validator_dan_gerbang_spec(make_rep
     fm, body = elicit.split("\n---\n", 1)
     card = _example_tech(SKILLS / "spec" / "templates" / "ticket-template.md").split("## Catatan Elisitasi")[0]
     notes = body[body.index("## Catatan Elisitasi"):]
-    text = fm.replace("priority: -", "priority: HIGH") + "\n---\n\n" + card + notes
+    text = fm.replace("priority: -", "priority: MEDIUM") + "\n---\n\n" + card + notes
     root = make_repo({f"{TDIR}/TICKET.md": text, **CODE})
     git(root, "add", "-A")
     git(root, "commit", "-qm", "docs(ticket): contoh")

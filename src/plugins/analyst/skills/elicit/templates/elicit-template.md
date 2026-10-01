@@ -210,8 +210,8 @@ revision: 0
 review: -
 review_round: 0
 request_hash: e0670009f586
-elicit_hash: 1b9b84564372
-elicit_log: 2
+elicit_hash: e200a21aa9e2
+elicit_log: 3
 ---
 
 # Relasi project dan workspace
@@ -247,7 +247,7 @@ Fitur berbagi project kuartal depan bergantung pada relasi ini.
 Tabel penghubung dipilih karena FK dan indeks tetap ditegakkan database; kolom array `workspace_ids` ditolak karena tanpa FK.
 
 #### Rollout
-Dua rilis: tambah tabel beserta backfill dan ubah repository, lalu hapus kolom lama di rilis berikutnya.
+Dua rilis: tambah tabel beserta backfill dan ubah repository, lalu hapus kolom lama di rilis berikutnya. Migrasi turun hanya sah selama rilis 1, sebelum fitur berbagi dibuka.
 
 #### Ukuran Keberhasilan
 Tidak dibahas — acceptance criteria sudah memuat alat ukurnya.
@@ -258,6 +258,7 @@ Tidak dibahas — acceptance criteria sudah memuat alat ukurnya.
 |---|---|---|---|---|
 | 1 | 2026-10-01 | Data lama: tiap project dipindah ke tabel penghubung dengan workspace sekarang? | Ya, backfill satu baris per project | Budi (Lead Engineer) |
 | 2 | 2026-10-01 | Kolom lama dihapus di rilis yang sama atau berikutnya? | Berikutnya, supaya bisa mundur | Budi (Lead Engineer) |
+| 3 | 2026-10-01 | Bila migrasi turun sesudah ada project bertaut ke dua workspace, tautan mana yang dipertahankan? | Migrasi turun hanya sah selama rilis 1, sebelum fitur berbagi dibuka; saat itu tiap project masih satu tautan | Budi (Lead Engineer) |
 
 ### Pertanyaan Terbuka
 

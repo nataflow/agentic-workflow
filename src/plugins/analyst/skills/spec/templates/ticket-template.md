@@ -213,7 +213,7 @@ Pembanding judul yang **gugur**: `Admin Finance dapat mencatat pembayaran invoic
 
 ## 4. Contoh Terisi `TECH` — `relasi-project-workspace` (tidak tersalin ke artefak)
 
-Lanjutan contoh bagian 4 `elicit-template.md`: `priority: -` menjadi `priority: HIGH`, H1 kerja diganti judul final, dan kartu disisipkan di atas catatan elisitasi yang tidak berubah.
+Lanjutan contoh bagian 4 `elicit-template.md`: `priority: -` menjadi `priority: MEDIUM` (tenggat kuartal depan), H1 kerja diganti judul final, dan kartu disisipkan di atas catatan elisitasi yang tidak berubah.
 
 ````markdown
 # Pisahkan relasi project dan workspace menjadi many-to-many
@@ -251,14 +251,14 @@ CREATE TABLE project_workspaces (
 ## Acceptance Criteria
 
 - **AC-1**: Satu project dapat ditautkan ke dua workspace dan muncul di daftar keduanya — verifikasi: test repository `TestProjectRepo_ListByWorkspace`
-- **AC-2**: Respons daftar project identik sebelum dan sesudah migrasi (C-1) — verifikasi: snapshot test handler daftar project
+- **AC-2**: Respons daftar project di REST dan MCP identik sebelum dan sesudah migrasi (C-1) — verifikasi: snapshot test handler REST dan tool MCP daftar project
 - **AC-3**: Tiap project lama tertaut ke workspace asalnya sesudah migrasi naik (C-2) — verifikasi: hitung baris `project_workspaces` = jumlah project pada data seed
-- **AC-4**: Migrasi turun mengembalikan `workspace_id` tiap project (C-2) — verifikasi: migrasi naik lalu turun satu langkah atas data seed, bandingkan isi `projects`
+- **AC-4**: Selama rilis 1, migrasi turun mengembalikan `workspace_id` tiap project tanpa kehilangan data (C-2) — verifikasi: migrasi naik lalu turun satu langkah atas data seed, bandingkan isi `projects`
 
 ## Dampak & Rollout
 
 - Backend saja; frontend tidak berubah karena C-1.
-- Rilis 1: tabel penghubung beserta backfill dan repository baru. Rilis 2: hapus kolom lama. Jalan mundur rilis 1: migrasi turun.
+- Rilis 1: tabel penghubung beserta backfill dan repository baru. Rilis 2: hapus kolom lama. Jalan mundur hanya selama rilis 1, sebelum fitur berbagi dibuka: migrasi turun.
 
 ## Di Luar Cakupan
 

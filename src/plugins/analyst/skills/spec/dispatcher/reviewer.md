@@ -11,13 +11,14 @@ Review satu draft TICKET.md analyst.
 
 - Ticketdir: `{ticketdir}` — kartu `TICKET.md` berstatus `DRAFT`; `## Catatan Elisitasi` (`elicitation: CLOSED`)
   di berkas yang sama adalah sumber kebenarannya.
-- Tipe: `{type}`
+- Tipe: `{type}` · kategori `{category}` (`TECH` → nilai dengan rubrik bagian *Tiket `TECH`* definisi agent-mu)
 - Ronde: `{round}` dari plafon 2 per revisi.
 - Ronde 2 saja: vonis sebelumnya `{previous_verdict}`, seksi yang berubah `{changed_sections}`.
 - Sidik konten yang kamu nilai: `{sidik}` — salin apa adanya ke baris `- Sidik:` balikanmu; dilarang menghitung
   atau mengubahnya.
 - Sudah Dijamin: `validate_doc.py --kind ticket` `PASS` — struktur, penomoran AC/BR, keterpikulan BR
-  oleh AC, placeholder, dan kebocoran teknis leksikal. Dilarang menghitung ulang.
+  oleh AC, placeholder, dan kebocoran teknis leksikal (`TECH`: penomoran AC/D/C, keterpikulan C oleh AC,
+  dan keberadaan tiap `path:baris` di disk). Dilarang menghitung ulang.
 - Larangan: read-only; dilarang menulis `status: READY`, menulis ulang tiket, menilai kelayakan teknis,
   atau bertanya ke user.
 - Balikan: blok `## Ticket Review` sesuai definisi agent-mu, tanpa teks lain.
@@ -29,6 +30,7 @@ Review satu draft TICKET.md analyst.
 | --- | --- | --- |
 | `{ticketdir}` | `<root>/<ticketdir>` (`root` dari baris `Terselesaikan:` `check --gate spec`) | **[REQUIRED]** Path absolut |
 | `{type}` | `Terselesaikan: type=` keluaran `ticket.py check --gate spec` | **[REQUIRED]** Dari frontmatter `TICKET.md`, bukan diketik ulang |
+| `{category}` | Frontmatter `category` `TICKET.md` | **[REQUIRED]** `TECH` saja; `-` untuk tipe lain |
 | `{round}` | `Terselesaikan: ronde=` keluaran `ticket.py check --gate spec` | **[REQUIRED]** `1` atau `2`; `habis` → dilarang dispatch. `ticket.py review` menolak blok yang `- Ronde:`-nya berbeda |
 | `{previous_verdict}` | Isi berkas `review_report` dari `check --gate spec` (blok `## Ticket Review` ronde 1) | **[OPTIONAL]** Hanya ronde 2; `-` di ronde 1 |
 | `{changed_sections}` | Heading `##` yang berubah sejak ronde 1 | **[OPTIONAL]** Hanya ronde 2; `-` di ronde 1 |
