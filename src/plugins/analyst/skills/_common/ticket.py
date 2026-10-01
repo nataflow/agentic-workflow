@@ -48,6 +48,7 @@ from typing import Any, Dict, List
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from analyst_lib import (  # noqa: E402
+    CATEGORIES,
     ELICIT_H2,
     SLUG_RE,
     SYNC_CONFIG,
@@ -299,6 +300,12 @@ def cmd_new(root: Path, args: argparse.Namespace) -> int:
     if not SLUG_RE.match(args.slug) or len(args.slug) > 40:
         print(f"NEW FAIL: slug `{args.slug}` bukan kebab-case ≤40 karakter")
         return 1
+    if args.type == "TECH" and args.category not in CATEGORIES:
+        print(f"NEW FAIL: tiket TECH wajib `--category {'|'.join(CATEGORIES)}` (analyst:intake Phase 3)")
+        return 1
+    if args.type != "TECH" and args.category:
+        print(f"NEW FAIL: `--category` hanya untuk tiket TECH, bukan {args.type}")
+        return 1
     request = sys.stdin.read() if args.request == "-" else args.request
     if not request.strip():
         print("NEW FAIL: --request kosong — minta user menempelkan permintaan atau keluhan aslinya")
@@ -322,7 +329,8 @@ def cmd_new(root: Path, args: argparse.Namespace) -> int:
         print(f"NEW FAIL: {rel} sudah ada (slug sama dalam menit yang sama) — tunggu satu menit atau pilih slug lain")
         return 1
     title = " ".join(args.title.split()) or args.slug.replace("-", " ").capitalize()
-    text = ticket_skeleton(args.type, args.slug, args.requester, dt.date.today().isoformat(), title, request)
+    text = ticket_skeleton(args.type, args.slug, args.requester, dt.date.today().isoformat(), title, request,
+                           args.category)
     (root / rel).mkdir(parents=True, exist_ok=True)
     (root / rel / TICKET_FILE).write_text(text, encoding="utf-8")
     notes = _ignore_tickets(root)
@@ -330,6 +338,7 @@ def cmd_new(root: Path, args: argparse.Namespace) -> int:
     if mode == "diabaikan" and not sync_configured(root):
         notes += " · PERINGATAN: ticketdir diabaikan git tanpa sinkron nataflow — tiket hanya ada di disk ini"
     print(f"NEW PASS: {rel} · root={root} · git={mode} · type={args.type}"
+          + (f" · category={args.category}" if args.category else "")
           + (" · ticketdir KOSONG dipakai ulang" if reuse else "") + notes)
     return 0
 
@@ -853,6 +862,8 @@ def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:
                 # READY menjamin `approved_seal` tertulis = segel isi sekarang; tiket lama tanpa field itu
                 # mendapat nilai yang sama dari isinya.
                 approved_seal=ticket_seal(text), reopened=int(reopened))
+    if str(fm.get("category", "")).strip():
+        meta["category"] = str(fm["category"]).strip()
     ref = str(fm.get("external_ref", "-")).strip()
     if ref and ref != "-":
         meta["external_ref"] = ref
@@ -891,6 +902,7 @@ def main() -> None:
     s = sub.add_parser("new")
     s.add_argument("--slug", required=True)
     s.add_argument("--type", required=True, type=str.upper, choices=TYPES)
+    s.add_argument("--category", default="", type=str.upper, help=f"wajib untuk TECH: {'|'.join(CATEGORIES)}")
     s.add_argument("--requester", required=True, help="nama atau peran peminta")
     s.add_argument("--request", required=True, help="permintaan asli apa adanya, atau `-` untuk stdin")
     s.add_argument("--title", default="", help="judul kerja H1; default dari slug")

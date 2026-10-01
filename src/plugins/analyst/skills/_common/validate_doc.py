@@ -5,7 +5,8 @@
 bentuk catatan dan, bila `elicitation: CLOSED`, kelengkapan pilar wajib, nol
 pertanyaan memblokir, nol baris `Asumsi:`, dan jejak tiap `domain_terms`. `--kind ticket` memvonis kartu di atasnya: bentuk
 tiket, penomoran AC/BR, keterpikulan tiap `BR-{n}` oleh AC, nol placeholder,
-dan nol kebocoran teknis. Rumah kanonik aturannya bagian 2
+dan nol kebocoran teknis — atau, untuk tiket `TECH`, bukti `file:baris` yang benar-benar ada di
+repo, AC berbukti `verifikasi:`, dan keterpikulan tiap `C-{n}`. Rumah kanonik aturannya bagian 2
 `skills/elicit/templates/elicit-template.md` dan
 `skills/spec/templates/ticket-template.md`; penilaian semantik tetap milik
 penulis dan `ticket-reviewer`.
@@ -21,6 +22,7 @@ from typing import List
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from analyst_lib import (  # noqa: E402
+    CATEGORIES,
     ELICIT_H2,
     LOG_ROW,
     PILLARS_OPTIONAL,
@@ -37,6 +39,7 @@ from analyst_lib import (  # noqa: E402
     duplicate_headings,
     find_root,
     format_report,
+    h1_lines,
     meaningful,
     normalize_ticketdir,
     report_json,
@@ -56,6 +59,8 @@ CARD_H2 = {
             "Di Luar Cakupan", "Pertanyaan Terbuka", "Lampiran"),
 }
 CARD_H2["IMPROVEMENT"] = CARD_H2["FEATURE"]
+CARD_H2["TECH"] = ("Latar Belakang", "Kondisi Saat Ini", "Kondisi Target", "Keputusan", "Batasan",
+                   "Acceptance Criteria", "Dampak & Rollout", "Di Luar Cakupan", "Pertanyaan Terbuka", "Lampiran")
 NONE_LINE = "- Tidak ada."
 SKIPPED = re.compile(r"^Tidak dibahas — .+")
 ELICIT_Q = re.compile(r"^- \*\*Q-(\d+)\*\* \[(MEMBLOKIR|TIDAK MEMBLOKIR)\]: .+ — menunggu: .+$")
@@ -72,6 +77,15 @@ ASSUMPTION = re.compile(r"(?:^|[\s(\[>*_])\**Asumsi\**\s*:", re.IGNORECASE)
 CONFIRMED = re.compile(r"^\s*ya\b", re.IGNORECASE)          # kolom jawaban baris konfirmasi istilah domain
 QUOTED = re.compile(r'"([^"\n]+)"|“([^”\n]+)”')
 BUG_FIELDS = ("**Langkah reproduksi**:", "**Yang diharapkan**:", "**Yang terjadi**:", "**Dampak**:")
+# Kartu `TECH` (17): AC berbukti cara verifikasi, keputusan bertimbangan, batasan dipikul AC, bukti `file:baris`.
+TECH_AC = re.compile(r"^(.+) — verifikasi: (.+)$")
+D_LINE = re.compile(r"^- \*\*D-(\d+)\*\*: .+ — alasan: .+ — alternatif: .+$")
+D_NONE = re.compile(r"^- Tidak ada keputusan baru — .+")
+C_LINE = re.compile(r"^- \*\*C-(\d+)\*\*: .+")
+C_NONE = re.compile(r"^- Tidak ada batasan khusus — .+")
+C_TOKEN = re.compile(r"\bC-(\d+)\b")
+EVIDENCE = re.compile(r"`([^`\s:]+):(\d+)(?:-(\d+))?`")
+CODE_SPAN = re.compile(r"`[^`\n]*`")
 
 
 class DocValidator(Checker):
@@ -112,6 +126,11 @@ class DocValidator(Checker):
             errors.append(f"elicitation `{self.fm.get('elicitation', '')}` bukan OPEN|CLOSED")
         if self.fm.get("type") not in TYPES:
             errors.append(f"type `{self.fm.get('type', '')}` bukan {'|'.join(TYPES)}")
+        category = self.fm.get("category")
+        if self.fm.get("type") == "TECH" and category not in CATEGORIES:
+            errors.append(f"category `{category or ''}` bukan {'|'.join(CATEGORIES)} (wajib untuk TECH)")
+        elif self.fm.get("type") != "TECH" and category is not None:
+            errors.append("category hanya untuk tiket TECH")
         slug = self.rel.rsplit("/", 1)[-1].split("-", 1)[-1]
         if self.fm.get("slug") != slug:
             errors.append(f"slug `{self.fm.get('slug', '')}` ≠ slug ticketdir `{slug}`")
@@ -121,9 +140,21 @@ class DocValidator(Checker):
             errors.append("requester kosong")
         return errors
 
-    def _placeholder(self, cid: int, parts: dict, skip: tuple) -> None:
-        """Placeholder di luar seksi kutipan mentah; autolink `<https://…>` dan `<nama@…>` bukan slot."""
-        text = "\n".join(l for h, lines in parts.items() if h not in skip for l in lines)
+    def _placeholder(self, cid: int, parts: dict, skip: tuple, code: bool = False) -> None:
+        """Placeholder di luar seksi kutipan mentah; autolink `<https://…>` dan `<nama@…>` bukan slot.
+
+        `code` (kartu `TECH`): blok dan span kode dilewati — `List<String>` di sana tipe, bukan slot.
+        """
+        lines, fence = [], False
+        for h, body in parts.items():
+            if h in skip:
+                continue
+            for line in body:
+                if code and line.startswith("```"):
+                    fence = not fence
+                elif not (code and fence):
+                    lines.append(CODE_SPAN.sub(" ", line) if code else line)
+        text = "\n".join(lines)
         hits = sorted({h for h in PLACEHOLDER.findall(text) if "@" not in h and not h.startswith("<http")})
         self.add(cid, "Nol placeholder", not hits, "lolos" if not hits else ", ".join(hits[:5]),
                  "Ganti tiap `<...>`, TBD, TODO dengan isi final.")
@@ -136,7 +167,7 @@ class DocValidator(Checker):
         closed = self.fm.get("elicitation") == "CLOSED"
         typ = self.fm.get("type", "FEATURE") if self.fm.get("type") in TYPES else "FEATURE"
 
-        h1 = [l for l in self.body.splitlines() if l.startswith("# ")]
+        h1 = h1_lines(self.body)
         self.h3 = sections("\n".join(self.h2.get(ELICIT_H2, [])), 3)
         errors = []
         if len(h1) != 1:
@@ -234,7 +265,7 @@ class DocValidator(Checker):
                  "; ".join(errors) or (f"{len(ids)} terbuka, {blocking} memblokir" if ids else "nihil"),
                  "`- **Q-n** [MEMBLOKIR|TIDAK MEMBLOKIR]: <tanya> — menunggu: <siapa>`, atau `- Tidak ada.`")
 
-        self._placeholder(7, self.h3, ("Permintaan Asli", "Log Tanya-Jawab"))
+        self._placeholder(7, self.h3, ("Permintaan Asli", "Log Tanya-Jawab"), code=typ == "TECH")
 
         terms = self.fm.get("domain_terms", [])
         self.add(8, "domain_terms", isinstance(terms, list), f"{len(terms) if isinstance(terms, list) else '-'} istilah",
@@ -273,7 +304,7 @@ class DocValidator(Checker):
                  "Ikuti bagian 1 elicit-template.md dan field kartu ticket-template.md.")
         typ = self.fm.get("type") if self.fm.get("type") in TYPES else "FEATURE"
 
-        h1 = [l for l in self.body.splitlines() if l.startswith("# ")]
+        h1 = h1_lines(self.body)
         expected = CARD_H2[typ] + (ELICIT_H2,)
         errors = []
         if len(h1) != 1:
@@ -286,9 +317,68 @@ class DocValidator(Checker):
         if dup:
             errors.append("heading ganda (isi yang pertama tertimpa): " + ", ".join(dup))
         self.add(2, "Struktur", not errors, "; ".join(errors) or "lolos",
-                 f"Satu H1, tujuh H2 kartu persis urutan template tipe {typ} (tiap heading sekali), lalu "
+                 f"Satu H1, {len(CARD_H2[typ])} H2 kartu persis urutan template tipe {typ} (tiap heading sekali), lalu "
                  f"`## {ELICIT_H2}` tanpa disentuh.")
 
+        if typ == "TECH":
+            self._tech_card()
+        else:
+            self._business_card(typ)
+
+        oos = meaningful(self.h2.get("Di Luar Cakupan", []))
+        ok = bool(oos) and all(OOS_LINE.match(l.strip()) for l in oos)
+        self.add(6, "Di luar cakupan bersuara", ok, f"{len(oos)} butir",
+                 "Minimal satu `- <yang tidak dikerjakan> — <alasan>`.")
+
+        qs = meaningful(self.h2.get("Pertanyaan Terbuka", []))
+        ok = qs == [NONE_LINE] or (bool(qs) and all(TICKET_Q.match(q.strip()) for q in qs))
+        ok = ok and "MEMBLOKIR" not in "\n".join(qs)
+        attach = meaningful(self.h2.get("Lampiran", []))
+        ok = ok and bool(attach) and all(l.strip().startswith("- ") for l in attach)
+        self.add(7, "Pertanyaan terbuka & lampiran", ok,
+                 f"{0 if qs == [NONE_LINE] else len(qs)} pertanyaan, {len(attach)} baris lampiran",
+                 "Pertanyaan `- **Q-n**: <tanya> — asumsi: <asumsi>` (non-blocking saja) atau `- Tidak ada.`; "
+                 "Lampiran berupa butir daftar (tautan atau nama dokumen) atau `- Tidak ada.`")
+
+        self._placeholder(8, self.h2, ("Lampiran", ELICIT_H2), code=typ == "TECH")
+
+        if typ == "TECH":
+            self._evidence(9)
+        else:
+            self._leaks(9)
+
+        # G6: tiap `Q-{n}` TIDAK MEMBLOKIR catatan dibawa kartu beserta asumsinya, dan kartu tidak
+        # mengarang pertanyaan yang tidak ada di catatan.
+        notes_q = sections("\n".join(self.h2.get(ELICIT_H2, [])), 3).get("Pertanyaan Terbuka", [])
+        open_q, all_q = set(), set()
+        for line in meaningful(notes_q):
+            m = ELICIT_Q.match(line.strip())
+            if m:
+                all_q.add(int(m.group(1)))
+                if m.group(2) == "TIDAK MEMBLOKIR":
+                    open_q.add(int(m.group(1)))
+        card_q = {int(m.group(1)) for m in (TICKET_Q.match(q.strip()) for q in qs) if m}
+        lost, ghost = sorted(open_q - card_q), sorted(card_q - all_q)
+        errors = ([f"Q TIDAK MEMBLOKIR catatan tanpa jejak di kartu: {', '.join(f'Q-{n}' for n in lost)}"]
+                  if lost else [])
+        if ghost:
+            errors.append(f"Q kartu tanpa asal di catatan: {', '.join(f'Q-{n}' for n in ghost)}")
+        self.add(10, "Pertanyaan terbuka terbawa", not errors,
+                 "; ".join(errors) or f"{len(card_q)} Q, sama dengan catatan",
+                 "Salin tiap `Q-{n}` TIDAK MEMBLOKIR dari `### Pertanyaan Terbuka` catatan ke `## Pertanyaan "
+                 "Terbuka` kartu dengan ID yang sama beserta asumsinya; Q yang sudah terjawab hapus dari kartu.")
+
+        if self.fm.get("status") == "READY":
+            current = content_hash(self.text)
+            sealed = str(self.fm.get("approved_hash", ""))
+            seal = str(self.fm.get("approved_seal", "-") or "-")
+            seal_ok = seal == "-" or seal == ticket_seal(self.text)   # `-`: tiket sebelum 09 E8
+            self.add(11, "Konten = yang disetujui", sealed == current and seal_ok,
+                     f"approved_hash {sealed or '-'} · konten {current} · segel {'cocok' if seal_ok else 'BERBEDA'}",
+                     "Tiket READY disunting sesudah disetujui: `ticket.py reopen`, atau pulihkan isinya.")
+
+    def _business_card(self, typ: str) -> None:
+        """Check 3–5 kartu `FEATURE`/`IMPROVEMENT`/`BUG`: cerita atau laporan, AC Given/When/Then, BR terpikul."""
         background = meaningful(self.h2.get("Latar Belakang", []))
         if typ == "BUG":
             report = "\n".join(self.h2.get("Laporan Bug", []))
@@ -345,62 +435,105 @@ class DocValidator(Checker):
                  "`- **BR-n**: <aturan>` bernomor urut dan disebut minimal satu AC, atau "
                  "`- Tidak ada aturan khusus — <alasan>`.")
 
-        oos = meaningful(self.h2.get("Di Luar Cakupan", []))
-        ok = bool(oos) and all(OOS_LINE.match(l.strip()) for l in oos)
-        self.add(6, "Di luar cakupan bersuara", ok, f"{len(oos)} butir",
-                 "Minimal satu `- <yang tidak dikerjakan> — <alasan>`.")
-
-        qs = meaningful(self.h2.get("Pertanyaan Terbuka", []))
-        ok = qs == [NONE_LINE] or (bool(qs) and all(TICKET_Q.match(q.strip()) for q in qs))
-        ok = ok and "MEMBLOKIR" not in "\n".join(qs)
-        attach = meaningful(self.h2.get("Lampiran", []))
-        ok = ok and bool(attach) and all(l.strip().startswith("- ") for l in attach)
-        self.add(7, "Pertanyaan terbuka & lampiran", ok,
-                 f"{0 if qs == [NONE_LINE] else len(qs)} pertanyaan, {len(attach)} baris lampiran",
-                 "Pertanyaan `- **Q-n**: <tanya> — asumsi: <asumsi>` (non-blocking saja) atau `- Tidak ada.`; "
-                 "Lampiran berupa butir daftar (tautan atau nama dokumen) atau `- Tidak ada.`")
-
-        self._placeholder(8, self.h2, ("Lampiran", ELICIT_H2))
-
+    def _leaks(self, cid: int) -> None:
         terms = self.fm.get("domain_terms", [])
         terms = terms if isinstance(terms, list) else [terms]
         leaks = scan_leaks(self.body, terms, skip_sections=("Lampiran", ELICIT_H2),
                            line_offset=body_offset(self.text, self.body))
-        self.add(9, "Nol kebocoran teknis", not leaks,
+        self.add(cid, "Nol kebocoran teknis", not leaks,
                  "lolos" if not leaks else "; ".join(leaks[:6]) + (f" (+{len(leaks) - 6})" if len(leaks) > 6 else ""),
                  "Tulis ulang dalam bahasa perilaku yang dilihat pengguna; kutip teks layar dalam "
                  "tanda kutip; istilah yang memang kosakata produk dicatat analyst:elicit di "
                  "`domain_terms` lebih dulu.")
 
-        # G6: tiap `Q-{n}` TIDAK MEMBLOKIR catatan dibawa kartu beserta asumsinya, dan kartu tidak
-        # mengarang pertanyaan yang tidak ada di catatan.
-        notes_q = sections("\n".join(self.h2.get(ELICIT_H2, [])), 3).get("Pertanyaan Terbuka", [])
-        open_q, all_q = set(), set()
-        for line in meaningful(notes_q):
-            m = ELICIT_Q.match(line.strip())
-            if m:
-                all_q.add(int(m.group(1)))
-                if m.group(2) == "TIDAK MEMBLOKIR":
-                    open_q.add(int(m.group(1)))
-        card_q = {int(m.group(1)) for m in (TICKET_Q.match(q.strip()) for q in qs) if m}
-        lost, ghost = sorted(open_q - card_q), sorted(card_q - all_q)
-        errors = ([f"Q TIDAK MEMBLOKIR catatan tanpa jejak di kartu: {', '.join(f'Q-{n}' for n in lost)}"]
-                  if lost else [])
-        if ghost:
-            errors.append(f"Q kartu tanpa asal di catatan: {', '.join(f'Q-{n}' for n in ghost)}")
-        self.add(10, "Pertanyaan terbuka terbawa", not errors,
-                 "; ".join(errors) or f"{len(card_q)} Q, sama dengan catatan",
-                 "Salin tiap `Q-{n}` TIDAK MEMBLOKIR dari `### Pertanyaan Terbuka` catatan ke `## Pertanyaan "
-                 "Terbuka` kartu dengan ID yang sama beserta asumsinya; Q yang sudah terjawab hapus dari kartu.")
+    def _tech_card(self) -> None:
+        """Check 3–5 kartu `TECH`: isi teknis, AC berbukti `verifikasi:`, keputusan bertimbangan, batasan terpikul."""
+        empty = [h for h in ("Latar Belakang", "Kondisi Target", "Dampak & Rollout")
+                 if not meaningful(self.h2.get(h, []))]
+        self.add(3, "Latar belakang, kondisi target & rollout", not empty,
+                 "kosong: " + ", ".join(empty) if empty else "lolos",
+                 "Isi `## Latar Belakang` (masalah teknis dan dampaknya), `## Kondisi Target` (struktur akhir), dan "
+                 "`## Dampak & Rollout` (urutan, migrasi data, rollback).")
 
-        if self.fm.get("status") == "READY":
-            current = content_hash(self.text)
-            sealed = str(self.fm.get("approved_hash", ""))
-            seal = str(self.fm.get("approved_seal", "-") or "-")
-            seal_ok = seal == "-" or seal == ticket_seal(self.text)   # `-`: tiket sebelum 09 E8
-            self.add(11, "Konten = yang disetujui", sealed == current and seal_ok,
-                     f"approved_hash {sealed or '-'} · konten {current} · segel {'cocok' if seal_ok else 'BERBEDA'}",
-                     "Tiket READY disunting sesudah disetujui: `ticket.py reopen`, atau pulihkan isinya.")
+        acs = meaningful(self.h2.get("Acceptance Criteria", []))
+        nums, bad, cited = [], [], set()
+        for line in acs:
+            m = AC_LINE.match(line.strip())
+            v = TECH_AC.match(m.group(2)) if m else None
+            if not v:
+                bad.append(line.strip()[:50])
+                continue
+            nums.append(int(m.group(1)))
+            cited.update(int(n) for n in C_TOKEN.findall(v.group(1)))
+        ok = not bad and 1 <= len(nums) <= 10 and nums == list(range(1, len(nums) + 1))
+        self.add(4, "Acceptance Criteria", ok,
+                 f"{len(nums)} AC" + (f"; {len(bad)} baris tanpa `— verifikasi:`" if bad else "")
+                 + ("" if nums == list(range(1, len(nums) + 1)) else f"; nomor {nums} tidak urut"),
+                 "1–10 baris `- **AC-n**: <pernyataan teknis> — verifikasi: <perintah, test, atau pemeriksaan>` "
+                 "bernomor urut dari AC-1.")
+
+        errors = []
+        ds = meaningful(self.h2.get("Keputusan", []))
+        if not (len(ds) == 1 and D_NONE.match(ds[0].strip())):
+            d_ids = [int(m.group(1)) for m in (D_LINE.match(l.strip()) for l in ds) if m]
+            if len(d_ids) != len(ds) or not ds:
+                errors.append("baris keputusan rusak (wajib `— alasan: … — alternatif: …`) atau seksi kosong")
+            if d_ids != list(range(1, len(d_ids) + 1)):
+                errors.append(f"nomor D {d_ids} tidak urut dari 1")
+        cs = meaningful(self.h2.get("Batasan", []))
+        if len(cs) == 1 and C_NONE.match(cs[0].strip()):
+            c_ids: List[int] = []
+        else:
+            c_ids = [int(m.group(1)) for m in (C_LINE.match(l.strip()) for l in cs) if m]
+            if len(c_ids) != len(cs) or not cs:
+                errors.append("baris batasan rusak atau seksi kosong")
+            if c_ids != list(range(1, len(c_ids) + 1)):
+                errors.append(f"nomor C {c_ids} tidak urut dari 1")
+        orphan, ghost = sorted(set(c_ids) - cited), sorted(cited - set(c_ids))
+        if orphan:
+            errors.append("C tanpa AC pemikul: " + ", ".join(f"C-{n}" for n in orphan))
+        if ghost:
+            errors.append("AC merujuk C hantu: " + ", ".join(f"C-{n}" for n in ghost))
+        self.add(5, "Keputusan & batasan terpikul", not errors,
+                 "; ".join(errors) or f"{len(c_ids)} C, seluruhnya dipikul AC",
+                 "`- **D-n**: <keputusan> — alasan: <…> — alternatif: <yang ditolak>` atau `- Tidak ada keputusan "
+                 "baru — <alasan>`; `- **C-n**: <batasan>` disebut minimal satu AC, atau `- Tidak ada batasan "
+                 "khusus — <alasan>`.")
+
+    def _evidence(self, cid: int) -> None:
+        """Tiap butir `## Kondisi Saat Ini` membawa `` `path:baris` `` yang ada di repo — bukti, bukan ingatan."""
+        lines = meaningful(self.h2.get("Kondisi Saat Ini", []))
+        bullets = [l.strip() for l in lines if l.strip().startswith("- ")]
+        errors = []
+        if not bullets:
+            errors.append("tanpa butir `- `")
+        bare = [b[:50] for b in bullets if not EVIDENCE.search(b)]
+        if bare:
+            errors.append(f"{len(bare)} butir tanpa `path:baris`: {bare[0]}")
+        refs = [m for l in lines for m in EVIDENCE.finditer(l)]
+        for m in refs:
+            problem = self._resolve(m.group(1), int(m.group(2)), int(m.group(3) or m.group(2)))
+            if problem:
+                errors.append(f"`{m.group(0).strip('`')}` {problem}")
+        self.add(cid, "Bukti kondisi saat ini", not errors,
+                 "; ".join(errors[:6]) + (f" (+{len(errors) - 6})" if len(errors) > 6 else "") if errors
+                 else f"{len(refs)} rujukan, seluruhnya ada",
+                 "Tiap butir `## Kondisi Saat Ini` menyebut minimal satu `` `path/relatif/root:baris` `` (atau "
+                 "`:awal-akhir`) yang ada di repo ini; rujukan repo lain taruh di `## Lampiran`.")
+
+    def _resolve(self, rel: str, start: int, end: int) -> str:
+        path = (self.root / rel).resolve()
+        try:
+            path.relative_to(self.root)
+        except ValueError:
+            return "di luar root repo"
+        if not path.is_file():
+            return "tidak ada"
+        data = path.read_bytes()
+        total = data.count(b"\n") + (1 if data and not data.endswith(b"\n") else 0)
+        if not 1 <= start <= end <= total:
+            return f"melampaui {total} baris berkas"
+        return ""
 
 
 def main() -> None:

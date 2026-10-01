@@ -36,7 +36,9 @@ TICKETS_IGNORE_TEXT = (
 IGNORED = "diabaikan git"   # hasil `git_commit` bila seluruh path diabaikan `.gitignore`
 TICKETDIR_RE = re.compile(r"^analyst/tickets/\d{10}-[a-z0-9]+(?:-[a-z0-9]+)*$")
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-TYPES = ("FEATURE", "IMPROVEMENT", "BUG")
+TYPES = ("FEATURE", "IMPROVEMENT", "BUG", "TECH")
+# `category` hanya untuk tiket `TECH` (17): menentukan rubrik `ticket-reviewer`, bukan bentuk kartu.
+CATEGORIES = ("REFACTOR", "DATA_MODEL", "ARCHITECTURE", "PERFORMANCE", "DEPENDENCY")
 PRIORITIES = ("HIGH", "MEDIUM", "LOW")
 PLACEHOLDER = re.compile(r"\bTBD\b|\bTODO\b|diisi nanti|<[A-Za-z][^<>\n]*>")
 UNANSWERED = "_(belum terjawab)_"
@@ -54,11 +56,13 @@ PILLARS_REQUIRED = {
     "IMPROVEMENT": ("Masalah", "Aktor", "Kondisi Saat Ini", "Kondisi Diinginkan",
                     "Aturan Bisnis", "Batas Cakupan", "Urgensi"),
     "BUG": ("Langkah Reproduksi", "Yang Diharapkan", "Yang Terjadi", "Dampak", "Urgensi"),
+    "TECH": ("Masalah Teknis", "Kondisi Saat Ini", "Kondisi Target", "Batasan", "Batas Cakupan", "Urgensi"),
 }
 PILLARS_OPTIONAL = {
     "FEATURE": ("Kasus Khusus", "Ukuran Keberhasilan"),
     "IMPROVEMENT": ("Kasus Khusus", "Ukuran Keberhasilan"),
     "BUG": ("Lingkungan", "Batas Cakupan"),
+    "TECH": ("Keputusan", "Rollout", "Ukuran Keberhasilan"),
 }
 
 
@@ -275,6 +279,17 @@ def sections(body: str, level: int = 2) -> Dict[str, List[str]]:
     return out
 
 
+def h1_lines(body: str) -> List[str]:
+    """Baris H1 di luar pagar kode — komentar `# …` di blok kode kartu `TECH` bukan judul."""
+    out, in_fence = [], False
+    for line in body.splitlines():
+        if line.startswith("```"):
+            in_fence = not in_fence
+        elif not in_fence and line.startswith("# "):
+            out.append(line)
+    return out
+
+
 def headings(body: str, level: int = 2) -> List[str]:
     return list(sections(body, level).keys())
 
@@ -339,8 +354,10 @@ def content_hash(text: str, part: str = "all") -> str:
     if part != "all":
         body = split_parts(body)[0 if part == "card" else 1]
     norm = "\n".join(l.rstrip() for l in body.strip().splitlines())
+    # `category` (17) hanya ikut bila tertulis: sidik tiket lama tanpa field itu tidak bergeser.
+    keys = CONTENT_FIELDS[part] + (("category",) if part != "elicit" and "category" in fm else ())
     fields = "\n".join(f"{k}={','.join(sorted(fm[k])) if isinstance(fm.get(k), list) else fm.get(k, '')}"
-                       for k in CONTENT_FIELDS[part])
+                       for k in keys)
     return hashlib.sha256(f"{fields}\n{norm}".encode("utf-8")).hexdigest()[:12]
 
 
@@ -385,15 +402,17 @@ def request_digest(text: str) -> str:
 
 
 def ticket_skeleton(ticket_type: str, slug: str, requester: str, created: str, title: str,
-                    request: str) -> str:
+                    request: str, category: str = "") -> str:
     """`TICKET.md` awal persis bagian 1 `elicit-template.md`, beserta `request_hash`.
 
     Rumah kanonik kerangkanya tetap template itu; `tests/analyst/test_ticket_10.py` menagih keduanya sama.
+    Baris `category` hanya ditulis untuk tiket `TECH`.
     """
+    cat = f"category: {category}\n" if ticket_type == "TECH" else ""
     quote = "\n".join(f"> {l.rstrip()}" if l.strip() else ">" for l in request.strip("\n").splitlines())
     pillars = "\n\n".join(f"#### {p}\n{UNANSWERED}"
                           for p in PILLARS_REQUIRED[ticket_type] + PILLARS_OPTIONAL[ticket_type])
-    text = (f"---\nstatus: DRAFT\nelicitation: OPEN\ntype: {ticket_type}\npriority: -\nslug: {slug}\n"
+    text = (f"---\nstatus: DRAFT\nelicitation: OPEN\ntype: {ticket_type}\n{cat}priority: -\nslug: {slug}\n"
             f"requester: {clean_value(requester)}\ncreated: {created}\nexternal_ref: -\ndomain_terms: []\n"
             f"revision: 0\nreview: -\nreview_round: 0\nrequest_hash: -\n---\n\n# {title}\n\n"
             f"## {ELICIT_H2}\n\n### Permintaan Asli\n\n{quote}\n\n### Fakta\n\n{pillars}\n\n"
