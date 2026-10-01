@@ -1,6 +1,6 @@
 # Panduan Elisitasi — `elicit`
 
-Dibaca di Phase 1 (`SKILL.md`); bagian 2 dipakai tiap giliran Phase 2. Lawan bicara skill ini adalah peminta non-engineer — pemilik bisnis, tim operasional, sales, CS, atau pengguna akhir — sehingga pertanyaan disusun dalam bahasa pekerjaan mereka, bukan bahasa sistem.
+Dibaca di Phase 1 (`SKILL.md`); bagian 2 dipakai tiap giliran Phase 2. Lawan bicara skill ini adalah peminta non-engineer — pemilik bisnis, tim operasional, sales, CS, atau pengguna akhir — sehingga pertanyaan disusun dalam bahasa pekerjaan mereka, bukan bahasa sistem. Tiket `TECH` (peminta engineer) memakai `elicitation-tech.md` sebagai ganti bagian 1–3 dan 6; bagian 4 tetap berlaku.
 
 ## 1. Pilar per Tipe
 

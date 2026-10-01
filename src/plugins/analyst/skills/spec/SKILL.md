@@ -1,6 +1,6 @@
 ---
 name: spec
-description: Dipanggil analyst:elicit sesudah elisitasi CLOSED, atau analyst:intake untuk ticketdir berkeadaan SPEC/DRAFT/DRIFT, perubahan tiket READY, dan pembatalan tiket - menyusun kartu TICKET.md non-teknis (user story, acceptance criteria Given/When/Then, aturan bisnis), lolos ticket-reviewer dan persetujuan user, sebelum tiket diserahkan ke engineer
+description: Dipanggil analyst:elicit sesudah elisitasi CLOSED, atau analyst:intake untuk ticketdir berkeadaan SPEC/DRAFT/DRIFT, perubahan tiket READY, dan pembatalan tiket - menyusun kartu TICKET.md non-teknis (user story, acceptance criteria Given/When/Then, aturan bisnis) atau, untuk tiket TECH, kartu teknis (kondisi saat ini berbukti file:baris, kondisi target, keputusan, batasan, AC terverifikasi), lolos ticket-reviewer dan persetujuan user, sebelum tiket diserahkan ke engineer
 user-invocable: false
 ---
 
@@ -8,7 +8,7 @@ user-invocable: false
 
 - Kartu `TICKET.md` disusun **hanya** dari `## Catatan Elisitasi` di berkas yang sama. Kebutuhan yang tidak ada di sana kembali ke `analyst:elicit`, tidak dikarang di sini.
 - `READY` hanya ditulis `ticket.py approve` sesudah jawaban eksplisit user di `AskUserQuestion`; skrip menolak bila validator gagal, `elicitation` tidak `CLOSED`, catatan elisitasi berbeda dari segel `ticket.py close`, atau vonis `ticket-reviewer` terakhir bukan `PASS` atas sidik kartu **dan** catatan elisitasi yang sama persis dengan sekarang.
-- Nol isi teknis: tiket menyebut **apa** yang dilihat dan dilakukan pengguna, tidak pernah **bagaimana** sistem membangunnya.
+- Nol isi teknis untuk `FEATURE`/`IMPROVEMENT`/`BUG`: tiket menyebut **apa** yang dilihat dan dilakukan pengguna, tidak pernah **bagaimana** sistem membangunnya. Kartu `TECH` justru teknis, tetapi berhenti di **struktur akhir** yang disepakati — urutan langkah dan pembagian brief milik engineer.
 - Field pembukuan frontmatter (`revision`, `revision_base`, `review`, `review_round`, `approved*`, `reopen*`, `request_hash`, `elicit_hash`, `elicit_log`) dan `<ticketdir>/review.md` hanya ditulis `ticket.py`; saat menulis ulang body, nilainya disalin apa adanya.
 
 ## Precondition [REQUIRED]
@@ -16,7 +16,7 @@ user-invocable: false
 1. Skrip: `ticket.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py`; `validate_doc.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/validate_doc.py`; rubrik prioritas di bagian 4 dan tabel bentuk hasil di bagian 6 `${CLAUDE_PLUGIN_ROOT}/skills/elicit/references/elicitation-guide.md`.
 2. **Perubahan tiket `READY`/`DRIFT`** (`change_request` terisi atau keadaan `DRIFT`): konfirmasi ke user lewat `AskUserQuestion` bahwa tiket dibuka ulang, lalu `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py reopen --ticketdir <ticketdir> --reason "<change_request atau DRIFT>"`.
 3. **Pembatalan tiket** (`cancel_request` terisi): konfirmasi ke user lewat `AskUserQuestion` — tiket `READY` mungkin sudah diserahkan ke engineer lewat `ticket_source`, dan task cermin nataflow-nya ikut menjadi `cancelled` — lalu `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py cancel --ticketdir <ticketdir> --reason "<cancel_request>"`, ditambah `--force` hanya untuk tiket `READY` yang pembatalannya dikonfirmasi eksplisit. `CANCEL PASS` atas tiket yang pernah `READY` → jalankan prosedur `references/nataflow-sync.md` (15 A6). Tutup dengan baris `SPEC — BATAL` dan selesai; Workflow tidak dijalankan.
-4. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py check --gate spec --ticketdir <ticketdir>`. `PASS` → baca baris `Terselesaikan:` (`root`, `type`, `git`, dan bila tiket sudah ada `revision`, `review_round`, `ronde`, `sidik`, `review_segar`, `review_basi`, `review_report`). `FAIL` → remediasi per `Tindakan`: elisitasi belum `CLOSED` → `analyst:elicit`; check 5 *elisitasi tanpa segel* (tiket lama) → `ticket.py close --ticketdir <ticketdir>` sekali; check 5 *catatan berubah sesudah ditutup* → dilarang menyegel ulang dari sini: pulihkan catatannya bila yang mengubah bukan elisitasi, atau `analyst:elicit` dengan `reopen_reason` yang menyebut perubahannya.
+4. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py check --gate spec --ticketdir <ticketdir>`. `PASS` → baca baris `Terselesaikan:` (`root`, `type` — `category` dibaca dari frontmatter untuk `TECH` —, `git`, dan bila tiket sudah ada `revision`, `review_round`, `ronde`, `sidik`, `review_segar`, `review_basi`, `review_report`). `FAIL` → remediasi per `Tindakan`: elisitasi belum `CLOSED` → `analyst:elicit`; check 5 *elisitasi tanpa segel* (tiket lama) → `ticket.py close --ticketdir <ticketdir>` sekali; check 5 *catatan berubah sesudah ditutup* → dilarang menyegel ulang dari sini: pulihkan catatannya bila yang mengubah bukan elisitasi, atau `analyst:elicit` dengan `reopen_reason` yang menyebut perubahannya.
 
 ## Parameter [REQUIRED]
 
@@ -35,6 +35,8 @@ user-invocable: false
 
 ### Phase 1 — Rumusan
 
+Tiket `TECH` → **Phase 1T** sebagai ganti phase ini.
+
 1. **Judul**: perintah kerja yang dibaca engineer di papan task, ≤ 12 kata, berpola `<kata kerja> <objek domain> <kualifikasi>`. Kata kerja per tipe: `FEATURE` — Buat, Tambah, Tampilkan, Izinkan; `IMPROVEMENT` — Ubah, Perluas, Tampilkan, Sederhanakan; `BUG` — Perbaiki, diikuti gejala dan tempatnya. Kata kerjanya menyasar hasil yang teramati, bukan cara membangun: `Tampilkan QTY Received per produk di daftar Purchase Order`, bukan `Tambah kolom qty received di tabel PO`. Siapa dan kenapa milik User Story, bukan judul — judul yang bercerita tentang keinginan aktor (`Admin Finance dapat …`, `… ingin …`) mengulang User Story. Objek judul mengikuti bentuk hasil (panduan bagian 6): `Buat API daftar Purchase Order …` untuk API, `Tampilkan … di <layar>` untuk layar. Istilah domain, nama entitas, menu, layar, dan kolom dipakai persis seperti di elisitasi — yang berbahasa Inggris tidak diterjemahkan: "created at di report order hingga detik" → `Tampilkan Created At hingga detik di Report Order`, bukan `Tampilkan waktu dibuat hingga detik di Laporan Pesanan`. Hanya kata penghubungnya yang berbahasa Indonesia.
 2. **Prioritas**: pilar `Urgensi` dipetakan lewat rubrik bagian 4 panduan.
 3. **Latar Belakang**: 2–4 kalimat dari `Masalah` (BUG: `Dampak`) — siapa, seberapa sering atau mahal, kenapa sekarang.
@@ -51,16 +53,36 @@ user-invocable: false
 8. **Pertanyaan Terbuka**: tiap `Q-{n}` `TIDAK MEMBLOKIR` yang tersisa, dengan ID yang sama seperti di catatan, beserta asumsi yang dipakai AC. Validator menagih kedua himpunan ID sama.
 9. **`domain_terms`**: milik `analyst:elicit` — dipakai apa adanya, dilarang ditambah dari sini (Failure path 3).
 
+### Phase 1T — Rumusan Tiket `TECH`
+
+Rubrik dan contoh: bagian 1 `TECH`, butir 17–20, dan bagian 4 `templates/ticket-template.md`; kategori di bagian 4 `${CLAUDE_PLUGIN_ROOT}/skills/elicit/references/elicitation-tech.md`.
+
+1. **Judul**: ≤ 12 kata, kata kerja teknis (Pisahkan, Pindahkan, Satukan, Ganti, Hapus, Normalisasi, Percepat, Naikkan) + objek struktur yang berubah + kualifikasi hasil (butir 17).
+2. **Prioritas**: pilar `Urgensi` lewat rubrik bagian 4 panduan, sama seperti tipe lain.
+3. **Latar Belakang**: 2–4 kalimat dari `Masalah Teknis` dan `Urgensi`.
+4. **Kondisi Saat Ini**: tiap fakta pilar menjadi satu butir beserta `` `path:baris` ``-nya, persis seperti di catatan. Dilarang menambah bukti baru dari sini — bukti yang kurang atau basi → `analyst:elicit` dengan `reopen_reason`.
+5. **Kondisi Target**: dari pilar `Kondisi Target`; boleh blok kode atau diagram, dilarang urutan langkah (butir 20).
+6. **Keputusan**: tiap keputusan pilar `Keputusan` menjadi `D-{n}` beserta alasan dan alternatifnya; pilar `Tidak dibahas` → `- Tidak ada keputusan baru — <alasan>`. `category: ARCHITECTURE` tanpa satu pun keputusan → `analyst:elicit` dengan `reopen_reason`.
+7. **Batasan**: tiap fakta pilar `Batasan` menjadi satu `C-{n}`.
+8. **Acceptance Criteria** — sapu berurutan, satu AC per hal yang dapat dibuktikan, masing-masing dengan `— verifikasi:`:
+   - kondisi target tercapai;
+   - tiap `C-{n}` dijaga (sebut `(C-n)` di baris AC-nya);
+   - yang dituntut `category` (butir 19);
+   - `Ukuran Keberhasilan` bila digali.
+   Lebih dari 10 AC → sama seperti Phase 1 butir 6.
+9. **Dampak & Rollout**: pilar `Rollout`, ditambah repo atau modul terdampak yang tersurat di catatan; pilar `Tidak dibahas` → satu butir yang menyatakan rilis tunggal tanpa migrasi bertahap, bila itu fakta catatan.
+10. **Di Luar Cakupan**, **Pertanyaan Terbuka**, **Lampiran**: sama seperti Phase 1 butir 7–8; rujukan repo lain masuk `## Lampiran`.
+
 ### Phase 2 — Tulis Draft
 
 1. Sunting `<ticketdir>/TICKET.md`: ganti H1 kerja dengan judul final dan tulis kartu persis bagian 1 `templates/ticket-template.md` untuk tipenya di antara H1 dan `## Catatan Elisitasi`; isi `priority` dan `external_ref`. Seksi `## Catatan Elisitasi` beserta field frontmatter lain dibiarkan byte demi byte.
-2. `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/validate_doc.py --kind ticket --ticketdir <ticketdir>` sampai `PASS`. Temuan kebocoran → rumuskan ulang sebagai perilaku yang terlihat; `domain_terms` hanya untuk istilah yang tercatat elisitasi.
-3. Self-test semantik butir 11–16 template.
+2. `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/validate_doc.py --kind ticket --ticketdir <ticketdir>` sampai `PASS`. Temuan kebocoran → rumuskan ulang sebagai perilaku yang terlihat; `domain_terms` hanya untuk istilah yang tercatat elisitasi. `TECH` check 9 *bukti kondisi saat ini* gagal → salin ulang bukti persis dari catatan; buktinya sendiri yang hilang atau basi → `analyst:elicit` dengan `reopen_reason` = `bukti basi: <path:baris>`.
+3. Self-test semantik butir 11–16 template (`TECH`: butir 12, 14, 15, dan 17–20).
 
 ### Phase 3 — Review Independen
 
 1. `ronde=habis` (plafon 2 ronde per revisi) → dilarang dispatch; lompat ke Phase 5 dengan BLOCKER tersisa (lihat `dispatcher/reviewer.md` gerbang masuk).
-2. Muat `dispatcher/reviewer.md`, hidrasi slot `ticketdir`, `type`, `round` (`ronde` dari `check --gate spec` — sudah memperhitungkan siklus ronde baru), `sidik`, dan pada ronde 2 `previous_verdict` beserta `changed_sections`; dispatch `ticket-reviewer` (`subagent_type`: `analyst:ticket-reviewer`) langsung, tanpa skill pembungkus.
+2. Muat `dispatcher/reviewer.md`, hidrasi slot `ticketdir`, `type`, `category` (`-` di luar `TECH`), `round` (`ronde` dari `check --gate spec` — sudah memperhitungkan siklus ronde baru), `sidik`, dan pada ronde 2 `previous_verdict` beserta `changed_sections`; dispatch `ticket-reviewer` (`subagent_type`: `analyst:ticket-reviewer`) langsung, tanpa skill pembungkus.
 3. Catat balikan **seketika**, sebelum satu suntingan pun: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py review --ticketdir <ticketdir> --verdict <PASS|BLOCKED> --report - <<'EOF'`, lalu blok `## Ticket Review` reviewer apa adanya, lalu `EOF` (`--verdict DISPATCH_FAILED` tanpa `--report`; vonis lain tanpa blok ditolak). Skrip menyimpan sidik konten yang benar-benar dinilai reviewer dan bloknya ke `<ticketdir>/review.md`; menolak bila `- Verdict:` di blok berbeda dengan `--verdict`, bila `- Sidik:` di blok (disalin reviewer dari slot `{sidik}` prompt) berbeda dengan sidik disk, bila catatan elisitasi berbeda dari segelnya, bila `validate_doc.py` `ticket`/`elicit` `FAIL` (dispatch tidak sah), atau bila blok tidak konsisten (`- BLOCKER:` tidak sama dengan jumlah butir di bawah `**BLOCKER:**`, `PASS` ber-BLOCKER, `BLOCKED` tanpa BLOCKER, `- Ronde:` bukan ronde yang dicatat). Suntingan sesudahnya membuat vonis itu basi dan menuntut ronde berikut. Tangani per tabel `### Penanganan Balikan` template itu.
 
 ### Phase 4 — Commit Draft
@@ -69,7 +91,7 @@ user-invocable: false
 
 ### Phase 5 — Persetujuan User
 
-1. Sajikan **ringkasan gerbang**, bukan isi kartu: baris `TICKET — DRAFT · <ticketdir>/TICKET.md · review <review_report>`, lalu 3–4 kalimat — judul, tipe, dan prioritas beserta alasannya; inti user story atau laporan bug; jumlah AC dan `BR-{n}` beserta aturan yang paling menentukan dan asumsi Pertanyaan Terbuka bila ada; vonis reviewer dalam satu frasa (mis. `PASS · 2 ADVISORY`). Daftar AC, `BR-{n}`, Di Luar Cakupan, dan blok `## Ticket Review` tetap di berkas; dilarang menyalinnya ke chat. Ada `ADVISORY [ELISITASI]` → satu kalimat: itu pertanyaan yang belum pernah diajukan ke peminta, dijawab lewat *Kembali ke elisitasi*. User meminta rincian → sajikan seksi yang diminta saja, lalu ajukan ulang pertanyaan butir 2.
+1. Sajikan **ringkasan gerbang**, bukan isi kartu: baris `TICKET — DRAFT · <ticketdir>/TICKET.md · review <review_report>`, lalu 3–4 kalimat — judul, tipe, dan prioritas beserta alasannya; inti user story atau laporan bug (`TECH`: category dan inti kondisi target); jumlah AC dan `BR-{n}` (`TECH`: `C-{n}` dan `D-{n}`) beserta aturan atau batasan yang paling menentukan dan asumsi Pertanyaan Terbuka bila ada; vonis reviewer dalam satu frasa (mis. `PASS · 2 ADVISORY`). Daftar AC, `BR-{n}`, Di Luar Cakupan, dan blok `## Ticket Review` tetap di berkas; dilarang menyalinnya ke chat. Ada `ADVISORY [ELISITASI]` → satu kalimat: itu pertanyaan yang belum pernah diajukan ke peminta, dijawab lewat *Kembali ke elisitasi*. User meminta rincian → sajikan seksi yang diminta saja, lalu ajukan ulang pertanyaan butir 2.
 2. `AskUserQuestion`: *Setujui (READY)* — **hanya bila `review_segar=ya`** · *Revisi (sebut poinnya)* · *Kembali ke elisitasi* · *Tahan*. `review_segar=tidak` dengan plafon ronde habis → sajikan sebabnya tanpa opsi *Setujui*.
 3. **Setujui** → `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py approve --ticketdir <ticketdir> --answer "<jawaban user apa adanya>"`. Skrip memateraikan `READY` dan meng-commit `TICKET.md` (beserta `review.md`) bila repo git dan ticketdir tidak diabaikan `.gitignore`. `FAIL` → sebab di keluaran; review basi dengan plafon ronde tersisa → Phase 3 ronde berikut; plafon ronde habis → sajikan sebabnya dan ajukan ulang pilihan *Revisi* (satu-satunya jalan membuka ronde baru) atau *Kembali ke elisitasi*.
 4. **Sinkron nataflow** — tepat sesudah `approve` exit 0 atau exit 3 (`READY` tertulis, commit gagal), sebelum baris penutup: jalankan prosedur `references/nataflow-sync.md` apa adanya atas `<ticketdir>`, dengan `ticket.py` dari Precondition. Hasilnya satu segmen `nataflow …` di baris penutup. `approve` exit 1 → langkah ini tidak berjalan.
@@ -80,8 +102,9 @@ user-invocable: false
 ## Guardrails
 
 - **ELISITASI SATU-SATUNYA SUMBER**: dilarang menambah aturan, batas, peran, notifikasi, atau kasus yang tidak ada di `## Catatan Elisitasi`, sekalipun "biasanya perlu".
-- **AC TERAMATI**: `then` berupa teks layar, tombol, status, angka, atau pesan yang diterima — bukan "data tersimpan" atau "sistem memproses".
-- **NOL TEKNIS**: dilarang menyebut penyimpanan, integrasi, teknologi, struktur data, estimasi, atau pembagian backend/frontend.
+- **AC TERAMATI** (selain `TECH`): `then` berupa teks layar, tombol, status, angka, atau pesan yang diterima — bukan "data tersimpan" atau "sistem memproses".
+- **NOL TEKNIS** (selain `TECH`): dilarang menyebut penyimpanan, integrasi, teknologi, struktur data, estimasi, atau pembagian backend/frontend.
+- **BERHENTI DI TARGET** (`TECH`): AC berbukti `verifikasi:` yang dapat diputuskan engineer lain; dilarang menulis urutan langkah, nama berkas migrasi, estimasi, atau pembagian brief.
 - **APPROVAL LEWAT SKRIP**: dilarang menulis `status: READY`, `approved_hash`, `approved_seal`, atau `review:` dengan tangan.
 - **CATATAN MILIK ELICIT**: dilarang menyunting `## Catatan Elisitasi`, `elicitation`, atau `domain_terms`, dan dilarang menjalankan `ticket.py close` kecuali adopsi segel tiket lama (check 5 *elisitasi tanpa segel*; skrip menolaknya bila catatan berubah sesudah review terakhir), dari skill ini; tiap perubahan fakta lewat `analyst:elicit` dengan `reopen_reason`. Suntingan catatan di luar jalur itu ditolak `check`, `review`, dan `approve` lewat segel `elicit_hash`.
 - **REVIEWER LEWAT TEMPLATE**: `ticket-reviewer` hanya lewat prompt terhidrasi `dispatcher/reviewer.md`; blok vonisnya diteruskan ke user tanpa parafrase.
@@ -92,10 +115,11 @@ user-invocable: false
   - "User bilang oke di chat, saya set READY sendiri" — tanpa `approve`, sidik tidak dimateraikan dan suntingan sesudahnya tidak terdeteksi.
   - "Engineer pasti butuh detail tabelnya, saya tambahkan" — detail teknis milik `TASK.md` engineer; tiket yang memutuskan cara membangun mengikat engineer pada tebakan analis.
   - "AC-nya 14, tidak apa-apa" — tiket sebesar itu memuat lebih dari satu tujuan; pecah.
+  - "Lead engineer sudah tahu langkahnya, saya tulis sekalian di Kondisi Target" (`TECH`) — langkah yang terkunci di tiket mengikat `plan` hilir pada urutan yang belum diuji terhadap kode.
 
 ## Output [REQUIRED]
 
-Tiket disetujui — tutup satu baris: `SPEC — READY · <ticketdir>/TICKET.md @<sidik> · <type> · <priority> · <n> AC · <n> BR · <commit <sha> | tanpa git | diabaikan git> · nataflow <dibuat #<code> | diperbarui #<code> | dilewati | GAGAL: <sebab>> — serahkan ke engineer: backend:tech-lead dan/atau frontend:lead dengan ticket_source: <ticketdir>/TICKET.md (lihat README Serah Terima).` Segmen `nataflow` berasal dari Phase 5 butir 4; `GAGAL` tidak mengubah `READY` maupun serah terimanya. `diabaikan git` bersama `nataflow GAGAL` atau `dilewati` → tambahkan `(tiket hanya di disk ini)` sesudah segmen `nataflow`: tidak ada salinan lain sampai sinkron diulang. Tiket dibatalkan (Precondition 3) — tutup satu baris: `SPEC — BATAL · <ticketdir> · <commit <sha> | tanpa git | diabaikan git> · nataflow <dibatalkan #<code> | dilewati | GAGAL: <sebab>>`; tiket yang belum pernah `READY` tidak menjalankan sinkron dan segmennya dihapus. Selain itu sajikan blok berikut dan hapus baris bernilai `—`:
+Tiket disetujui — tutup satu baris: `SPEC — READY · <ticketdir>/TICKET.md @<sidik> · <type>[/<category>] · <priority> · <n> AC · <n BR | n C> · <commit <sha> | tanpa git | diabaikan git> · nataflow <dibuat #<code> | diperbarui #<code> | dilewati | GAGAL: <sebab>> — serahkan ke engineer: backend:tech-lead dan/atau frontend:lead dengan ticket_source: <ticketdir>/TICKET.md (lihat README Serah Terima).` Tiket `TECH` diserahkan hanya ke gerbang repo tempat tiket tinggal. Segmen `nataflow` berasal dari Phase 5 butir 4; `GAGAL` tidak mengubah `READY` maupun serah terimanya. `diabaikan git` bersama `nataflow GAGAL` atau `dilewati` → tambahkan `(tiket hanya di disk ini)` sesudah segmen `nataflow`: tidak ada salinan lain sampai sinkron diulang. Tiket dibatalkan (Precondition 3) — tutup satu baris: `SPEC — BATAL · <ticketdir> · <commit <sha> | tanpa git | diabaikan git> · nataflow <dibatalkan #<code> | dilewati | GAGAL: <sebab>>`; tiket yang belum pernah `READY` tidak menjalankan sinkron dan segmennya dihapus. Selain itu sajikan blok berikut dan hapus baris bernilai `—`:
 
 ```markdown
 ### SPEC — <MENUNGGU KEPUTUSAN | TERTAHAN>
@@ -109,7 +133,7 @@ Tiket disetujui — tutup satu baris: `SPEC — READY · <ticketdir>/TICKET.md @
 
 1. **`elicitation` belum `CLOSED`**: hentikan; `analyst:elicit` menuntaskannya lebih dulu.
 2. **Fakta elisitasi saling bertentangan** saat merumuskan AC: jangan memilih sendiri — `analyst:elicit` dengan `reopen_reason` menyebut kedua fakta.
-3. **Validator kebocoran tidak kunjung `PASS`** karena istilah memang kosakata produk: dilarang menyunting catatan elisitasi atau `domain_terms` dari sini — panggil `analyst:elicit` dengan `reopen_reason` = `konfirmasi istilah domain: <istilah>`; sesudah istilah tercatat di `domain_terms` elisitasi, kembali ke Phase 0.
+3. **Validator kebocoran tidak kunjung `PASS`** (selain `TECH`) karena istilah memang kosakata produk: dilarang menyunting catatan elisitasi atau `domain_terms` dari sini — panggil `analyst:elicit` dengan `reopen_reason` = `konfirmasi istilah domain: <istilah>`; sesudah istilah tercatat di `domain_terms` elisitasi, kembali ke Phase 0.
 4. **Dispatch reviewer gagal dua kali**: tiket tidak dapat di-`approve`; sajikan draft dengan status `TERTAHAN` dan minta user mengulang sesi.
 5. **`approve` atau `commit` gagal commit** (exit 3; hook, gpg, index terkunci): isinya sudah tertulis (`approve`: status `READY`); sajikan baris `COMMIT GAGAL` apa adanya dan minta user meng-commit sendiri dengan perintah yang dicetak. Dilarang `--no-verify`. Ticketdir yang diabaikan `.gitignore` tidak pernah sampai ke sini: skrip melewati commit-nya.
 6. **Sinkron nataflow `GAGAL`** (server MCP tidak tersedia, tool galat, config `.claude/nataflow.json` atau `analyst/nataflow.json` rusak atau keduanya berbeda isi, task kembar): tiket tetap `READY` dan serah terima tetap berjalan. Sajikan segmen `GAGAL` apa adanya; sesudah sebabnya dibereskan, sinkron diulang lewat `analyst:intake` ("sinkron ulang tiket `<ticketdir>`"). Dilarang `reopen` hanya untuk mengulang sinkron.

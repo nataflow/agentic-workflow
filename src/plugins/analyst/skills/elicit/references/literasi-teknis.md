@@ -1,6 +1,6 @@
 # Literasi Teknis — `elicit`
 
-Dibaca di Phase 1 (`SKILL.md`) bersama panduan elisitasi; dipakai tiap giliran Phase 2 untuk memilih pertanyaan pilar `Aktor`, `Aturan Bisnis`, `Kondisi Diinginkan`, dan `Kasus Khusus`. Berkas ini **lensa bertanya**, bukan kosakata tiket: engineer akan menanyakan hal-hal di bawah ini sesudah tiket diserahkan, jadi lebih murah bila jawabannya sudah digali dari peminta sekarang. Kolom *Konsep* hanya untuk analis — pertanyaan ke peminta dan isi pilar tetap berbahasa pekerjaan mereka (panduan bagian 3), dan kartu tetap lolos pemindai kebocoran.
+Dibaca di Phase 1 (`SKILL.md`) bersama panduan elisitasi; dipakai tiap giliran Phase 2 untuk memilih pertanyaan pilar `Aktor`, `Aturan Bisnis`, `Kondisi Diinginkan`, dan `Kasus Khusus`. Berkas ini **lensa bertanya**, bukan kosakata tiket: engineer akan menanyakan hal-hal di bawah ini sesudah tiket diserahkan, jadi lebih murah bila jawabannya sudah digali dari peminta sekarang. Kolom *Konsep* hanya untuk analis — pertanyaan ke peminta dan isi pilar tetap berbahasa pekerjaan mereka (panduan bagian 3), dan kartu tetap lolos pemindai kebocoran. Tidak dipakai untuk tiket `TECH` — lihat `elicitation-tech.md`.
 
 ## 1. Di Balik Layar (backend)
 

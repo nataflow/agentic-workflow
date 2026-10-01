@@ -214,3 +214,29 @@ def test_t6_metadata_sinkron_membawa_category(repo):
     r = run_script(TICKET, "sync-payload", "--ticketdir", TDIR, "--json", cwd=repo)
     meta = json.loads(json.loads(r.stdout)["create"]["metadata"])
     assert (meta["type"], meta["category"]) == ("TECH", "DATA_MODEL")
+
+
+# --- T7: contoh template ------------------------------------------------------------------------
+
+SKILLS = PLUGINS / "analyst" / "skills"
+
+
+def _example_tech(template) -> str:
+    section = template.read_text(encoding="utf-8").split("\n## 4. ", 1)[1]
+    return section.split("````markdown\n", 1)[1].split("\n````", 1)[0] + "\n"
+
+
+@pytest.mark.regression("17 T7")
+def test_t7_contoh_tech_kedua_template_lolos_validator_dan_gerbang_spec(make_repo):
+    elicit = _example_tech(SKILLS / "elicit" / "templates" / "elicit-template.md")
+    fm, body = elicit.split("\n---\n", 1)
+    card = _example_tech(SKILLS / "spec" / "templates" / "ticket-template.md").split("## Catatan Elisitasi")[0]
+    notes = body[body.index("## Catatan Elisitasi"):]
+    text = fm.replace("priority: -", "priority: HIGH") + "\n---\n\n" + card + notes
+    root = make_repo({f"{TDIR}/TICKET.md": text, **CODE})
+    git(root, "add", "-A")
+    git(root, "commit", "-qm", "docs(ticket): contoh")
+    assert failed(root, "elicit") == (0, {})
+    assert failed(root, "ticket") == (0, {})
+    r = tk(root, "check", "--gate", "spec", "--ticketdir", TDIR)
+    assert r.code == 0, r.out
