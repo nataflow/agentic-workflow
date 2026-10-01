@@ -114,6 +114,7 @@ Kontrak serah-terima tiket (`ticket_source`):
 3. **Fase 1 butir 4**: tiap `TAC-{n}` dihitung satu permukaan yang disebut `request`.
 4. **Syarat tiket**: frontmatter `status: READY` dan `elicitation: CLOSED`; di repo git, commit terakhir yang menyentuh berkas bersubjek `docs(ticket): kunci TICKET <slug> READY` atau `docs(ticket): ref TICKET <slug>` dan berkasnya bersih. Penilainya prasyarat `task` check 7, bukan gerbang.
 5. **Jalur**: gerbang → `analyst` (slot `Ticket Source`) → `task` (keterpikulan `TAC-{n}`) dan, bila sumbu bisnis tetap aktif, `business-analysis` (serap `TBR-{n}`); `analyst/references/chain-rules.md` bagian 1.1 dan 2.1.
+6. **Tiket `TECH`** (frontmatter `type: TECH`, dari lead engineer): kartu teknis tanpa `BR-{n}`; `D-{n}` (keputusan) dan `C-{n}` (batasan) dirujuk `TD-{n}`/`TC-{n}` dan dihitung sudah disepakati, sama seperti `TBR-{n}`. Bukti `path:baris` di `## Kondisi Saat Ini` adalah **titik awal**, bukan kebenaran final: Fase 1 tetap membuktikan permukaan dari kode sekarang, dan baris yang bergeser tidak membatalkan tiket. Klaim kondisi yang tidak lagi benar, atau `TC-{n}` yang tidak dapat dijaga → BERHENTI dan kembalikan ke `analyst:spec` (reopen), bukan dilanggar diam-diam. `Kondisi Target` tiket mengikat hasil akhir, tidak mengikat urutan brief. Risk tetap diputuskan Keputusan 2 dari kode, bukan dari `category` tiket.
 
 ### C. Lane `AUDIT_SWEEP` → `audit`
 
