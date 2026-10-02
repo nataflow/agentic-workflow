@@ -3,7 +3,8 @@
 
 `--kind elicit` memvonis frontmatter dan `## Catatan Elisitasi` (H2 terakhir):
 bentuk catatan dan, bila `elicitation: CLOSED`, kelengkapan pilar wajib, nol
-pertanyaan memblokir, nol baris `Asumsi:`, dan jejak tiap `domain_terms`. `--kind ticket` memvonis kartu di atasnya: bentuk
+pertanyaan memblokir, nol baris `Asumsi:`, dan jejak tiap `domain_terms`; catatan non-`TECH` juga dilarang memuat
+rujukan `path:baris` di tiap giliran. `--kind ticket` memvonis kartu di atasnya: bentuk
 tiket, penomoran AC/BR, keterpikulan tiap `BR-{n}` oleh AC, nol placeholder,
 dan nol kebocoran teknis — atau, untuk tiket `TECH`, bukti `file:baris` yang benar-benar ada di
 repo, AC berbukti `verifikasi:`, dan keterpikulan tiap `C-{n}`. Rumah kanonik aturannya bagian 2
@@ -292,6 +293,16 @@ class DocValidator(Checker):
                  "Tiap istilah `domain_terms` wajib punya baris log berjawaban Ya yang mengutip istilahnya: "
                  "`| n | ... | Apakah \"<istilah>\" nama produk? | Ya | <peminta> |`. Kemunculan di permintaan "
                  "asli saja tidak cukup.")
+
+        # 11 — konteks `code-scout` bukan fakta (18 X3): bukti kode hanya milik `TECH`. Permintaan Asli dikecualikan
+        # karena dimateraikan dan berasal dari peminta. Path tanpa `/` atau `.` (mis. jam `10:30`) bukan rujukan berkas.
+        if typ != "TECH":
+            leaked = [f"`{m.group(0)[1:-1]}` ({h})" for h, body in self.h3.items() if h != "Permintaan Asli"
+                      for line in body for m in EVIDENCE.finditer(line) if re.search(r"[/.]", m.group(1))]
+            self.add(11, "Tanpa bukti kode", not leaked,
+                     "lolos" if not leaked else f"{len(leaked)} rujukan `path:baris`: " + ", ".join(leaked[:3]),
+                     "Konteks `code-scout` pada tiket non-TECH bukan fakta: tulis ulang sebagai perilaku yang "
+                     "terlihat pengguna atau `Asumsi:` tanpa rujukan berkas, lalu konfirmasi ke peminta.")
 
     # ── kartu tiket ──
     def _ticket(self) -> None:

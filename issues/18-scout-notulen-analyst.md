@@ -230,7 +230,7 @@ Bila belum final: `NOTULEN — DRAFT · <notulendir> · <sebab>`.
 ---
 
 ## X1 [Tinggi] Subagent `code-scout` belum ada
-- [ ] Selesai
+- [x] Selesai
 
 Konteks utama `elicit` sekarang menjalankan sendiri hingga 8 `Read`/`Grep`/`Glob` untuk tiket `TECH`, dan tiket
 non-`TECH` tidak punya jalan sama sekali untuk melihat kode. **Perubahan:** `agents/code-scout.md` sesuai
@@ -243,7 +243,7 @@ Kontrak. Isinya:
 `maxTurns` berupa angka.
 
 ## X2 [Tinggi] Tidak ada dispatcher scout
-- [ ] Selesai
+- [x] Selesai
 
 **Perubahan:**
 - `skills/elicit/dispatcher/scout.md` memuat kerangka prompt dengan slot Kontrak.
@@ -253,7 +253,7 @@ Kontrak. Isinya:
 **Test:** gerbang `FAIL` bila berkas dispatcher hilang dari salinan plugin di fixture.
 
 ## X3 [Tinggi] Konteks kode bisa lolos jadi bukti di tiket non-`TECH`
-- [ ] Selesai
+- [x] Selesai
 
 Tidak ada pagar mesin yang menolak `` `path:baris` `` di catatan non-`TECH`. `scan_leaks` hanya memindai kartu
 dan melewati `## Catatan Elisitasi`. **Perubahan:** check baru di `validate_doc.py --kind elicit`, hanya untuk
