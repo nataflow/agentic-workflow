@@ -200,3 +200,23 @@ def test_b3_field_batch_sah_atau_absen_lolos(make_repo, lines):
     root = make_repo({f"{TDIR}/TICKET.md": with_fm(lines)}, git_init=False)
     for kind in ("elicit", "ticket"):
         assert frontmatter_check(root, kind=kind)["status"] == "PASS"
+
+
+# --- B4: berkas wajib gerbang -------------------------------------------------------------------
+
+@pytest.mark.regression("19 B4")
+@pytest.mark.parametrize("gate", ["elicit", "spec"])
+def test_b4_check_menagih_prosedur_batch(tmp_path, make_repo, gate):
+    plugin = tmp_path / "plugin"
+    shutil.copytree(ANALYST, plugin, ignore=shutil.ignore_patterns("__pycache__"))
+    script = plugin / "skills" / "_common" / "ticket.py"
+    root = make_repo({f"{TDIR}/TICKET.md": FIXTURE.read_text(encoding="utf-8")}, name="ws", git_init=False)
+
+    def check_2():
+        r = run_script(script, "check", "--gate", gate, "--ticketdir", TDIR, "--json", cwd=root)
+        return {c["id"]: c for c in json.loads(r.stdout)["checks"]}[2]
+
+    assert check_2()["status"] == "PASS"
+    (plugin / "skills" / "intake" / "references" / "batch.md").unlink()
+    c = check_2()
+    assert c["status"] == "FAIL" and "intake/references/batch.md" in c["summary"]
