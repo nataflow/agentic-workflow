@@ -386,7 +386,7 @@ merebut pemicu.
 `commit`. **Test:** sesudah `new` → `final` di repo git, `git log` tidak bertambah dan `git status` bersih.
 
 ## N7 [Tinggi] Sinkron notulen ke nataflow
-- [ ] Selesai
+- [x] Selesai
 
 **Perubahan:**
 

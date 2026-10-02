@@ -277,3 +277,76 @@ def test_n5_kerangka_skrip_sama_dengan_template():
     assert text == expected
     headings = [l[3:] for l in block.splitlines() if l.startswith("## ")]
     assert tuple(headings) == mod.H2
+
+
+# --- N7: sync-payload ---------------------------------------------------------------------------
+
+def payload(root, rel):
+    r = run_script(NOTULEN, "sync-payload", "--notulendir", rel, "--json", cwd=root)
+    return r.returncode, r.stdout
+
+
+def finalized(root):
+    rel = new(root)
+    fill(root, rel)
+    assert nt(root, "final", "--notulendir", rel, "--answer", "Final")[0] == 0
+    return rel
+
+
+@pytest.mark.regression("18 N7")
+def test_n7_tanpa_config_dilewati(plain):
+    rel = finalized(plain)
+    code, out = payload(plain, rel)
+    assert code == 0 and json.loads(out) == {"status": "SKIP", "enabled": False}
+
+
+@pytest.mark.regression("18 N7")
+def test_n7_config_rusak_draft_drift_dan_path_asing_gagal(plain):
+    write_files(plain, {".claude/nataflow.json": "{"})
+    rel = finalized(plain)
+    code, out = payload(plain, rel)
+    assert code == 1 and json.loads(out)["status"] == "FAIL"
+
+    write_files(plain, {".claude/nataflow.json": '{"repo": "acme/notes"}'})
+    edit(plain, rel, "Rilis dilakukan Jumat.", "Rilis dilakukan Kamis.")
+    code, out = payload(plain, rel)
+    assert code == 1 and "notulen DRIFT" in json.loads(out)["problems"][0]
+
+    draft = new(plain, slug="draft")
+    code, out = payload(plain, draft)
+    assert code == 1 and "notulen DRAFT" in json.loads(out)["problems"][0]
+
+    code, out = payload(plain, "analyst/tickets/2610020900-x")
+    assert code == 1 and "bukan notulendir" in json.loads(out)["problems"][0]
+
+
+@pytest.mark.regression("18 N7")
+def test_n7_payload_dokumen_project_notes_meeting(plain):
+    write_files(plain, {".claude/nataflow.json": '{"mcp_server": "nf", "repo": "acme/notes"}'})
+    rel = finalized(plain)
+    code, out = payload(plain, rel)
+    assert code == 0, out
+    data = json.loads(out)
+    assert (data["status"], data["mcp_server"], data["notulen_key"]) == ("PASS", "nf", rel)
+
+    lookup, create, update = data["lookup"], data["create"], data["update"]
+    assert lookup == {"reference_table": "project", "type": "notes.meeting", "include_content": False,
+                      "metadata": json.dumps({"source": "analyst", "notulen_key": rel}, separators=(",", ":"))}
+    assert create["reference_table"] == update["reference_table"] == "project"
+    assert create["type"] == update["type"] == "notes.meeting"
+    assert create["title"] == "Sprint review Q4 — 2026-10-02"
+    assert "content_sha256" not in create and "title" not in update
+
+    content = create["content"]
+    assert content == update["content"] == content.strip()
+    assert content.startswith("# Sprint review Q4\n\n## Ringkasan")
+    assert content.endswith("- **Q-1**: Format tanggal di CSV? — menunggu: Rina")
+    assert "Catatan Asli" not in content and "rapat sprint" not in content and "final_hash" not in content
+    assert update["content_sha256"] == __import__("hashlib").sha256(content.encode("utf-8")).hexdigest()
+
+    meta = json.loads(create["metadata"])
+    fm, _ = lib.split_frontmatter(path(plain, rel).read_text(encoding="utf-8"))
+    assert meta == {"source": "analyst", "notulen_key": rel, "slug": "sprint-review", "meeting_date": "2026-10-02",
+                    "final_hash": fm["final_hash"], "repo": "acme/notes"}
+    assert update["metadata"] == create["metadata"]
+    assert payload(plain, rel)[1] == out

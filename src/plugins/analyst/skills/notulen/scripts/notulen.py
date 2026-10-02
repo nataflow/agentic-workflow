@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI siklus hidup notulen rapat plugin `analyst` (18 N1–N4, N6).
+"""CLI siklus hidup notulen rapat plugin `analyst` (18 N1–N4, N6, N7).
 
 Tiap notulendir `analyst/notulen/<YYMMDDhhmm>-<slug>/` memuat satu `NOTULEN.md`: notulen terstruktur di atas,
 `## Catatan Asli` (catatan kasar pencatat apa adanya) sebagai H2 terakhir. Notulen bisa memuat info sensitif, jadi
@@ -11,6 +11,8 @@ ada di disk ini dan, bila sinkron aktif, di nataflow.
 - `new`    — alokasikan notulendir beserta `NOTULEN.md` awal: kerangka, catatan asli verbatim, `source_hash`.
 - `check`  — validator struktur dan isi notulen; `--final` ikut menagih nol `Asumsi:`.
 - `final`  — `status: FINAL` + segel `final_hash` sesudah validator `PASS` dan jawaban eksplisit user.
+- `sync-payload` — argumen tool MCP nataflow untuk notulen `FINAL`: dokumen `notes.meeting` di bawah project MCP key
+             (`list_document` → `create_document` / `upsert_document`); read-only, tanpa commit.
 
 `DRIFT` = notulen `FINAL` yang disunting sesudah disegel: `final` dijalankan ulang sesudah user mengonfirmasi isinya.
 
@@ -27,6 +29,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
+import nataflow_sync as ns  # noqa: E402
 from analyst_lib import (  # noqa: E402
     BOM,
     PLACEHOLDER,
@@ -38,6 +41,7 @@ from analyst_lib import (  # noqa: E402
     format_report,
     git_mode,
     h1_lines,
+    load_sync_config,
     meaningful,
     normalize_ticketdir,
     report_json,
@@ -73,6 +77,8 @@ ACTION_ROW = re.compile(r"^\|\s*A-(\d+)\s*\|(.*)\|(.*)\|(.*)\|$")
 # Selaras validator elisitasi: `Asumsi:` di mana pun dalam baris, juga bentuk tebal.
 ASSUMPTION = re.compile(r"(?:^|[\s(\[>*_])\**Asumsi\**\s*:", re.IGNORECASE)
 CONTENT_FIELDS = ("meeting_date",)  # field isi yang ikut sidik `final_hash`; sisanya pembukuan
+DOC_TYPE = "notes.meeting"         # `type` dokumen nataflow (keputusan user 2026-10-02)
+TITLE_MAX = 255                    # batas `title` `create_document` di server
 
 
 # ── Bentuk berkas ────────────────────────────────────────────────────────────
@@ -331,6 +337,23 @@ def classify(root: Path, rel: str) -> Dict[str, str]:
     return {**row, "state": "RUSAK", "route": f"status `{status or '-'}` bukan {'|'.join(STATUSES)}"}
 
 
+def sync_content(text: str) -> str:
+    """Isi dokumen nataflow (K13): badan notulen tanpa frontmatter dan tanpa `## Catatan Asli`, tanpa spasi tepi.
+
+    Spasi tepi dibuang di sini karena `create_document` men-*trim* isi sementara `upsert_document` menyimpannya apa
+    adanya: isi yang sudah bersih membuat `content_sha256` keduanya sama.
+    """
+    _, body = split_frontmatter(text)
+    lines, in_fence = body.splitlines(), False
+    for i, line in enumerate(lines):
+        if line.startswith("```"):
+            in_fence = not in_fence
+        elif not in_fence and line.rstrip() == f"## {SOURCE_H2}":
+            lines = lines[:i]
+            break
+    return "\n".join(lines).strip()
+
+
 def resolve(root: Path, raw: str) -> str:
     return normalize_ticketdir(raw, root)
 
@@ -428,6 +451,57 @@ def cmd_final(root: Path, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:
+    """Argumen tool MCP nataflow untuk satu notulen `FINAL` (18 N7, K10–K13) — read-only, tanpa commit.
+
+    Model mengirim `lookup`, `create`, dan `update` apa adanya; `reference_id` diisi dari `get_project_info` dan
+    `key` dari hasil `list_document`. Identitas dokumen adalah metadata `notulen_key` = path notulendir, bukan judul:
+    `create_document` menurunkan key server dari slug judul, sehingga sinkron ulang wajib mencari dulu lalu
+    `upsert_document` ke key itu. Judul dikunci saat dokumen pertama dibuat.
+    """
+    config, problems = load_sync_config(root)
+    if problems:
+        return ns.emit_fail(args.json, "SYNC-PAYLOAD", problems)
+    if config is None:
+        return ns.emit_skip(args.json, "SYNC-PAYLOAD")
+    rel = resolve(root, args.notulendir)
+    if not NOTULENDIR_RE.match(rel) or not (root / rel).is_dir():
+        return ns.emit_fail(args.json, "SYNC-PAYLOAD", [f"`{rel}` bukan notulendir {NOTULEN_DIR}/<YYMMDDhhmm>-<slug>"])
+    row = classify(root, rel)
+    if row["state"] != "FINAL":
+        why = {"DRAFT": "jalankan `final` sesudah user mengonfirmasi isinya",
+               "DRIFT": "disunting sesudah final — konfirmasi ke user lalu `final` ulang"}
+        return ns.emit_fail(args.json, "SYNC-PAYLOAD", [f"notulen {row['state']}, bukan FINAL — "
+                                                         + why.get(row["state"], row["route"])])
+    text = text_of(root / rel / NOTULEN_FILE)
+    fm, _ = split_frontmatter(text)
+    title = f"{title_of(text)} — {fm['meeting_date']}"
+    content = sync_content(text)
+    problems = ns.check_documents([{"key": rel, "type": DOC_TYPE}])
+    if len(title) > TITLE_MAX:
+        problems.append(f"judul dokumen lebih dari {TITLE_MAX} karakter — pendekkan H1 lalu `final` ulang")
+    if problems:
+        return ns.emit_fail(args.json, "SYNC-PAYLOAD", problems)
+    key = {"source": "analyst", "notulen_key": rel}
+    meta = ns.compact({**key, "slug": fm.get("slug", ""), "meeting_date": fm["meeting_date"],
+                       "final_hash": fm.get("final_hash", ""), "repo": ns.repo_identity(root, config)})
+    payload = {
+        "status": "PASS",
+        "enabled": True,
+        "mcp_server": config["mcp_server"],
+        "notulen_key": rel,
+        "lookup": {"reference_table": "project", "type": DOC_TYPE, "include_content": False,
+                   "metadata": ns.compact(key)},
+        "create": {"reference_table": "project", "type": DOC_TYPE, "title": title, "content": content,
+                   "metadata": meta},
+        "update": {"reference_table": "project", "type": DOC_TYPE, "content": content,
+                   "content_sha256": ns.sha256_text(content), "metadata": meta},
+    }
+    ns.emit(payload, args.json, f"SYNC-PAYLOAD PASS: {rel} · server {config['mcp_server']} · judul `{title}` · "
+                                f"sha {payload['update']['content_sha256'][:12]} — argumen tool lewat `--json`")
+    return 0
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description="Siklus hidup notulen rapat analyst")
     p.add_argument("--root", default=None, help="root ruang kerja; default root git atau cwd")
@@ -446,9 +520,13 @@ def main() -> None:
     s = sub.add_parser("final")
     s.add_argument("--notulendir", required=True)
     s.add_argument("--answer", required=True, help="jawaban user apa adanya")
+    s = sub.add_parser("sync-payload")
+    s.add_argument("--notulendir", required=True)
+    s.add_argument("--json", action="store_true")
     args = p.parse_args()
     root = (Path(args.root) if args.root else find_root()).resolve()
-    handler: Dict[str, Any] = {"state": cmd_state, "new": cmd_new, "check": cmd_check, "final": cmd_final}
+    handler: Dict[str, Any] = {"state": cmd_state, "new": cmd_new, "check": cmd_check, "final": cmd_final,
+                               "sync-payload": cmd_sync_payload}
     sys.exit(handler[args.cmd](root, args))
 
 

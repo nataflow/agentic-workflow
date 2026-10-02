@@ -1,6 +1,6 @@
 ---
 name: notulen
-description: Gunakan ketika user membawa catatan kasar rapat atau meeting (poin-poin, singkatan, coretan) untuk dirapikan jadi notulen terstruktur — ringkasan, peserta, agenda, pembahasan, keputusan, action item ber-PIC dan tenggat, pertanyaan terbuka — atau notulen yang sudah ada perlu dilanjutkan atau difinalkan; bukan untuk membuat tiket (itu analyst:intake) - penataan ulang tanpa mengarang isi, klarifikasi celah ke pencatat, dan finalisasi berpersetujuan, sebelum notulen dibagikan tanpa konfirmasi pencatat
+description: Gunakan ketika user membawa catatan kasar rapat atau meeting (poin-poin, singkatan, coretan) untuk dirapikan jadi notulen terstruktur — ringkasan, peserta, agenda, pembahasan, keputusan, action item ber-PIC dan tenggat, pertanyaan terbuka — atau notulen yang sudah ada perlu dilanjutkan, difinalkan, atau disinkron ulang ke nataflow; bukan untuk membuat tiket (itu analyst:intake) - penataan ulang tanpa mengarang isi, klarifikasi celah ke pencatat, finalisasi berpersetujuan, dan sinkron opsional ke nataflow, sebelum notulen dibagikan tanpa konfirmasi pencatat
 ---
 
 ## THE IRON LAW
@@ -8,11 +8,11 @@ description: Gunakan ketika user membawa catatan kasar rapat atau meeting (poin-
 - Isi notulen hanya berasal dari `## Catatan Asli` atau jawaban pencatat di sesi ini. Yang disimpulkan analis ditulis `Asumsi:` dan wajib dikonfirmasi sebelum `final`.
 - Butir dicatat sebagai **Keputusan** hanya bila catatan atau pencatat menyatakannya diputuskan. Selain itu butir masuk **Pembahasan**.
 - `status: FINAL` hanya ditulis `notulen.py final` sesudah jawaban eksplisit user. Skrip memvonis validator dan menyegel isi notulen.
-- Notulen tidak membaca kode, tidak menghasilkan tiket, dan tidak di-commit. `analyst/notulen/` selalu diabaikan git.
+- Notulen tidak membaca kode, tidak menghasilkan tiket, dan tidak di-commit. `analyst/notulen/` selalu diabaikan git; salinannya di luar disk hanya dokumen nataflow, yang isinya disusun `notulen.py sync-payload`, bukan model.
 
 ## Precondition [REQUIRED]
 
-1. Skrip: `notulen.py` = `${CLAUDE_PLUGIN_ROOT}/skills/notulen/scripts/notulen.py`. Template isi: `templates/notulen-template.md`.
+1. Skrip: `notulen.py` = `${CLAUDE_PLUGIN_ROOT}/skills/notulen/scripts/notulen.py`. Template isi: `templates/notulen-template.md`. Prosedur sinkron: `references/nataflow-sync.md`.
 2. `python3 ${CLAUDE_PLUGIN_ROOT}/skills/notulen/scripts/notulen.py state` harus berjalan. Galat → laporkan mentah ke user, berhenti.
 
 ## Parameter [REQUIRED]
@@ -30,6 +30,7 @@ Jalankan `notulen.py state`, lalu rutekan:
 
 - Permintaan melanjutkan notulen `DRAFT` → baca `NOTULEN.md` utuh, lalu Phase 3.
 - Notulen `DRIFT` (disunting sesudah final) → sajikan seksi yang berubah ke user, lalu Phase 5.
+- Sinkron ulang notulen `FINAL` (mis. sesudah segmen `nataflow GAGAL`) → Phase 6 saja.
 - `RUSAK` / `NAMA_TIDAK_SAH` → laporkan baris `state` ke user, berhenti. Frontmatter tidak ditambal dengan tangan.
 - Selain itu → notulen baru, Phase 1.
 
@@ -66,6 +67,10 @@ Isi seksi `NOTULEN.md` dari `## Catatan Asli` menurut bagian 2 `templates/notule
 2. `AskUserQuestion`: *Final* · *Ada koreksi (sebut)* · *Tahan*.
 3. *Final* → `python3 ${CLAUDE_PLUGIN_ROOT}/skills/notulen/scripts/notulen.py final --notulendir <notulendir> --answer "<jawaban user>"`. *Koreksi* → terapkan, lalu ulangi Phase 4. *Tahan* → notulen tetap `DRAFT`, tutup dengan baris `NOTULEN — DRAFT`.
 
+### Phase 6 — Sinkron nataflow
+
+Sesudah `FINAL PASS`, jalankan prosedur `references/nataflow-sync.md` apa adanya. Hasilnya satu segmen `nataflow …` di baris penutup. `GAGAL` tidak menurunkan `FINAL`.
+
 ## Guardrails
 
 - **FAKTA BUKAN TEBAKAN**: seksi dilarang diisi praktik umum, kelanjutan yang "biasanya terjadi", atau isi rapat sejenis. Yang tidak ada di catatan adalah pertanyaan, bukan isi.
@@ -82,7 +87,8 @@ Isi seksi `NOTULEN.md` dari `## Catatan Asli` menurut bagian 2 `templates/notule
 
 ## Output [REQUIRED]
 
-- Final: `NOTULEN — FINAL · <notulendir> · <n> keputusan · <n> action item · <n> Q`.
+- Final: `NOTULEN — FINAL · <notulendir> · <n> keputusan · <n> action item · <n> Q · nataflow <dibuat | diperbarui | tidak berubah | dilewati | GAGAL: <sebab>>`.
+- Sinkron ulang: `SINKRON — <notulendir> · nataflow <…>`.
 - Belum final: `NOTULEN — DRAFT · <notulendir> · <sebab: ditahan user | menunggu jawaban <siapa> | validator FAIL>`.
 
 ## Failure path
@@ -91,7 +97,8 @@ Isi seksi `NOTULEN.md` dari `## Catatan Asli` menurut bagian 2 `templates/notule
 2. **Validator `FAIL` tak kunjung `PASS`** karena isi memang tidak diketahui → ubah jadi `Q-n` atau `belum ditentukan`, bukan dikarang.
 3. **`Catatan asli utuh` `FAIL`** → kutipan berubah saat menulis ulang berkas; salin ulang dari keluaran `new` atau sumber tempelannya, byte demi byte.
 4. **`FINAL FAIL`** → ikuti sebab di keluaran; validator `FAIL` → Phase 4; jawaban kosong → ulangi Phase 5.
-5. **Pencatat tidak tahu jawabannya** → catat `Q-n` dengan `menunggu: <siapa>`. Notulen tetap boleh final dengan pertanyaan terbuka.
+5. **Sinkron `GAGAL`** (server MCP tidak tersedia, `get_project_info` galat, judul bentrok, dokumen ber-`notulen_key` kembar) → notulen tetap `FINAL`. Bereskan sebabnya, lalu sinkron ulang lewat `/analyst:notulen`. Dilarang mengulang `create_document` tanpa `list_document` ulang.
+6. **Pencatat tidak tahu jawabannya** → catat `Q-n` dengan `menunggu: <siapa>`. Notulen tetap boleh final dengan pertanyaan terbuka.
 
 ## STYLE
 
