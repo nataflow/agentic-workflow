@@ -3,7 +3,24 @@
 Sumber: feedback user 2026-10-02 dan diskusi desain sesi yang sama. Basis kode plugin: commit `7423c86`
 (analyst 0.14.0).
 
-**Status (2026-10-02):** rencana, belum dikerjakan.
+**Status (2026-10-02):** B1–B7 dan D1 selesai. Test regresi di `tests/analyst/test_batch_19.py` (27 test: B1–B4),
+ditambah satu kasus smoke `state --batch`. Suite penuh hijau (2138), subset analyst/smoke/lint hijau di Python 3.9,
+lint 0 FAIL, dan `claude plugin validate .` lolos. Versi: analyst 0.15.0.
+
+Selisih pelaksanaan terhadap Kontrak di bawah:
+
+- `batch.md` tidak memakai `${CLAUDE_PLUGIN_ROOT}` (lint R2 untuk berkas non-SKILL.md). Perintah ditulis
+  `python3 <ticket.py> …` dengan path dari Precondition skill pemuatnya, dan template scout dirujuk lewat
+  Precondition 1 `analyst:elicit`. `elicit` dan `spec` memuatnya dari Precondition 1 sebagai `batch.md`.
+- B1: ticketdir `KOSONG` yang dipakai ulang ikut membawa field batch, dan `--urutan` dinormalkan (`01/3` → `1/3`).
+- B4: `PERTANYAAN HEMAT` intake untuk batch menjadi maksimal satu `AskUserQuestion` per tiket per phase (mis.
+  keraguan tipe), tiap panggilan tentang satu tiket. Koreksi urutan dari user sebelum alokasi menyusun ulang
+  urutan; sesudah alokasi urutan tetap (`batch.md` bagian 3).
+- B5: `NEW FAIL` karena slug kembar dengan ticketdir terbuka di tengah alokasi tidak memakai slug lain: tujuan
+  itu duplikat yang lolos intake, tidak dialokasikan, dan disebut `Belum disentuh` di ringkasan (`batch.md`
+  bagian 5 butir 3). Tiket batch yang belum pernah diisi masuk Phase 1 dari jalur Lanjutan Phase 0.
+- B6: rute *menunggu jawaban user* dan `analyst:elicit (reopen)` tetap di tiket yang sama; hanya `READY`, `BATAL`,
+  *ditahan user*, dan `TERTAHAN` yang memindahkan batch ke tiket berikutnya.
 
 ## Tujuan
 
@@ -152,7 +169,7 @@ Kolom `Keadaan` dari `state --batch`; kolom `nataflow` dari baris penutup tiap t
 ada.
 
 ## B1 [Tinggi] `ticket.py new` belum mengenal batch
-- [ ] Selesai
+- [x] Selesai
 
 `new` hanya mengalokasikan satu tiket, dan nama ticketdir yang dialokasikan pada menit yang sama terurut
 menurut slug, bukan menurut urutan pilihan intake. **Perubahan:** argumen `--urutan`/`--batch` sesuai
@@ -166,7 +183,7 @@ Kontrak; `ticket_skeleton` menerima `batch` dan `urutan` opsional dan menulis ke
 - paritas kerangka `test_g9` tetap hijau tanpa perubahan.
 
 ## B2 [Sedang] `state` tidak tahu urutan batch
-- [ ] Selesai
+- [x] Selesai
 
 **Perubahan:** kolom, urutan baris, dan `--batch` sesuai Kontrak.
 
@@ -174,7 +191,7 @@ Kontrak; `ticket_skeleton` menerima `batch` dan `urutan` opsional dan menulis ke
 `--batch` ikut menampilkan `READY` dan `DIBATALKAN` dan menyaring batch lain; baris non-batch berisi `-`.
 
 ## B3 [Sedang] Field batch tanpa pagar validator
-- [ ] Selesai
+- [x] Selesai
 
 Field yang disunting tangan (`urutan: 7/3`, `batch` tanpa `urutan`) membuat urutan resume salah tanpa ada yang
 menolak. **Perubahan:** aturan frontmatter sesuai Kontrak di `_frontmatter_common`, sehingga berlaku di
@@ -183,7 +200,7 @@ menolak. **Perubahan:** aturan frontmatter sesuai Kontrak di `_frontmatter_commo
 **Test:** tiap pelanggaran → `FAIL` check frontmatter; tiket tanpa field batch tetap `PASS`.
 
 ## B4 [Tinggi] `intake` memaksa satu tujuan per pesan
-- [ ] Selesai
+- [x] Selesai
 
 **Perubahan:**
 - `skills/intake/references/batch.md` baru: alur, kriteria urutan (K4), syarat selesai satu tiket (K3), aturan
@@ -204,7 +221,7 @@ menolak. **Perubahan:** aturan frontmatter sesuai Kontrak di `_frontmatter_commo
 lint R-check bersih.
 
 ## B5 [Tinggi] `elicit` belum bisa mengalokasikan batch dan menjalankan scout di depan
-- [ ] Selesai
+- [x] Selesai
 
 **Perubahan:**
 - `elicit/SKILL.md`:
@@ -224,18 +241,18 @@ lint R-check bersih.
 **Test:** `test_scout_18.py` disesuaikan bila teks plafon ikut diuji; selebihnya ditagih lint R-check.
 
 ## B6 [Sedang] `spec` berhenti sesudah satu tiket
-- [ ] Selesai
+- [x] Selesai
 
 **Perubahan:** `spec/SKILL.md` Output: sesudah baris penutup tiket batch (`READY`, *Tahan*, dibatalkan), lanjut
 ke tiket berikutnya per `batch.md`; sesudah tiket terakhir, sajikan ringkasan batch.
 
 ## B7 [Rendah] Smoke untuk `state --batch`
-- [ ] Selesai
+- [x] Selesai
 
 Tambah kasus `ticket.py state --batch 2609250000-smoke --json` ke `CASES` `tests/test_smoke.py`.
 
 ## D1 [Rendah] Dokumen dan versi
-- [ ] Selesai
+- [x] Selesai
 
 - `README.md` analyst: `## Workflow` (batch), `## Artefak` (field batch), `## Penegakan Mekanis` (`new
   --urutan`, `state --batch`).
