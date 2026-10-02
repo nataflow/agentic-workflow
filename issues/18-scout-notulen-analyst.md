@@ -351,7 +351,7 @@ untuk melanjutkan notulen yang belum final. **Test:** kelima keadaan terbaca; `-
 `analyst/notulen/`.
 
 ## N5 [Tinggi] Skill `analyst:notulen`
-- [ ] Selesai
+- [x] Selesai
 
 **Perubahan:** `skills/notulen/SKILL.md` (`user-invocable`, deskripsi "Gunakan ketika user membawa catatan kasar
 rapat …") dan `templates/notulen-template.md`. Isi skill:

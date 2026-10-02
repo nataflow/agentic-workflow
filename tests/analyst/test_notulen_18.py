@@ -256,3 +256,24 @@ def test_n6_notulen_tidak_pernah_di_commit(repo):
     assert code == 0 and "tanpa commit" in out
     assert git(repo, "rev-list", "--count", "HEAD") == before
     assert git(repo, "status", "--porcelain", "-uall") == ""
+
+
+# --- N5: template ↔ skrip -----------------------------------------------------------------------
+
+@pytest.mark.regression("18 N5")
+def test_n5_kerangka_skrip_sama_dengan_template():
+    template = (PLUGINS / "analyst" / "skills" / "notulen" / "templates" / "notulen-template.md").read_text(
+        encoding="utf-8")
+    block = template.split("````markdown\n", 1)[1].split("\n````", 1)[0] + "\n"
+    mod = load_module(NOTULEN, "notulen_18")
+    text = mod.skeleton("sprint-review", "Sprint review Q4", "2026-10-02", "2026-10-03", "catatan kasar")
+    fm, _ = lib.split_frontmatter(text)
+    expected = (block.replace("<slug>", "sprint-review")
+                .replace("meeting_date: <YYYY-MM-DD>", "meeting_date: 2026-10-02")
+                .replace("created: <YYYY-MM-DD>", "created: 2026-10-03")
+                .replace("<12 hex>", fm["source_hash"])
+                .replace("<judul rapat>", "Sprint review Q4")
+                .replace("<catatan kasar apa adanya>", "catatan kasar"))
+    assert text == expected
+    headings = [l[3:] for l in block.splitlines() if l.startswith("## ")]
+    assert tuple(headings) == mod.H2
