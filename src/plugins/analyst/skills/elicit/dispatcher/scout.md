@@ -4,7 +4,7 @@ Pakai template ini saat `elicit` mendispatch subagent penelusur kode dangkal (`c
 
 **Tujuan:** Mengumpulkan bukti `path:baris` (tiket `TECH`) atau konteks singkat tentang apa yang sudah ada di kode (tipe lain) tanpa membaca kode di konteks utama. Hasilnya dipakai sebagai bahan pertanyaan, bukan sebagai fakta dari peminta.
 
-**Dispatch setelah:** `elicit` Phase 1. Brief atau permintaan sudah dipetakan ke pilar, dan `TICKET.md` sudah ditulis sekali.
+**Dispatch setelah:** `elicit` Phase 1. Brief atau permintaan sudah dipetakan ke pilar, dan `TICKET.md` sudah ditulis sekali. Tiket batch: dispatch pertama berjalan di awal batch, sesudah semua `ticket.py new` `PASS` dan sebelum Phase 1 tiket mana pun — satu dispatch per tiket yang membutuhkan, semuanya dalam satu pesan (`intake/references/batch.md` bagian 6).
 
 ````markdown
 Telusuri kode secara dangkal untuk elisitasi satu tiket analyst.
@@ -32,13 +32,13 @@ Telusuri kode secara dangkal untuk elisitasi satu tiket analyst.
 
 **Gerbang masuk**, kegagalan mana pun membatalkan dispatch:
 
-- **Plafon 2 dispatch per sesi elisitasi**: satu di Phase 1, dan satu susulan untuk butir `Belum disisir` atau klaim baru dari jawaban peminta. Dispatch ketiga dilarang. Sisa pertanyaannya ditanyakan ke peminta.
+- **Plafon 2 dispatch per tiket**: satu di Phase 1 (tiket batch: di awal batch), dan satu susulan untuk butir `Belum disisir` atau klaim baru dari jawaban peminta. Dispatch ketiga dilarang. Sisa pertanyaannya ditanyakan ke peminta. Dispatch ulang karena balikan hilang dari percakapan (diringkas otomatis, atau sesi baru) tidak dihitung, sama seperti ulangan karena gagal.
 - **Dispatch langsung tanpa skill pembungkus.** Doktrin penelusuran ada di `agents/code-scout.md`. Dilarang menyalin isi tiket ke prompt. Butir `pertanyaan` cukup kata-kata peminta.
 - **Audit hidrasi**: batalkan dispatch bila prompt masih memuat slot `{...}` mentah atau `TBD`/`TODO`.
 
 ### Penanganan Balikan
 
-Balikan tidak ditulis ke berkas mana pun. Pakai isinya langsung di Phase 1–2:
+Balikan tidak ditulis ke berkas mana pun. Pakai isinya langsung di Phase 1–2; balikan tiket batch disimpan di percakapan berlabel slug tiketnya sampai gilirannya tiba:
 
 | Balikan subagent | Penanganan `elicit` |
 | --- | --- |

@@ -1,6 +1,6 @@
 ---
 name: elicit
-description: Dipanggil analyst:intake sesudah tipe dan slug ditetapkan, atau untuk ticketdir berkeadaan ELISITASI, atau analyst:spec saat fakta tiket perlu digali ulang - tanya-jawab terarah dengan peminta non-engineer (tiket TECH: dengan lead engineer, ditambah pembuktian klaimnya lewat subagent code-scout; tipe lain memakai code-scout hanya sebagai konteks pertanyaan), direkam per pilar ke seksi Catatan Elisitasi TICKET.md tiap giliran, sampai tertutup tanpa pertanyaan memblokir, sebelum analyst:spec menulis kartu tiket di atasnya
+description: Dipanggil analyst:intake sesudah tipe dan slug ditetapkan (satu tiket, atau batch 2–5 tiket yang dialokasikan sekaligus beserta scout paralel lalu dielisitasi satu per satu), atau untuk ticketdir berkeadaan ELISITASI, atau analyst:spec saat fakta tiket perlu digali ulang - tanya-jawab terarah dengan peminta non-engineer (tiket TECH: dengan lead engineer, ditambah pembuktian klaimnya lewat subagent code-scout; tipe lain memakai code-scout hanya sebagai konteks pertanyaan), direkam per pilar ke seksi Catatan Elisitasi TICKET.md tiap giliran, sampai tertutup tanpa pertanyaan memblokir, sebelum analyst:spec menulis kartu tiket di atasnya
 user-invocable: false
 ---
 
@@ -8,14 +8,15 @@ user-invocable: false
 
 - Tiap fakta di `## Catatan Elisitasi` berasal dari permintaan asli atau jawaban yang terekam di log. Yang disimpulkan analis ditulis `Asumsi:` dan wajib dikonfirmasi di Phase 4.
 - `TICKET.md` ditulis ulang **sesudah tiap giliran tanya-jawab**, bukan di akhir — jawaban yang hanya hidup di percakapan hilang saat sesi berganti.
-- Konteks utama tidak membaca kode. Seluruh pembacaan kode lewat subagent `analyst:code-scout` (`dispatcher/scout.md`), maksimal 2 dispatch per sesi. Balikannya bahan bertanya, bukan fakta: hanya tiket `TECH` yang mencatat `path:baris`, dan hanya dari butir `Ditemukan`.
-- Maksimal 3 pertanyaan per giliran lewat `AskUserQuestion`; dilarang menanyakan solusi teknis. Tiket `TECH` boleh bertanya teknis, tetapi analyst tetap tidak memilihkan solusi (`references/elicitation-tech.md` bagian 1).
+- Konteks utama tidak membaca kode. Seluruh pembacaan kode lewat subagent `analyst:code-scout` (`dispatcher/scout.md`), maksimal 2 dispatch per tiket. Balikannya bahan bertanya, bukan fakta: hanya tiket `TECH` yang mencatat `path:baris`, dan hanya dari butir `Ditemukan`.
+- Maksimal 3 pertanyaan per giliran lewat `AskUserQuestion`, dan satu panggilan hanya tentang satu tiket; dilarang menanyakan solusi teknis. Tiket `TECH` boleh bertanya teknis, tetapi analyst tetap tidak memilihkan solusi (`references/elicitation-tech.md` bagian 1).
 - `elicitation: CLOSED` hanya ditulis `ticket.py close` sesudah konfirmasi fakta Phase 4 — skrip memvonis `validate_doc.py --kind elicit`, menyegel catatan, dan meng-commit. Skill ini hanya menulis frontmatter miliknya dan `## Catatan Elisitasi` di bawah `### Permintaan Asli`; kutipan permintaan asli (dimateraikan `ticket.py new`), kartu di atasnya, `status`, dan `priority` bukan miliknya.
+- Batch: satu tiket diselesaikan penuh sebelum tiket berikutnya, dan fakta tidak berpindah antar-tiket — jawaban untuk tiket lain hanya boleh masuk sebagai `Asumsi:` (`batch.md` bagian 7).
 
 ## Precondition [REQUIRED]
 
-1. Skrip: `ticket.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py`; `validate_doc.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/validate_doc.py`. Template dispatch penelusur kode: `dispatcher/scout.md`.
-2. **Tiket baru** (dari intake dengan `slug`, `type`, `request`, `requester`; juga ticketdir `KOSONG`): `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py new --slug <slug> --type <type> [--category <category>] --requester "<requester>" --request - <<'EOF'` (`--category` wajib untuk `TECH` dan ditolak untuk tipe lain), lalu `request` apa adanya, lalu `EOF` → `NEW PASS: <ticketdir> · root=<root> · git=<ya|tidak|diabaikan> · type=<type>[ · category=<category>]`. `git=diabaikan`: ticketdir diabaikan `.gitignore` — tetap di disk, tidak pernah di-commit (repo bersinkron nataflow: `new` menulis `analyst/tickets/.gitignore` bila belum ada); segmen tambahan keluaran `new` disampaikan ke user apa adanya. Skrip menulis `TICKET.md` persis bagian 1 `templates/elicit-template.md` — permintaan asli sebagai blockquote beserta `request_hash`, seluruh pilar `_(belum terjawab)_` — dan memakai ulang ticketdir `KOSONG` ber-slug sama. `FAIL` slug kembar → kembali ke `analyst:intake` Phase 1.
+1. Skrip: `ticket.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py`; `validate_doc.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/validate_doc.py`. Template dispatch penelusur kode: `dispatcher/scout.md`. Prosedur batch: `${CLAUDE_PLUGIN_ROOT}/skills/intake/references/batch.md` (di bawah: `batch.md`).
+2. **Tiket baru** (dari intake dengan `slug`, `type`, `request`, `requester`; juga ticketdir `KOSONG`): `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py new --slug <slug> --type <type> [--category <category>] --requester "<requester>" --request - <<'EOF'` (`--category` wajib untuk `TECH` dan ditolak untuk tipe lain), lalu `request` apa adanya, lalu `EOF` → `NEW PASS: <ticketdir> · root=<root> · git=<ya|tidak|diabaikan> · type=<type>[ · category=<category>]`. `git=diabaikan`: ticketdir diabaikan `.gitignore` — tetap di disk, tidak pernah di-commit (repo bersinkron nataflow: `new` menulis `analyst/tickets/.gitignore` bila belum ada); segmen tambahan keluaran `new` disampaikan ke user apa adanya. Skrip menulis `TICKET.md` persis bagian 1 `templates/elicit-template.md` — permintaan asli sebagai blockquote beserta `request_hash`, seluruh pilar `_(belum terjawab)_` — dan memakai ulang ticketdir `KOSONG` ber-slug sama. `FAIL` slug kembar → kembali ke `analyst:intake` Phase 1. **Batch** (`batch` terisi): alokasikan semua tiket sekaligus, berurutan, per `batch.md` bagian 5 — perintah yang sama ditambah `--urutan <k>/<N>` (dan `--batch <id>` untuk k ≥ 2); keluaran `PASS` ditambah segmen ` · batch=<id> urutan=<k>/<N>`.
 3. **Ticketdir ada** (`ELISITASI` atau buka ulang): `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py check --gate elicit --ticketdir <ticketdir>` (tambah `--reopen` bila `reopen_reason` terisi). `PASS` → catat `root=` dan `git=` dari baris `Terselesaikan:` lalu lanjut. `FAIL` → remediasi per baris `Tindakan`; tiket `READY` dibuka ulang hanya lewat `analyst:spec`.
 
 ## Parameter [REQUIRED]
@@ -26,13 +27,15 @@ user-invocable: false
 - `request` — string — `[REQUIRED]` bila `ticketdir` kosong atau berkeadaan `KOSONG` — permintaan asli apa adanya.
 - `requester` — string — `[REQUIRED]` bila `ticketdir` kosong atau berkeadaan `KOSONG` — nama/peran peminta; `ticket.py new` menolak nilai kosong.
 - `reopen_reason` — string — default `""` — alasan `analyst:spec` mengembalikan elisitasi yang sudah `CLOSED`.
+- `batch` — list — default `[]` — hasil `analyst:intake` Phase 6: 2–5 butir `{ slug, type, category, request, requester }` berurutan. Terisi → parameter tiket tunggal di atas diabaikan.
 
 ## Workflow
 
 ### Phase 0 — Alokasi atau Lanjutan
 
+- **Awal batch** (`batch` terisi): alokasi semua tiket (Precondition 2), lalu scout awal batch per `batch.md` bagian 6 — semua dispatch dalam satu pesan. Tiket urutan 1 lanjut sebagai **Baru**; tiket berikutnya masuk per `batch.md` bagian 8 sebagai **Lanjutan**.
 - **Baru** (termasuk ticketdir `KOSONG`): `TICKET.md` sudah ditulis `ticket.py new` (Precondition 2) dengan `elicitation: OPEN`; dilarang menulis kerangkanya dengan tangan. Baca berkasnya, lalu Phase 1.
-- **Lanjutan** (`ELISITASI`): baca `TICKET.md` utuh. Ada `Q-{n}` `menunggu:` orang lain → tanyakan lewat `AskUserQuestion` apakah jawabannya sudah tersedia; ya → catat, tidak → lompat ke pilar yang belum terjawab tanpa `menunggu`.
+- **Lanjutan** (`ELISITASI`): baca `TICKET.md` utuh. Ada `Q-{n}` `menunggu:` orang lain → tanyakan lewat `AskUserQuestion` apakah jawabannya sudah tersedia; ya → catat, tidak → lompat ke pilar yang belum terjawab tanpa `menunggu`. Tiket batch yang belum pernah diisi (log kosong, seluruh pilar `_(belum terjawab)_`) → Phase 1.
 - **Buka ulang** (`reopen_reason`): set `elicitation: OPEN` (kartu yang sudah ada dibiarkan untuk `spec`), tambahkan baris log `| n | <tanggal> | Dibuka ulang | <reopen_reason> | analyst:spec |` — `ticket.py close` menolak menutup ulang catatan yang berubah sejak segel terakhir tanpa baris ini — lalu gali hanya pilar yang disebut alasannya.
 
 ### Phase 1 — Isi dari Permintaan
@@ -43,15 +46,17 @@ Baca `references/elicitation-guide.md` dan `references/literasi-teknis.md`. Isi 
 
 **Konteks kode** (tipe selain `TECH`): bila permintaan menyebut layar, menu, laporan, status, atau data yang mungkin sudah ada, dispatch `analyst:code-scout` `mode: KONTEKS` (`dispatcher/scout.md`) dengan 1–5 konsep itu dalam kata-kata peminta. Temuannya dipakai sebagai bahan opsi pertanyaan Phase 2 dalam bahasa yang terlihat pengguna, atau sebagai baris `Asumsi:` tanpa rujukan berkas yang dikonfirmasi di Phase 4. Temuan scout dilarang ditulis sebagai fakta pilar, dan `path:baris` dilarang disalin ke catatan (`validate_doc.py --kind elicit` menolaknya). Ruang kerja tanpa kode atau scout gagal → lanjut tanpa konteks kode.
 
+**Tiket batch**: dispatch Phase 1 di atas sudah berjalan di awal batch. Pakai balikan tiket ini, tunggu bila belum tiba sebelum Phase 2, dan dispatch ulang hanya per `batch.md` bagian 6 butir 5.
+
 ### Phase 2 — Giliran Tanya-Jawab
 
 1. Pilih ≤ 3 pilar wajib yang belum terjawab, urut dampak: `FEATURE`/`IMPROVEMENT` — Masalah → Aktor → Kondisi Diinginkan → Aturan Bisnis → Batas Cakupan → Urgensi → Kondisi Saat Ini; `BUG` — Langkah Reproduksi → Yang Terjadi → Yang Diharapkan → Dampak → Urgensi; `TECH` — Masalah Teknis → Kondisi Saat Ini → Kondisi Target → Batasan → Batas Cakupan → Urgensi, ditambah yang wajib tergali untuk `category`-nya (`references/elicitation-tech.md` bagian 4).
-2. `AskUserQuestion`: satu pertanyaan per pilar, 2–4 opsi konkret beserta konsekuensi bisnisnya (aturan bertanya: panduan bagian 2). Pertanyaan pilar `Aktor`, `Aturan Bisnis`, `Kondisi Diinginkan`, dan `Kasus Khusus` dipilih dari `references/literasi-teknis.md` — hanya konsep yang disentuh permintaan dan bentuk hasilnya. Opsi boleh bertumpu pada temuan scout `KONTEKS` ("Layar daftar invoice sudah punya saringan status. Tambah saringan tanggal di sana, atau layar baru?"), tetap tanpa nama berkas atau istilah sistem. Tiket `TECH` tidak memakai `literasi-teknis.md`: opsinya alternatif teknis beserta konsekuensinya, dan klaim yang tidak cocok dengan kode diajukan berdampingan dengan buktinya.
+2. `AskUserQuestion`: satu pertanyaan per pilar, 2–4 opsi konkret beserta konsekuensi bisnisnya (aturan bertanya: panduan bagian 2). Pertanyaan pilar `Aktor`, `Aturan Bisnis`, `Kondisi Diinginkan`, dan `Kasus Khusus` dipilih dari `references/literasi-teknis.md` — hanya konsep yang disentuh permintaan dan bentuk hasilnya. Opsi boleh bertumpu pada temuan scout `KONTEKS` ("Layar daftar invoice sudah punya saringan status. Tambah saringan tanggal di sana, atau layar baru?"), tetap tanpa nama berkas atau istilah sistem. Tiket batch: header tiap pertanyaan `Tiket <k>/<N>`. Tiket `TECH` tidak memakai `literasi-teknis.md`: opsinya alternatif teknis beserta konsekuensinya, dan klaim yang tidak cocok dengan kode diajukan berdampingan dengan buktinya.
 3. **Sesudah tiap giliran**: tambahkan baris log per jawaban (sumber = `requester` atau nama yang disebut user), perbarui pilar, tulis `TICKET.md`, jalankan `validate_doc.py --kind elicit --ticketdir <ticketdir>` — `elicitation: OPEN` boleh menyisakan pilar belum terjawab, tetapi struktur wajib `PASS`.
 4. Jawaban "tidak tahu" atau "tanya si X" → `- **Q-{n}** [MEMBLOKIR | TIDAK MEMBLOKIR]: <pertanyaan> — menunggu: <siapa>` (butir 12 template menentukan labelnya), lanjut ke pilar lain.
-5. Ulangi sampai seluruh pilar wajib terisi atau yang tersisa hanya pertanyaan `menunggu`. **Plafon 5 giliran per sesi**: habis → simpan, commit tertunda (Phase 5 butir 3), dan sajikan blok `TERTAHAN`.
-6. Jawaban memunculkan klaim kode baru (`TECH`) atau konsep baru yang mungkin sudah ada (tipe lain), atau balikan scout menyisakan `Belum disisir` → satu dispatch susulan bila plafon 2 per sesi masih tersisa; selain itu tanyakan ke peminta.
-7. Jawaban memunculkan tujuan pengguna kedua yang dapat dirilis terpisah → panduan bagian 5: tanyakan mana yang dikerjakan, catat sisanya di `Batas Cakupan` `— tiket terpisah`.
+5. Ulangi sampai seluruh pilar wajib terisi atau yang tersisa hanya pertanyaan `menunggu`. **Plafon 5 giliran per tiket per sesi**: habis → simpan, commit tertunda (Phase 5 butir 3), dan sajikan blok `TERTAHAN`.
+6. Jawaban memunculkan klaim kode baru (`TECH`) atau konsep baru yang mungkin sudah ada (tipe lain), atau balikan scout menyisakan `Belum disisir` → satu dispatch susulan bila plafon 2 per tiket masih tersisa; selain itu tanyakan ke peminta.
+7. Jawaban memunculkan tujuan pengguna kedua yang dapat dirilis terpisah → panduan bagian 5: tanyakan mana yang dikerjakan, catat sisanya di `Batas Cakupan` `— tiket terpisah`. Tujuan yang sudah menjadi tiket lain di batch ini, termasuk tujuan lain dalam permintaan asli yang disalin utuh (`batch.md` bagian 2), dicatat `<tujuan> — tiket <slug>` tanpa bertanya.
 
 ### Phase 3 — Pilar Opsional
 
@@ -67,7 +72,7 @@ Ini **konfirmasi fakta, bukan persetujuan tiket** — persetujuan hanya di `anal
 
 ### Phase 5 — Tutup & Serah Terima
 
-1. Pertanyaan `MEMBLOKIR` masih ada → dilarang menutup; blok `TERTAHAN` beserta daftar pertanyaan siap diteruskan.
+1. Pertanyaan `MEMBLOKIR` masih ada → dilarang menutup; blok `TERTAHAN` beserta daftar pertanyaan siap diteruskan. Tiket batch yang tertahan (butir ini, plafon giliran, atau *Tunda* di Phase 4) → sesudah bloknya, lanjut ke tiket berikutnya per `batch.md` bagian 8.
 2. Self-test semantik butir 10–15 template, lalu `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py close --ticketdir <ticketdir>`. Skrip menulis `elicitation: CLOSED` hanya bila `validate_doc.py --kind elicit` `PASS` (bila tidak, berkas dikembalikan apa adanya dan laporan validator dicetak), menyegel catatan (`elicit_hash`, `elicit_log`), dan di repo git meng-commit `docs(ticket): elisitasi <slug>` (`commit diabaikan git` bila ticketdir diabaikan `.gitignore`). Dilarang menulis `elicitation: CLOSED` dengan tangan: `analyst:spec` menolak catatan tanpa segel.
 3. Exit 3 (`COMMIT GAGAL`) → `CLOSED` sudah tertulis; sajikan barisnya apa adanya (Failure path 5). Draft yang **tertahan** di-commit lewat `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py commit --ticketdir <ticketdir> --stage tertunda` (subjek `docs(ticket): elisitasi <slug> (tertunda)`, staging path eksplisit); dilarang `git add`/`git commit` dengan tangan. Bukan repo git (`tanpa git`) atau ticketdir diabaikan `.gitignore` (`commit diabaikan git`) → skrip melewati commit; sebut di Output.
 4. Panggil `analyst:spec` dengan `{ ticketdir }`.
@@ -79,8 +84,9 @@ Ini **konfirmasi fakta, bukan persetujuan tiket** — persetujuan hanya di `anal
 - **BAHASA PEMINTA**: istilah bisnis peminta dipakai apa adanya dan konsisten; dilarang diganti sinonim di pilar lain. Istilah domain dan nama entitas, menu, layar, atau kolom berbahasa Inggris (*Report Order*, *Created At*) tidak diterjemahkan ke Bahasa Indonesia (panduan bagian 3).
 - **SIMPAN TIAP GILIRAN**: tulis `TICKET.md` sesudah tiap giliran, sebelum pertanyaan berikutnya.
 - **KODE SEBAGAI KONTEKS** (selain `TECH`): kode menunjukkan apa yang ada, bukan apa yang diinginkan peminta. Temuan `code-scout` hanya mempertajam pertanyaan atau menjadi `Asumsi:` yang dikonfirmasi; `Kondisi Saat Ini` tetap diceritakan peminta. `path:baris` dilarang di catatan non-`TECH`.
-- **KODE LEWAT SCOUT** (semua tipe): konteks utama dilarang memakai `Read`/`Grep`/`Glob` atas kode repo; pembacaan kode hanya lewat `analyst:code-scout`, maksimal 2 dispatch per sesi. Bukti `TECH` hanya dari butir `Ditemukan` balikan scout; dilarang menyunting kode atau menulis bukti yang tidak ada di balikan.
+- **KODE LEWAT SCOUT** (semua tipe): konteks utama dilarang memakai `Read`/`Grep`/`Glob` atas kode repo; pembacaan kode hanya lewat `analyst:code-scout`, maksimal 2 dispatch per tiket. Bukti `TECH` hanya dari butir `Ditemukan` balikan scout; dilarang menyunting kode atau menulis bukti yang tidak ada di balikan.
 - **KUTIPAN PERMINTAAN TETAP**: `### Permintaan Asli` dimateraikan `request_hash` oleh `ticket.py new`; saat menulis ulang berkas tiap giliran, salin kutipan itu byte demi byte. Keterangan baru dari peminta masuk log, bukan ke kutipan.
+- **SATU TIKET SATU KONTEKS** (batch): tiap `AskUserQuestion`, baris log, dan pilar hanya tentang tiket yang sedang digarap. Jawaban yang terdengar berlaku juga untuk tiket lain tetap ditanyakan atau dikonfirmasi di tiket itu sendiri.
 - **SATU TIKET SATU ELISITASI**: dilarang menulis atau menyunting kartu di atas `## Catatan Elisitasi`, menyusun acceptance criteria, atau menanyakan "setuju dengan tiketnya?".
 - **RATIONALIZATION PREVENTION**:
   - "Aturannya pasti begini, tidak perlu ditanya" — aturan yang ditebak lolos ke tiket sebagai kebutuhan palsu dan dibangun engineer.
@@ -89,6 +95,7 @@ Ini **konfirmasi fakta, bukan persetujuan tiket** — persetujuan hanya di `anal
   - "Nanti saja ditulis ke berkas" — sesi terputus menghapus semua jawaban yang belum tertulis.
   - "Scout sudah menemukannya, tulis saja sebagai fakta" (selain `TECH`) — kode menunjukkan yang ada, bukan yang dibutuhkan peminta; fakta yang tidak pernah dikonfirmasi peminta lolos ke tiket sebagai kebutuhan palsu.
   - "Lead engineer pasti benar, buktinya tidak perlu dicek" (`TECH`) — bukti yang tidak dibaca lolos ke tiket sebagai kondisi palsu; validator kartu menolak `path:baris` yang tidak ada.
+  - "Tiket 1 sudah menjawab aktornya, salin saja ke tiket 2" (batch) — reviewer menilai tiket 2 hanya dari catatannya sendiri; jawaban tanpa baris log di tiket itu adalah fakta tanpa sumber. Tulis sebagai `Asumsi:` dan konfirmasi di Phase 4.
   - "Validator sudah PASS, `elicitation: CLOSED` saya tulis sendiri" — tanpa segel `close`, suntingan catatan sesudahnya tidak terdeteksi dan `analyst:spec` menolak masuk.
 
 ## Output [REQUIRED]
@@ -104,9 +111,11 @@ Elisitasi tertutup → tutup satu baris: `ELICIT — CLOSED · <ticketdir> · <n
 - **Lanjutkan dengan**: `analyst:intake` (ticketdir terbaca ELISITASI) atau `analyst:elicit` ticketdir <path>
 ```
 
+Tiket batch: baris `CLOSED` berlanjut ke `analyst:spec` untuk tiket yang sama; blok `TERTAHAN` tidak mengakhiri batch — lanjut ke tiket berikutnya per `batch.md` bagian 8.
+
 ## Failure path
 
-1. **`ticket.py new` gagal** (slug kembar terbuka, `--request`/`--requester` kosong, izin tulis): slug kembar → kembali ke intake Phase 1; masukan kosong → minta permintaan asli atau nama peminta ke user; izin → laporkan galat OS.
+1. **`ticket.py new` gagal** (slug kembar terbuka, `--request`/`--requester` kosong, izin tulis): slug kembar → kembali ke intake Phase 1 (batch: `batch.md` bagian 5 butir 3); masukan kosong → minta permintaan asli atau nama peminta ke user; izin → laporkan galat OS.
 2. **Peminta tidak dapat dihubungi / menjawab "terserah"**: "terserah" bukan fakta — tawarkan opsi rekomendasi dengan konsekuensinya dan minta dipilih; tetap tidak memilih → `Q-{n}` `MEMBLOKIR`, tahan.
 3. **Jawaban bertentangan** dengan fakta sebelumnya: sajikan keduanya berdampingan lewat `AskUserQuestion`, catat yang dipilih, tandai yang lama di log `(dikoreksi di #n)`.
 4. **Validator `FAIL`** (termasuk `CLOSE FAIL` yang mencetak laporan validator): perbaiki sesuai baris `Tindakan`; dilarang menutup sebelum `PASS`. `CLOSE FAIL` karena tanpa baris `Dibuka ulang` → catat pembukaan ulang yang benar-benar terjadi beserta alasannya; `Permintaan Asli berubah` → pulihkan kutipan aslinya dari git.

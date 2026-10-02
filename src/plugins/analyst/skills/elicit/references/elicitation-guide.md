@@ -62,7 +62,7 @@ Menerjemahkan istilah **teknis** menjadi perilaku berbeda dengan menerjemahkan *
 
 ## 5. Tanda Permintaan Terlalu Besar
 
-Temuan di tengah elisitasi bahwa permintaan memuat lebih dari satu tujuan pengguna yang dapat dirilis terpisah (mis. "cicilan" **dan** "denda keterlambatan" **dan** "laporan piutang") adalah temuan lingkup, bukan pilar tambahan. Hentikan penggalian tujuan kedua, tanyakan ke user lewat `AskUserQuestion` mana yang dikerjakan tiket ini, dan catat sisanya di `Batas Cakupan` dengan alasan `— tiket terpisah`.
+Temuan di tengah elisitasi bahwa permintaan memuat lebih dari satu tujuan pengguna yang dapat dirilis terpisah (mis. "cicilan" **dan** "denda keterlambatan" **dan** "laporan piutang") adalah temuan lingkup, bukan pilar tambahan. Hentikan penggalian tujuan kedua, tanyakan ke user lewat `AskUserQuestion` mana yang dikerjakan tiket ini, dan catat sisanya di `Batas Cakupan` dengan alasan `— tiket terpisah`. Dalam batch (`intake/references/batch.md`), tujuan kedua yang sudah menjadi tiket lain di batch itu tidak ditanyakan: catat langsung sebagai `<tujuan> — tiket <slug>`.
 
 ## 6. Bentuk Hasil
 
