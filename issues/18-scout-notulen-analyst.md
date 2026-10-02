@@ -302,7 +302,7 @@ yang tidak terbukti → tanyakan" tetap.
   - `TECH` → `TERTAHAN`, karena ruang kerja bukan repo yang diubah (sejalan dengan intake Phase 4).
 
 ## N1 [Tinggi] Alokasi notulendir dan `.gitignore`
-- [ ] Selesai
+- [x] Selesai
 
 **Perubahan:** `notulen.py new` membaca catatan kasar dari stdin dan menulis kerangka template. Catatan disalin
 ke `## Catatan Asli` sebagai blockquote, byte demi byte, lalu `source_hash` dihitung. Bila
@@ -316,7 +316,7 @@ ke `## Catatan Asli` sebagai blockquote, byte demi byte, lalu `source_hash` dihi
 - `.gitignore` milik user yang sudah ada tidak ditimpa.
 
 ## N2 [Tinggi] Validator notulen
-- [ ] Selesai
+- [x] Selesai
 
 **Perubahan:** `notulen.py check` menagih hal-hal berikut:
 - Struktur: tiap H2 Kontrak hadir tepat sekali dan berurutan, dengan `## Catatan Asli` sebagai H2 terakhir. H1
@@ -332,7 +332,7 @@ ke `## Catatan Asli` sebagai blockquote, byte demi byte, lalu `source_hash` dihi
 **Test:** satu kasus `FAIL` per aturan, ditambah satu kasus `PASS` lengkap.
 
 ## N3 [Tinggi] `final` dan deteksi `DRIFT`
-- [ ] Selesai
+- [x] Selesai
 
 **Perubahan:** `notulen.py final` menjalankan validator lalu menulis `status: FINAL`, `final_hash` (sidik badan
 tanpa field pembukuan), `finalized`, dan `final_answer`. `state`/`sync-payload` menghitung ulang sidik;
@@ -344,7 +344,7 @@ selisih berarti `DRIFT`. `final` boleh dijalankan ulang atas `DRIFT`.
 - sunting sesudah `FINAL` → `DRIFT`, dan `final` ulang mengembalikan `FINAL`.
 
 ## N4 [Sedang] `state`
-- [ ] Selesai
+- [x] Selesai
 
 **Perubahan:** `notulen.py state [--json]` mendaftar notulendir beserta keadaannya. Skill memakainya di Phase 0
 untuk melanjutkan notulen yang belum final. **Test:** kelima keadaan terbaca; `--json` valid tanpa direktori
@@ -380,7 +380,7 @@ merebut pemicu.
 **Test:** lint F1/F3 bersih; R-check atas rujukan template dan referensi.
 
 ## N6 [Sedang] Notulen tidak pernah di-commit
-- [ ] Selesai
+- [x] Selesai
 
 **Perubahan:** properti `notulen.py`. Tidak ada pemanggilan `git_commit`, `git add`, maupun subperintah
 `commit`. **Test:** sesudah `new` → `final` di repo git, `git log` tidak bertambah dan `git status` bersih.
