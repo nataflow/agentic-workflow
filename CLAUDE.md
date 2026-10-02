@@ -70,7 +70,9 @@ skeletons), `dispatcher/` (prompts used to dispatch subagents), `scripts/`, and 
 
 - **analyst** — turns a stakeholder request into a non-technical `TICKET.md` (`intake` → `elicit` →
   `spec`, reviewed by `ticket-reviewer`). `elicit` reads code only through the shallow `code-scout` subagent
-  (evidence for `TECH`, question context otherwise). `notulen` turns rough meeting notes into a gitignored
+  (evidence for `TECH`, question context otherwise). Two to five requests in one message become a batch
+  (`skills/intake/references/batch.md`): `ticket.py new --urutan k/N` allocates every ticketdir up front, scouts
+  run in parallel, then tickets finish one at a time. `notulen` turns rough meeting notes into a gitignored
   `NOTULEN.md` (`skills/notulen/scripts/notulen.py`), optionally mirrored to nataflow as a `notes.meeting`
   document. `skills/_common/ticket.py` is the state machine; a READY ticket is handed to
   `backend:tech-lead`/`frontend:lead` as `ticket_source`.

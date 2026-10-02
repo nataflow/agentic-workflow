@@ -27,7 +27,7 @@ Prasyarat: `python3` ≥ 3.9. `git` opsional (lihat seksi Git). Lihat juga `READ
 
 | Skill | Peran | Menulis | Dikunci oleh |
 |---|---|---|---|
-| `analyst:intake` | gerbang: wilayah, tipe, ukuran, duplikat, pemulihan ticketdir, sinkron ulang nataflow | — | — |
+| `analyst:intake` | gerbang: wilayah, tipe, ukuran, batch berurutan hingga 5 tiket, duplikat, pemulihan ticketdir, sinkron ulang nataflow | — | — |
 | `analyst:elicit` | tanya-jawab dengan peminta, direkam tiap giliran | `TICKET.md` — `domain_terms` + `## Catatan Elisitasi` (kerangkanya ditulis `ticket.py new`) | `ticket.py close` → `elicitation: CLOSED` + segel catatan |
 | `analyst:spec` | penyusunan kartu, review independen, persetujuan user | `TICKET.md` — kartu di atas catatan | `ticket.py approve` → `READY` |
 | `analyst:notulen` | catatan kasar rapat → notulen terstruktur, klarifikasi ke pencatat, sinkron opsional | `NOTULEN.md` (kerangkanya ditulis `notulen.py new`) | `notulen.py final` → `FINAL` |
@@ -42,7 +42,7 @@ kartu `PASS`/`BLOCKED` terhadap catatan elisitasi di berkas yang sama sebelum di
 
 `code-scout` (`agents/code-scout.md`) adalah penelusur kode dangkal read-only (`Read`/`Grep`/`Glob`, model
 `haiku`, kuota 8 pemanggilan) yang didispatch `elicit` lewat `skills/elicit/dispatcher/scout.md`, maksimal dua kali
-per sesi. Ia hanya melaporkan apa yang ada di kode dan di mana, tanpa flow, alur, atau edge case. Konteks utama
+per tiket; dalam batch, dispatch pertama semua tiket berjalan paralel di awal batch. Ia hanya melaporkan apa yang ada di kode dan di mana, tanpa flow, alur, atau edge case. Konteks utama
 `elicit` tidak membaca kode sendiri. Untuk tiket `TECH` balikannya menjadi bukti `path:baris`; untuk tipe lain
 balikannya hanya bahan pertanyaan atau `Asumsi:` yang dikonfirmasi peminta, karena kode menunjukkan apa yang ada,
 bukan apa yang diinginkan peminta.
@@ -54,8 +54,8 @@ permintaan ──► intake ──┬─► di luar wilayah (kerja teknis kecil)
                         ├─► status tiket ──────────────────────────► jawaban, berhenti
                         │
                         └─► elicit ─► ticket.py new ─► TICKET.md (kerangka + permintaan asli, elicitation: OPEN)
-                              │        code-scout (≤2 dispatch): bukti TECH, atau konteks pertanyaan tipe lain
-                              │        tanya-jawab ≤3/giliran, tulis tiap giliran (≤5 giliran per sesi)
+                              │        code-scout (≤2 dispatch per tiket): bukti TECH, atau konteks pertanyaan
+                              │        tanya-jawab ≤3/giliran, tulis tiap giliran (≤5 giliran per tiket)
                               │        menunggu jawaban pihak lain → TERTAHAN, lanjut di sesi berikutnya
                               │        konfirmasi fakta → ticket.py close (CLOSED + segel catatan + commit)
                               ▼
@@ -69,6 +69,28 @@ permintaan ──► intake ──┬─► di luar wilayah (kerja teknis kecil)
 Permintaan yang sudah lengkap tetap melewati `elicit`: fakta diisi dari permintaan asli, dikonfirmasi sekali,
 lalu ditutup tanpa satu pertanyaan pun. Dengan begitu `spec` dan `ticket-reviewer` selalu punya satu sumber
 kebenaran tertulis.
+
+**Batch.** Satu pesan berisi 2–5 permintaan menjadi batch, bukan antrian yang harus masuk `intake` satu per
+satu:
+
+```
+permintaan (2–5 tujuan) ─► intake: pecah, tipe, duplikat, urutan otomatis, slug, peminta sekali
+                             │      → blok INTAKE — BATCH
+                             ▼
+                           elicit: ticket.py new --urutan k/N ×N (semua tersegel di disk)
+                             │     code-scout semua tiket paralel dalam satu pesan
+                             ▼
+                           tiket 1: elicit → spec → READY/ditahan/tertahan ─► tiket 2 ─► … ─► tiket N
+                                                                                   ▼
+                                                              ringkasan dari ticket.py state --batch <id>
+```
+
+Urutan ditentukan tanpa pertanyaan dari kata-kata peminta: prasyarat lebih dulu, lalu urgensi yang disebut,
+lalu urutan di pesan. Tiap tiket diselesaikan penuh sebelum tiket berikutnya, satu `AskUserQuestion` hanya
+membahas satu tiket (header `Tiket k/N`), dan plafon giliran serta scout berlaku per tiket. Jawaban untuk satu
+tiket tidak menjadi fakta tiket lain kecuali dikonfirmasi lewat `Asumsi:`. Tiket yang tertahan tidak menahan
+batch, dan sesi berikutnya melanjutkan dari tiket terbuka berurutan terkecil. Aturan lengkap:
+`skills/intake/references/batch.md`.
 
 ## Artefak
 
@@ -91,6 +113,8 @@ kebenaran tertulis.
 ---
 status: DRAFT → READY          ← ticket.py (approve / reopen / cancel)
 elicitation: OPEN → CLOSED     ← ticket.py new / close (analyst:elicit)
+batch: <ticketdir urutan 1>    ← hanya tiket batch, ditulis ticket.py new --urutan
+urutan: <k>/<N>                ← (field pembukuan, di luar sidik dan segel)
 ...
 ---
 # <judul>                      ← kartu, ditulis analyst:spec
@@ -154,11 +178,11 @@ apa adanya. Kerangka dan aturan isinya: `skills/notulen/templates/notulen-templa
 
 | Skrip | Memvonis |
 |---|---|
-| `_common/ticket.py state` | keadaan tiap ticketdir: `KOSONG`, `ELISITASI`, `SPEC`, `DRAFT`, `READY`, `DRIFT`, `RUSAK`, `NAMA_TIDAK_SAH`, `DIBATALKAN` |
-| `_common/ticket.py new` | ticketdir baru beserta `TICKET.md` awal: kerangka persis bagian 1 `elicit-template.md`, permintaan asli dari `--request` sebagai blockquote, dan `request_hash`; ticketdir `KOSONG` ber-slug sama dipakai ulang; repo git bersinkron nataflow → `analyst/tickets/.gitignore` (`*`) ditulis bila belum ada; `git=ya\|tidak\|diabaikan` |
+| `_common/ticket.py state` | keadaan tiap ticketdir: `KOSONG`, `ELISITASI`, `SPEC`, `DRAFT`, `READY`, `DRIFT`, `RUSAK`, `NAMA_TIDAK_SAH`, `DIBATALKAN`; tiket batch tampil berurutan `urutan` di posisi tiket urutan 1-nya, dan `--batch <id>` menyaring satu batch dalam semua keadaan |
+| `_common/ticket.py new` | ticketdir baru beserta `TICKET.md` awal: kerangka persis bagian 1 `elicit-template.md`, permintaan asli dari `--request` sebagai blockquote, dan `request_hash`; ticketdir `KOSONG` ber-slug sama dipakai ulang; `--urutan <k>/<N>` (2 ≤ N ≤ 5, dan `--batch <id>` untuk k ≥ 2) menulis `batch`/`urutan` dan menolak batch tak dikenal, N berbeda, atau urutan kembar; repo git bersinkron nataflow → `analyst/tickets/.gitignore` (`*`) ditulis bila belum ada; `git=ya\|tidak\|diabaikan` |
 | `_common/ticket.py close` | satu-satunya penulis `elicitation: CLOSED`: hanya bila `validate_doc.py --kind elicit` `PASS` (bila tidak, berkas dikembalikan); menyegel catatan (`elicit_hash`, `elicit_log`) dan commit `docs(ticket): elisitasi <slug>`; menutup ulang catatan yang berubah sejak segel menuntut baris log baru `Dibuka ulang`; tiket lama tanpa segel diadopsi sekali |
 | `_common/ticket.py check --gate elicit\|spec` | prasyarat gate atas satu ticketdir; gate `spec` menolak catatan elisitasi yang berbeda dari segelnya; mencetak `root=` (path ticketdir relatif root, bukan cwd) dan, untuk draft, `ronde` dan `sidik` (slot prompt reviewer), `review_basi` (bagian yang berubah sesudah review), serta `review_report` |
-| `_common/validate_doc.py --kind elicit` | `## Catatan Elisitasi`: struktur, pilar per tipe, log bernomor, tiap heading sekali, permintaan asli sama dengan `request_hash`; tipe selain `TECH` dilarang memuat `` `path:baris` `` di luar permintaan asli (konteks `code-scout` bukan fakta); `CLOSED` ⇒ nol pilar kosong, nol pertanyaan memblokir, nol `Asumsi:` di mana pun dalam baris, dan tiap `domain_terms` punya baris konfirmasi berjawaban `Ya` di log |
+| `_common/validate_doc.py --kind elicit` | frontmatter, termasuk pasangan `batch`/`urutan` yang sah; `## Catatan Elisitasi`: struktur, pilar per tipe, log bernomor, tiap heading sekali, permintaan asli sama dengan `request_hash`; tipe selain `TECH` dilarang memuat `` `path:baris` `` di luar permintaan asli (konteks `code-scout` bukan fakta); `CLOSED` ⇒ nol pilar kosong, nol pertanyaan memblokir, nol `Asumsi:` di mana pun dalam baris, dan tiap `domain_terms` punya baris konfirmasi berjawaban `Ya` di log |
 | `_common/validate_doc.py --kind ticket` | kartu: struktur per tipe (tiap heading sekali), AC Given/When/Then, BR terpikul AC, ID `Q-{n}` sama dengan `TIDAK MEMBLOKIR` di catatan, nol placeholder, **nol kebocoran teknis** |
 | `_common/ticket.py review` | vonis `PASS`/`BLOCKED` **wajib** membawa blok reviewer (`--report`): `- Verdict:` sama dengan `--verdict`, dan `- Sidik:` (disalin reviewer dari prompt) sama dengan sidik `<kartu>/<catatan elisitasi>` di disk — draft yang berubah sesudah dispatch ditolak; blok wajib konsisten (`- BLOCKER:` = jumlah butir, `PASS` ⇔ nol BLOCKER, `- Ronde:` = ronde yang dicatat); blok disimpan ke `review.md`; ditolak bila salah satu validator `FAIL` atau catatan berbeda dari segelnya; plafon 2 ronde per revisi, dibuka ulang hanya bila catatan elisitasi disegel ulang |
 | `_common/ticket.py approve` | `READY` hanya bila kedua validator (`ticket`, `elicit`) `PASS`, `elicitation: CLOSED` dengan catatan sama dengan segelnya, **dan** vonis review `PASS` atas sidik kartu dan catatan elisitasi sekarang; menulis `approved_hash` dan `approved_seal` (segel yang dibaca engineer) |
@@ -308,8 +332,11 @@ sinkron tidak meng-commit tiketnya (lihat Git), sehingga task inilah satu-satuny
 
 ## Sengaja Belum Ada
 
-- **`split`** — pemecahan epic menjadi beberapa tiket. Sementara ini `intake` memilih satu tujuan per tiket dan
+- **`split`** — pemecahan epic menjadi beberapa tiket beserta ketergantungan formal antar-tiket. Sementara ini
+  `intake` memecah permintaan per tujuan pengguna, memproses hingga 5 tujuan sebagai batch berurutan, dan
   mengembalikan sisanya sebagai antrian tiket.
+- **Batch lanjutan** — review tiket ke-k berjalan paralel dengan elisitasi tiket berikutnya, pertanyaan gabungan
+  lintas tiket, dan batch lebih dari 5 tiket.
 - **`acceptance`** — UAT: membaca `REPORT.md` engineer dan memvonis AC tiket dalam bahasa bisnis.
 - **Notulen ke tiket** — seksi calon tiket di notulen dan serah terima `D-{n}`/`A-{n}` ke `/analyst:intake`;
   notulen dari transkrip atau rekaman rapat; reviewer independen untuk notulen.
