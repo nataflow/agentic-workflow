@@ -8,9 +8,11 @@ terakhir. `review.md` (opsional) adalah jejak blok `## Ticket Review` terakhir, 
 
 Satu-satunya jalan mutasi status yang punya konsekuensi di luar penulisnya:
 
-- `state`   — pindai `analyst/tickets/*/`, vonis keadaan dan rute tiap ticketdir.
+- `state`   — pindai `analyst/tickets/*/`, vonis keadaan dan rute tiap ticketdir; tiket batch berurutan
+              menurut `urutan`, `--batch <id>` menyaring satu batch.
 - `new`     — alokasikan `analyst/tickets/<YYMMDDhhmm>-<slug>/` beserta `TICKET.md` awal (kerangka,
               permintaan asli, `request_hash`); menolak slug kembar terbuka, memakai ulang yang `KOSONG`.
+              `--urutan <k>/<N>` (dan `--batch <id>` untuk k ≥ 2) menandai tiket batch intake (19).
 - `check`   — prasyarat gate `elicit` / `spec` atas satu ticketdir.
 - `close`   — tutup elisitasi: `elicitation: CLOSED` + segel catatan (`elicit_hash`, `elicit_log`).
 - `review`  — catat vonis `ticket-reviewer` beserta sidik konten yang dinilainya (dan bloknya).
@@ -48,6 +50,7 @@ from typing import Any, Dict, List
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from analyst_lib import (  # noqa: E402
+    BATCH_MAX,
     CATEGORIES,
     ELICIT_H2,
     SLUG_RE,
@@ -70,6 +73,7 @@ from analyst_lib import (  # noqa: E402
     load_sync_config,
     log_rows,
     normalize_ticketdir,
+    parse_urutan,
     report_json,
     set_frontmatter_field,
     split_frontmatter,
@@ -234,11 +238,12 @@ def classify(root: Path, rel: str) -> Dict[str, str]:
     d = root / rel
     ticket = d / TICKET_FILE
     if ticket.is_file() and not decodes(ticket):   # satu tiket rusak tidak menghentikan pemindaian `state`
-        return {"ticketdir": rel, "type": "-", "title": "-", "state": "RUSAK",
+        return {"ticketdir": rel, "type": "-", "title": "-", "batch": "-", "urutan": "-", "state": "RUSAK",
                 "route": f"{TICKET_FILE} bukan UTF-8 — pulihkan dari git atau simpan ulang sebagai UTF-8"}
     t = read(ticket)
     es, ts = t.get("elicitation", ""), t.get("status", "")
-    row = {"ticketdir": rel, "type": t.get("type", "-"), "title": title_of(ticket)}
+    row = {"ticketdir": rel, "type": t.get("type", "-"), "title": title_of(ticket),
+           "batch": str(t.get("batch", "")).strip() or "-", "urutan": str(t.get("urutan", "")).strip() or "-"}
     if not TICKETDIR_RE.match(rel):
         row.update(state="NAMA_TIDAK_SAH", route=f"bukan ticketdir analyst — ganti nama ke {TICKETS_DIR}/"
                                                  "<YYMMDDhhmm>-<slug> (git mv) atau pindahkan keluar analyst/tickets/")
@@ -276,22 +281,51 @@ def ticketdirs(root: Path) -> List[str]:
     return sorted(f"{TICKETS_DIR}/{p.name}" for p in base.iterdir() if p.is_dir())
 
 
+def state_order(row: Dict[str, str]) -> Any:
+    """Satu batch tampil berurutan `urutan` di posisi tiket urutan 1-nya; tiket lain menurut nama."""
+    pos = parse_urutan(row["urutan"]) if row["batch"] != "-" else None
+    return (f"{TICKETS_DIR}/{row['batch']}", pos[0]) if pos else (row["ticketdir"], 0)
+
+
+def batch_conflict(root: Path, batch: str, k: int, n: int) -> str:
+    """Tiket urutan k ≥ 2 hanya bergabung ke batch yang tiket urutan 1-nya ada, ber-N sama, tanpa urutan kembar."""
+    head = root / TICKETS_DIR / batch / TICKET_FILE
+    if not TICKETDIR_RE.match(f"{TICKETS_DIR}/{batch}") or not head.is_file() or not decodes(head):
+        return f"batch `{batch}` tidak dikenal — pakai id dari keluaran `NEW PASS` tiket urutan 1/{n}"
+    fm = read(head)
+    if str(fm.get("batch", "")).strip() != batch or parse_urutan(fm.get("urutan", "")) != (1, n):
+        return (f"{TICKETS_DIR}/{batch} bukan tiket urutan 1/{n} batch itu (batch `{fm.get('batch', '-')}`, "
+                f"urutan `{fm.get('urutan', '-')}`)")
+    for rel in ticketdirs(root):
+        f = root / rel / TICKET_FILE
+        if not f.is_file() or not decodes(f):
+            continue
+        other = read(f)
+        if str(other.get("batch", "")).strip() == batch and parse_urutan(other.get("urutan", "")) == (k, n):
+            return f"urutan {k}/{n} batch {batch} sudah dipakai {rel}"
+    return ""
+
+
 # ── subcommand ────────────────────────────────────────────────────────────────
 
 def cmd_state(root: Path, args: argparse.Namespace) -> int:
-    rows = [classify(root, rel) for rel in ticketdirs(root)]
-    if not args.all:
+    rows = sorted((classify(root, rel) for rel in ticketdirs(root)), key=state_order)
+    if args.batch:
+        rows = [r for r in rows if r["batch"] == args.batch.strip()]   # satu batch utuh, termasuk READY/DIBATALKAN
+    elif not args.all:
         rows = [r for r in rows if r["state"] not in ("DIBATALKAN",) and (args.ready or r["state"] != "READY")]
     if args.json:
         import json
         print(json.dumps({"root": str(root), "ticketdirs": rows}, indent=2, ensure_ascii=False))
         return 0
     if not rows:
-        print("TICKET STATE: nihil ticketdir terbuka")
+        print(f"TICKET STATE: nihil ticketdir di batch {args.batch.strip()}" if args.batch
+              else "TICKET STATE: nihil ticketdir terbuka")
         return 0
     print(f"TICKET STATE: {len(rows)} ticketdir")
     for r in rows:
-        print(f"- {r['ticketdir']} · {r['state']} · {r['type']} · {r['title']}\n    → {r['route']}")
+        batch = f" · batch {r['batch']} {r['urutan']}" if r["batch"] != "-" else ""
+        print(f"- {r['ticketdir']} · {r['state']} · {r['type']} · {r['title']}{batch}\n    → {r['route']}")
     return 0
 
 
@@ -313,6 +347,28 @@ def cmd_new(root: Path, args: argparse.Namespace) -> int:
     if not args.requester.strip():
         print("NEW FAIL: --requester kosong — tanyakan nama atau peran peminta (analyst:intake Phase 6)")
         return 1
+    batch, pos = args.batch.strip(), None
+    if batch and not args.urutan.strip():
+        print("NEW FAIL: --batch tanpa --urutan — tiket batch wajib `--urutan <k>/<N>`")
+        return 1
+    if args.urutan.strip():
+        pos = parse_urutan(args.urutan)
+        if not pos:
+            print(f"NEW FAIL: --urutan `{args.urutan.strip()}` bukan <k>/<N> dengan 2 ≤ N ≤ {BATCH_MAX} "
+                  f"dan 1 ≤ k ≤ N (analyst:intake references/batch.md)")
+            return 1
+        if pos[0] == 1 and batch:
+            print("NEW FAIL: --batch dilarang untuk urutan 1 — id batch adalah nama ticketdir tiket urutan 1 itu "
+                  "sendiri")
+            return 1
+        if pos[0] > 1 and not batch:
+            print(f"NEW FAIL: --urutan {pos[0]}/{pos[1]} wajib `--batch <id>` — id dari keluaran `NEW PASS` "
+                  f"tiket urutan 1/{pos[1]}")
+            return 1
+        conflict = batch_conflict(root, batch, *pos) if pos[0] > 1 else ""
+        if conflict:
+            print(f"NEW FAIL: {conflict}")
+            return 1
     reuse = None
     for rel in ticketdirs(root):
         r = classify(root, rel)
@@ -329,8 +385,10 @@ def cmd_new(root: Path, args: argparse.Namespace) -> int:
         print(f"NEW FAIL: {rel} sudah ada (slug sama dalam menit yang sama) — tunggu satu menit atau pilih slug lain")
         return 1
     title = " ".join(args.title.split()) or args.slug.replace("-", " ").capitalize()
+    batch = (batch or rel.rsplit("/", 1)[-1]) if pos else ""
+    urutan = f"{pos[0]}/{pos[1]}" if pos else ""
     text = ticket_skeleton(args.type, args.slug, args.requester, dt.date.today().isoformat(), title, request,
-                           args.category)
+                           args.category, batch, urutan)
     (root / rel).mkdir(parents=True, exist_ok=True)
     (root / rel / TICKET_FILE).write_text(text, encoding="utf-8")
     notes = _ignore_tickets(root)
@@ -339,6 +397,7 @@ def cmd_new(root: Path, args: argparse.Namespace) -> int:
         notes += " · PERINGATAN: ticketdir diabaikan git tanpa sinkron nataflow — tiket hanya ada di disk ini"
     print(f"NEW PASS: {rel} · root={root} · git={mode} · type={args.type}"
           + (f" · category={args.category}" if args.category else "")
+          + (f" · batch={batch} urutan={urutan}" if pos else "")
           + (" · ticketdir KOSONG dipakai ulang" if reuse else "") + notes)
     return 0
 
@@ -898,6 +957,7 @@ def main() -> None:
     s = sub.add_parser("state")
     s.add_argument("--all", action="store_true", help="ikut tampilkan DIBATALKAN dan READY")
     s.add_argument("--ready", action="store_true", help="ikut tampilkan READY")
+    s.add_argument("--batch", default="", help="hanya tiket batch ini (nama ticketdir urutan 1), semua keadaan")
     s.add_argument("--json", action="store_true")
     s = sub.add_parser("new")
     s.add_argument("--slug", required=True)
@@ -906,6 +966,8 @@ def main() -> None:
     s.add_argument("--requester", required=True, help="nama atau peran peminta")
     s.add_argument("--request", required=True, help="permintaan asli apa adanya, atau `-` untuk stdin")
     s.add_argument("--title", default="", help="judul kerja H1; default dari slug")
+    s.add_argument("--urutan", default="", help=f"tiket batch intake: posisi `<k>/<N>`, 2 ≤ N ≤ {BATCH_MAX}")
+    s.add_argument("--batch", default="", help="id batch (nama ticketdir urutan 1); wajib untuk k ≥ 2")
     s = sub.add_parser("check")
     s.add_argument("--gate", required=True, choices=("elicit", "spec"))
     s.add_argument("--ticketdir", required=True)

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Validator mekanis TICKET.md plugin `analyst` — satu berkas, dua bagian.
 
-`--kind elicit` memvonis frontmatter dan `## Catatan Elisitasi` (H2 terakhir):
+`--kind elicit` memvonis frontmatter (termasuk pasangan `batch`/`urutan` tiket batch) dan
+`## Catatan Elisitasi` (H2 terakhir):
 bentuk catatan dan, bila `elicitation: CLOSED`, kelengkapan pilar wajib, nol
 pertanyaan memblokir, nol baris `Asumsi:`, dan jejak tiap `domain_terms`; catatan non-`TECH` juga dilarang memuat
 rujukan `path:baris` di tiap giliran. `--kind ticket` memvonis kartu di atasnya: bentuk
@@ -35,6 +36,7 @@ from analyst_lib import (  # noqa: E402
     TYPES,
     UNANSWERED,
     Checker,
+    batch_problems,
     body_offset,
     content_hash,
     duplicate_headings,
@@ -139,7 +141,7 @@ class DocValidator(Checker):
             errors.append("created bukan YYYY-MM-DD")
         if not str(self.fm.get("requester", "")).strip():
             errors.append("requester kosong")
-        return errors
+        return errors + batch_problems(self.fm, self.rel.rsplit("/", 1)[-1])
 
     def _placeholder(self, cid: int, parts: dict, skip: tuple, code: bool = False) -> None:
         """Placeholder di luar seksi kutipan mentah; autolink `<https://…>` dan `<nama@…>` bukan slot.

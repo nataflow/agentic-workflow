@@ -43,6 +43,10 @@ PRIORITIES = ("HIGH", "MEDIUM", "LOW")
 PLACEHOLDER = re.compile(r"\bTBD\b|\bTODO\b|diisi nanti|<[A-Za-z][^<>\n]*>")
 UNANSWERED = "_(belum terjawab)_"
 LIST_FIELDS = ("domain_terms",)  # satu-satunya field frontmatter bertipe list
+# Batch intake (19): tiket yang dialokasikan bersama membawa `batch: <nama ticketdir urutan 1>` dan
+# `urutan: <k>/<N>`. Field pembukuan — sengaja di luar `CONTENT_FIELDS` dan `SEAL_FIELDS`.
+BATCH_MAX = 5
+URUTAN_RE = re.compile(r"^(\d+)/(\d+)$")
 
 # Satu-satunya artefak: kartu tiket di atas, catatan elisitasi sebagai H2 terakhir.
 TICKET_FILE = "TICKET.md"
@@ -401,20 +405,48 @@ def request_digest(text: str) -> str:
     return hashlib.sha256("\n".join(l.rstrip() for l in quote).encode("utf-8")).hexdigest()[:12]
 
 
+def parse_urutan(value: Any) -> Optional[Tuple[int, int]]:
+    """`<k>/<N>` sah (2 ≤ N ≤ `BATCH_MAX`, 1 ≤ k ≤ N) → `(k, N)`; selain itu None."""
+    m = URUTAN_RE.match(str(value).strip())
+    if not m:
+        return None
+    k, n = int(m.group(1)), int(m.group(2))
+    return (k, n) if 2 <= n <= BATCH_MAX and 1 <= k <= n else None
+
+
+def batch_problems(fm: Dict[str, Any], name: str) -> List[str]:
+    """Pelanggaran field batch frontmatter; `name` = nama ticketdir tanpa `analyst/tickets/`."""
+    if "batch" not in fm and "urutan" not in fm:
+        return []
+    if "batch" not in fm or "urutan" not in fm:
+        return ["batch dan urutan wajib berpasangan (ditulis `ticket.py new --urutan`)"]
+    errors = []
+    pos = parse_urutan(fm["urutan"])
+    if not pos:
+        errors.append(f"urutan `{fm['urutan']}` bukan <k>/<N> dengan 2 ≤ N ≤ {BATCH_MAX} dan 1 ≤ k ≤ N")
+    batch = str(fm["batch"]).strip()
+    if not TICKETDIR_RE.match(f"{TICKETS_DIR}/{batch}"):
+        errors.append(f"batch `{batch}` bukan nama ticketdir <YYMMDDhhmm>-<slug>")
+    elif pos and pos[0] == 1 and batch != name:
+        errors.append(f"batch `{batch}` ≠ nama ticketdir sendiri `{name}` (tiket urutan 1)")
+    return errors
+
+
 def ticket_skeleton(ticket_type: str, slug: str, requester: str, created: str, title: str,
-                    request: str, category: str = "") -> str:
+                    request: str, category: str = "", batch: str = "", urutan: str = "") -> str:
     """`TICKET.md` awal persis bagian 1 `elicit-template.md`, beserta `request_hash`.
 
     Rumah kanonik kerangkanya tetap template itu; `tests/analyst/test_ticket_10.py` menagih keduanya sama.
-    Baris `category` hanya ditulis untuk tiket `TECH`.
+    Baris `category` hanya ditulis untuk tiket `TECH`; baris `batch`/`urutan` hanya untuk tiket batch.
     """
     cat = f"category: {category}\n" if ticket_type == "TECH" else ""
+    bat = f"batch: {batch}\nurutan: {urutan}\n" if batch else ""
     quote = "\n".join(f"> {l.rstrip()}" if l.strip() else ">" for l in request.strip("\n").splitlines())
     pillars = "\n\n".join(f"#### {p}\n{UNANSWERED}"
                           for p in PILLARS_REQUIRED[ticket_type] + PILLARS_OPTIONAL[ticket_type])
     text = (f"---\nstatus: DRAFT\nelicitation: OPEN\ntype: {ticket_type}\n{cat}priority: -\nslug: {slug}\n"
             f"requester: {clean_value(requester)}\ncreated: {created}\nexternal_ref: -\ndomain_terms: []\n"
-            f"revision: 0\nreview: -\nreview_round: 0\nrequest_hash: -\n---\n\n# {title}\n\n"
+            f"revision: 0\nreview: -\nreview_round: 0\nrequest_hash: -\n{bat}---\n\n# {title}\n\n"
             f"## {ELICIT_H2}\n\n### Permintaan Asli\n\n{quote}\n\n### Fakta\n\n{pillars}\n\n"
             "### Log Tanya-Jawab\n\n| # | Tanggal | Pertanyaan | Jawaban | Sumber |\n|---|---|---|---|---|\n\n"
             "### Pertanyaan Terbuka\n\n- Tidak ada.\n")
