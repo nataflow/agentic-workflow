@@ -5,7 +5,7 @@ mulai dari tiket stakeholder sampai kode yang direview, ditambah kerja langsung 
 
 | Plugin | Versi | Fungsi | Titik masuk |
 |---|---|---|---|
-| [`analyst`](src/plugins/analyst/README.md) | 0.13.0 | Permintaan pengguna/stakeholder menjadi `TICKET.md` non-teknis (user story, acceptance criteria, aturan bisnis), atau perubahan struktur dari lead engineer menjadi tiket `TECH` berbukti `file:baris`, lewat elisitasi, review independen, dan persetujuan | `/analyst:intake` |
+| [`analyst`](src/plugins/analyst/README.md) | 0.14.0 | Permintaan pengguna/stakeholder menjadi `TICKET.md` non-teknis (user story, acceptance criteria, aturan bisnis), atau perubahan struktur dari lead engineer menjadi tiket `TECH` berbukti `file:baris`, lewat elisitasi, review independen, dan persetujuan; catatan kasar rapat menjadi `NOTULEN.md` | `/analyst:intake`, `/analyst:notulen` |
 | [`backend`](src/plugins/backend/README.md) | 0.13.1 | Kerja backend 7 stack (Java Spring, Go, Node, Bun, Rust, PHP, CodeIgniter 4): profil, TASK/BRD/PRD/brief, eksekusi, review, dan laporan | `/backend:tech-lead` |
 | [`frontend`](src/plugins/frontend/README.md) | 0.12.1 | Kerja frontend (React + Vite, React Native/Expo, SvelteKit, Svelte + Vite): alur layar, bentuk layar, kontrak, brief, eksekusi, review, dan laporan dengan ledger approval | `/frontend:lead` |
 | [`quickdev`](src/plugins/quickdev/README.md) | 0.8.0 | Alur ringan untuk stack apa pun: profil, explore, clarify, satu berkas rencana, execute, dan review, tanpa taskdir dan tanpa subagent | `/quickdev:profile`, `/quickdev:plan` |
@@ -42,6 +42,7 @@ Marketplace git memakai `version` di `plugin.json`: pengguna hanya mendapat peru
 | Situasi | Plugin |
 |---|---|
 | Peminta non-engineer atau stakeholder; kebutuhan belum jelas | `analyst` |
+| Catatan kasar rapat yang perlu dirapikan jadi notulen | `analyst` (`/analyst:notulen`) |
 | Repo backend salah satu dari 7 stack; kerja berisiko atau butuh kontrak dan jejak keputusan | `backend` |
 | Repo React + Vite, React Native/Expo, SvelteKit, atau Svelte + Vite | `frontend` |
 | Perubahan kecil–menengah, stack lain (Next.js, FastAPI, …), tanpa taskdir | `quickdev` |

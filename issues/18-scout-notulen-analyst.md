@@ -4,7 +4,24 @@ Sumber: feedback user 2026-10-02 dan diskusi desain sesi yang sama. Basis kode p
 (analyst 0.13.0). Kontrak server dibaca dari `nataflow-api` (`internal/adapters/primary/mcp/tools.go`,
 `internal/features/document/domain.go`).
 
-**Status (2026-10-02):** rencana, belum dikerjakan.
+**Status (2026-10-02):** X1–X5, N1–N8, dan D1 selesai. Test regresi di `tests/analyst/test_scout_18.py`
+(9 test: X1–X3) dan `tests/analyst/test_notulen_18.py` (33 test: N1–N7), ditambah tiga kasus smoke `notulen.py`.
+Suite penuh hijau, subset baru hijau di Python 3.9, dan lint 0 FAIL. Versi: analyst 0.14.0.
+
+Selisih pelaksanaan terhadap Kontrak di bawah:
+
+- X3 menjadi check 11 `validate_doc.py --kind elicit`. Selain `### Permintaan Asli`, check ini menyisir seluruh
+  catatan elisitasi, termasuk log dan pertanyaan terbuka. Rujukan dihitung hanya bila path-nya memuat `/` atau `.`,
+  supaya jam dalam backtick (`` `17:00` ``) tidak terbaca sebagai bukti kode.
+- N1: `new` menerima `--notes` (teks atau `-` untuk stdin, sejajar `--request` di `ticket.py new`). `--title` dan
+  `--date` wajib, dan tanggal divalidasi sebagai tanggal sungguhan. `.gitignore` milik user tidak ditimpa; bila
+  isinya membuat notulen tidak lagi diabaikan, `new` memperingatkan (`git=ya`). Catatan yang hanya berisi spasi
+  dan BOM ditolak sebagai kosong.
+- N2: check bernomor 1–9. Peserta wajib berupa butir `- `. Tenggat `YYYY-MM-DD` divalidasi sebagai tanggal
+  sungguhan. `check --final` menagih nol `Asumsi:` di luar `## Catatan Asli`.
+- N7: `update` ikut membawa `reference_table: project`, sehingga prosedur hanya menambah `reference_id` dan `key`.
+  Judul lebih dari 255 karakter ditolak `sync-payload`. Metadata ikut membawa `repo` (`repo_identity`).
+- Smoke: keadaan `rusak` ikut merusak `analyst/notulen/2609250000-smoke/NOTULEN.md`.
 
 ## Tujuan
 
@@ -427,7 +444,7 @@ merebut pemicu.
 repo. `python3 scripts/lint_plugins.py` hijau tanpa `LINT_IGNORE` baru.
 
 ## D1 [Rendah] Dokumen dan versi
-- [ ] Selesai
+- [x] Selesai
 
 - `README.md` analyst:
   - `## Tiga Skill, Satu Subagent` → empat skill, dua subagent;

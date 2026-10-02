@@ -1,6 +1,6 @@
 # Alur Plugin `analyst`
 
-> Plugin `analyst` (v0.13.0) adalah jembatan antara pengguna/stakeholder dan engineer. Ia menerima permintaan,
+> Plugin `analyst` (v0.14.0) adalah jembatan antara pengguna/stakeholder dan engineer. Ia menerima permintaan,
 > keluhan, atau laporan bug dari sisi pengguna, menggali faktanya lewat tanya-jawab dengan peminta
 > non-engineer, lalu menerbitkan `TICKET.md`: kartu tiket non-teknis setara kartu Jira/Trello, berisi user
 > story, acceptance criteria, dan aturan bisnis. Tiket melewati review independen dan persetujuan user sebelum
@@ -8,20 +8,25 @@
 > ketika kebutuhan datang dari bahasa bisnis. Sejak v0.13.0 ada satu jalur teknis: tipe `TECH`, untuk
 > perubahan struktur dari lead engineer (refaktor, relasi data, arsitektur, kinerja, dependensi) yang perlu
 > dikunci sebelum dikerjakan. Kartunya teknis dan berbukti `file:baris`, tetapi tetap berhenti di kondisi
-> target. Kerja teknis kecil dan diagnosis (stacktrace dari developer) bukan wilayahnya. Tiga prinsip membentuk plugin ini: tiket menyebut **apa dan kenapa**, tidak pernah
-> **bagaimana**; fakta berasal dari peminta, bukan tebakan analis; dan semua yang bisa divonis mesin divonis
-> skrip.
+> target. Kerja teknis kecil dan diagnosis (stacktrace dari developer) bukan wilayahnya. Sejak v0.14.0 kode
+> hanya dibaca subagent `code-scout` (bukti untuk `TECH`, bahan pertanyaan untuk tipe lain), dan skill
+> `analyst:notulen` merapikan catatan kasar rapat menjadi `NOTULEN.md` di luar alur tiket. Tiga prinsip membentuk
+> plugin ini: tiket menyebut **apa dan kenapa**, tidak pernah **bagaimana**; fakta berasal dari peminta, bukan
+> tebakan analis; dan semua yang bisa divonis mesin divonis skrip.
 
 ## Peta Komponen
 
 | Komponen | Jenis | Peran singkat | Berkas |
 |---|---|---|---|
-| `analyst:intake` | skill (satu-satunya yang muncul di menu `/`) | Gerbang: pulihkan ticketdir, tentukan wilayah, tipe (beserta `category` untuk `TECH`), ukuran, cek duplikat, tetapkan slug, dan sinkron ulang tiket `READY` ke nataflow. Tidak menulis berkas apa pun | `skills/intake/SKILL.md` |
-| `analyst:elicit` | skill (`user-invocable: false`) | Tanya-jawab dengan peminta. Fakta direkam per pilar ke `## Catatan Elisitasi` setiap giliran, lalu elisitasi ditutup lewat `ticket.py close` (`CLOSED` + segel) | `skills/elicit/SKILL.md`, `references/elicitation-guide.md`, `references/literasi-teknis.md`, `references/elicitation-tech.md` (tiket `TECH`), `templates/elicit-template.md` |
+| `analyst:intake` | skill (menu `/`; titik masuk tiket) | Gerbang: pulihkan ticketdir, tentukan wilayah, tipe (beserta `category` untuk `TECH`), ukuran, cek duplikat, tetapkan slug, dan sinkron ulang tiket `READY` ke nataflow. Tidak menulis berkas apa pun | `skills/intake/SKILL.md` |
+| `analyst:elicit` | skill (`user-invocable: false`) | Tanya-jawab dengan peminta. Fakta direkam per pilar ke `## Catatan Elisitasi` setiap giliran, lalu elisitasi ditutup lewat `ticket.py close` (`CLOSED` + segel) | `skills/elicit/SKILL.md`, `references/elicitation-guide.md`, `references/literasi-teknis.md`, `references/elicitation-tech.md` (tiket `TECH`), `templates/elicit-template.md`, `dispatcher/scout.md` |
 | `analyst:spec` | skill (`user-invocable: false`) | Menyusun kartu di atas catatan elisitasi, dispatch reviewer, commit draft, minta persetujuan user, lalu `READY` dan sinkron nataflow opsional | `skills/spec/SKILL.md`, `templates/ticket-template.md`, `dispatcher/reviewer.md`, `references/nataflow-sync.md` |
+| `analyst:notulen` | skill (menu `/`) | Catatan kasar rapat → `NOTULEN.md` terstruktur tanpa mengarang isi, klarifikasi celah ke pencatat, `FINAL` lewat `notulen.py final`, lalu sinkron opsional ke nataflow sebagai dokumen `notes.meeting` project. Tidak membaca kode dan tidak membuat tiket | `skills/notulen/SKILL.md`, `templates/notulen-template.md`, `references/nataflow-sync.md` |
+| `code-scout` | agent (read-only, model `haiku`, `maxTurns: 10`) | Penelusuran kode dangkal untuk `elicit`: apa yang ada dan di mana, tanpa flow/alur/edge case. `BUKTI` (`TECH`) atau `KONTEKS` (tipe lain), kuota 8 pemanggilan | `agents/code-scout.md` |
 | `ticket-reviewer` | agent (read-only, model `sonnet`) | Memvonis draft kartu `PASS`/`BLOCKED` secara semantik terhadap catatan elisitasi; tiket `TECH` dinilai rubrik T1–T11, termasuk membuka sendiri tiap bukti `path:baris` | `agents/ticket-reviewer.md` |
 | `ticket.py` | script (CLI siklus hidup) | `state`, `new` (menulis `TICKET.md` awal, dan `analyst/tickets/.gitignore` di repo bersinkron), `check --gate elicit\|spec`, `close`, `review`, `revise`, `approve`, `commit --stage draft\|tertunda` (commit draft), `reopen`, `cancel`, `ref`, dan `sync-payload` (argumen tool MCP nataflow, read-only) | `skills/_common/ticket.py` |
-| `validate_doc.py` | script (validator) | `--kind elicit` menilai catatan elisitasi. `--kind ticket` menilai kartu, termasuk pemindai kebocoran teknis; kartu `TECH` sebagai gantinya ditagih AC `— verifikasi:`, `D-{n}`/`C-{n}`, dan bukti `path:baris` yang ada di disk | `skills/_common/validate_doc.py` |
+| `notulen.py` | script (CLI siklus hidup notulen) | `state`, `new` (kerangka, catatan asli, `source_hash`, `analyst/notulen/.gitignore`), `check [--final]`, `final` (`FINAL` + `final_hash`), dan `sync-payload` (argumen dokumen nataflow, read-only). Tidak pernah meng-commit | `skills/notulen/scripts/notulen.py` |
+| `validate_doc.py` | script (validator) | `--kind elicit` menilai catatan elisitasi; tipe selain `TECH` ditolak bila memuat `path:baris` (konteks `code-scout` bukan fakta). `--kind ticket` menilai kartu, termasuk pemindai kebocoran teknis; kartu `TECH` sebagai gantinya ditagih AC `— verifikasi:`, `D-{n}`/`C-{n}`, dan bukti `path:baris` yang ada di disk | `skills/_common/validate_doc.py` |
 | `analyst_lib.py` | script (pustaka) | Mencari root, parser frontmatter, pemecah kartu/catatan, sidik `content_hash`, `request_digest`, kerangka `ticket_skeleton`, segel `ticket_seal`, `scan_leaks`, config sinkron `load_sync_config`, dan commit git yang melewati path diabaikan `.gitignore` | `skills/_common/analyst_lib.py` |
 
 ## Alur Utama
@@ -44,8 +49,10 @@ flowchart TD
     CLASSIFY --> SLUG["Phase 6: slug + requester"]
     SLUG --> ELICIT
     ELICIT --> NEW["ticket.py new: kerangka + permintaan asli + request_hash, elicitation: OPEN"]
-    NEW -->|"TECH"| PROVE["Mode ringkas: petakan brief, buktikan klaim di kode (kuota 8), catat path:baris"]
+    NEW -->|"TECH"| PROVE["Mode ringkas: petakan brief, code-scout BUKTI (kuota 8), catat path:baris"]
     PROVE --> TURN
+    NEW -->|"tipe lain, permintaan menyebut layar/data yang ada"| CONTEXT["code-scout KONTEKS: bahan opsi pertanyaan / Asumsi:"]
+    CONTEXT --> TURN
     NEW --> TURN["Giliran tanya-jawab, maks 3 pertanyaan. Tulis TICKET.md + validate elicit"]
     TURN -->|"menunggu pihak lain / plafon 5 giliran"| HOLD1["ELICIT TERTAHAN, commit (tertunda)"]
     TURN --> CONFIRM{"Phase 4: konfirmasi fakta"}
@@ -66,7 +73,8 @@ flowchart TD
     SYNC -->|"dibuat / diperbarui / dilewati / GAGAL, READY tetap"| HANDOFF["ticket_source ke backend:tech-lead / frontend:lead"]
 ```
 
-Semua pekerjaan masuk lewat `/analyst:intake`, termasuk melanjutkan tiket yang setengah jalan. Intake membaca
+Semua pekerjaan tiket masuk lewat `/analyst:intake`, termasuk melanjutkan tiket yang setengah jalan. Notulen
+rapat punya titik masuk sendiri, `/analyst:notulen`, dan tidak menyentuh ticketdir. Intake membaca
 keadaan setiap ticketdir dari `ticket.py state`, bukan dari ingatan sesi. `elicit` dan `spec` tidak muncul di
 menu. Model memanggil keduanya lewat tool Skill sesuai keadaan ticketdir. Permintaan yang sudah lengkap tetap
 melewati `elicit`: fakta diisi dari permintaan asli, dikonfirmasi sekali, lalu ditutup tanpa satu pertanyaan
@@ -126,6 +134,7 @@ pun, sehingga `spec` dan reviewer selalu punya satu sumber kebenaran tertulis. `
 - **Pemicu / kapan dipakai**: dipanggil `intake` sesudah tipe dan slug ditetapkan, untuk ticketdir berkeadaan
   `ELISITASI`/`KOSONG`, atau oleh `spec` bila fakta perlu digali ulang (`reopen_reason`).
 - **Prasyarat**:
+  - Template dispatch `dispatcher/scout.md` ada (ditagih `check --gate elicit`).
   - Tiket baru (juga ticketdir `KOSONG`): `ticket.py new --slug <slug> --type <type> [--category <category>] --requester … --request -`
     (permintaan asli lewat stdin; `--category` wajib untuk `TECH` dan ditolak untuk tipe lain) harus mengembalikan
     `NEW PASS: <ticketdir> · root=… · git=… · type=…`.
@@ -142,9 +151,12 @@ pun, sehingga `spec` dan reviewer selalu punya satu sumber kebenaran tertulis. `
      menolak menutup ulang catatan yang berubah tanpa baris ini), lalu gali hanya pilar yang disebut alasannya.
   1. **Isi dari permintaan**: tiket `TECH` memakai mode ringkas `references/elicitation-tech.md`: brief lead
      engineer dipetakan ke pilar `TECH` (Masalah Teknis, Kondisi Saat Ini, Kondisi Target, Batasan, Batas
-     Cakupan, Urgensi; opsional Keputusan, Rollout, Ukuran Keberhasilan), tiap klaim kondisi sekarang
-     dibuktikan di kode dalam kuota 8 `Read`/`Grep`/`Glob` dan dicatat sebagai `path:baris`, lalu giliran
-     tanya-jawab hanya untuk celahnya. Tipe lain: fakta tersurat ditulis langsung. Fakta tersirat ditulis sebagai `Asumsi:`.
+     Cakupan, Urgensi; opsional Keputusan, Rollout, Ukuran Keberhasilan), klaim kondisi sekarang dikirim ke
+     `code-scout` `mode: BUKTI` (kuota 8 `Read`/`Grep`/`Glob` di subagent), butir `Ditemukan` dicatat sebagai
+     `path:baris`, lalu giliran tanya-jawab hanya untuk celahnya. Tipe lain: fakta tersurat ditulis langsung. Fakta tersirat ditulis sebagai `Asumsi:`.
+     Bila permintaan menyebut layar, menu, laporan, status, atau data yang mungkin sudah ada, `code-scout`
+     `mode: KONTEKS` dipakai sebagai bahan opsi pertanyaan atau `Asumsi:` tanpa rujukan berkas, tidak pernah
+     sebagai fakta pilar. Konteks utama tidak membaca kode sendiri; plafon 2 dispatch per sesi.
      `Kondisi Diinginkan` diawali `Bentuk hasil:` (layar, API, proses otomatis, laporan; panduan bagian 6).
      Istilah teknis dari peminta dirumuskan ulang sebagai perilaku. Istilah yang memang kosakata produk
      dikonfirmasi, dicatat di log sebagai baris berjawaban *Ya*, lalu dimasukkan ke `domain_terms`.
@@ -162,13 +174,16 @@ pun, sehingga `spec` dan reviewer selalu punya satu sumber kebenaran tertulis. `
   5. **Tutup & serah terima**: bila masih ada `MEMBLOKIR`, elisitasi dilarang ditutup. Selain itu lakukan
      self-test semantik, lalu `ticket.py close`: skrip menulis `CLOSED` hanya bila validator `PASS`, menyegel
      catatan (`elicit_hash`, `elicit_log`), dan meng-commit. Lalu panggil `spec`.
-- **Subagent yang didispatch**: tidak ada.
+- **Subagent yang didispatch**: `analyst:code-scout`, langsung lewat `dispatcher/scout.md`, maksimal 2 kali per
+  sesi. Balikan kosong atau rusak diulang sekali; gagal lagi → tipe lain lanjut tanpa konteks kode, `TECH`
+  `TERTAHAN`. Balikan tidak ditulis ke berkas mana pun.
 - **Output / artefak**: `<ticketdir>/TICKET.md` berisi frontmatter dan `## Catatan Elisitasi` (Permintaan
   Asli · Fakta per pilar · Log Tanya-Jawab · Pertanyaan Terbuka). Baris penutup:
   `ELICIT — CLOSED · <ticketdir> · <n> pilar · <n> log · <n> Q tidak memblokir · <commit> — lanjut ke analyst:spec`.
   Bila belum tuntas, dipakai blok `ELICIT — TERTAHAN` dengan pertanyaan siap diteruskan.
 - **Gerbang & commit**: `validate_doc.py --kind elicit` wajib `PASS` setiap giliran untuk struktur (tiap
-  heading sekali, permintaan asli sama dengan `request_hash`). Saat `CLOSED`, validator menagih nol pilar
+  heading sekali, permintaan asli sama dengan `request_hash`) dan, untuk tipe selain `TECH`, nol `path:baris` di
+  luar permintaan asli (check 11). Saat `CLOSED`, validator menagih nol pilar
   kosong, nol `MEMBLOKIR`, nol `Asumsi:` di mana pun dalam baris, dan setiap `domain_terms` punya baris
   konfirmasi berjawaban *Ya*. `ticket.py close` meng-commit `docs(ticket): elisitasi <slug>`; draft tertahan
   di-commit lewat `ticket.py commit --stage tertunda` (`… (tertunda)`). Ticketdir yang diabaikan git tidak
@@ -299,16 +314,66 @@ sequenceDiagram
     end
 ```
 
+### `analyst:notulen`
+
+- **Pemicu / kapan dipakai**: user membawa catatan kasar rapat untuk dirapikan, melanjutkan atau memfinalkan
+  notulen, atau menyinkron ulang notulen `FINAL` ke nataflow. Dipanggil lewat `/analyst:notulen`; model juga boleh
+  memanggilnya. Bukan untuk membuat tiket.
+- **Prasyarat**: `notulen.py state` berjalan. Parameter: `notes` (tempelan atau path berkas), `title`,
+  `meeting_date`, `notulendir`.
+- **Langkah**:
+  0. **Orientasi**: `notulen.py state`. `DRAFT` dilanjutkan, `DRIFT` dikonfirmasi ulang ke user, sinkron ulang
+     langsung ke Phase 6, `RUSAK`/`NAMA_TIDAK_SAH` dilaporkan.
+  1. **Alokasi**: judul dan tanggal rapat ditanyakan bila kosong. `notulen.py new --slug --title --date --notes -`
+     menulis kerangka, `## Catatan Asli` verbatim beserta `source_hash`, dan `analyst/notulen/.gitignore` (`*`)
+     tanpa syarat. Berkas catatan dibaca lewat redirect stdin, tidak diketik ulang.
+  2. **Tata ulang** menurut bagian 2 `templates/notulen-template.md`: Ringkasan, Peserta, Agenda, Pembahasan,
+     Keputusan `D-{n}` (hanya yang dinyatakan diputuskan), Action Item `A-{n}` (PIC dan tenggat, atau `belum
+     ditentukan`), Pertanyaan Terbuka `Q-{n}`.
+  3. **Klarifikasi celah**: ≤ 3 pertanyaan per giliran, plafon 2 giliran (keputusan atau pembahasan, PIC dan
+     tenggat, peserta, singkatan). Tulis `NOTULEN.md` dan `check` sesudah tiap giliran. Yang tak terjawab menjadi
+     `belum ditentukan` atau `Q-{n}`.
+  4. **Validasi**: `notulen.py check --final` sampai `PASS`, lalu self-test bagian 3 template.
+  5. **Konfirmasi pencatat**: *Final* · *Ada koreksi* · *Tahan*. *Final* menjalankan `notulen.py final --answer`.
+  6. **Sinkron nataflow**: prosedur `skills/notulen/references/nataflow-sync.md`.
+- **Subagent yang didispatch**: tidak ada.
+- **Output / artefak**: `analyst/notulen/<YYMMDDhhmm>-<slug>/NOTULEN.md`. Baris penutup
+  `NOTULEN — FINAL · <notulendir> · <n> keputusan · <n> action item · <n> Q · nataflow <dibuat | diperbarui | tidak
+  berubah | dilewati | GAGAL: <sebab>>`, atau `NOTULEN — DRAFT · <notulendir> · <sebab>`.
+- **Gerbang & commit**: `FINAL` hanya lewat `notulen.py final` (validator `PASS` termasuk nol `Asumsi:`, dan
+  jawaban user tidak kosong). Tidak ada commit sama sekali: notulendir selalu diabaikan git.
+- **Lanjut ke**: selesai. Permintaan kerja yang muncul di rapat dijadikan tiket oleh user lewat `/analyst:intake`.
+
+```mermaid
+flowchart TD
+    N0["Phase 0: notulen.py state"] -->|"baru"| N1["Phase 1: notulen.py new (kerangka + Catatan Asli + .gitignore)"]
+    N0 -->|"DRAFT"| N3
+    N0 -->|"DRIFT"| N5
+    N0 -->|"sinkron ulang FINAL"| N6
+    N1 --> N2["Phase 2: tata ulang dari Catatan Asli"]
+    N2 --> N3["Phase 3: klarifikasi ≤3/giliran, plafon 2 giliran, check tiap giliran"]
+    N3 --> N4["Phase 4: check --final sampai PASS"]
+    N4 --> N5{"Phase 5: AskUserQuestion"}
+    N5 -->|"Koreksi"| N4
+    N5 -->|"Tahan"| ND["NOTULEN — DRAFT"]
+    N5 -->|"Final"| NF["notulen.py final: FINAL + final_hash, tanpa commit"]
+    NF --> N6["Phase 6: sync-payload, get_project_info, list_document, lalu create_document / upsert_document"]
+    N6 -->|"dibuat / diperbarui / tidak berubah / dilewati / GAGAL, FINAL tetap"| NE["NOTULEN — FINAL"]
+```
+
 ## Subagent
 
 | Agent | Dipanggil oleh | Tools | Input | Output/vonis | Larangan |
 |---|---|---|---|---|---|
+| `code-scout` | `analyst:elicit` Phase 1 (dan satu dispatch susulan di Phase 2), lewat `skills/elicit/dispatcher/scout.md` | Read, Grep, Glob (model `haiku`, `maxTurns: 10`) | Slot `mode` (`BUKTI`/`KONTEKS`), `root` (path absolut), `batas` (opsional), `pertanyaan` (1–5 butir `P{n}` dalam kata-kata peminta) | Blok `## Code Scout`: `Mode`, `Repo` (`ada kode`/`tanpa kode`), `Pemanggilan: <n> dari 8`, lalu `### Ditemukan` (`path:baris` yang dibaca sendiri), `### Tidak ditemukan` (beserta direktori yang disisir), `### Belum disisir`. Tiap butir tepat sekali | Dilarang mengedit atau menulis berkas, menelusuri flow/alur/edge case/rantai pemanggil, menyarankan solusi, menulis `path:baris` yang tidak dibaca, dan berdialog dengan user |
 | `ticket-reviewer` | `analyst:spec` Phase 3, lewat `skills/spec/dispatcher/reviewer.md` | Read, Grep, Glob (model `sonnet`) | Slot `ticketdir` (path absolut), `type`, `round` (1/2), `sidik` (`<12hex>/<12hex>`, diambil tepat sebelum dispatch). Ronde 2 menambah `previous_verdict` dan `changed_sections`. Isi tiket dibaca sendiri dari disk | Blok `## Ticket Review`: `Verdict: PASS\|BLOCKED`, `Sidik`, `Ronde`, hitungan BLOCKER `[MEKANIS]`/`[SEMANTIK]`, BLOCKER berjangkar `TICKET.md:<baris>`, dan ADVISORY. Ada 12 fokus pemeriksaan: hasil teramati, ukuran pasti, setia elisitasi maju dan mundur, kebocoran teknis semantik, satu tujuan, BUG dapat direproduksi, pertanyaan terbuka jujur, latar belakang, prioritas selaras urgensi, judul perintah kerja, celah yang belum ditanyakan (`ADVISORY [ELISITASI]`, tidak diserap `spec`) | Dilarang mengedit berkas, menulis/menyarankan `READY`, menulis ulang tiket, menilai kelayakan teknis/estimasi, bertanya ke user, dan menghitung ulang cek mekanis `validate_doc.py` |
 
 ## Hooks & Guard
 
-Tidak ada. Plugin `analyst` tidak punya direktori `hooks/`. Penegakannya sepenuhnya lewat skrip `ticket.py`
-dan `validate_doc.py` di setiap gerbang.
+Tidak ada. Plugin `analyst` tidak punya direktori `hooks/`. Penegakannya sepenuhnya lewat skrip `ticket.py`,
+`validate_doc.py`, dan `notulen.py` di setiap gerbang. Kedua subagent analyst read-only lewat daftar `tools`-nya
+(`code-scout` dan `ticket-reviewer` tanpa `Write`/`Edit`/`Bash`), sehingga tidak butuh pagar `guard_bash` seperti
+subagent backend/frontend.
 
 Catatan dari sisi lain: hook `SessionStart` plugin `backend`/`frontend` mengecualikan permintaan yang
 memanggil atau melanjutkan `analyst:*`. Di dalam alur analyst, blok `<backend-tech-lead-gate>` /
@@ -324,6 +389,9 @@ nama plugin engineer (mis. berisi `analyst`) agar hook kedua plugin engineer dia
 ./analyst/tickets/<YYMMDDhhmm>-<slug>/
   TICKET.md   satu-satunya artefak yang disunting skill (kartu di atas, ## Catatan Elisitasi sebagai H2 terakhir)
   review.md   blok ## Ticket Review terakhir, hanya ditulis ticket.py review --report
+./analyst/notulen/.gitignore     ditulis notulen.py new tanpa syarat bila belum ada: `*`
+./analyst/notulen/<YYMMDDhhmm>-<slug>/
+  NOTULEN.md  notulen rapat, ## Catatan Asli sebagai H2 terakhir; tidak pernah di-commit
 ```
 
 `.claude/nataflow.json` (objek JSON, ter-commit; `analyst/nataflow.json` lama tetap diterima, dan dua berkas yang
@@ -392,6 +460,26 @@ direktori tidak cocok dengan pola `<YYMMDDhhmm>-<slug>`.
 - `approve` memateraikan `approved_hash` (sidik berkas utuh) dan `approved_seal` (`ticket_seal`: body utuh
   plus `type`, `priority`, `domain_terms`, tanpa field pembukuan dan `external_ref`).
 
+### Notulen
+
+`NOTULEN.md` punya satu sumbu status, `status: DRAFT → FINAL`, ditulis `notulen.py` (`DRAFT` awal oleh `new`,
+`FINAL` oleh `final`). `type`, `slug`, `created`, dan `source_hash` ditulis `new`; `meeting_date` adalah tanggal
+rapat dari pencatat dan ikut sidik; `final_hash`, `finalized`, dan `final_answer` ditulis `final`. `notulen.py
+state` menurunkan keadaan berikut:
+
+```mermaid
+stateDiagram-v2
+    [*] --> DRAFT: notulen.py new
+    DRAFT --> FINAL: notulen.py final (validator PASS + jawaban user)
+    FINAL --> DRIFT: disunting sesudah final
+    DRIFT --> FINAL: notulen.py final ulang
+```
+
+`RUSAK` berarti `NOTULEN.md` tidak ada, bukan UTF-8, atau status tidak sah. `NAMA_TIDAK_SAH` berarti direktori
+tidak cocok dengan pola `<YYMMDDhhmm>-<slug>`. Sinkron hanya untuk `FINAL`: dokumen `notes.meeting` di bawah project
+MCP key (`get_project_info`), beridentitas metadata `notulen_key` = path notulendir. Isinya badan notulen tanpa
+frontmatter dan tanpa `## Catatan Asli`; judulnya `<H1> — <tanggal rapat>`, dikunci saat `create_document` pertama.
+
 ## Handoff Lintas Plugin
 
 - **Ke engineer**: tiket `READY` diserahkan sebagai `ticket_source: <ticketdir>/TICKET.md` ke
@@ -425,7 +513,7 @@ direktori tidak cocok dengan pola `<YYMMDDhhmm>-<slug>`.
 - **Batas dengan plugin lain**: kontrak teknis dan brief milik `backend`, alur/bentuk layar milik
   `frontend`, perubahan kecil tanpa taskdir milik `quickdev`. Dua skill sengaja belum dibuat: `split`
   (pemecahan epic; untuk sementara intake memakai antrian tiket) dan `acceptance` (UAT atas `REPORT.md`
-  engineer).
+  engineer). Notulen belum diserahkan ke mana pun: calon tiket dari rapat dibuat user lewat `/analyst:intake`.
 
 ## Titik Gagal & Pemulihan
 
@@ -451,4 +539,10 @@ direktori tidak cocok dengan pola `<YYMMDDhhmm>-<slug>`.
 | `close`/`approve`/`ref`/`cancel`/`commit` exit 3 (commit gagal karena hook, gpg, index terkunci) | elicit, spec / ticket.py | Isi sudah tertulis. Sajikan baris `COMMIT GAGAL`, lalu user meng-commit manual dengan perintah dan subjek persis yang dicetak. Dilarang `--no-verify` dan `git add -f`. Path yang diabaikan `.gitignore` bukan kegagalan: skrip melewati commit-nya |
 | Tiket `READY` disunting (`DRIFT`) | intake, penerima engineer | Setujui ulang lewat `spec` (`reopen` → review → approve), atau pulihkan isi yang disetujui. `ticket.py ref` menolak tiket `DRIFT`. Bila suntingannya menyentuh catatan elisitasi, check 5 mengarahkan ke `elicit` dulu |
 | Membatalkan tiket `READY` | ticket.py, spec (`cancel_request`) | `cancel` ditolak tanpa `--force`, karena tiket mungkin sudah diserahkan ke engineer. `--force` hanya atas keputusan eksplisit user, lalu sinkron membuat task cerminnya `cancelled` |
+| `code-scout` mengembalikan balikan kosong, tanpa blok `## Code Scout`, atau error | elicit | Ulangi sekali (tidak dihitung plafon 2). Gagal lagi atau `Repo: tanpa kode`: tipe lain lanjut tanpa konteks kode; `TECH` `ELICIT — TERTAHAN` ("bukti kode tidak dapat dikumpulkan") |
+| Validator elisitasi check 11: `path:baris` di catatan tiket non-`TECH` | elicit | Tulis ulang sebagai perilaku yang terlihat pengguna atau `Asumsi:` tanpa rujukan berkas, lalu konfirmasi ke peminta |
+| `NEW FAIL` notulen (slug kembar terbuka, judul/tanggal/catatan kosong, tanggal tidak sah) | notulen | Lanjutkan notulendir yang terbuka atau pilih slug lain; masukan kosong ditanyakan ke user |
+| `notulen.py check` `FAIL` karena isi memang tidak diketahui | notulen | Ubah jadi `Q-{n}` atau `belum ditentukan`, bukan dikarang. `Catatan asli utuh` `FAIL` → salin ulang kutipan byte demi byte |
+| Notulen `FINAL` disunting (`DRIFT`) | notulen | Sajikan perubahannya ke user, lalu `notulen.py final` ulang. `sync-payload` menolak `DRIFT` |
+| Sinkron notulen `GAGAL` (server MCP tidak tersedia, `get_project_info` galat, judul bentrok, dokumen ber-`notulen_key` kembar) | notulen | Notulen tetap `FINAL`. Bereskan sebabnya, lalu `/analyst:notulen` "sinkron ulang notulen `<notulendir>`". Judul bentrok diputuskan user (sunting H1, `final` ulang). Dilarang mengulang `create_document` tanpa `list_document` ulang |
 | Sinkron nataflow `GAGAL` (server MCP tidak tersedia, tool galat, config rusak, task ber-`ticket_key` kembar) | spec, intake | Tiket tetap `READY` dan serah terima tetap berjalan. Bereskan sebabnya, lalu `/analyst:intake` "sinkron ulang tiket `<ticketdir>`". Dilarang `reopen` hanya demi sinkron, dan dilarang mengulang `create_task` tanpa `list_task` ulang |
