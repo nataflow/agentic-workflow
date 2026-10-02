@@ -18,6 +18,7 @@ from conftest import GIT_ENV, PLUGINS, git
 BE_TD = "backenddev/docs/2609250000-smoke"
 FE_TD = "frontenddev/docs/2609250000-smoke"
 AN_TD = "analyst/tickets/2609250000-smoke"
+AN_NT = "analyst/notulen/2609250000-smoke"
 HOOK_STDIN = "SESSION"  # diganti payload SessionStart ber-cwd repo
 BASH_STDIN = json.dumps({"hook_event_name": "PreToolUse", "tool_name": "Bash",
                          "tool_input": {"command": "ls"}})
@@ -28,6 +29,9 @@ CASES = [
     ("analyst/skills/_common/ticket.py", ["sync-payload", "--ticketdir", AN_TD, "--json"], True, None),
     ("analyst/skills/_common/ticket.py", ["commit", "--ticketdir", AN_TD, "--stage", "draft"], False, None),
     ("analyst/skills/_common/validate_doc.py", ["--kind", "elicit", "--ticketdir", AN_TD, "--json"], True, None),
+    ("analyst/skills/notulen/scripts/notulen.py", ["state", "--json"], True, None),
+    ("analyst/skills/notulen/scripts/notulen.py", ["check", "--notulendir", AN_NT, "--json"], True, None),
+    ("analyst/skills/notulen/scripts/notulen.py", ["sync-payload", "--notulendir", AN_NT, "--json"], True, None),
 
     ("nataflow/skills/create-artifact/scripts/artifact.py", ["config", "--json"], True, None),
 
@@ -97,7 +101,7 @@ NOT_UTF8 = b"\xff\xfe\x80 bukan utf-8 \xc3\x28\n"
 CORRUPT = [f"{td}/{doc}" for td in (BE_TD, FE_TD) for doc in
            ("TASK.md", "brief-01.md", "REVIEW.md", "REPORT.md")] + [
     f"{BE_TD}/BRD.md", f"{BE_TD}/PRD.md", f"{BE_TD}/HALT.md", f"{BE_TD}/RCA.md",
-    f"{FE_TD}/FLOW.md", f"{FE_TD}/UI.md", f"{FE_TD}/CONTRACT.md", f"{AN_TD}/TICKET.md", "analyst/nataflow.json",
+    f"{FE_TD}/FLOW.md", f"{FE_TD}/UI.md", f"{FE_TD}/CONTRACT.md", f"{AN_TD}/TICKET.md", f"{AN_NT}/NOTULEN.md", "analyst/nataflow.json",
     ".claude/nataflow.json",
     "frontenddev/reviews/2609250000-smoke.md", "plan/smoke.md", "repo-profile.md",
     ".claude/profile/backenddev/index.json", ".claude/profile/backenddev/commands.md",

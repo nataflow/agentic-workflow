@@ -420,7 +420,7 @@ merebut pemicu.
   - keluaran byte-identik pada dua pemanggilan.
 
 ## N8 [Rendah] Smoke dan lint untuk CLI baru
-- [ ] Selesai
+- [x] Selesai
 
 **Perubahan:** tambah tiga kasus `notulen.py` ke `CASES` di `tests/test_smoke.py`: `state --json`,
 `check --notulendir … --json`, dan `sync-payload --notulendir … --json`. `--json` harus valid di keempat keadaan
