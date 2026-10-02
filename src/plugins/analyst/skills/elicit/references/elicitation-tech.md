@@ -13,7 +13,7 @@ Kartu `TECH` berhenti di **kondisi target**, yaitu struktur akhir yang disepakat
 Lead engineer biasanya datang dengan brief yang sudah menjawab sebagian besar pilar. Urutannya:
 
 1. **Petakan brief ke pilar.** Isi tiap pilar yang dijawab permintaan asli; yang tersirat ditulis `Asumsi:`.
-2. **Verifikasi kode.** Tiap klaim tentang kondisi sekarang dibuktikan di repo ini dan dicatat sebagai `` `path:baris` `` di pilar `Kondisi Saat Ini`. **Kuota 8 pemanggilan** `Read`/`Grep`/`Glob` per sesi elisitasi, khusus untuk membuktikan klaim peminta, bukan untuk menjelajah. Klaim yang tidak terbukti atau bertentangan dengan kode → tanyakan ke peminta di giliran berikutnya, bukan dikoreksi diam-diam.
+2. **Verifikasi kode lewat scout.** Klaim tentang kondisi sekarang dikirim ke subagent `analyst:code-scout` `mode: BUKTI` (`../dispatcher/scout.md`, 1–5 klaim per dispatch, maksimal 2 dispatch per sesi). Scout memegang **kuota 8 pemanggilan** `Read`/`Grep`/`Glob`, khusus untuk membuktikan klaim peminta, bukan untuk menjelajah. Konteks utama tidak membaca kode sendiri. Hanya butir `Ditemukan` yang dicatat sebagai `` `path:baris` `` di pilar `Kondisi Saat Ini`. Klaim yang `Tidak ditemukan`, `Belum disisir`, atau dibantah kode → tanyakan ke peminta di giliran berikutnya, bukan dikoreksi diam-diam.
 3. **Tanya celahnya saja.** Giliran tanya-jawab (≤ 3 pertanyaan) hanya untuk pilar wajib yang masih kosong, `Asumsi:` yang perlu dikonfirmasi, dan klaim yang tidak cocok dengan kode.
 
 Bukti yang dicatat menunjuk berkas di **repo tempat tiket ini tinggal**, relatif terhadap root-nya. `validate_doc.py --kind ticket` memeriksa tiap `path:baris` kartu benar-benar ada. Rujukan ke repo lain ditulis di `## Lampiran` kartu, bukan sebagai bukti.

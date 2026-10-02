@@ -268,7 +268,7 @@ pengguna atau `Asumsi:` tanpa rujukan berkas". Check berlaku di tiap giliran, bu
 - fixture lama tetap `PASS`.
 
 ## X4 [Sedang] Prosa `elicit` masih melarang kode untuk non-`TECH`
-- [ ] Selesai
+- [x] Selesai
 
 **Perubahan di `skills/elicit/SKILL.md`:**
 1. **Phase 1**:
@@ -290,7 +290,7 @@ yang tidak terbukti → tanyakan" tetap.
 **Test:** lint R-check atas rujukan `dispatcher/scout.md`.
 
 ## X5 [Sedang] Jalur gagal scout belum ada
-- [ ] Selesai
+- [x] Selesai
 
 **Perubahan di Failure path `elicit`:**
 - Balikan kosong atau tanpa blok `## Code Scout` → dispatch ulang sekali.
