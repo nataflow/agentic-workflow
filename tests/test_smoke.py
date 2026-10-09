@@ -41,6 +41,7 @@ CASES = [
     ("product/skills/_common/charter.py", ["guard", "--mode", "NEW_PRODUCT", "--json"], True, None),
     ("product/skills/_common/charter.py", ["check", "--gate", "spec", "--charterdir", PR_TD, "--json"], True, None),
     ("product/skills/_common/charter.py", ["commit", "--charterdir", PR_TD, "--stage", "draft"], False, None),
+    ("product/skills/init/scripts/check_preconditions.py", ["--json"], True, None),
     ("product/skills/_common/validate_doc.py", ["--kind", "charter", "--charterdir", PR_TD, "--json"], True, None),
 
     ("backend/hooks/detect.py", ["--plugin", "backend"], "hook", HOOK_STDIN),
