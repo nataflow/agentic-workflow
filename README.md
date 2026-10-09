@@ -1,15 +1,17 @@
 # nataflow
 
-Marketplace plugin Claude Code `nataflow`: lima plugin untuk alur kerja rekayasa perangkat lunak,
-mulai dari tiket stakeholder sampai kode yang direview, ditambah kerja langsung dengan server nataflow.
+Marketplace plugin Claude Code `nataflow`: enam plugin untuk alur kerja rekayasa perangkat lunak,
+mulai dari inisiasi produk dan tiket stakeholder sampai kode yang direview, ditambah kerja langsung dengan
+server nataflow.
 
 | Plugin | Versi | Fungsi | Titik masuk |
 |---|---|---|---|
 | [`analyst`](src/plugins/analyst/README.md) | 0.15.0 | Permintaan pengguna/stakeholder (satu, atau hingga lima sekaligus secara berurutan) menjadi `TICKET.md` non-teknis (user story, acceptance criteria, aturan bisnis), atau perubahan struktur dari lead engineer menjadi tiket `TECH` berbukti `file:baris`, lewat elisitasi, review independen, dan persetujuan; catatan kasar rapat menjadi `NOTULEN.md` | `/analyst:intake`, `/analyst:notulen` |
-| [`backend`](src/plugins/backend/README.md) | 0.13.1 | Kerja backend 7 stack (Java Spring, Go, Node, Bun, Rust, PHP, CodeIgniter 4): profil, TASK/BRD/PRD/brief, eksekusi, review, dan laporan | `/backend:tech-lead` |
-| [`frontend`](src/plugins/frontend/README.md) | 0.12.1 | Kerja frontend (React + Vite, React Native/Expo, SvelteKit, Svelte + Vite): alur layar, bentuk layar, kontrak, brief, eksekusi, review, dan laporan dengan ledger approval | `/frontend:lead` |
+| [`backend`](src/plugins/backend/README.md) | 0.13.2 | Kerja backend 7 stack (Java Spring, Go, Node, Bun, Rust, PHP, CodeIgniter 4): profil, TASK/BRD/PRD/brief, eksekusi, review, dan laporan | `/backend:tech-lead` |
+| [`frontend`](src/plugins/frontend/README.md) | 0.12.2 | Kerja frontend (React + Vite, React Native/Expo, SvelteKit, Svelte + Vite): alur layar, bentuk layar, kontrak, brief, eksekusi, review, dan laporan dengan ledger approval | `/frontend:lead` |
 | [`quickdev`](src/plugins/quickdev/README.md) | 0.8.0 | Alur ringan untuk stack apa pun: profil, explore, clarify, satu berkas rencana, execute, dan review, tanpa taskdir dan tanpa subagent | `/quickdev:profile`, `/quickdev:plan` |
 | [`nataflow`](src/plugins/nataflow/README.md) | 0.1.0 | Artifact nataflow: halaman HTML mandiri yang dinilai gerbang kontrak halaman lalu di-upsert ke project milik MCP key, tanpa berkas di repo | `/nataflow:create-artifact` |
+| [`product`](src/plugins/product/README.md) | 0.1.0 | Inisiasi produk baru (folder kosong), fitur baru, atau improvement fitur (codebase) menjadi `CHARTER.md` enam pilar — Purpose, Actors, Business Process, Business Rules, Success Criteria, Scope — dengan guard permintaan yang terlalu umum, elisitasi, review independen, dan persetujuan | `/product:init` |
 
 Skill internal (mis. `backend:plan`, `frontend:contract`, `analyst:spec`) tidak muncul di menu `/`.
 Model memanggilnya dari gerbang masing-masing.
@@ -23,6 +25,7 @@ Model memanggilnya dari gerbang masing-masing.
 /plugin install frontend@nataflow
 /plugin install quickdev@nataflow
 /plugin install nataflow@nataflow
+/plugin install product@nataflow
 ```
 
 Untuk salinan lokal: `/plugin marketplace add ./path/ke/agentic-workflow`. Marketplace direktori lokal
@@ -31,16 +34,17 @@ Marketplace git memakai `version` di `plugin.json`: pengguna hanya mendapat peru
 
 ## Prasyarat
 
-- `python3` ≥ 3.9 di `PATH` untuk hook dan skrip `analyst`, `backend`, `frontend`, dan `nataflow`. Semua skrip
+- `python3` ≥ 3.9 di `PATH` untuk hook dan skrip `analyst`, `backend`, `frontend`, `nataflow`, dan `product`. Semua skrip
   hanya memakai stdlib. Python 3.11+ disarankan untuk repo Rust ber-workspace (`tomllib`).
-- `git`. `backend` dan `frontend` mewajibkan repo git, sedangkan `analyst` bisa berjalan di folder
-  dokumen biasa. `nataflow` tidak butuh repo, tetapi butuh server MCP nataflow yang berjalan.
+- `git`. `backend` dan `frontend` mewajibkan repo git, sedangkan `analyst` dan `product` bisa berjalan di
+  folder dokumen biasa atau folder kosong. `nataflow` tidak butuh repo, tetapi butuh server MCP nataflow yang berjalan.
 - Di Windows yang hanya punya `py`/`python` tanpa `python3`, hook SessionStart tidak jalan.
 
 ## Memilih Plugin
 
 | Situasi | Plugin |
 |---|---|
+| Gagasan produk baru, fitur baru, atau improvement yang butuh arah lengkap sebelum dipecah jadi tiket | `product` |
 | Peminta non-engineer atau stakeholder; kebutuhan belum jelas | `analyst` |
 | Catatan kasar rapat yang perlu dirapikan jadi notulen | `analyst` (`/analyst:notulen`) |
 | Repo backend salah satu dari 7 stack; kerja berisiko atau butuh kontrak dan jejak keputusan | `backend` |
@@ -48,13 +52,16 @@ Marketplace git memakai `version` di `plugin.json`: pengguna hanya mendapat peru
 | Perubahan kecil–menengah, stack lain (Next.js, FastAPI, …), tanpa taskdir | `quickdev` |
 | Laporan, dashboard, atau diagram HTML yang dibuka anggota project di nataflow | `nataflow` |
 
+Rantai `product` → `analyst`: butir Scope `S<n>` charter `APPROVED` dibawa satu per satu ke `/analyst:intake`
+(serah-terima otomatis belum aktif; ID `S<n>` sudah disiapkan untuk itu).
+
 Rantai `analyst` → engineer: tiket `READY` diserahkan dengan menempelkan isi `TICKET.md` sebagai permintaan
 ke `/backend:tech-lead` dan/atau `/frontend:lead`. Engineer lalu menerbitkan `TASK.md` teknisnya
 sendiri.
 
 ## Hidup Berdampingan
 
-Kelima plugin biasanya dipasang user-wide. Yang menentukan perilaku di satu repo:
+Keenam plugin biasanya dipasang user-wide. Yang menentukan perilaku di satu repo:
 
 - **Hook SessionStart.** Hanya `backend` dan `frontend` yang punya hook. Keduanya berbagi
   `hooks/detect.py` yang identik byte-per-byte, dan masing-masing menyala bila profilnya ada atau
@@ -64,7 +71,7 @@ Kelima plugin biasanya dipasang user-wide. Yang menentukan perilaku di satu repo
   lama di `.claude/profile/` dimigrasikan oleh pemiliknya (mode MIGRATE) dan tidak disentuh plugin lain.
   `quickdev` memakai `repo-profile.md` sendiri.
 - **Pemanggilan eksplisit.** Teks gerbang engineer mengecualikan permintaan yang memanggil atau melanjutkan
-  `/analyst:*` dan `/quickdev:*`. Skill quickdev hanya jalan bila user mengetik `/quickdev:<skill>`.
+  `/analyst:*`, `/product:*`, dan `/quickdev:*`. Skill quickdev hanya jalan bila user mengetik `/quickdev:<skill>`.
 - **Penanda `.claude/workflow`.** Berkas teks di repo pengguna berisi nama plugin yang boleh menggerbangi
   repo itu, dipisah spasi atau baris. Hook yang namanya tidak tercantum akan diam. Isi `quickdev` membuat
   kedua hook engineer diam; isi `frontend quickdev` hanya menyalakan frontend. Bila berkas tidak ada,

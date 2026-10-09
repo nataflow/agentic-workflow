@@ -4,8 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-`nataflow` is a Claude Code **plugin marketplace**, not an application. It ships five plugins under
-`src/plugins/`: `analyst`, `backend`, `frontend`, `quickdev`, and `nataflow`. Each plugin is a set of skills
+`nataflow` is a Claude Code **plugin marketplace**, not an application. It ships six plugins under
+`src/plugins/`: `analyst`, `backend`, `frontend`, `quickdev`, `nataflow`, and `product`. Each plugin is a set of skills
 (`SKILL.md` prose), subagents (`agents/*.md`), hooks, and stdlib-only Python scripts that skills call to
 enforce their gates mechanically. Everything under `src/plugins/<plugin>/` is copied into the user's
 plugin cache, so dev-only files (tests, `__pycache__`, `src/plugins` paths in prose) must not live there.
@@ -90,6 +90,14 @@ skeletons), `dispatcher/` (prompts used to dispatch subagents), `scripts/`, and 
 - **nataflow** — direct work against the nataflow server over MCP, no repo artifacts. `create-artifact`
   writes a self-contained HTML page, gates it with `skills/create-artifact/scripts/artifact.py check`, and
   upserts it under the MCP key's project via the `nataflow-api` `*_artifact` MCP tools. Model-invocable.
+- **product** — initiation of a new product (empty folder, mode `NEW_PRODUCT`), a new feature, or an
+  improvement (codebase, `NEW_FEATURE`/`IMPROVEMENT`) into `product/<slug>/CHARTER.md` with six pillars
+  (Purpose, Actors, Business Process, Business Rules, Success Criteria, Scope). Entry `product:init` runs a
+  minimum-context guard (`charter.py guard`) that rejects over-general requests before any folder exists, then
+  `product:discover` (elicitation; `code-scout` maps current roles/flow/rules in codebase modes) and
+  `product:spec` (card, `charter-reviewer`, approval). `skills/_common/charter.py` is the state machine; scope
+  items carry stable `S<n>` IDs prepared for a future hand-off to `analyst`. The backend/frontend gate texts
+  exempt `/product:*`.
 
 Repo profiles are per plugin: `.claude/profile/backenddev/` and `.claude/profile/frontenddev/`
 (`index.json` + fixed set of `.md` files; see `BE_PROFILE_MD`/`FE_PROFILE_MD` in `tests/conftest.py`).
@@ -125,6 +133,9 @@ Tests live outside `src/` so they never ship. They invoke plugin scripts via `su
 - Chain fixtures: `chain_repo` (backend taskdir on a work branch), `fe_chain_repo`, `fe_approved_chain`,
   `fe_round`, `fe_minor_chain` (built by `tests/frontend/fixtures/minor_chain_reviewed.sh`), and
   `ticket_review` for analyst.
+- product tests import `tests/product_helpers.py` (`from product_helpers import …`): fixture `ws` runs each test
+  once per mode (`NEW_PRODUCT`/`NEW_FEATURE`/`IMPROVEMENT`), `empty_ws` is an empty non-git folder, and
+  `Workspace.to_closed()`/`to_reviewed()`/`to_approved()` build a charter in each lifecycle state.
 - `load_module(path, name)` imports a plugin script under a unique name and purges sibling modules,
   because backend and frontend have same-named modules (`precondition_lib`, `detect`).
 
