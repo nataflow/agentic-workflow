@@ -1,6 +1,6 @@
 # Alur Plugin `frontend`
 
-> Plugin `frontend` (v0.12.1, `src/plugins/frontend/.claude-plugin/plugin.json`) menangani kerja frontend di beberapa stack: React + Vite SPA, React Native/Expo, SvelteKit, dan Svelte + Vite. Next.js sengaja tidak dilayani. Isinya sepuluh skill dan lima subagent yang membawa permintaan kerja lewat rantai dokumen: akar `TASK.md` → `FLOW.md`/`UI.md` → `CONTRACT.md` → brief → eksekusi → `REVIEW.md` → `REPORT.md`. Tiap gate dikunci persetujuan user yang dimateraikan skrip `chain.py`, dan tiap hal yang dapat dicek mesin divonis validator, bukan diingat model. Plugin ini dipakai di repo frontend yang terdeteksi hook `SessionStart`. Pintu masuknya selalu `/frontend:lead`. Hanya `lead`, `profile`, dan `review` yang muncul di menu `/`. Tujuh skill lainnya `user-invocable: false` dan dipanggil model lewat tool Skill (`README.md` § Ten Skills).
+> Plugin `frontend` (v0.12.2, `src/plugins/frontend/.claude-plugin/plugin.json`) menangani kerja frontend di beberapa stack: React + Vite SPA, React Native/Expo, SvelteKit, dan Svelte + Vite. Next.js sengaja tidak dilayani. Isinya sepuluh skill dan lima subagent yang membawa permintaan kerja lewat rantai dokumen: akar `TASK.md` → `FLOW.md`/`UI.md` → `CONTRACT.md` → brief → eksekusi → `REVIEW.md` → `REPORT.md`. Tiap gate dikunci persetujuan user yang dimateraikan skrip `chain.py`, dan tiap hal yang dapat dicek mesin divonis validator, bukan diingat model. Plugin ini dipakai di repo frontend yang terdeteksi hook `SessionStart`. Pintu masuknya selalu `/frontend:lead`. Hanya `lead`, `profile`, dan `review` yang muncul di menu `/`. Tujuh skill lainnya `user-invocable: false` dan dipanggil model lewat tool Skill (`README.md` § Ten Skills).
 
 ## Peta Komponen
 
@@ -528,7 +528,7 @@ Penulis dan penilai selalu berada di context terpisah. Sebabnya, penilai yang be
   - stack yang terdeteksi dan kandidat lain di monorepo;
   - catatan status profil: lengkap, `ABSENT`/`OTHER_OWNER` (GENERATE; `EXPLORE_FACT` tetap berangkat tanpa profil), lokasi lama (MIGRATE), JSON rusak, `stack` tidak sah, field `plugin` asing, atau berkas hilang (REFRESH);
   - aturan `RULES`: `frontend:lead` jalan lebih dulu untuk tiap permintaan kerja, termasuk susulan kecil.
-- Gate boleh dilewati hanya untuk empat hal (`hooks/gate_text.py`): jawaban yang memasok informasi ke rute yang sudah diputuskan, pertanyaan pengetahuan umum, operasi VCS atas kerja yang sudah selesai, dan alur `/analyst:*` atau `/quickdev:*` yang dipanggil eksplisit.
+- Gate boleh dilewati hanya untuk empat hal (`hooks/gate_text.py`): jawaban yang memasok informasi ke rute yang sudah diputuskan, pertanyaan pengetahuan umum, operasi VCS atas kerja yang sudah selesai, dan alur `/analyst:*`, `/product:*`, atau `/quickdev:*` yang dipanggil eksplisit.
 - Hook hanya menyala kalau profil frontend ada, atau manifest (root, workspace, `apps/*`, `packages/*`, `services/*`, anak langsung root, maksimal 200 kandidat) memuat penanda stack yang didukung. Next.js, CRA, dan React/Svelte tanpa Vite membuat hook diam.
 - **Opt-out** lewat berkas `.claude/workflow` yang berisi daftar plugin yang boleh menggerbangi repo, dipisah spasi, koma, atau baris. Kalau nama plugin ini tidak ada di dalamnya (termasuk berkas kosong), hook diam (`detect.py` `opted_out`).
 - `detect.py` identik byte-per-byte dengan milik `backend` dan diimpor skrip prasyarat lewat `precondition_lib.py`, sehingga vonis hook sama dengan vonis skrip.
@@ -672,7 +672,7 @@ stateDiagram-v2
   - Di repo fullstack, kedua hook menyala dan masing-masing menyuntik bloknya sendiri.
   - Profil backend di `.claude/profile/index.json` lama tidak pernah dibaca atau ditimpa. Profil frontend tinggal di `.claude/profile/frontenddev/`.
   - Backend yang dipanggil kontrak ini dikerjakan lewat plugin `backend` (`README.md` § Boundaries). TAC yang merupakan porsi backend dicatat di Out of Scope.
-- **Dengan `quickdev` dan `analyst` (alur eksplisit).** Permintaan `/analyst:*`, `/quickdev:*`, atau susulan di tengah skill mereka dikecualikan dari gate `frontend:lead`. Isi `.claude/workflow` menentukan plugin mana yang boleh menggerbangi repo. Contohnya, isi `quickdev` saja membuat hook `frontend` dan `backend` diam.
+- **Dengan `quickdev` dan `analyst` (alur eksplisit).** Permintaan `/analyst:*`, `/product:*`, `/quickdev:*`, atau susulan di tengah skill mereka dikecualikan dari gate `frontend:lead`. Isi `.claude/workflow` menentukan plugin mana yang boleh menggerbangi repo. Contohnya, isi `quickdev` saja membuat hook `frontend` dan `backend` diam.
 - **Batas dengan skill lain** (`README.md` § Boundaries With Other Skills):
   - UI dari nol tanpa codebase acuan → `frontend-design`.
   - Bug korektness, keamanan, atau efisiensi pada diff → `/code-review`.

@@ -36,7 +36,7 @@ def _verdict(plugin, state, location="own"):
 @pytest.mark.parametrize("plugin", list(GATES))
 def test_lewati_mentions_other_plugins(plugin):
     text = _load(plugin, "gate_text").render(_verdict(plugin, "OK"))
-    assert "/analyst:*" in text and "/quickdev:*" in text
+    assert "/analyst:*" in text and "/product:*" in text and "/quickdev:*" in text
 
 
 @pytest.mark.parametrize("plugin", list(GATES))

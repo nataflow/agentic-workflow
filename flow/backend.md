@@ -1,6 +1,6 @@
 # Alur Plugin `backend`
 
-> Plugin `backend` (v0.13.1, `src/plugins/backend/.claude-plugin/plugin.json`) menyediakan 12 skill dan 6 subagent untuk kerja backend lintas-stack: Java Spring, Go, Node, Bun, Rust, PHP, dan CodeIgniter 4. Plugin ini dipakai untuk tiap permintaan kerja di repo backend, yaitu fitur, bugfix, audit, dokumentasi API, maupun pertanyaan tentang kode. Semua permintaan masuk lewat satu gerbang, `backend:tech-lead`. Gerbang itu memutuskan lane, risk level, dan taskdir dari kode aktual sebelum satu brief ditulis atau satu berkas `src/` disentuh. Plugin sengaja dibuat generic: pengetahuan spesifik-repo disimpan di `.claude/profile/backenddev/`, sedangkan pengetahuan spesifik-stack disimpan di adapter `skills/profile/stacks/<stack>.md`.
+> Plugin `backend` (v0.13.2, `src/plugins/backend/.claude-plugin/plugin.json`) menyediakan 12 skill dan 6 subagent untuk kerja backend lintas-stack: Java Spring, Go, Node, Bun, Rust, PHP, dan CodeIgniter 4. Plugin ini dipakai untuk tiap permintaan kerja di repo backend, yaitu fitur, bugfix, audit, dokumentasi API, maupun pertanyaan tentang kode. Semua permintaan masuk lewat satu gerbang, `backend:tech-lead`. Gerbang itu memutuskan lane, risk level, dan taskdir dari kode aktual sebelum satu brief ditulis atau satu berkas `src/` disentuh. Plugin sengaja dibuat generic: pengetahuan spesifik-repo disimpan di `.claude/profile/backenddev/`, sedangkan pengetahuan spesifik-stack disimpan di adapter `skills/profile/stacks/<stack>.md`.
 
 Semua path berkas di dokumen ini relatif terhadap `src/plugins/backend/`.
 
@@ -53,7 +53,7 @@ Skill ber-`user-invocable: false` tidak muncul di menu `/`. Untuk memulai, melan
 flowchart TD
     U["Permintaan user"] --> HK["SessionStart: detect.py menyuntik blok backend-tech-lead-gate"]
     HK --> TL["backend:tech-lead — Gerbang Masuk"]
-    TL -->|"4 pengecualian: klarifikasi, konsep umum, VCS, /analyst:* /quickdev:*"| DIRECT["Jawab langsung tanpa gerbang"]
+    TL -->|"4 pengecualian: klarifikasi, konsep umum, VCS, /analyst:* /product:* /quickdev:*"| DIRECT["Jawab langsung tanpa gerbang"]
     TL --> F0{"Fase 0: prasyarat --read-only, profil ada?"}
     F0 -->|"profil absen/rusak/lama & rute mengubah kode"| PROF["backend:profile GENERATE / REFRESH / MIGRATE"]
     F0 -->|"ya"| F1["Fase 1: eksplorasi kode — code-explorer atau fast-path ≤3 Glob+Grep"]
@@ -124,7 +124,7 @@ flowchart TD
 
 ### `backend:tech-lead`
 
-- **Pemicu / kapan dipakai**: tiap pesan user berupa permintaan perubahan perilaku, bugfix, audit, eksekusi artefak, susulan cakupan, koreksi arah, atau pertanyaan baca-kode. Pertanyaan baca-kode memakai jalur cepat `references/explore-fact.md`. Ada empat pengecualian yang dijawab tanpa gerbang (`references/gate-scope.md` bagian 1): jawaban klarifikasi, konsep umum non-repo, operasi VCS atas kerja tuntas, dan alur `/analyst:*` atau `/quickdev:*` yang dipanggil eksplisit. Persetujuan `BRD.md`/`PRD.md` bukan pemicu; ia diteruskan ke `backend:analyst`.
+- **Pemicu / kapan dipakai**: tiap pesan user berupa permintaan perubahan perilaku, bugfix, audit, eksekusi artefak, susulan cakupan, koreksi arah, atau pertanyaan baca-kode. Pertanyaan baca-kode memakai jalur cepat `references/explore-fact.md`. Ada empat pengecualian yang dijawab tanpa gerbang (`references/gate-scope.md` bagian 1): jawaban klarifikasi, konsep umum non-repo, operasi VCS atas kerja tuntas, dan alur `/analyst:*`, `/product:*`, atau `/quickdev:*` yang dipanggil eksplisit. Persetujuan `BRD.md`/`PRD.md` bukan pemicu; ia diteruskan ke `backend:analyst`.
 - **Prasyarat**: `scripts/check_preconditions.py --read-only` di Fase 0. Prasyarat penuh 6 check dijalankan tanpa flag di Fase 3 butir 0, atau dengan `--re-entry` di Fase 5. Keenam check: Profile Index & Invariants, Git Worktree & HEAD State, Git Clean Working Tree, Workspace Write Access, Profile Commands, dan Base Branch & Branch Convention.
 - **Langkah**:
   1. **Fase 0**: jalankan prasyarat read-only. Bila profil absen, pertanyaan baca-kode tetap dijawab dalam mode terdegradasi, sedangkan rute yang mengubah kode diarahkan ke `PROFILE` lebih dulu. Profil di lokasi lama memicu `PROFILE` mode MIGRATE.
