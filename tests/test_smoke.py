@@ -19,6 +19,7 @@ BE_TD = "backenddev/docs/2609250000-smoke"
 FE_TD = "frontenddev/docs/2609250000-smoke"
 AN_TD = "analyst/tickets/2609250000-smoke"
 AN_NT = "analyst/notulen/2609250000-smoke"
+PR_TD = "product/smoke"
 HOOK_STDIN = "SESSION"  # diganti payload SessionStart ber-cwd repo
 BASH_STDIN = json.dumps({"hook_event_name": "PreToolUse", "tool_name": "Bash",
                          "tool_input": {"command": "ls"}})
@@ -35,6 +36,12 @@ CASES = [
     ("analyst/skills/notulen/scripts/notulen.py", ["sync-payload", "--notulendir", AN_NT, "--json"], True, None),
 
     ("nataflow/skills/create-artifact/scripts/artifact.py", ["config", "--json"], True, None),
+
+    ("product/skills/_common/charter.py", ["state", "--all", "--json"], True, None),
+    ("product/skills/_common/charter.py", ["guard", "--mode", "NEW_PRODUCT", "--json"], True, None),
+    ("product/skills/_common/charter.py", ["check", "--gate", "spec", "--charterdir", PR_TD, "--json"], True, None),
+    ("product/skills/_common/charter.py", ["commit", "--charterdir", PR_TD, "--stage", "draft"], False, None),
+    ("product/skills/_common/validate_doc.py", ["--kind", "charter", "--charterdir", PR_TD, "--json"], True, None),
 
     ("backend/hooks/detect.py", ["--plugin", "backend"], "hook", HOOK_STDIN),
     ("backend/hooks/guard_bash.py", ["hook"], "hook", BASH_STDIN),
@@ -103,6 +110,7 @@ CORRUPT = [f"{td}/{doc}" for td in (BE_TD, FE_TD) for doc in
            ("TASK.md", "brief-01.md", "REVIEW.md", "REPORT.md")] + [
     f"{BE_TD}/BRD.md", f"{BE_TD}/PRD.md", f"{BE_TD}/HALT.md", f"{BE_TD}/RCA.md",
     f"{FE_TD}/FLOW.md", f"{FE_TD}/UI.md", f"{FE_TD}/CONTRACT.md", f"{AN_TD}/TICKET.md", f"{AN_NT}/NOTULEN.md", "analyst/nataflow.json",
+    f"{PR_TD}/CHARTER.md",
     ".claude/nataflow.json",
     "frontenddev/reviews/2609250000-smoke.md", "plan/smoke.md", "repo-profile.md",
     ".claude/profile/backenddev/index.json", ".claude/profile/backenddev/commands.md",
