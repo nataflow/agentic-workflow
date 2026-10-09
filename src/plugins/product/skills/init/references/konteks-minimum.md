@@ -30,7 +30,8 @@ Skrip menolak butir yang:
 
 - kosong atau kurang dari 3 karakter;
 - utuhnya kata atau frasa yang tidak mempersempit apa pun: *semua*, *siapa saja*, *umum*, *terserah*, *belum tahu*,
-  *aplikasi*, *sistem*, dan sejenisnya. Frasa yang **memuat** kata itu tetap sah bila mempersempit: *semua cabang
+  *aplikasi*, *sistem*, dan sejenisnya — termasuk keluhan tanpa isi seperti *kurang*, *jelek*, *bermasalah*, atau
+  *perlu diperbaiki*. Frasa yang **memuat** kata itu tetap sah bila mempersempit: *semua cabang
   toko roti* lolos, *semua* saja tidak;
 - `NEW_PRODUCT` saja: sebutan orang tanpa segmen untuk `--untuk` (*pengguna*, *user*, *pelanggan*, *konsumen*,
   *masyarakat*). Di codebase sebutan itu bisa jadi peran yang memang sudah ada di aplikasi, dan scout yang

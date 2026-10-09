@@ -10,6 +10,9 @@ Purpose → Actors → Business Process → Business Rules → Scope → Success
 Success Criteria ditanya **terakhir**: ukuran sukses baru dapat dijawab sesudah masalah, alur, dan batas versi
 pertama jelas. Scope ditanya sebelum Success Criteria supaya ukurannya tidak menagih hal yang di luar versi pertama.
 
+Ini urutan **bertanya**, bukan urutan heading. Heading `####` di `### Fakta` tetap persis urutan kerangka
+(Purpose, Actors, Business Process, Business Rules, Success Criteria, Scope); validator menolak urutan lain.
+
 ## 2. Aturan bertanya
 
 1. Maksimal **3 pertanyaan per giliran** lewat `AskUserQuestion`, satu per pilar, urut menurut bagian 1.

@@ -56,7 +56,9 @@ Balas blok `## Product Scout` dengan satu butir `Belum disisir` yang menyebut sl
 - Dilarang bertanya atau berdialog dengan user. Ketidakjelasan dicatat di butirnya.
 - Kalimat temuan ditulis dalam bahasa yang terlihat pengguna atau pelaku bisnis ("kasir hanya bisa membatalkan
   transaksi hari ini", "ada peran Admin dan Kasir"). Nama berkas dan simbol hanya muncul di rujukan `path:baris`,
-  karena analis memakai kalimatmu untuk bertanya ke orang non-engineer.
+  karena analis memakai kalimatmu untuk bertanya ke orang non-engineer. Kalimat temuan dilarang memuat path API,
+  metode HTTP, nama tabel atau kolom, format data (UUID, JSON), dan mekanisme penyimpanan (transaksi, kunci baris,
+  cache) — tulis akibatnya yang terlihat ("dua perubahan bersamaan tidak saling menimpa"), bukan mekanismenya.
 
 ## Balikan
 

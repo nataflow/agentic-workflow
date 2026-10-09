@@ -58,6 +58,10 @@ VAGUE = {
     "semua", "semua orang", "semuanya", "umum", "masyarakat umum", "orang", "orang-orang", "pokoknya",
     "macam-macam", "banyak", "lainnya", "lain-lain", "dll", "everyone", "anyone", "anything", "general",
     "aplikasi", "sistem", "fitur", "masalah",
+    # Keluhan tanpa isi: menyebut ada yang salah tanpa menyebut apa yang salah.
+    "kurang", "kurang bagus", "kurang baik", "jelek", "buruk", "tidak bagus", "error", "eror", "bermasalah",
+    "ada masalah", "perlu diperbaiki", "diperbaiki", "perbaikan", "improve", "improvement", "lebih baik",
+    "dibuat lebih baik", "tidak sesuai", "kacau", "ribet",
 }
 # Sebutan orang tanpa segmen hanya terlalu umum untuk produk baru: di codebase, "pelanggan" bisa jadi peran
 # yang memang sudah ada di aplikasi, dan scout yang memastikannya.

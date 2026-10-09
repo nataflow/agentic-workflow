@@ -45,6 +45,13 @@ def test_guard_json_menyebut_label_mode(empty_ws):
     assert data["problems"] == ["Yang salah atau kurang (--masalah) `terserah` terlalu umum"]
 
 
+def test_keluhan_tanpa_isi_ditolak():
+    problems = LIB.context_problems("IMPROVEMENT", {"untuk": "PIC task", "masalah": "kurang", "lingkup": "status task"})
+    assert problems == ["Yang salah atau kurang (--masalah) `kurang` terlalu umum"]
+    assert LIB.context_problems("IMPROVEMENT", {"untuk": "PIC task", "masalah": "task selesai bisa dibuka lagi",
+                                                "lingkup": "status task"}) == []
+
+
 def test_context_problems_frasa_bersegmen_tetap_sah():
     assert LIB.context_problems("NEW_PRODUCT", {"untuk": "semua cabang toko roti", "masalah": "stok selisih",
                                                 "lingkup": "ritel"}) == []
