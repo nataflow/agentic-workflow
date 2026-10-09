@@ -1,0 +1,17 @@
+{
+  "name": "product",
+  "description": "Skill dan subagent untuk inisiasi produk baru, fitur baru, atau improvement fitur yang sudah ada: guard konteks minimum atas permintaan yang terlalu umum, elisitasi terarah per pilar (konteks kode dikumpulkan subagent code-scout pada mode codebase), dan penulisan CHARTER.md enam pilar — Purpose, Actors, Business Process, Business Rules, Success Criteria, Scope — dengan review independen charter-reviewer dan persetujuan user. Mode NEW_PRODUCT berjalan di folder kosong; NEW_FEATURE dan IMPROVEMENT berjalan di codebase",
+  "version": "0.1.0",
+  "author": {
+    "name": "Fakhrul Nugroho",
+    "email": "fakhrulnugroho15@gmail.com"
+  },
+  "license": "MIT",
+  "keywords": [
+    "product",
+    "product-charter",
+    "requirements",
+    "discovery",
+    "business-process"
+  ]
+}
