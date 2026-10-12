@@ -73,9 +73,10 @@ Aturan lintas seksi:
 
 1. **Keputusan atau pembahasan.** Butir yang ragu ("kayaknya", "usul", "coba") masuk Pembahasan, bukan Keputusan. Bila keraguannya mengubah isi notulen, tanyakan ke pencatat.
 2. **Tenggat konkret.** Tenggat relatif ("minggu depan", "Jumat") dihitung dari `meeting_date`, lalu diajukan sebagai opsi tanggal ke pencatat. Tanpa konfirmasi, tenggat ditulis `belum ditentukan`.
-3. **Asumsi.** Tafsiran analis yang belum dikonfirmasi ditulis `Asumsi: <...>` di Pembahasan. `final` menolak notulen yang masih memuat `Asumsi:`.
+3. **Asumsi.** Tafsiran analis yang belum dikonfirmasi ditulis `Asumsi: <...>` di Pembahasan, termasuk tafsiran dari balikan `code-scout`. `final` menolak notulen yang masih memuat `Asumsi:`.
 4. **Penomoran.** `D-n`, `A-n`, dan `Q-n` berurutan dari 1. Nomor yang sudah dipakai tidak diganti saat menyunting, agar rujukan ke notulen tetap stabil.
 5. **Bahasa rapat.** Istilah, nama produk, dan campuran bahasa dipakai apa adanya. Yang dirapikan hanya kalimat, bukan istilahnya.
+6. **Tanpa rujukan kode.** Seksi notulen dilarang memuat `` `path:baris` ``. Nama layar, menu, atau fitur ditulis dengan kata-kata pencatat. `## Catatan Asli` dikecualikan.
 
 ## 3. Self-test Sebelum `final`
 
@@ -83,4 +84,5 @@ Aturan lintas seksi:
 2. Tidak ada butir Pembahasan yang sebenarnya keputusan, dan sebaliknya.
 3. Tiap `A-n` ber-PIC atau bertenggat `belum ditentukan` memang tidak disebut, bukan terlewat.
 4. Ringkasan tidak memuat hal yang tidak ada di seksi lain.
-5. Tidak ada informasi dari luar catatan dan jawaban pencatat, termasuk dari kode, tiket, atau rapat lain.
+5. Tidak ada informasi dari luar catatan dan jawaban pencatat, termasuk dari kode, tiket, atau rapat lain. Konteks
+   `code-scout` hanya hadir lewat jawaban pencatat yang mengonfirmasinya, tanpa rujukan `path:baris`.

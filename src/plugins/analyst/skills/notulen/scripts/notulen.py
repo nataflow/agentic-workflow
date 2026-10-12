@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI siklus hidup notulen rapat plugin `analyst` (18 N1–N4, N6, N7).
+"""CLI siklus hidup notulen rapat plugin `analyst` (18 N1–N4, N6, N7; 20 S1).
 
 Tiap notulendir `analyst/notulen/<YYMMDDhhmm>-<slug>/` memuat satu `NOTULEN.md`: notulen terstruktur di atas,
 `## Catatan Asli` (catatan kasar pencatat apa adanya) sebagai H2 terakhir. Notulen bisa memuat info sensitif, jadi
@@ -9,7 +9,8 @@ ada di disk ini dan, bila sinkron aktif, di nataflow.
 - `state`  — pindai `analyst/notulen/*/`, vonis keadaan tiap notulendir (`DRAFT`, `FINAL`, `DRIFT`, `RUSAK`,
              `NAMA_TIDAK_SAH`).
 - `new`    — alokasikan notulendir beserta `NOTULEN.md` awal: kerangka, catatan asli verbatim, `source_hash`.
-- `check`  — validator struktur dan isi notulen; `--final` ikut menagih nol `Asumsi:`.
+- `check`  — validator struktur dan isi notulen, termasuk nol rujukan `path:baris` (konteks `code-scout` bukan isi
+             notulen); `--final` ikut menagih nol `Asumsi:`.
 - `final`  — `status: FINAL` + segel `final_hash` sesudah validator `PASS` dan jawaban eksplisit user.
 - `sync-payload` — argumen tool MCP nataflow untuk notulen `FINAL`: dokumen `notes.meeting` di bawah project MCP key
              (`list_document` → `create_document` / `upsert_document`); read-only, tanpa commit.
@@ -76,6 +77,8 @@ ACTION_SEP = re.compile(r"^\|(\s*:?-{3,}:?\s*\|){4}$")
 ACTION_ROW = re.compile(r"^\|\s*A-(\d+)\s*\|(.*)\|(.*)\|(.*)\|$")
 # Selaras validator elisitasi: `Asumsi:` di mana pun dalam baris, juga bentuk tebal.
 ASSUMPTION = re.compile(r"(?:^|[\s(\[>*_])\**Asumsi\**\s*:", re.IGNORECASE)
+# Selaras `EVIDENCE` validator elisitasi: rujukan berkas `` `path:baris` `` atau `` `path:a-b` ``.
+EVIDENCE = re.compile(r"`([^`\s:]+):(\d+)(?:-(\d+))?`")
 CONTENT_FIELDS = ("meeting_date",)  # field isi yang ikut sidik `final_hash`; sisanya pembukuan
 DOC_TYPE = "notes.meeting"         # `type` dokumen nataflow (keputusan user 2026-10-02)
 TITLE_MAX = 255                    # batas `title` `create_document` di server
@@ -175,6 +178,7 @@ class NotulenValidator(Checker):
         self._questions()
         self._placeholder()
         self._assumptions()
+        self._code_refs()
         return self.ok
 
     def _frontmatter(self) -> None:
@@ -291,6 +295,16 @@ class NotulenValidator(Checker):
         self.add(9, "Asumsi terkonfirmasi", not (final and lines),
                  f"{len(lines)} baris `Asumsi:`" + (" pada FINAL" if final and lines else ""),
                  "Konfirmasi tiap `Asumsi:` ke pencatat (hapus labelnya) atau pindahkan jadi `Q-n` sebelum final.")
+
+    def _code_refs(self) -> None:
+        """Konteks `code-scout` bahan bertanya, bukan isi notulen (20 S1). `## Catatan Asli` dikecualikan karena
+        dimateraikan dan berasal dari pencatat; path tanpa `/` atau `.` (mis. jam `10:30`) bukan rujukan berkas."""
+        leaked = [f"`{m.group(0)[1:-1]}` ({h})" for h, body in self.h2.items() if h != SOURCE_H2
+                  for line in body for m in EVIDENCE.finditer(line) if re.search(r"[/.]", m.group(1))]
+        self.add(10, "Tanpa rujukan kode", not leaked,
+                 "lolos" if not leaked else f"{len(leaked)} rujukan `path:baris`: " + ", ".join(leaked[:3]),
+                 "Konteks `code-scout` bukan isi notulen: tulis ulang dengan kata-kata pencatat (layar, menu, fitur) "
+                 "tanpa rujukan berkas, atau `Asumsi:` yang dikonfirmasi ke pencatat sebelum final.")
 
 
 def _real_date(value: str) -> bool:
