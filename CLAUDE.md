@@ -73,8 +73,9 @@ skeletons), `dispatcher/` (prompts used to dispatch subagents), `scripts/`, and 
   (evidence for `TECH`, question context otherwise). Two to five requests in one message become a batch
   (`skills/intake/references/batch.md`): `ticket.py new --urutan k/N` allocates every ticketdir up front, scouts
   run in parallel, then tickets finish one at a time. `notulen` turns rough meeting notes into a gitignored
-  `NOTULEN.md` (`skills/notulen/scripts/notulen.py`), optionally mirrored to nataflow as a `notes.meeting`
-  document. `skills/_common/ticket.py` is the state machine; a READY ticket is handed to
+  `NOTULEN.md` (`skills/notulen/scripts/notulen.py`), may dispatch `code-scout` in `KONTEKS` mode to sharpen
+  clarifying questions (never as notulen content; `check` rejects `path:baris`), and is optionally mirrored to
+  nataflow as a `notes.meeting` document. `skills/_common/ticket.py` is the state machine; a READY ticket is handed to
   `backend:tech-lead`/`frontend:lead` as `ticket_source`.
 - **backend** — entry `backend:tech-lead` picks a lane/risk/taskdir, then `backend:analyst` orchestrates a
   document chain (TASK → optional BRD → optional PRD → briefs) with reviewer subagents and user approval,

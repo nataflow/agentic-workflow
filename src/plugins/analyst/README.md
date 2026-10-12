@@ -45,7 +45,9 @@ kartu `PASS`/`BLOCKED` terhadap catatan elisitasi di berkas yang sama sebelum di
 per tiket; dalam batch, dispatch pertama semua tiket berjalan paralel di awal batch. Ia hanya melaporkan apa yang ada di kode dan di mana, tanpa flow, alur, atau edge case. Konteks utama
 `elicit` tidak membaca kode sendiri. Untuk tiket `TECH` balikannya menjadi bukti `path:baris`; untuk tipe lain
 balikannya hanya bahan pertanyaan atau `Asumsi:` yang dikonfirmasi peminta, karena kode menunjukkan apa yang ada,
-bukan apa yang diinginkan peminta.
+bukan apa yang diinginkan peminta. `notulen` juga boleh mendispatch-nya, selalu mode `KONTEKS`, lewat
+`skills/notulen/dispatcher/scout.md` (maksimal dua kali per notulen) untuk istilah, singkatan, atau layar yang disebut
+catatan rapat; balikannya hanya mempertajam pertanyaan ke pencatat.
 
 ## Workflow
 
@@ -171,7 +173,10 @@ apa adanya. Kerangka dan aturan isinya: `skills/notulen/templates/notulen-templa
 - **Final berpersetujuan**: `notulen.py final` menulis `FINAL` dan menyegel isinya (`final_hash`) sesudah validator
   `PASS` dan jawaban eksplisit user. Suntingan sesudahnya terbaca `DRIFT` sampai `final` dijalankan ulang.
 - **Tanpa git**: `analyst/notulen/.gitignore` (`*`) ditulis tanpa syarat, dan skripnya tidak pernah meng-commit.
-- **Bukan tiket**: notulen tidak membaca kode dan tidak membuat tiket. Permintaan yang muncul di rapat dijadikan tiket
+- **Kode sebagai konteks**: konteks utama tidak membaca kode. Catatan yang menyebut konsep sistem boleh di-scout
+  (`code-scout` mode `KONTEKS`, ≤ 2 dispatch), dan balikannya menjadi opsi pertanyaan ke pencatat, bukan isi notulen.
+  `notulen.py check` menolak `path:baris` di seksi notulen; kegagalan scout tidak menahan notulen.
+- **Bukan tiket**: notulen tidak membuat tiket. Permintaan yang muncul di rapat dijadikan tiket
   lewat `/analyst:intake`.
 
 ## Penegakan Mekanis
@@ -191,7 +196,7 @@ apa adanya. Kerangka dan aturan isinya: `skills/notulen/templates/notulen-templa
 | `_common/ticket.py ref` | isi `external_ref` pada `DRAFT`/`READY`; `DRIFT`/`RUSAK` ditolak (subjek `ref TICKET` dibaca penerima tiket lama sebagai tanda terkunci); `READY` di-commit `docs(ticket): ref TICKET <slug>`, `DRAFT` tidak di-commit |
 | `_common/ticket.py sync-payload` | argumen tool MCP nataflow untuk tiket `READY` (bukan `DRIFT`/`RUSAK`): `lookup` (`list_task`), `create`, `update` — judul dari H1, deskripsi = kartu tanpa catatan elisitasi, `metadata` teks JSON byte-stabil berkunci `ticket_key`; `documents` (`review.md`); tiket pernah-`READY` yang dibatalkan → `lookup` + `task_status` `cancelled`; `SKIP` tanpa `.claude/nataflow.json` maupun `analyst/nataflow.json`, `FAIL` bila config rusak atau keduanya berbeda isi; read-only, tanpa commit |
 | `notulen/scripts/notulen.py state` / `new` | keadaan tiap notulendir (`DRAFT`, `FINAL`, `DRIFT`, `RUSAK`, `NAMA_TIDAK_SAH`); notulendir baru beserta kerangka persis bagian 1 `notulen-template.md`, catatan asli verbatim, `source_hash`, dan `analyst/notulen/.gitignore` |
-| `notulen/scripts/notulen.py check` | struktur dan urutan H2, catatan asli sama dengan `source_hash`, seksi isi terisi, `D-{n}`/`A-{n}`/`Q-{n}` berurutan, action item ber-PIC dan bertenggat `YYYY-MM-DD` atau `belum ditentukan`, nol placeholder; `--final` ⇒ nol `Asumsi:` |
+| `notulen/scripts/notulen.py check` | struktur dan urutan H2, catatan asli sama dengan `source_hash`, seksi isi terisi, `D-{n}`/`A-{n}`/`Q-{n}` berurutan, action item ber-PIC dan bertenggat `YYYY-MM-DD` atau `belum ditentukan`, nol placeholder, nol `` `path:baris` `` di luar `## Catatan Asli` (konteks `code-scout` bukan isi notulen); `--final` ⇒ nol `Asumsi:` |
 | `notulen/scripts/notulen.py final` | satu-satunya penulis `FINAL`: validator `PASS` dan jawaban user tidak kosong; menyegel `final_hash`; tanpa commit |
 | `notulen/scripts/notulen.py sync-payload` | argumen dokumen nataflow untuk notulen `FINAL` (bukan `DRAFT`/`DRIFT`): `lookup` (`list_document` bersaring `notulen_key`), `create` (`create_document`, judul `<H1> — <tanggal rapat>`), `update` (`upsert_document` dengan `content_sha256`); isi tanpa frontmatter dan tanpa `## Catatan Asli`; read-only |
 
@@ -340,7 +345,8 @@ sinkron tidak meng-commit tiketnya (lihat Git), sehingga task inilah satu-satuny
 - **`acceptance`** — UAT: membaca `REPORT.md` engineer dan memvonis AC tiket dalam bahasa bisnis.
 - **Notulen ke tiket** — seksi calon tiket di notulen dan serah terima `D-{n}`/`A-{n}` ke `/analyst:intake`;
   notulen dari transkrip atau rekaman rapat; reviewer independen untuk notulen.
-- **`code-scout` di luar elisitasi** — penentuan wilayah backend/frontend di `intake` dan pemeriksaan kartu di `spec`.
+- **`code-scout` di `intake` dan `spec`** — penentuan wilayah backend/frontend di `intake` dan pemeriksaan kartu di
+  `spec`.
 - **Sinkron nataflow lanjutan** — status task selesai saat seluruh engineer tuntas (plugin engineer hanya
   menaikkannya ke `in_progress`, karena satu tiket bisa menaungi taskdir backend dan frontend), penghapusan task
   saat tiket dibatalkan, dan catatan elisitasi sebagai dokumen (sengaja tidak dikirim).
