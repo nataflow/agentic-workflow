@@ -60,7 +60,7 @@ flowchart TD
 
 ## 2. Aturan Validasi
 
-**Mekanis** — ditagih `validate_doc.py --kind flow`; `FAIL` menahan commit draft dan `chain.py approve`:
+**Mekanis** — ditagih `validate_doc.py --kind flow`; `FAIL` menahan `chain.py draft` dan `chain.py approve`:
 
 1. **Frontmatter**: `status` hanya `DRAFT` (ditulis penulis) atau `APPROVED` (ditulis `chain.py approve`, tidak pernah dengan tangan); `slug`, `stack` terisi; `order: 10`; `based_on` berpola `<sha 7 digit> (YYYY-MM-DD)` dari `git rev-parse --short HEAD`.
 2. **Struktur**: tepat satu H1 berawalan `# User Flow — `, dan enam heading `##` persis urutan bagian 1 — dilarang menambah, membuang, atau menomori ulang.
@@ -68,7 +68,7 @@ flowchart TD
 4. **Data Demands**: baris `DD-{n}` berurutan dari `DD-1` tanpa lompatan, minimal satu. Nomor ini dirujuk kolom `Sumber` Acceptance Criteria `CONTRACT.md`, dan `validate_doc.py --kind contract` menagih **tiap** `DD-{n}` dipikul minimal satu AC — Data Demand tanpa AC adalah sapuan mundur yang bolong.
 5. **Placeholder**: nol `TBD`/`TODO`/`diisi nanti` dan nol slot `<...>` berspasi di luar blok kode.
 
-**Semantik** — self-test penulis sebelum commit draft, tidak dapat ditagih skrip:
+**Semantik** — self-test penulis sebelum `chain.py draft`, tidak dapat ditagih skrip:
 
 6. Tiap rute dan parameter rute di seksi 3 berjangkar bukti repo (`surface-map.md` profil atau pointer `file:baris` laporan `code-explorer`) — dilarang mengarang nama rute.
 7. Tiap layar punya baris di matriks seksi 4 untuk kondisi form *dirty* bila layar itu memuat input.

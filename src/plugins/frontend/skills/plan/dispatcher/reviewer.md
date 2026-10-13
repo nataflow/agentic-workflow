@@ -1,8 +1,8 @@
 # Template Prompt Auditor Dokumen Planning — `doc-reviewer`
 
-Gunakan template ini saat `plan` mendispatch subagent auditor dokumen planning (`doc-reviewer`) secara langsung, sebelum batch brief di-commit.
+Gunakan template ini saat `plan` mendispatch subagent auditor dokumen planning (`doc-reviewer`) secara langsung, sebelum batch brief dicatat `chain.py draft`.
 
-**Tujuan:** Menilai keselarasan seluruh `brief-*.md` terhadap `CONTRACT.md`, `UI.md`, dan `FLOW.md` secara helikopter view, tepat satu kali per ronde, lalu menulis hasilnya sebagai `{taskdir}/REVIEW-PLAN.md` ber-verdict yang ikut batch commit breakdown.
+**Tujuan:** Menilai keselarasan seluruh `brief-*.md` terhadap `CONTRACT.md`, `UI.md`, dan `FLOW.md` secara helikopter view, tepat satu kali per ronde, lalu menulis hasilnya sebagai `{taskdir}/REVIEW-PLAN.md` ber-verdict yang ikut tersidik di approval breakdown.
 
 **Dispatch setelah:** `plan` Phase 3 — seluruh brief baru berstatus `READY`, `validate_briefs.py --contract` `PASS`, dan `review_round.py open --gate plan` `PASS`. Lane `HOTFIX_MINOR` (`sections` kosong) melewati gerbang ini seluruhnya.
 
@@ -10,7 +10,7 @@ Gunakan template ini saat `plan` mendispatch subagent auditor dokumen planning (
 Audit dokumen planning satu taskdir secara helikopter view sebelum eksekusi kode.
 
 - Taskdir: `{taskdir}` — `brief-*.md` aktif berstatus `READY`; brief `DONE`/`BLOCKED` terkunci dan hanya ditagih predikat cakupan.
-- Ronde: `{round}` dari plafon 2 per putaran (putaran baru sesudah draft `PASS` di-commit, atau sesudah `reopen`).
+- Ronde: `{round}` dari plafon 2 per putaran (putaran baru sesudah draft `PASS` dicatat `chain.py draft`, atau sesudah `reopen`).
 - Sidik: `{sidik}` — sidik batch brief yang kamu nilai; salin persis ke frontmatter `sidik`.
 - Ronde menyempit: brief berubah sejak ronde lalu `{brief_berubah}`; laporan ronde lalu `{previous_report}`.
   Keduanya `-` pada ronde 1. Bila terisi, baca laporan lalu untuk tahu temuan mana yang seharusnya
@@ -98,7 +98,7 @@ sidik: "<sidik>"
 - Verdict: <PASS | BLOCKED>
 - Predikat: <nol temuan BLOCKER — eksekusi boleh lanjut | <n> temuan BLOCKER — eksekusi ditahan>
 - Audit ulang: <tidak perlu (PASS) | ronde menyempit memverifikasi perbaikan, seluruh BLOCKER MEKANIS | ronde menyempit mengaudit ulang <n> BLOCKER SEMANTIK>
-- Rute berikutnya: <batch commit breakdown + approval user | revisi ke <daftar skill pemilik>, lalu ronde menyempit>
+- Rute berikutnya: <catat batch (`chain.py draft`) + approval user | revisi ke <daftar skill pemilik>, lalu ronde menyempit>
 ```
 
 Bagian 3 hanya memuat fakta peta perubahan; tiap cacat blast radius tetap ditulis ulang sebagai entri
@@ -142,14 +142,14 @@ python3 «review_round.py» open --taskdir {taskdir} --gate plan
 ```
 
 - `validate_briefs.py` `FAIL` → perbaiki brief dulu. Temuannya mekanis; memberangkatkan subagent berbayar untuk menemukannya lagi adalah pemborosan.
-- `review_round.py open` `FAIL` → plafon ronde habis (2 per putaran, 8 per taskdir). Dilarang mendispatch; batch ber-BLOCKER tidak dapat disetujui (`chain.py approve` menuntut ronde terakhir `PASS`) — jangan commit batch; sajikan `BLOCKER` tersisa ke user dan serahkan ke `frontend:lead` Phase 8 (plafon habis: `AskUserQuestion` rumuskan ulang di taskdir baru atau hentikan). Isi slot `{round}` dengan nomor ronde dari keluaran `open`.
+- `review_round.py open` `FAIL` → plafon ronde habis (2 per putaran, 8 per taskdir). Dilarang mendispatch; batch ber-BLOCKER tidak dapat disetujui (`chain.py approve` menuntut ronde terakhir `PASS`) — jangan catat draft batch; sajikan `BLOCKER` tersisa ke user dan serahkan ke `frontend:lead` Phase 8 (plafon habis: `AskUserQuestion` rumuskan ulang di taskdir baru atau hentikan). Isi slot `{round}` dengan nomor ronde dari keluaran `open`.
 
 **Predikat mekanis sudah dijamin.** Seluruh check `validate_briefs.py` — S, N, D, L, T, F, B, R, V, K, O, E, C, P, G, M — sudah `PASS`. `doc-reviewer` dilarang menghitung ulang satu pun.
 
 - **Dispatch langsung tanpa skill pembungkus**: doktrin audit — gerbang masuk, D1–D4, severity, verdict — duduk di `agents/doc-reviewer.md`. Dilarang menyalin potongannya ke prompt, dan dilarang menyalin isi brief, `CONTRACT.md`, `UI.md`, `FLOW.md`, atau profil.
 - **Ronde 2 menyempit**: hidrasi `{brief_berubah}` dan `{previous_report}`; ronde 2 berangkat bila ronde 1 ber-verdict `BLOCKED` — termasuk yang hanya ber-`BLOCKER [MEKANIS]`, sesudah perbaikannya lolos `validate_briefs.py` — atau bila brief disunting sesudah ronde terakhir `PASS`. Approval menuntut ronde terakhir `PASS` atas konten final, tanpa `reopen` hop sesudahnya; tanpa ronde menyempit, batch yang sudah diperbaiki tidak dapat disetujui.
 - **Verdict bukan approval**: `PASS` membuka pintu approval user, bukan menggantikannya.
-- **Laporan di-commit pendispatch**: `REVIEW-PLAN.md` masuk batch commit breakdown `plan`; dilarang menyisipkan instruksi git ke prompt.
+- **Laporan dikunci pendispatch**: `REVIEW-PLAN.md` ikut tersidik di kejadian `approve BRIEF` (tanpa commit, Langkah 24); dilarang menyisipkan instruksi git ke prompt.
 - **Audit hidrasi**: batalkan dispatch bila prompt masih memuat slot `{...}` mentah atau `TBD`/`TODO`. Penanda `<...>` di blok format bukan slot.
 
 ### Penanganan Balikan
@@ -163,7 +163,7 @@ python3 «review_round.py» record --taskdir {taskdir} --gate plan \
 
 | Balikan subagent | Penanganan `plan` |
 | --- | --- |
-| `Verdict: PASS` | `record --verdict PASS`, lalu batch commit lewat `review_round.py commit --gate plan` (Phase 4), yang men-stage breakdown bersama `REVIEW-PLAN.md` |
+| `Verdict: PASS` | `record --verdict PASS`, lalu catat batch lewat `chain.py draft --row BRIEF` (Phase 4) |
 | `Verdict: BLOCKED`, seluruh `BLOCKER` `[MEKANIS]` | `record --verdict BLOCKED`; perbaiki brief sampai `validate_briefs.py` `PASS`, lalu ronde menyempit atas konten final |
 | `Verdict: BLOCKED`, ada `BLOCKER [SEMANTIK]` | `record --verdict BLOCKED`; rutekan tiap temuan ke pemilik pada `Rute Revisi` (brief → `plan` sendiri; DTO/layer → `chain.py reopen --row CONTRACT` lewat `frontend:lead`), lalu ronde menyempit bila plafon masih ada |
 | `Reason: Gate Breakdown belum tuntas` / `Dokumen hulu hilang` / `Frontmatter brief malformed` | Cacat dokumen, bukan cacat audit: `record --verdict DISPATCH_FAILED`, perbaiki dokumennya, lalu `open` ulang |

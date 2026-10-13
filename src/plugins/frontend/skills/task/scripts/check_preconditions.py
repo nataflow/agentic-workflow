@@ -102,8 +102,14 @@ class PreconditionChecker:
             self._add(10, name, "FAIL", "repo git tidak terbaca — penanda ignore tidak dapat dipastikan",
                       "Jalankan di root repo git yang sah (lihat check 7).")
             return
-        self._add(10, name, "PASS", f"`{prefix}/docs/` diabaikan git"
-                  + (" (penanda `.gitignore` baru ditulis)" if written else ""))
+        summary = f"`{prefix}/docs/` diabaikan git" + (" (penanda `.gitignore` baru ditulis)" if written else "")
+        if not (self.root / docs_git.NATAFLOW_CONFIG).is_file():      # 24 K2: tanpa cermin, disk satu-satunya salinan
+            self._add(10, name, "WARN", f"{summary}; `{docs_git.NATAFLOW_CONFIG}` tidak ada — dokumen taskdir hanya "
+                                         "tersimpan di disk ini",
+                      "Sebut ke user sekali: tanpa sinkron nataflow, dokumen taskdir tidak punya salinan di luar "
+                      "mesin ini. Lanjutkan.")
+            return
+        self._add(10, name, "PASS", summary)
 
     def _check_3_absent(self, taskdir_ok: bool) -> None:
         name = "TASK.md belum ada"

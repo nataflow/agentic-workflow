@@ -82,7 +82,7 @@ reviewed_at: <YYYY-MM-DD>
 
 ## 2. Aturan Validasi
 
-Ditagih `validate_review.py`; `FAIL` menahan commit `REVIEW.md` dan membuat dispatch reviewer dianggap gagal (maks satu ulang):
+Ditagih `validate_review.py`; `FAIL` menahan `REVIEW.md` (tidak sah, dan tidak pernah di-commit) dan membuat dispatch reviewer dianggap gagal (maks satu ulang):
 
 1. **Frontmatter**: `artifact: REVIEW`; `taskdir` = path taskdir yang divalidasi; `stack` = `stack` profil; `verdict` enum; `p1`/`p2`/`p3` bilangan; `base` = `base_commit` frontmatter `TASK.md` (HEAD saat akar dikunci `chain.py root`) — sha lain `FAIL`; `head` = sha `HEAD` yang dinilai reviewer, wajib leluhur `HEAD` (kesegaran review diukur darinya: commit kode rantai sesudah `head` membuat review basi); `reviewed_at` tanggal kalender sah `YYYY-MM-DD`, tidak lebih awal dari tanggal `base_commit`.
 2. **Struktur**: tepat satu H1 persis `# Review Findings — <slug>`, lalu delapan heading `##` persis urutan bagian 1.

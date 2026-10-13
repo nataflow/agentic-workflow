@@ -1,6 +1,6 @@
 # TASK Template & Self-test Akar — `task`
 
-Dipakai di Phase 4 (`SKILL.md`) sebagai isi berkas `frontenddev/docs/<YYMMDDhhmm>-<slug>/TASK.md`. Ikuti bagian 1 persis — satu H1 dan empat heading, tidak lebih: begitu dokumen menuntut sub-heading di luar keempatnya, isinya milik `ux-design`, `ui-design`, `contract`, atau `plan`. Bagian 2 dan 3 tidak ikut tersalin ke artefak.
+Dipakai di Phase 4 (`SKILL.md`) sebagai isi berkas `frontenddev/docs/<YYMMDDhhmm>-<slug>/TASK.md`. Ikuti bagian 1 persis — satu H1 dan empat heading, tidak lebih (ditambah `## Riwayat Rantai` yang hanya ditulis `chain.py`): begitu dokumen menuntut sub-heading di luar keempatnya, isinya milik `ux-design`, `ui-design`, `contract`, atau `plan`. Bagian 2 dan 3 tidak ikut tersalin ke artefak.
 
 Bentuk berkas ini sengaja sejajar dengan `TASK.md` milik `backend` — frontmatter, heading inti, butir `SC-{n}` ber-alat-ukur, dan ledger `## Chain` — supaya satu fitur full-stack punya dua akar yang dapat disandingkan baris demi baris. Yang berbeda hanya enum `lane`, field `sections`, hop ledger, dan daftar alat ukur sah.
 
@@ -17,6 +17,7 @@ created: <YYYY-MM-DD>
 finding_source: <path REVIEW.md asal>
 findings: [<P1-1>, <P2-3>]
 ticket_source: <path TICKET.md analyst>
+base_commit: <ditulis `chain.py root` — dilarang diketik>
 ---
 
 # <Fitur — jenis kerja, maksimal 8 kata>
@@ -40,18 +41,24 @@ ticket_source: <path TICKET.md analyst>
 ## Chain
 
 <ditulis `chain.py init` dari `sections` — dilarang diketik dengan tangan>
+
+## Riwayat Rantai
+
+<ditulis `chain.py root` dan subperintah sesudahnya — dilarang diketik atau disunting dengan tangan>
 ````
 
 Baris `## Chain` memuat **tepat** hop yang dijadwalkan `sections`, berurutan: `FLOW` (bila `flow`), `UI` (bila `ui`), `CONTRACT` (bila `sections` non-kosong), dan `BRIEF` (selalu). Hop dicentang hanya oleh `chain.py approve`, dibuka ulang hanya oleh `chain.py reopen`, dan ditambah hanya oleh `chain.py escalate`:
 
 ```markdown
 - [ ] FLOW     — frontend:ux-design     → FLOW.md
-- [x] UI       — frontend:ui-design     → UI.md @ APPROVED 3f9c2ab
-- [~] CONTRACT — frontend:contract      → CONTRACT.md @ re-entry 1 (was 7d1e0c4)
+- [x] UI       — frontend:ui-design     → UI.md @ APPROVED 3f9c2ab1d0e4
+- [~] CONTRACT — frontend:contract      → CONTRACT.md @ re-entry 1 (was 7d1e0c4a92b1)
 - [ ] BRIEF    — frontend:plan          → brief-*.md
 ```
 
-Sha di baris `[x]` adalah commit **konten** yang disetujui user. Gerbang hilir memvonis isi dokumen sekarang identik dengan isinya di sha itu, kecuali baris `status:`; suntingan sesudah approval tanpa `reopen` gagal di setiap skrip prasyarat hilir.
+Nilai di baris `[x]` adalah sidik (12 hex) **konten** yang disetujui user. Kejadian `approve` di `## Riwayat Rantai` memateraikan sidik lengkapnya beserta ronde reviewer, sidik `SC-{n}`, dan jawaban user. Gerbang hilir memvonis isi dokumen sekarang identik dengan sidik itu, kecuali baris `status:`; suntingan sesudah approval tanpa `reopen` gagal di setiap skrip prasyarat hilir.
+
+`## Riwayat Rantai` mencatat satu baris per kejadian, bernomor urut: `akar` (`chain.py root`: `base_commit`, lane, sections, sidik akar), `draft`, `approve`, `reopen` (beserta keadaan brief), `eskalasi`, `amandemen`, dan `abandon`. Plafon re-entry, revisi, eskalasi, dan putaran ronde reviewer dihitung dari seksi ini. Sidik akar — frontmatter tanpa `status:` dan isi sebelum `## Chain` — hanya boleh berubah lewat `chain.py amend` atau `escalate`. Dokumen taskdir tidak pernah di-commit (Langkah 24).
 
 Baris `finding_source:` dan `findings:` hanya ditulis bila akar berangkat dari temuan review; permintaan kerja biasa menghilangkan keduanya sepenuhnya. Baris `ticket_source:` hanya ditulis bila akar berangkat dari tiket analyst (`SKILL.md` Phase 3 butir 6).
 
@@ -59,7 +66,7 @@ ______________________________________________________________________
 
 ## 2. Self-test Akar
 
-Dijalankan `task` atas `TASK.md` yang baru ditulis, sebelum commit Phase 4 berangkat. Butir 1–4, 6, 7, dan 9 divonis mekanis oleh `scripts/validate_task.py`; butir 5 dan 8 milik model. Satu butir gagal berarti `TASK.md` diperbaiki seketika lalu rangkaian diulang dari butir 1. `TASK.md` adalah akar rantai — cacat di sini menular ke FLOW, UI, CONTRACT, dan tiap brief tanpa satu pun gerbang hilir yang memeriksanya kembali.
+Dijalankan `task` atas `TASK.md` yang baru ditulis, sebelum `chain.py root` Phase 4 mengunci akar. Butir 1–4, 6, 7, dan 9 divonis mekanis oleh `scripts/validate_task.py`; butir 5 dan 8 milik model. Satu butir gagal berarti `TASK.md` diperbaiki seketika lalu rangkaian diulang dari butir 1. `TASK.md` adalah akar rantai — cacat di sini menular ke FLOW, UI, CONTRACT, dan tiap brief tanpa satu pun gerbang hilir yang memeriksanya kembali.
 
 1. **Struktur & frontmatter**: frontmatter memuat `status: ACTIVE`, pasangan `lane`/`sections` yang sah (`HOTFIX_MINOR` ⇔ `sections: []`; `FAST_FORWARD`/`REFACTOR_ARCH` ⇔ tepat `[architecture]`; `FULL_PIPELINE` memuat `flow` atau `ui`), dan `created` berformat `YYYY-MM-DD`. Body memuat tepat satu H1 dan tepat empat heading `## Description`, `## Success Criteria`, `## Out of Scope`, `## Chain` dengan nama dan urutan persis bagian 1.
 2. **Penomoran `SC-{n}`**: baris `- [ ] **SC-{n}**:` berurut mulai `SC-1` tanpa lompatan dan tanpa nomor ganda, berjumlah 1–7 butir **aktif**; butir gugur hasil amandemen (`~~…~~ — gugur: <alasan>`) tetap bernomor dan tidak dihitung.
@@ -73,7 +80,7 @@ Dijalankan `task` atas `TASK.md` yang baru ditulis, sebelum commit Phase 4 beran
 8. **Kecukupan akar**: tiap `SC-{n}` menamai permukaan yang disebut `request` atau terbukti di `evidence`. Butir yang memperkenalkan permukaan di luar keduanya dihapus, dilarang dicarikan akar susulan.
 9. **Ledger `## Chain`**: baris hop persis `expected_rows(sections)` dan seluruhnya `[ ]` — ditulis `chain.py init`, bukan diketik.
 
-Hasilnya dilaporkan sebagai satu baris per butir (`butir <n>: lolos` atau `butir <n>: gagal — <rincian>`), dan commit Phase 4 dilarang berangkat sebelum kesembilannya lolos.
+Hasilnya dilaporkan sebagai satu baris per butir (`butir <n>: lolos` atau `butir <n>: gagal — <rincian>`), dan `chain.py root` Phase 4 dilarang berangkat sebelum kesembilannya lolos.
 
 ______________________________________________________________________
 

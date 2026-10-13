@@ -6,7 +6,7 @@ user-invocable: false
 
 ## THE IRON LAW
 
-- `UI.md` lahir dan di-commit `DRAFT`; `APPROVED` hanya ditulis `chain.py approve --row UI` sesudah jawaban eksplisit user di `AskUserQuestion`. Dilarang menulis `APPROVED` dengan tangan.
+- `UI.md` lahir `DRAFT` dan dicatat `chain.py draft --row UI` sebelum diajukan — tanpa commit: dokumen taskdir diabaikan git dan dicerminkan ke nataflow; `APPROVED` hanya ditulis `chain.py approve --row UI` sesudah jawaban eksplisit user di `AskUserQuestion`. Dilarang menulis `APPROVED` dengan tangan.
 - Draft diajukan ke user hanya sesudah `validate_doc.py --kind ui` `PASS`.
 - Tiap layar merancang enam cabang state ber-ID `ST-{n}`; state fetching dikoordinasikan Controller layar, bukan komponen anak.
 - Token visual dari `visual.md` profil dan batas platform dari adapter stack; dilarang membuat atau mengubah berkas di `src/`.
@@ -14,7 +14,7 @@ user-invocable: false
 ## Precondition [REQUIRED]
 
 1. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/ui-design/scripts/check_preconditions.py --taskdir <taskdir>`.
-2. `PASS` (9/9): lanjut. `FAIL`: hentikan dan remediasi — akar tidak sah atau `sections` tanpa `ui` → kembali ke `frontend:lead`; hop `FLOW` belum tercentang atau berubah sesudah disetujui → `ux-design` atau `chain.py reopen --row FLOW` lewat lead; `UI.md` sudah `APPROVED` → gate ini tuntas, revisi hanya lewat `chain.py reopen --row UI`; profil/adapter → `frontend:profile`; tree kotor yang menurut skrip seluruhnya artefak taskdir ini (draft tertunda sesi lalu) → commit dulu sebagai `draft`/`revise UI.md` (Phase 5 butir 3), lalu ulangi prasyarat; kotoran lain → laporkan ke user. `WARN` `UI.md` tertunda (`DRAFT`) → tanyakan ke user: putuskan draft itu, revisi, atau tulis ulang.
+2. `PASS` (9/9): lanjut. `FAIL`: hentikan dan remediasi — akar tidak sah atau `sections` tanpa `ui` → kembali ke `frontend:lead`; hop `FLOW` belum tercentang atau berubah sesudah disetujui → `ux-design` atau `chain.py reopen --row FLOW` lewat lead; `UI.md` sudah `APPROVED` → gate ini tuntas, revisi hanya lewat `chain.py reopen --row UI`; profil/adapter → `frontend:profile`; tree kotor → laporkan ke user (dokumen taskdir tidak pernah tampak kotor). `WARN` `UI.md` tertunda (`DRAFT`) → ikuti tindakannya: konten belum tercatat → `chain.py draft --row UI` (Phase 5 butir 3) lebih dulu; lalu tanyakan ke user: putuskan draft itu, revisi, atau tulis ulang.
 3. Skrip: `chain.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py`; `validate_doc.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/validate_doc.py`.
 
 ## Parameter [REQUIRED]
@@ -53,14 +53,14 @@ Tawarkan 2–3 opsi — Standard Card/List · Compact/Dense Table · Visual-Driv
 
 1. Tulis `<taskdir>/UI.md` persis bagian 1 `templates/ui-template.md`: `status: DRAFT`, `based_on` dari `git rev-parse --short HEAD`.
 2. `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/validate_doc.py --kind ui --taskdir <taskdir>` sampai `PASS`, lalu self-test semantik bagian 2 butir 5–8 template.
-3. Commit: `git add <taskdir>/UI.md` lalu `docs(<slug>): draft UI.md` (revisi berikutnya: `docs(<slug>): revise UI.md`).
+3. Catat draft: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py draft --taskdir <taskdir> --row UI`. Skrip menjalankan ulang `validate_doc.py` dan mencatat kejadian `draft` bersidik konten di `## Riwayat Rantai`; revisi berikutnya dicatat dengan perintah yang sama, dan draft kedua dan seterusnya dihitung revisi. Dilarang men-stage atau meng-commit `UI.md`.
 
 ### Phase 6 — Approval User
 
-1. Sajikan **ringkasan gerbang**, bukan isi dokumen: baris `UI.md DRAFT @ <sha> · <taskdir>/UI.md · <n> layar · <n> ST`, lalu 3–4 kalimat — opsi tata letak terpilih, isi P1 layar utama, cabang state yang menyimpang dari default (mis. kosong atau error khusus), dan asumsi default yang dipakai. Mockup, hierarki P1–P3, enam cabang per layar, dan pemetaan data tetap di berkas; dilarang menyalinnya ke chat. User meminta rincian → sajikan seksi atau layar yang diminta saja, lalu ajukan ulang pertanyaan butir 2.
+1. Sajikan **ringkasan gerbang**, bukan isi dokumen: baris `UI.md DRAFT @ <sidik12 keluaran chain.py draft> · <taskdir>/UI.md · <n> layar · <n> ST`, lalu 3–4 kalimat — opsi tata letak terpilih, isi P1 layar utama, cabang state yang menyimpang dari default (mis. kosong atau error khusus), dan asumsi default yang dipakai. Mockup, hierarki P1–P3, enam cabang per layar, dan pemetaan data tetap di berkas; dilarang menyalinnya ke chat. User meminta rincian → sajikan seksi atau layar yang diminta saja, lalu ajukan ulang pertanyaan butir 2.
 2. `AskUserQuestion`: *Setujui desain* · *Revisi (sebut poinnya)* · *Hentikan*.
 3. **Setuju** → `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py approve --taskdir <taskdir> --row UI --answer "<jawaban user apa adanya>"`. Approve PASS → jalankan prosedur `lead/references/nataflow-sync.md` (`--taskdir <taskdir>`); segmennya masuk baris penutup, dan `nataflow GAGAL` tidak membatalkan approval.
-4. **Revisi** → `chain.py revisions --taskdir <taskdir> --row UI` (plafon 2; `draft` ulang dan amandemen akar tidak me-reset hitungan). Di bawah plafon → perbarui, validasi, commit `revise`, ajukan ulang. Plafon habis → hentikan, sajikan poin penolakan berurutan, serahkan ke `frontend:lead` Phase 8 (plafon habis: taskdir baru atau hentikan).
+4. **Revisi** → `chain.py revisions --taskdir <taskdir> --row UI` (plafon 2; `draft` ulang dan amandemen akar tidak me-reset hitungan). Di bawah plafon → perbarui, `chain.py draft --row UI` (revisi ketiga ditolak skrip), ajukan ulang. Plafon habis → hentikan, sajikan poin penolakan berurutan, serahkan ke `frontend:lead` Phase 8 (plafon habis: taskdir baru atau hentikan).
 
 ## Guardrails
 
@@ -84,7 +84,7 @@ Desain disetujui — tutup satu baris: `UI — APPROVED @ <sha konten> · <n> la
 
 ```markdown
 ### UI — <MENUNGGU KEPUTUSAN | TERTAHAN>
-- **Draft**: UI.md @ <sha> · validator <PASS | FAIL>
+- **Draft**: UI.md @ <sidik12 | belum tercatat> · validator <PASS | FAIL>
 - **Plafon revisi**: <n>/2
 - **Rute**: <menunggu jawaban user | frontend:lead Phase 8>
 ```
@@ -93,7 +93,7 @@ Desain disetujui — tutup satu baris: `UI — APPROVED @ <sha konten> · <n> la
 
 1. **User menolak seluruh opsi**: minta preferensi spesifik, ulangi Phase 3.
 2. **Token visual absen dari profil**: tanyakan ke user nilai yang dipakai dan catat sebagai keputusan eksplisit; sarankan `frontend:profile` REFRESH.
-3. **Commit gagal** (hook, lock): perbaiki penyebab dan ulangi sebelum approval diajukan.
+3. **`chain.py draft` gagal** (validator `FAIL`, konten sama dengan draft tercatat, plafon revisi): perbaiki penyebab dan ulangi sebelum approval diajukan; dilarang mengajukan draft yang belum tercatat.
 4. **Kebutuhan data layar tidak ada di FLOW**: tanyakan ke user; tambahannya kemungkinan menuntut `chain.py reopen --row FLOW` lewat lead.
 5. **Adapter tidak ditemukan**: hentikan; batasan platform tidak boleh ditebak.
 

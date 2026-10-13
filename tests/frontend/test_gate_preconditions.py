@@ -148,10 +148,14 @@ def test_task_working_tree_kotor_fail(fresh_repo):
 @pytest.mark.regression("24 G2")
 def test_task_menulis_penanda_ignore(fresh_repo):
     r = task(fresh_repo, "FAST_FORWARD", "architecture")
-    assert r.returncode == 0 and checks(r)[10] == "PASS", r.out
+    assert r.returncode == 0 and checks(r)[10] == "WARN", r.out            # 24 K2: tanpa `.claude/nataflow.json`
+    assert "hanya tersimpan di disk" in r.stdout
     assert (fresh_repo / "frontenddev/docs/.gitignore").read_text(encoding="utf-8").rstrip().endswith("*")
     write_files(fresh_repo, {f"{NEW_TD}/TASK.md": "x\n"})
     assert git(fresh_repo, "status", "--porcelain") == ""
+    write_files(fresh_repo, {".claude/nataflow.json": "{}\n"})
+    commit(fresh_repo, "chore: aktifkan sinkron nataflow", ".claude/nataflow.json")
+    assert checks(task(fresh_repo, "FAST_FORWARD", "architecture"))[10] == "PASS"
 
 
 @pytest.mark.regression("24 G2")

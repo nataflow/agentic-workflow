@@ -1,6 +1,6 @@
 ---
 name: contract-reviewer
-description: Subagent read-only penilai CONTRACT.md frontend. Gunakan ketika frontend:contract selesai menulis draft yang lolos validate_doc.py dan butuh vonis PASS/BLOCKED sebelum draft di-commit dan diajukan ke user. Dilarang mengedit dokumen, menulis status APPROVED, menjalankan git, atau berdialog dengan user.
+description: Subagent read-only penilai CONTRACT.md frontend. Gunakan ketika frontend:contract selesai menulis draft yang lolos validate_doc.py dan butuh vonis PASS/BLOCKED sebelum draft dicatat dan diajukan ke user. Dilarang mengedit dokumen, menulis status APPROVED, menjalankan git, atau berdialog dengan user.
 tools: Read, Grep, Glob
 model: sonnet
 ---

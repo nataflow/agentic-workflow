@@ -68,14 +68,14 @@ Rancangan antarmuka, hierarki prioritas informasi, dan enam cabang state untuk <
 
 ## 2. Aturan Validasi
 
-**Mekanis** — ditagih `validate_doc.py --kind ui`; `FAIL` menahan commit draft dan `chain.py approve`:
+**Mekanis** — ditagih `validate_doc.py --kind ui`; `FAIL` menahan `chain.py draft` dan `chain.py approve`:
 
 1. **Frontmatter**: `status` hanya `DRAFT` atau `APPROVED` (yang kedua hanya lewat `chain.py approve`); `slug`, `stack` terisi; `order: 20`; `based_on` berpola `<sha 7 digit> (YYYY-MM-DD)`.
 2. **Struktur**: tepat satu H1 berawalan `# UI Design — `, dan lima heading `##` persis urutan bagian 1. Seksi 1 memuat blok mockup berpagar.
 3. **Cabang state**: heading `### ST-{n}. State <jenis> ...` berurutan dari `ST-1`. **Tiap layar tepat enam ST berurutan** (layar 1 = `ST-1..ST-6`, layar 2 = `ST-7..ST-12`, dst.), satu per jenis cabang: normal, loading, kosong, error, initial, stale/mutating. Urutan di dalam blok bebas. Jenis dibaca dari kata kunci judul (`Normal`/`Ready`, `Loading`/`Skeleton`, `Kosong`/`Empty`, `Error`/`Failure`/`Gagal`, `Initial`/`Idle`, `Stale`/`Mutating`/`Optimistic`). Cabang yang tidak relevan untuk suatu layar tetap ditulis beserta alasannya. Bila lebih dari satu layar, sebut layarnya di judul (`### ST-7. State Normal — Layar 2: Pembayaran`). `validate_doc.py --kind contract` menagih tiap `ST-{n}` dipikul minimal satu AC.
 4. **Placeholder**: nol `TBD`/`TODO`/`diisi nanti` dan nol slot `<...>` berspasi di luar blok kode.
 
-**Semantik** — self-test penulis sebelum commit draft:
+**Semantik** — self-test penulis sebelum `chain.py draft`:
 
 5. Tiap token visual (warna, spacing, radius, tipografi) di seksi 2 berasal dari `visual.md` profil; nilai literal tanpa token dicatat sebagai keputusan eksplisit, bukan diselipkan.
 6. Cabang ST-4 menyebut aksi pemulihan yang benar-benar dapat dipanggil (handler Controller), bukan hanya pesan.

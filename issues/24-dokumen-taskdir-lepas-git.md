@@ -420,3 +420,47 @@ di disk), begitu juga `fe_approved_chain` (`chain.py draft` menggantikan `review
 kode saja, `REVIEW.md` ber-`head`). Test berbasis git dokumen ditulis ulang ke Riwayat dengan ID regresi yang sama.
 Test baru: `tests/frontend/test_24_riwayat.py` (format dan keutuhan Riwayat, `root`/`amend`/`draft`, sidik akar,
 K13, dan G2 frontend).
+
+**Hasil tahap 3 (2026-10-13):** frontend berpindah utuh.
+
+- Riwayat Rantai dan `chain.py root`/`amend`/`draft` sudah berjalan. `review_round.py commit` gugur.
+- `tests/frontend/test_24_riwayat.py` baru (11 test). Test berbasis git dokumen ditulis ulang ke Riwayat dengan ID
+  regresinya tetap: J27, J42–J53, E12–E14, L4.x, 15 F2–F15.
+- Test baru 24 G2 (`test_gate_preconditions`, `test_08c_taskdir_state`), 24 K9 (`test_validate_review`,
+  `test_09_robustness`), 24 K13 (`test_12_guard`), dan 24 K14/G5 (`test_15_sync_payload`).
+- Suite penuh hijau dan lint 0 FAIL.
+
+Selisih pelaksanaan terhadap peta:
+
+- **Pemeriksaan `TUNTAS` dini dipertahankan, dengan kriteria disk.** Kriterianya: `REVIEW.md` `PASS`/`WARNING`,
+  ledger tercentang penuh, nol brief `READY`, dan `REPORT.md` ada. Lalu salah satu dari dua: review segar dan
+  laporan lolos `validate_report.py`, atau `head` review tidak lagi leluhur `HEAD`.
+  - Alasannya: tanpa pemeriksaan ini, rantai tuntas yang di-squash-merge kehilangan commit `implement unit`-nya.
+    Rantai itu lalu divonis `PENUTUP` selamanya (`test_j44_squash_rantai_tuntas_bukan_drift`).
+  - Unit yang ditambah sesudah review normal tetap membasikan review tanpa menulis ulang riwayat, jadi rantai yang
+    dilanjutkan tetap divonis lewat ledger.
+- **Mutasi `chain.py` menolak akar yang sidiknya tidak utuh.** Ini berlaku untuk `approve`, `reopen`, `draft`, dan
+  `escalate`, dan menjadi padanan 12 J47: dulu `reopen` menolak tree kotor; kini suntingan akar yang menggantung
+  diselesaikan lewat `amend` lebih dulu, tidak dibawa diam-diam.
+- **Kesegaran review menghitung semua commit pembawa kode sesudah `head`**, bukan hanya commit rantai `(<slug>)`.
+  Yang dinilai berkas yang disentuh, bukan subjek yang diketik (09 E13). Commit yang hanya menyentuh `frontenddev/`
+  atau `.claude/` tidak membasikannya.
+- **`task_root_sha` jatuh ke commit penambahan `TASK.md` untuk taskdir era git tanpa `base_commit`.** Riwayatnya
+  tetap ada sesudah `docs_git.py migrate`. Dengan begitu review ad-hoc `--target taskdir` dan laporan atas taskdir
+  lama tetap punya rentang.
+- **`strip_status_line` membuang baris `sidik_kontrak:` beserta newline di depannya.**
+  `set_frontmatter_field` menambahkan field baru di ujung frontmatter, dan versi pertama menyisakan baris kosong.
+  Akibatnya sidik brief bergeser sesudah approve. Bug ini tertangkap `test_c4_blocked_tanpa_remedi_menang_atas_ready`
+  dan kini dipaku `test_strip_sidik_kontrak_baris_terakhir_frontmatter`.
+- **`chain.py draft` menegakkan plafon revisi.** Dulu hanya `chain.py revisions` yang menghitung, dan commit
+  `revise` ketiga tetap lolos.
+- **Profil frontend tetap menulis baris `frontenddev/docs/**/.explore/`.** Penanda `frontenddev/docs/.gitignore`
+  sudah menutupnya, sehingga baris itu kini lapis cadangan bagi repo yang belum membuka taskdir. Pola berjangkar di
+  prosa explorer tetap dipaku 12 J4. Backend membuang baris `.explore/`-nya di tahap 2 karena backend tidak punya
+  laci akar `.backenddev/` yang dipakai sebelum taskdir ada.
+- **Pemulihan ronde tidak gugur di frontend.** Field `review` di kejadian `draft`/`approve` menggantikan trailer
+  `Review-Round`, jadi `committed_rounds` dan `rebuild` tetap bekerja. K15 untuk frontend kosong.
+- **`check_worktree` tidak lagi menerima `allow`/`own_action`.** Dokumen taskdir tidak pernah tampak kotor, jadi
+  cabang "kotoran milik taskdir sendiri" dibuang beserta parameternya.
+- **K2 (`WARN` tanpa `.claude/nataflow.json`)** baru berlaku di `docs_git.py status` dan check 10 prasyarat `task`
+  frontend. Gerbang masuk backend menyusul di tahap 4.

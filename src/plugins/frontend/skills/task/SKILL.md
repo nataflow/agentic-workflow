@@ -11,12 +11,12 @@ user-invocable: false
 - Sebut alat ukur pada tiap success criteria dan buang butir tanpa alat ukur.
 - Berhenti begitu tiap permukaan yang diminta punya satu butir pemikul; butir yang menambah permukaan baru dihapus.
 - Dilarang menyentuh `src/`, menulis FLOW/UI/CONTRACT/brief, atau mengubah `TASK.md` yang sudah ada.
-- Kunci berkas dalam satu commit tersendiri sebelum mengembalikan kendali ke `frontend:lead`.
+- Kunci akar lewat `chain.py root` sebelum mengembalikan kendali ke `frontend:lead`: `base_commit` dan kejadian `akar` di `## Riwayat Rantai`, tanpa commit — dokumen taskdir diabaikan git dan dicerminkan ke nataflow (Langkah 24).
 
 ## Precondition [REQUIRED]
 
 1. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/task/scripts/check_preconditions.py --taskdir <taskdir> --lane <lane> --sections <sections> [--finding-source <path>] [--ticket-source <path>]` — `--sections -` untuk `HOTFIX_MINOR`.
-2. `PASS` (9/9 checks) → lanjut ke Workflow. `FAIL` → hentikan dan remediasi butir gagal: taskdir tidak sah, atau slug sudah dipakai taskdir lain (check 9) → kembali ke `frontend:lead` Phase 5 (sufiks `-2`); profil hilang → `frontend:profile`; `TASK.md` sudah ada → serahkan ke lead tanpa menimpanya; pasangan `lane`/`sections` tidak sah (`HOTFIX_MINOR` ⇔ kosong; `FAST_FORWARD`/`REFACTOR_ARCH` ⇔ tepat `architecture`; `FULL_PIPELINE` memuat `flow` atau `ui`) → kembalikan ke lead, jangan dikoreksi sendiri; `finding_source` tidak ada atau belum ter-commit → laporkan ke user; template hilang → pulihkan berkas plugin; working tree kotor → laporkan ke user, jangan di-stash sendiri; `ticket_source` tidak `READY` atau disunting sesudah approve (check 8) → hentikan dan kembalikan ke lead, yang mengembalikannya ke `analyst:spec`.
+2. `PASS` (10/10 checks) → lanjut ke Workflow. `FAIL` → hentikan dan remediasi butir gagal: `frontenddev/docs/` masih ter-track git (check 10, `MIGRASI`) → kembali ke `frontend:lead` untuk prosedur migrasi; taskdir tidak sah, atau slug sudah dipakai taskdir lain (check 9) → kembali ke `frontend:lead` Phase 5 (sufiks `-2`); profil hilang → `frontend:profile`; `TASK.md` sudah ada → serahkan ke lead tanpa menimpanya; pasangan `lane`/`sections` tidak sah (`HOTFIX_MINOR` ⇔ kosong; `FAST_FORWARD`/`REFACTOR_ARCH` ⇔ tepat `architecture`; `FULL_PIPELINE` memuat `flow` atau `ui`) → kembalikan ke lead, jangan dikoreksi sendiri; `finding_source` tidak ada atau belum ter-commit → laporkan ke user; template hilang → pulihkan berkas plugin; working tree kotor → laporkan ke user, jangan di-stash sendiri; `ticket_source` tidak `READY` atau disunting sesudah approve (check 8) → hentikan dan kembalikan ke lead, yang mengembalikannya ke `analyst:spec`. `WARN` check 10 (`.claude/nataflow.json` tidak ada) → sebut ke user sekali bahwa dokumen taskdir hanya tersimpan di disk ini, lalu lanjut.
 
 ## Parameter [REQUIRED]
 
@@ -78,39 +78,39 @@ Susun 1–7 butir berformat `- [ ] **SC-{n}**: <hasil terukur> — verifikasi: <
 2. Baca `templates/task-template.md` bagian 1, isi placeholder, tulis ke `{taskdir}/TASK.md` dengan `status: ACTIVE`, `lane`, dan `sections` — tanpa baris ledger.
 3. **Ledger**: jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py init --taskdir <taskdir>`; skrip menulis `## Chain` tepat sesuai `sections`. Dilarang mengetik baris ledger dengan tangan.
 4. **Self-test akar**: jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/task/scripts/validate_task.py --taskdir <taskdir>` untuk butir mekanis (1–4, 6, 7, 9), lalu nilai sendiri butir 5 dan 8 bagian 2 template. Satu butir gagal → perbaiki `TASK.md`, ulangi dari butir 2.
-5. Stage eksplisit `{taskdir}/TASK.md` — plus `<finding_source>` bila ada temuan yang ditandai `OBSOLETE` — lalu commit `docs(<slug>): kunci TASK sebagai akar rantai`.
-6. Commit mendarat → jalankan prosedur `lead/references/nataflow-sync.md` (`--taskdir <taskdir>`) di main loop; segmennya masuk baris penutup. `nataflow GAGAL` tidak membatalkan akar.
-7. Catat SHA commit dan kembalikan kendali ke `frontend:lead`.
+5. **Kunci akar**: jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py root --taskdir <taskdir>`. Skrip menjalankan ulang `validate_task.py`, menolak `frontenddev/docs/` yang masih ter-track, lalu menulis `base_commit` = `HEAD` dan kejadian `akar` (lane, sections, sidik akar). Dilarang men-stage atau meng-commit `TASK.md`. `<finding_source>` yang ditandai `OBSOLETE` adalah dokumen tingkat repo: commit tersendiri `docs(review): tandai temuan OBSOLETE` dengan path eksplisit.
+6. Akar terkunci → jalankan prosedur `lead/references/nataflow-sync.md` (`--taskdir <taskdir>`) di main loop; segmennya masuk baris penutup. `nataflow GAGAL` tidak membatalkan akar.
+7. Catat `base_commit` dan kembalikan kendali ke `frontend:lead`.
 
 ## Guardrails
 
 - **AKAR, BUKAN DESAIN**: dilarang menulis perjalanan layar, mockup, cabang state, DTO, query key, layer shape, atau pemecahan unit. Begitu dokumen butuh sub-heading di luar empat yang ditetapkan, isinya milik gate hilir.
 - **TASK.md EKSISTING TAK TERSENTUH**: skill ini hanya menulis berkas yang belum ada. Pergeseran `lane`/`sections` hanya lewat `chain.py escalate` dan pencentangan ledger hanya lewat `chain.py approve`/`reopen` — wewenang `frontend:lead` dan gate pemilik hop (`lead/references/lane-routing-matrix.md` bagian 3).
 - **NOL SENTUHAN KODE**: dilarang menulis di luar `{taskdir}/TASK.md` — kecuali baris `> Status: OBSOLETE` di `finding_source` — menjalankan build atau test, dan mendispatch subagent.
-- **GIT TERBATAS**: dilarang `git push`, `git merge`, `git rebase`, dan staging wildcard (`git add .` atau `git add -A`).
+- **GIT TERBATAS**: dilarang `git push`, `git merge`, `git rebase`, staging wildcard (`git add .` atau `git add -A`), dan men-stage dokumen taskdir.
 - **CUKUP ITU BERHENTI**: dilarang menambah butir "sekalian" (a11y audit, animasi, refactor tetangga, analytics) yang tak disebut `request` maupun `evidence`, atau memekarkan `## Out of Scope` jadi rencana kerja berikutnya.
-- **RATIONALIZATION PREVENTION**: dilarang menyalin `request` ke `## Description`, mengosongkan `## Out of Scope` ("scope-nya kecil"), memakai `QA manual:` untuk hal yang dapat dibuktikan test, atau menunda commit menunggu approval — `TASK.md` tidak mengenal gerbang approval.
+- **RATIONALIZATION PREVENTION**: dilarang menyalin `request` ke `## Description`, mengosongkan `## Out of Scope` ("scope-nya kecil"), memakai `QA manual:` untuk hal yang dapat dibuktikan test, atau menunda penguncian menunggu approval — `TASK.md` tidak mengenal gerbang approval.
 
 ## Output [REQUIRED]
 
-Self-test 9/9 dan commit mendarat → tutup satu baris: `### TASK ROOT LOCKED — <taskdir>/TASK.md @ <sha> · status ACTIVE · lane <lane> · hop <daftar> · Uji Akar 9/9 lolos · nataflow <segmen>`. Selain itu, sajikan:
+Self-test 9/9 dan akar terkunci → tutup satu baris: `### TASK ROOT LOCKED — <taskdir>/TASK.md @ base <sha7> · status ACTIVE · lane <lane> · hop <daftar> · Uji Akar 9/9 lolos · nataflow <segmen>`. Selain itu, sajikan:
 
 ```markdown
 ### TASK ROOT LOCKED — TERTAHAN
 - **Path**    : frontenddev/docs/<YYMMDDhhmm>-<slug>/TASK.md · status ACTIVE
 - **Uji Akar**: gagal — <butir yang jatuh beserta alasannya> | 9/9 lolos
-- **Commit**  : GAGAL — <pesan git> | <sha>
+- **Kunci**   : GAGAL — <pesan chain.py root> | base <sha7>
 ```
 
-Kriteria dan bukti sudah terkunci di `TASK.md` — dilarang menyalinnya ke laporan. Tutup satu baris: `kembali ke frontend:lead | Taskdir: <path> | Akar: TASK.md @ <sha | belum terkunci>`.
+Kriteria dan bukti sudah terkunci di `TASK.md` — dilarang menyalinnya ke laporan. Tutup satu baris: `kembali ke frontend:lead | Taskdir: <path> | Akar: TASK.md @ <base sha7 | belum terkunci>`.
 
 ## Failure path
 
 1. **Taskdir tak sah**: hentikan, minta lead memprovisi. Dilarang membuat direktori sendiri.
-2. **TASK.md sudah ada**: hentikan tanpa menimpa, laporkan path dan `status`-nya ke lead — termasuk akar yang belum ter-commit: penguncian ulangnya milik lead (`validate_task.py` `PASS` → commit subjek akar; `FAIL` → user yang memutuskan).
+2. **TASK.md sudah ada**: hentikan tanpa menimpa, laporkan path dan `status`-nya ke lead — termasuk akar yang belum terkunci: penguncian ulangnya milik lead (`chain.py root` `PASS` → terkunci; validator `FAIL` → user yang memutuskan).
 3. **Bukti menggantung**: tak satu pun `evidence` mengarah ke berkas nyata → minta lead mendispatch `code-explorer`. Dilarang mengarang `file:baris`.
 4. **Kriteria tak terukur**: nol butir terukur tersisa → laporkan butir gugur dan minta klarifikasi lewat lead Phase 7. Dilarang mengganti butir gugur dengan butir baru demi jumlah.
-5. **Commit gagal**: pertahankan berkas di working tree, laporkan `Commit: GAGAL` plus pesan git, serahkan penguncian ke lead — lead menjalankan ulang `validate_task.py` lalu commit dengan subjek akar yang sama.
+5. **Penguncian gagal**: `chain.py root` `FAIL` (validator, `MIGRASI`, repo tanpa commit) → pertahankan `TASK.md` di disk, laporkan `Kunci: GAGAL` plus pesan skrip apa adanya, serahkan ke lead — lead menjalankan ulang `chain.py root` sesudah penyebabnya beres.
 
 ## STYLE
 

@@ -61,7 +61,7 @@ Prasyarat antar-unit (`depends_on`, commit unit sebelumnya) dan working tree ber
 - [FORBIDDEN] Mengubah `tsconfig.json`, `package.json`, atau config bundler/framework (`vite.config.*`, `svelte.config.js`, `metro.config.*`, `app.json`).
 - [FORBIDDEN] Mengomentari, men-skip, atau menghapus assertion test; mengubah mock global demi test lokal.
 - [FORBIDDEN] Memakai terminal dalam bentuk apa pun; tool `Bash` tidak tersedia. `git`, `npm`/`pnpm`/`yarn`/`npx`, dan rollback lewat terminal milik pendispatch.
-- [FORBIDDEN] Menyunting frontmatter brief — status ditulis `architect` bersama commit unit.
+- [FORBIDDEN] Menyunting brief — status ditulis `architect` tepat sebelum commit unit, dan hook menolak tulisanmu di taskdir selain `report-<NN>.md`.
 - [FORBIDDEN] Menulis seksi `## Triase` di laporan — milik `architect`.
 - [FORBIDDEN] Bertanya ke user; keputusan yang dibutuhkan menjadi `status: FAILED` beserta alasannya.
 - [FORBIDDEN] Menulis nilai kredensial, token, atau isi `.env` ke kode maupun laporan.

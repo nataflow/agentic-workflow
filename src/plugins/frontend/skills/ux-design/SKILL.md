@@ -6,7 +6,7 @@ user-invocable: false
 
 ## THE IRON LAW
 
-- `FLOW.md` lahir dan di-commit `DRAFT`; `APPROVED` hanya ditulis `chain.py approve --row FLOW` sesudah jawaban eksplisit user di `AskUserQuestion`. Dilarang menulis `APPROVED` dengan tangan.
+- `FLOW.md` lahir `DRAFT` dan dicatat `chain.py draft --row FLOW` sebelum diajukan — tanpa commit: dokumen taskdir diabaikan git dan dicerminkan ke nataflow; `APPROVED` hanya ditulis `chain.py approve --row FLOW` sesudah jawaban eksplisit user di `AskUserQuestion`. Dilarang menulis `APPROVED` dengan tangan.
 - Draft diajukan ke user hanya sesudah `validate_doc.py --kind flow` `PASS`.
 - Tiap perjalanan menutup lima dimensi — entry, maju, kembali/batal, cabang, data demands — dan tiap Data Demand ber-ID `DD-{n}`.
 - Konvensi rute dari adapter stack dan navigasi aktual repo, bukan dari stack lain; dilarang membuat atau mengubah berkas di `src/`.
@@ -14,7 +14,7 @@ user-invocable: false
 ## Precondition [REQUIRED]
 
 1. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/ux-design/scripts/check_preconditions.py --taskdir <taskdir>`.
-2. `PASS` (9/9): lanjut. `FAIL`: hentikan dan remediasi — akar tidak sah atau `sections` tanpa `flow` → kembali ke `frontend:lead`; `FLOW.md` sudah `APPROVED` → gate ini tuntas, revisi hanya lewat `chain.py reopen --row FLOW`; profil/adapter → `frontend:profile`; tree kotor yang menurut skrip seluruhnya artefak taskdir ini (draft tertunda sesi lalu) → commit dulu sebagai `draft`/`revise FLOW.md` (Phase 4 butir 3), lalu ulangi prasyarat; kotoran lain → laporkan ke user. `WARN` `FLOW.md` tertunda (`DRAFT`) → tanyakan ke user: putuskan draft itu, revisi, atau tulis ulang.
+2. `PASS` (9/9): lanjut. `FAIL`: hentikan dan remediasi — akar tidak sah atau `sections` tanpa `flow` → kembali ke `frontend:lead`; `FLOW.md` sudah `APPROVED` → gate ini tuntas, revisi hanya lewat `chain.py reopen --row FLOW`; profil/adapter → `frontend:profile`; tree kotor → laporkan ke user (dokumen taskdir tidak pernah tampak kotor). `WARN` `FLOW.md` tertunda (`DRAFT`) → ikuti tindakannya: konten belum tercatat → `chain.py draft --row FLOW` (Phase 4 butir 3) lebih dulu; lalu tanyakan ke user: putuskan draft itu, revisi, atau tulis ulang.
 3. Konflik rute dengan alur yang sudah ada tidak dapat divonis skrip; periksa di Phase 0.
 4. Skrip: `chain.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py`; `validate_doc.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/validate_doc.py`.
 
@@ -59,14 +59,14 @@ Tawarkan 2–3 opsi mengacu `references/ux-patterns.md` — Direct/Modal · Mult
 
 1. Tulis `<taskdir>/FLOW.md` persis bagian 1 `templates/flow-template.md`: `status: DRAFT`, `based_on` dari `git rev-parse --short HEAD`, baris **Akar** menyebut `SC-{n}` yang dilayani.
 2. `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/validate_doc.py --kind flow --taskdir <taskdir>` sampai `PASS`, lalu self-test semantik bagian 2 butir 6–9 template.
-3. Commit: `git add <taskdir>/FLOW.md` lalu `docs(<slug>): draft FLOW.md` (revisi berikutnya: `docs(<slug>): revise FLOW.md`).
+3. Catat draft: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py draft --taskdir <taskdir> --row FLOW`. Skrip menjalankan ulang `validate_doc.py` dan mencatat kejadian `draft` bersidik konten di `## Riwayat Rantai`; revisi berikutnya dicatat dengan perintah yang sama, dan draft kedua dan seterusnya dihitung revisi. Dilarang men-stage atau meng-commit `FLOW.md`.
 
 ### Phase 5 — Approval User
 
-1. Sajikan **ringkasan gerbang**, bukan isi dokumen: baris `FLOW.md DRAFT @ <sha> · <taskdir>/FLOW.md`, lalu 3–4 kalimat — opsi alur terpilih beserta titik masuk dan rute utamanya, penanganan batal/dirty, cabang error paling berisiko, dan asumsi default yang dipakai. Tabel rute, cabang error, dan Data Demands tetap di berkas; dilarang menyalinnya ke chat. User meminta rincian → sajikan seksi yang diminta saja, lalu ajukan ulang pertanyaan butir 2.
+1. Sajikan **ringkasan gerbang**, bukan isi dokumen: baris `FLOW.md DRAFT @ <sidik12 keluaran chain.py draft> · <taskdir>/FLOW.md`, lalu 3–4 kalimat — opsi alur terpilih beserta titik masuk dan rute utamanya, penanganan batal/dirty, cabang error paling berisiko, dan asumsi default yang dipakai. Tabel rute, cabang error, dan Data Demands tetap di berkas; dilarang menyalinnya ke chat. User meminta rincian → sajikan seksi yang diminta saja, lalu ajukan ulang pertanyaan butir 2.
 2. `AskUserQuestion`: *Setujui alur* · *Revisi (sebut poinnya)* · *Hentikan*.
 3. **Setuju** → `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py approve --taskdir <taskdir> --row FLOW --answer "<jawaban user apa adanya>"`. Approve PASS → jalankan prosedur `lead/references/nataflow-sync.md` (`--taskdir <taskdir>`); segmennya masuk baris penutup, dan `nataflow GAGAL` tidak membatalkan approval.
-4. **Revisi** → `chain.py revisions --taskdir <taskdir> --row FLOW` (plafon 2; `draft` ulang dan amandemen akar tidak me-reset hitungan). Di bawah plafon → perbarui, validasi, commit `revise`, ajukan ulang. Plafon habis → hentikan, sajikan poin penolakan berurutan, serahkan ke `frontend:lead` Phase 8 (plafon habis: taskdir baru atau hentikan).
+4. **Revisi** → `chain.py revisions --taskdir <taskdir> --row FLOW` (plafon 2; `draft` ulang dan amandemen akar tidak me-reset hitungan). Di bawah plafon → perbarui, `chain.py draft --row FLOW` (revisi ketiga ditolak skrip), ajukan ulang. Plafon habis → hentikan, sajikan poin penolakan berurutan, serahkan ke `frontend:lead` Phase 8 (plafon habis: taskdir baru atau hentikan).
 
 ## Guardrails
 
@@ -90,7 +90,7 @@ Alur disetujui — tutup satu baris: `FLOW — APPROVED @ <sha konten> · <n> la
 
 ```markdown
 ### FLOW — <MENUNGGU KEPUTUSAN | TERTAHAN>
-- **Draft**: FLOW.md @ <sha> · validator <PASS | FAIL>
+- **Draft**: FLOW.md @ <sidik12 | belum tercatat> · validator <PASS | FAIL>
 - **Plafon revisi**: <n>/2
 - **Rute**: <menunggu jawaban user | frontend:lead Phase 8>
 ```
@@ -99,7 +99,7 @@ Alur disetujui — tutup satu baris: `FLOW — APPROVED @ <sha konten> · <n> la
 
 1. **User menolak seluruh opsi alur**: minta preferensi spesifik, perbarui rancangan, ulangi Phase 3.
 2. **Konflik rute / parameter duplikat**: sesuaikan namespace segmen dan konfirmasikan ke user.
-3. **Commit gagal** (hook, lock): perbaiki penyebab dan ulangi sebelum approval diajukan; dilarang mengajukan draft yang belum ter-commit.
+3. **`chain.py draft` gagal** (validator `FAIL`, konten sama dengan draft tercatat, plafon revisi): perbaiki penyebab dan ulangi sebelum approval diajukan; dilarang mengajukan draft yang belum tercatat.
 4. **Deep-link menuntut parameter otentikasi yang belum ada di profil**: catat di seksi 6 dan tanyakan ke user.
 5. **Adapter tidak ditemukan**: hentikan; konvensi rute tidak boleh ditebak.
 
