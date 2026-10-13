@@ -104,7 +104,8 @@ skeletons), `dispatcher/` (prompts used to dispatch subagents), `scripts/`, and 
   paths: `PETA` (`skills/_common/workspace.py peta` writes `<root>/.fullstack/PETA.md` from profiles and git only,
   no code reading) and `TELUSUR` (parallel `repo-scout` subagents per repo, report under `.fullstack/explore/` built
   by `explore.py new`, FE→BE and API→API seams computed by `explore.py seam`, gated by `explore.py check`). Target
-  repos for API→API calls are certain only via user-confirmed `.fullstack/layanan.json`. `fullstack_lib.py` copies
+  repos for API→API calls are certain only via user-confirmed `.fullstack/layanan.json`; projects/repos listed
+  in `.fullstack/abaikan` (gitignore-style patterns) are skipped by every script. `fullstack_lib.py` copies
   `SKIP_DIRS`/`STACKS` from backend `hooks/detect.py` (a test asserts equality), and `tests/fullstack/
   test_profile_anchor_21.py` pins the backend/frontend profile-template anchors the parser reads. No hooks.
 

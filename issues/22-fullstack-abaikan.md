@@ -4,7 +4,21 @@ Sumber: permintaan user 2026-10-13 ("saya ingin ada fitur untuk exclude director
 di sesi yang sama: hanya tingkat proyek/repo, bukan folder di dalam repo. Basis kode plugin: commit `2720eb5`
 (fullstack 0.1.0, branch Langkah 21).
 
-**Status (2026-10-13):** rencana, belum dikerjakan.
+**Status (2026-10-13):** A1–A4 dan D1 selesai. Test regresi di `tests/fullstack/test_abaikan_22.py` (19), ditambah
+satu kasus smoke `abaikan list`. Suite penuh hijau (2470), subset fullstack/smoke hijau di Python 3.9, lint 0 FAIL,
+dan `claude plugin validate .` lolos. Versi: fullstack 0.2.0.
+
+Selisih pelaksanaan terhadap Kontrak di bawah:
+
+- **K4, `/` di awal pola.** Diperlakukan seperti `.gitignore` (berjangkar di root) lalu dibuang, bukan ditolak sebagai
+  path absolut. Yang ditolak: pola berawalan `~`, huruf drive Windows, `\`, segmen kosong/`.`/`..`, dan pola lebih
+  dari dua tingkat (tidak mungkin mengena root `<proyek>/<repo>`).
+- **`dikecualikan`** berisi `{dir, jenis, pola}` dengan `jenis` = `repo` atau `proyek`; butir `proyek` membawa `repo`
+  (jumlah repo di dalamnya) dan hanya dicatat bila folder itu memang berisi repo.
+- **`abaikan hapus`** menghapus baris berpola itu dan mempertahankan komentar serta baris lain apa adanya.
+- **Pesan bersama** `bukan_di_root()` di `fullstack_lib.py` dipakai `check`, `new`, dan `layanan set`; pesan untuk
+  repo yang memang tidak ada kini berbunyi "repo `<dir>` tidak ada di root".
+- **Deskripsi skill** menyebut pengecualian supaya model mengenali permintaan "abaikan repo X".
 
 ## Tujuan
 
@@ -69,31 +83,31 @@ Baris `Dibangun:` menyebut jumlah yang dikecualikan. Galat berkas atau baris tid
 - Prasyarat: `Terselesaikan:` memuat `dikecualikan=<n>`; berkas tak terbaca atau baris tidak sah → check baru WARN.
 
 ## A1 [Tinggi] `scan` belum mengenal pengecualian
-- [ ] Selesai
+- [x] Selesai
 
 `fullstack_lib.py`: `load_abaikan`, `cocok_abaikan`, `find_repos` berpola, `scan` dengan `dikecualikan` dan `abaikan`.
 Test: pola nama di dua tingkat, pola path, glob `*/infra`, proyek dilewati utuh beserta hitungan repo, plafon tidak
 menghitung yang dikecualikan, komentar dan baris kosong, pola tidak sah dilaporkan, berkas tak terbaca, tanpa berkas.
 
 ## A2 [Sedang] Belum ada cara aman mengelola pola
-- [ ] Selesai
+- [x] Selesai
 
 `workspace.py abaikan list/tambah/hapus`. Test: tambah lalu list, tambah duplikat ditolak, pola tidak sah ditolak,
 pola tanpa kecocokan disimpan dengan peringatan, hapus, hapus pola yang tidak ada, komentar di berkas dipertahankan.
 
 ## A3 [Sedang] Peta dan laporan tidak menyebut yang dikecualikan
-- [ ] Selesai
+- [x] Selesai
 
 `PETA.md` seksi `## Dikecualikan`; pesan `check`, `new`, dan `layanan set`; prasyarat. Test per butir.
 
 ## A4 [Rendah] Skill belum tahu cara mengecualikan
-- [ ] Selesai
+- [x] Selesai
 
 `SKILL.md`: perintah "abaikan/kecualikan repo X" → `abaikan tambah`, lalu `peta --write`; Precondition mencatat
 `dikecualikan`. Smoke untuk `abaikan list`.
 
 ## D1 [Rendah] Dokumen dan versi
-- [ ] Selesai
+- [x] Selesai
 
 README `fullstack`, `flow/fullstack.md`, `fullstack` 0.2.0.
 

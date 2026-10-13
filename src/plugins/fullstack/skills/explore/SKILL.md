@@ -1,13 +1,13 @@
 ---
 name: explore
-description: Gunakan ketika sesi berjalan di root multi-repo (folder non-git berisi repo seperti api/ dan frontend/, atau banyak proyek sekaligus di satu perusahaan) dan user ingin memahami aplikasi-aplikasinya — aplikasi apa saja yang ada, stack dan domain tiap repo, fitur dan rute frontend, aplikasi mana memanggil aplikasi mana — atau menelusuri satu layar, fitur, endpoint, entitas, atau integrasi lintas frontend dan backend (termasuk API ke API) - peta aplikasi PETA.md dari profil repo tanpa membaca kode, lalu explore permukaan lewat subagent repo-scout dengan jahitan yang dicocokkan skrip, sebelum kerja perubahan diarahkan ke gerbang backend/frontend di dalam repo
+description: Gunakan ketika sesi berjalan di root multi-repo (folder non-git berisi repo seperti api/ dan frontend/, atau banyak proyek sekaligus di satu perusahaan) dan user ingin memahami aplikasi-aplikasinya — aplikasi apa saja yang ada, stack dan domain tiap repo, fitur dan rute frontend, aplikasi mana memanggil aplikasi mana — atau menelusuri satu layar, fitur, endpoint, entitas, atau integrasi lintas frontend dan backend (termasuk API ke API), atau mengecualikan proyek/repo tertentu dari peta - peta aplikasi PETA.md dari profil repo tanpa membaca kode, lalu explore permukaan lewat subagent repo-scout dengan jahitan yang dicocokkan skrip, sebelum kerja perubahan diarahkan ke gerbang backend/frontend di dalam repo
 ---
 
 ## THE IRON LAW
 
 - **Hanya explore.** Skill ini tidak pernah mengubah berkas di repo anak, tidak menjalankan skill backend/frontend,
-  dan tidak meng-commit apa pun. Satu-satunya yang ditulis: `.fullstack/PETA.md`, `.fullstack/explore/*.md`, dan
-  `.fullstack/layanan.json` di root, semuanya lewat skrip atau dari template.
+  dan tidak meng-commit apa pun. Satu-satunya yang ditulis: `.fullstack/PETA.md`, `.fullstack/explore/*.md`,
+  `.fullstack/layanan.json`, dan `.fullstack/abaikan` di root, semuanya lewat skrip atau dari template.
 - **Konteks utama tidak membaca kode repo anak.** Gambaran perusahaan datang dari `PETA.md`, yang dibangun skrip dari
   profil. Bukti kode datang dari balikan subagent `fullstack:repo-scout`. Dilarang `Read`/`Grep`/`Glob` atas kode
   repo anak, termasuk "intip sebentar".
@@ -22,7 +22,7 @@ description: Gunakan ketika sesi berjalan di root multi-repo (folder non-git ber
    `${CLAUDE_PLUGIN_ROOT}/skills/_common/explore.py`. Template dispatch:
    `${CLAUDE_PLUGIN_ROOT}/skills/explore/dispatcher/scout.md`. Semua skrip dijalankan dengan cwd = root.
 2. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/explore/scripts/check_preconditions.py`. `PASS` → catat dari baris
-   `Terselesaikan:` nilai `root`, `repo`, `profil_valid`, `proyek`, `peta`, dan `laporan`. `PASS (WARN)` → sebut
+   `Terselesaikan:` nilai `root`, `repo`, `dikecualikan`, `profil_valid`, `proyek`, `peta`, dan `laporan`. `PASS (WARN)` → sebut
    peringatannya ke user, lalu lanjut. `FAIL` → remediasi per baris `Tindakan`, lalu berhenti. Check 3 `DALAM_REPO`
    berarti sesi ada di dalam repo: arahkan user ke `backend:tech-lead` atau `frontend:lead`, atau ke folder induknya.
 
@@ -38,6 +38,8 @@ description: Gunakan ketika sesi berjalan di root multi-repo (folder non-git ber
    - `PETA`: pertanyaan umum tentang aplikasi-aplikasi di root — "aplikasi apa saja", "pelajari semua", "stack
      tiap repo", "siapa memanggil siapa", "repo mana yang belum diprofilkan".
    - `TELUSUR`: satu objective konkret — layar, fitur, endpoint, entitas, atau integrasi — yang butuh bukti kode.
+   - `ABAIKAN`: user meminta proyek atau repo dikecualikan dari peta ("abaikan `legacy`", "jangan petakan repo
+     infra"), atau meminta pengecualian dibatalkan.
 
    Objective `TELUSUR` yang kabur ("cek order") dipersempit dengan satu `AskUserQuestion`; opsinya diambil dari nama
    domain dan fitur di `PETA.md`.
@@ -46,11 +48,23 @@ description: Gunakan ketika sesi berjalan di root multi-repo (folder non-git ber
    Objective yang menyebut beberapa proyek, atau integrasi API ke API antar proyek, melingkupi semuanya. Repo root
    langsung (tanpa folder proyek) berproyek `.`.
 
+### Jalur `ABAIKAN`
+
+1. Terjemahkan permintaan menjadi pola `.fullstack/abaikan`: nama tanpa `/` mengena proyek atau repo bernama itu di
+   tingkat mana pun (`legacy`, `api-lama`); path dengan `/` mengena path relatif root (`wms/api-lama`, `*/infra`).
+   Pola yang ambigu (mis. nama yang dipakai proyek dan repo sekaligus) → tampilkan dulu `python3 <workspace.py>
+   abaikan list --json` dan keluaran `scan`, lalu konfirmasi ke user.
+2. Jalankan `python3 <workspace.py> abaikan tambah <pola>` (atau `hapus <pola>`). Sebut ke user proyek/repo yang
+   terkena dari kunci `terkena`; `peringatan` (pola belum mengena apa pun) disampaikan apa adanya.
+3. Jalankan `python3 <workspace.py> peta --write` supaya `PETA.md` mengikuti, lalu kembali ke permintaan awal bila
+   ada.
+
 ### Jalur `PETA`
 
 1. Jalankan `python3 <workspace.py> peta --write`.
 2. Baca `.fullstack/PETA.md` dan jawab `request` dari situ. Bila ada repo dengan **profil tertinggal**, repo di
-   `## Belum terpetakan`, atau hubungan `belum dipetakan`, sebut di jawaban beserta arahannya.
+   `## Belum terpetakan`, atau hubungan `belum dipetakan`, sebut di jawaban beserta arahannya. Bila
+   `## Dikecualikan` tidak kosong, sebut jumlahnya supaya user tahu peta itu sengaja tidak utuh.
 3. Bila user lalu bertanya hal konkret, pindah ke jalur `TELUSUR` dengan lingkup dari jawaban itu.
 
 ### Jalur `TELUSUR`
@@ -107,6 +121,9 @@ celah yang mempengaruhi jawaban, dan path laporan. Kerja perubahan kode diarahka
 - **NOL TULIS DI REPO ANAK**: dilarang membuat, mengubah, atau menghapus berkas di dalam repo anak, termasuk profil.
 - **JAHITAN LEWAT SKRIP**: dilarang mengetik atau menyunting tabel `## Jahitan`; dilarang menulis `layanan.json`
   dengan tangan.
+- **PENGECUALIAN ATAS PERMINTAAN USER**: pola `abaikan` hanya ditambah atau dihapus bila user memintanya, selalu lewat
+  `workspace.py abaikan`. Repo yang profilnya rusak atau tertinggal diarahkan ke `<plugin>:profile`, bukan
+  dikecualikan diam-diam supaya peta terlihat bersih.
 - **NAMA CONFIG, BUKAN NILAI**: dilarang menyalin nilai `.env`, token, atau host dari mana pun ke laporan maupun
   jawaban.
 - **PERTANYAAN HEMAT**: maksimal satu `AskUserQuestion` untuk jalur/lingkup (Phase 0) dan satu untuk pemetaan
@@ -126,6 +143,7 @@ celah yang mempengaruhi jawaban, dan path laporan. Kerja perubahan kode diarahka
 ## Output [REQUIRED]
 
 - Jalur `PETA`: `.fullstack/PETA.md` (ditulis ulang utuh) dan jawaban di chat.
+- Jalur `ABAIKAN`: `.fullstack/abaikan` diperbarui dan `PETA.md` dibangun ulang.
 - Jalur `TELUSUR`: `.fullstack/explore/<YYMMDDhhmm>-<slug>.md` yang lolos `explore.py check`, `.fullstack/layanan.json`
   bila user mengonfirmasi pemetaan, dan ringkasan di chat beserta path laporan.
 

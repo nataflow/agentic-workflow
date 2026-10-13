@@ -83,6 +83,25 @@ nama config (mis. `WMS_API_URL`), bukan nilainya, karena scout dilarang membuka 
 }
 ```
 
+## Mengecualikan Proyek atau Repo
+
+Repo warisan, infra, atau proyek yang memang tidak perlu dipahami bisa dikecualikan lewat `.fullstack/abaikan`,
+gaya `.gitignore`: satu pola per baris, `#` untuk komentar.
+
+```
+# proyek warisan, seluruh repo di dalamnya
+legacy-erp
+# satu repo
+wms/api-lama
+# semua repo bernama infra di proyek mana pun
+*/infra
+```
+
+Pola tanpa `/` mengena nama proyek atau repo di tingkat mana pun; pola dengan `/` mengena path relatif root. Yang
+dikecualikan tidak di-scan, tidak bisa di-scout, dan tidak dihitung plafon 60 repo, tetapi tetap disebut di seksi
+`## Dikecualikan` `PETA.md`. Cukup minta "abaikan repo X" ke Claude, atau jalankan
+`workspace.py abaikan tambah <pola>` / `hapus <pola>` / `list`.
+
 ## Artefak
 
 Semua artefak tinggal di root, tidak di repo anak. Root bukan repo git, jadi tidak ada commit.
@@ -92,13 +111,14 @@ Semua artefak tinggal di root, tidak di repo anak. Root bukan repo git, jadi tid
 | `.fullstack/PETA.md` | `workspace.py peta --write` | ditulis ulang utuh tiap kali dibangun |
 | `.fullstack/explore/<YYMMDDhhmm>-<slug>.md` | kerangka `explore.py new`, isi oleh skill, jahitan `explore.py seam --write` | frontmatter mencatat SHA tiap repo; `list` menandai laporan basi |
 | `.fullstack/layanan.json` | `explore.py layanan set/hapus` | pemetaan layanan yang dikonfirmasi user |
+| `.fullstack/abaikan` | `workspace.py abaikan tambah/hapus`, atau disunting tangan | pola proyek/repo yang dikecualikan |
 
 ## Penegakan Mekanis
 
 | Skrip | Menjaga |
 |---|---|
 | `skills/explore/scripts/check_preconditions.py` | root bukan repo git, ada repo, minimal satu profil `VALID`, `.fullstack/` bisa ditulis, `layanan.json` terbaca |
-| `workspace.py scan` | peta proyek dan repo (dua tingkat, plafon 60 repo), status profil, kesegaran profil |
+| `workspace.py scan` | peta proyek dan repo (dua tingkat, plafon 60 repo), pengecualian `.fullstack/abaikan`, status profil, kesegaran profil |
 | `explore.py check` | frontmatter, urutan seksi dan bentuk tabel, rujukan `<repo>/<path>:<baris>` menunjuk berkas dan baris yang ada, `## Jahitan` sama dengan `seam`, arahan untuk profil rusak, celah untuk `DUGAAN`/`AMBIGU`, tanpa `TBD`/`TODO` |
 
 ## Batas Dengan Plugin Lain
@@ -110,6 +130,7 @@ Semua artefak tinggal di root, tidak di repo anak. Root bukan repo git, jadi tid
 ## Sengaja Belum Ada
 
 - Monorepo satu-git dan root lebih dari dua tingkat.
+- Mengecualikan folder di dalam repo dari penelusuran scout.
 - Pencocokan field DTO antar pemanggil dan penerima.
 - Permukaan selain HTTP (messaging, gRPC, websocket, MCP).
 - Ringkasan naratif di `PETA.md`; peta tetap mekanis.

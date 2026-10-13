@@ -1,6 +1,6 @@
 # Alur Plugin `fullstack`
 
-> Plugin `fullstack` (v0.1.0, `src/plugins/fullstack/.claude-plugin/plugin.json`) memetakan dan menelusuri aplikasi
+> Plugin `fullstack` (v0.2.0, `src/plugins/fullstack/.claude-plugin/plugin.json`) memetakan dan menelusuri aplikasi
 > dari root multi-repo: folder non-git berisi repo (`wms/{api,frontend}`) atau proyek berisi repo
 > (`company/{wms,erp}/{api,frontend}`). Satu skill (`explore`) dan satu subagent (`repo-scout`). Kebenaran dijaga
 > skrip stdlib di `skills/_common/`; prosa skill hanya mengarahkan. Tanpa hook, tanpa commit, read-only terhadap repo
@@ -14,7 +14,7 @@
 | Prasyarat | `skills/explore/scripts/check_preconditions.py` | berkas plugin, root bukan repo git, ada repo, profil `VALID`, `.fullstack/` bisa ditulis, `layanan.json` |
 | Dispatch scout | `skills/explore/dispatcher/scout.md` | slot `root`, `repo`, `peran`, `pertanyaan`, `verifikasi`, `panen`; plafon; penanganan balikan |
 | Kerangka laporan | `skills/explore/templates/explore-template.md` | seksi laporan `TELUSUR` beserta aturan pengisian |
-| Peta | `skills/_common/workspace.py` | `scan` (proyek, repo, profil, kesegaran), `peta` (`.fullstack/PETA.md`) |
+| Peta | `skills/_common/workspace.py` | `scan` (proyek, repo, profil, kesegaran, pengecualian), `peta` (`.fullstack/PETA.md`), `abaikan list/tambah/hapus` |
 | Laporan & jahitan | `skills/_common/explore.py` | `new`, `list`, `seam`, `check`, `layanan list/set/hapus` |
 | Pustaka | `skills/_common/fullstack_lib.py` | pemindaian root, pembacaan profil, `layanan.json`; salinan `SKIP_DIRS`/`STACKS` dari `hooks/detect.py` backend |
 | Subagent `repo-scout` | `agents/repo-scout.md` | read-only, haiku, kuota 10 pemanggilan; satu repo per dispatch; balikan `## Repo Scout` |
@@ -25,6 +25,7 @@
 /fullstack:explore (atau dipicu model di root multi-repo)
  ├─ check_preconditions.py ── FAIL (di dalam repo, tanpa repo, tanpa profil VALID) ──→ berhenti
  ├─ jalur
+ │   ├─ ABAIKAN ── workspace.py abaikan tambah|hapus <pola> ──→ peta --write
  │   ├─ PETA ── workspace.py peta --write ──→ baca PETA.md ──→ jawab di chat
  │   └─ TELUSUR
  │       ├─ lingkup proyek (tebak dari request, atau satu AskUserQuestion)
@@ -44,6 +45,7 @@
 | `PETA.md` | `<root>/.fullstack/` | `workspace.py peta --write` | ditulis ulang utuh tiap kali dibangun |
 | laporan `TELUSUR` | `<root>/.fullstack/explore/<YYMMDDhhmm>-<slug>.md` | `explore.py new` (kerangka), skill (isi), `seam --write` (jahitan) | `list`: segar, `basi` (HEAD salah satu repo bergeser), atau `rusak` |
 | `layanan.json` | `<root>/.fullstack/` | `explore.py layanan set/hapus` | bertambah tiap konfirmasi user |
+| `abaikan` | `<root>/.fullstack/` | `workspace.py abaikan tambah/hapus` atau user | dibaca semua skrip; yang dikecualikan tidak di-scan dan tercatat di `PETA.md` `## Dikecualikan` |
 
 Status profil per repo (`scan`): `VALID`, `INVALID_JSON`, `TIDAK_SAH` (JSON sah, `stack` kosong atau `plugin` milik
 lain), `LEGACY` (lokasi lama), atau tanpa profil. Profil `VALID` dengan lebih dari 50 commit `source_root` sejak
@@ -79,6 +81,8 @@ BE dalam lingkup kecuali dirinya. Target pasti hanya dari `layanan.json` atau FE
 | Hanya satu profil `VALID` | check 4 `WARN` | lanjut; penelusuran lintas repo terbatas |
 | Lebih dari 60 repo | check 3 `WARN`, `PETA.md` → `## Belum terpetakan` | jalankan dari folder yang lebih sempit |
 | `layanan.json` rusak | check 6 `WARN`; `seam`/`check` FAIL | perbaiki atau hapus berkasnya; `PETA` tetap jalan |
+| `abaikan` tak terbaca atau berbaris tidak sah | check 7 `WARN`, `PETA.md` → `## Belum terpetakan` | perbaiki lewat `workspace.py abaikan`; baris tidak sah diabaikan, repo-nya tetap dipetakan |
+| Laporan merujuk repo yang kemudian dikecualikan | check 1 `FAIL` "dikecualikan `.fullstack/abaikan`" | hapus pola, atau buat laporan baru tanpa repo itu |
 | Baris profil di luar format | `PETA.md` → `## Belum terpetakan` | `<plugin>:profile` mode REFRESH |
 | Scout gagal dua kali | repo → `### Belum disisir` | laporan terbit dengan `confidence` maksimal `medium` |
 | Jahitan diketik tangan | check 4 `FAIL` | `explore.py seam --write` |
