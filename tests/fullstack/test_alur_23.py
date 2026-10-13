@@ -223,3 +223,74 @@ def test_list_melaporkan_jalur(tmp_path):
     assert jalur == {"alur-order": ("ALUR", "ringkas"), "lama": ("TELUSUR", "")}
     proc = run(EXPLORE, root, "list", "--json")[0]
     assert proc.returncode == 0
+
+
+# ------------------------------------------------------------------ agent & dispatcher (L2, L3, K12)
+
+FULLSTACK = EXPLORE.parents[2]
+PLUGINS_DIR = FULLSTACK.parent
+AGENTS = {"BE": FULLSTACK / "agents" / "backend-explorer.md", "FE": FULLSTACK / "agents" / "frontend-explorer.md"}
+SUMBER = {"BE": PLUGINS_DIR / "backend" / "agents" / "code-explorer.md",
+          "FE": PLUGINS_DIR / "frontend" / "agents" / "code-explorer.md"}
+DISPATCHER = FULLSTACK / "skills" / "explore" / "dispatcher" / "explorer.md"
+BALIKAN = ("### Alur", "### Aturan Bisnis", "### Permukaan", "### Tidak ditemukan", "### Belum disisir")
+
+
+def _agent(peran):
+    text = AGENTS[peran].read_text(encoding="utf-8")
+    head, body = text.split("\n---\n", 1)
+    fm = dict(ln.split(":", 1) for ln in head.splitlines()[1:] if ":" in ln)
+    return {k.strip(): v.strip() for k, v in fm.items()}, body
+
+
+@pytest.mark.regression("23 L2")
+@pytest.mark.parametrize("peran, nama", [("BE", "backend-explorer"), ("FE", "frontend-explorer")])
+def test_agent_read_only_dan_berbalikan_tetap(peran, nama):
+    fm, body = _agent(peran)
+    assert fm["name"] == nama and fm["model"] == "sonnet" and fm["maxTurns"].isdigit()
+    assert [t.strip() for t in fm["tools"].split(",")] == ["Read", "Grep", "Glob"]       # 23 K2: tanpa Write
+    assert "fullstack:explore jalur ALUR" in fm["description"] and len(fm["description"]) <= 1536
+    assert f"## Alur Explorer — <repo> ({peran})" in body
+    assert "Pemanggilan: <n> dari <20|40>" in body and "Entry:" in body
+    for section in BALIKAN:
+        assert section in body, section
+    for slot in ("`root`", "`repo`", "`objective`", "`kedalaman`", "`batas cakupan`", "`konteks panen`"):
+        assert slot in body, slot
+    assert f".claude/profile/{'backend' if peran == 'BE' else 'frontend'}dev/index.json" in body
+    assert "laci" not in body and "Berkas laporan" not in body and "Format laporan" not in body
+
+
+@pytest.mark.regression("23 K12")
+@pytest.mark.parametrize("peran", ["BE", "FE"])
+def test_jendela_baca_sama_dengan_sumber(peran):
+    _fm, body = _agent(peran)
+    sumber = SUMBER[peran].read_text(encoding="utf-8")
+    for angka in ("max(1, L - 15)", "L + 35", "30–50 baris", "100 baris"):
+        assert angka in sumber, f"sumber {peran} berubah: {angka}"
+        assert angka in body, f"turunan {peran} menyimpang: {angka}"
+    for angka in ("120 baris", "3 jendela", "400 baris"):                    # pelonggaran `menyeluruh` milik BE
+        assert (angka in sumber) is (peran == "BE"), f"sumber {peran} berubah: {angka}"
+        assert (angka in body) is (peran == "BE"), f"turunan {peran} menyimpang: {angka}"
+
+
+@pytest.mark.regression("23 L2")
+def test_frontend_explorer_membaca_jangkar_profil_kanonik():
+    _fm, body = _agent("FE")
+    for anchor in ("Features Path", "Route Definitions", "Routing & Navigation", "Data Fetching & Cache",
+                   "Shared HTTP Client", "Framework Boundary", "HTTP Service Layer", "DTO Isolation",
+                   "Penanda Pengenal Kode"):
+        assert anchor in body, anchor
+
+
+@pytest.mark.regression("23 L3")
+def test_dispatcher_merujuk_agent_slot_dan_balikan():
+    text = DISPATCHER.read_text(encoding="utf-8")
+    assert "fullstack:backend-explorer" in text and "fullstack:frontend-explorer" in text
+    for slot in ("{root}", "{repo}", "{peran}", "{objective}", "{kedalaman}", "{batas}", "{panen}"):
+        assert slot in text, slot
+    handling = text[text.index("### Penanganan Balikan"):]
+    for section in BALIKAN:
+        assert f"`{section}`" in handling, section
+    for title in ("`## Alur`", "`## Aturan Bisnis`", "`## Permukaan`", "`## Celah`"):
+        assert title in handling, title
+    assert "maksimal 4 dispatch" in text and "satu putaran" in text
