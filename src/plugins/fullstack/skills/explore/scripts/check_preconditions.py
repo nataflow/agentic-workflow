@@ -34,7 +34,7 @@ from fullstack_lib import (  # noqa: E402
 PLUGIN_ROOT = Path(__file__).resolve().parents[3]
 NEEDED = ("skills/_common/fullstack_lib.py", "skills/_common/workspace.py", "skills/_common/explore.py",
           "skills/explore/dispatcher/scout.md", "skills/explore/templates/explore-template.md",
-          "agents/repo-scout.md")
+          "skills/explore/templates/alur-template.md", "agents/repo-scout.md")
 
 
 def _add(results: List[Dict[str, Any]], cid: int, name: str, status: str, summary: str, action: str = "") -> None:

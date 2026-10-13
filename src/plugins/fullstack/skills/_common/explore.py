@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Laporan explore `TELUSUR` plugin `fullstack`: panen, jahitan, pagar, dan pemetaan layanan.
+"""Laporan explore `TELUSUR` dan `ALUR` plugin `fullstack`: panen, jahitan, pagar, dan pemetaan layanan.
 
     python3 explore.py new   --slug <slug> --objective <teks> --lingkup <proyek,...> --repo <dir,...>
-                             [--root <dir>] [--json]
+                             [--jalur TELUSUR|ALUR] [--kedalaman ringkas|menyeluruh] [--root <dir>] [--json]
     python3 explore.py list  [--root <dir>] [--json]
     python3 explore.py seam  --report <path> [--root <dir>] [--write] [--json]
     python3 explore.py check --report <path> [--root <dir>] [--json]
@@ -10,11 +10,12 @@
     python3 explore.py layanan set   --pemanggil <dir> --target <nama-config> --repo <dir> [--prefix <path>]
     python3 explore.py layanan hapus --pemanggil <dir> --target <nama-config>
 
-`new` menulis kerangka laporan dari `templates/explore-template.md` skill `explore`, dengan frontmatter dan tabel
-`## Repo` yang sudah terisi dari `scan`. `list` membaca frontmatter laporan di `.fullstack/explore/` dan menandai laporan `basi` bila HEAD salah satu
+`new` menulis kerangka laporan dari `templates/explore-template.md` (`TELUSUR`) atau `templates/alur-template.md`
+(`ALUR`) skill `explore`, dengan frontmatter dan tabel `## Repo` yang sudah terisi dari `scan`. Laporan tanpa field
+`jalur` adalah laporan `TELUSUR` (23 K8). `list` membaca frontmatter laporan di `.fullstack/explore/` dan menandai laporan `basi` bila HEAD salah satu
 repo sudah bergeser (K18–K19). `seam` mencocokkan tabel `## Panggilan` dengan `## Endpoint` (K20–K26); dengan
-`--write` tabel `## Jahitan` laporan ditulis ulang dari hasilnya. `check` adalah pagar laporan (exit 0 PASS,
-1 FAIL). `layanan` mengelola `.fullstack/layanan.json`, satu-satunya sumber target pasti BE → BE (K21).
+`--write` tabel `## Jahitan` laporan ditulis ulang dari hasilnya; laporan `ALUR` ditolak (23 K9). `check` adalah
+pagar laporan (exit 0 PASS, 1 FAIL) dengan aturan menurut `jalur`. `layanan` mengelola `.fullstack/layanan.json`, satu-satunya sumber target pasti BE → BE (K21).
 
 Standard library saja.
 """
@@ -51,11 +52,18 @@ CONFIDENCE = ("high", "medium", "low")
 METHODS = ("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS")
 STATUS = ("COCOK", "TIDAK_ADA_DI_TARGET", "DUGAAN", "AMBIGU", "TAK_DIKENAL", "TAK_TERPANGGIL")
 TABLE_COLS = {"Endpoint": 4, "Panggilan": 5, "Jahitan": 6}
+JALUR = ("TELUSUR", "ALUR")
+KEDALAMAN = ("ringkas", "menyeluruh")
+SECTIONS_ALUR = ("Jawaban", "Repo", "Alur", "Aturan Bisnis", "Permukaan", "Celah", "Arahan Lanjut")
+TABLE_COLS_ALUR = {"Aturan Bisnis": 3, "Permukaan": 4}
+SUBJUDUL = re.compile(r"^`?([^`(]+?)`?\s*\((BE|FE)\)\s*$")
+LANGKAH = re.compile(r"^\s*\d+\.\s")
 POINTER = re.compile(r"`([\w.\-()\[\]+@~]+(?:/[\w.\-()\[\]+@~]+)+):(\d+)(?:-(\d+))?`")
 PLACEHOLDER = re.compile(r"\b(TBD|TODO)\b")
 NONE_CELLS = ("", "-", "—")
 COMMENT = re.compile(r"<!--.*?-->", re.S)
 TEMPLATE = Path(__file__).resolve().parents[1] / "explore" / "templates" / "explore-template.md"
+TEMPLATE_ALUR = TEMPLATE.with_name("alur-template.md")
 
 
 # ------------------------------------------------------------------ parsing laporan
@@ -143,12 +151,17 @@ def subsections(body: str) -> Dict[str, str]:
     return {k: "\n".join(v) for k, v in out.items()}
 
 
+def jalur_of(report: Dict[str, Any]) -> str:
+    """`jalur` frontmatter; laporan tanpa field itu adalah laporan `TELUSUR` (23 K8)."""
+    return report["fm"].get("jalur") or "TELUSUR"
+
+
 def base_api(report: Dict[str, Any]) -> Dict[str, str]:
     """`{dir FE: prefix}` dari baris `- Base API:` di `### <dir> (FE)` seksi Temuan."""
     out: Dict[str, str] = {}
     for title, body in subsections(report["body"].get("Temuan", "")).items():
-        m = re.match(r"^`?([^`(]+?)`?\s*\(FE\)\s*$", title)
-        if not m:
+        m = SUBJUDUL.match(title)
+        if not m or m.group(2) != "FE":
             continue
         for raw in body.splitlines():
             line = raw.strip()
@@ -299,8 +312,14 @@ def run_check(root: Path, report_path: Path) -> Tuple[Checks, Dict[str, Any]]:
     proyek = {r["proyek"] for r in sc["repo"]}
 
     fm = rep["fm"]
+    jalur = jalur_of(rep)
+    alur = jalur == "ALUR"
     probs = list(rep["galat"])
     probs += [f"field `{k}` kosong atau tidak ada" for k in FM_FIELDS if not fm.get(k)]
+    if jalur not in JALUR:
+        probs.append(f"`jalur` `{jalur}` di luar TELUSUR/ALUR")
+    if alur and fm.get("kedalaman") not in KEDALAMAN:
+        probs.append(f"`kedalaman` `{fm.get('kedalaman', '')}` wajib ringkas/menyeluruh untuk laporan ALUR")
     if fm.get("slug") and not SLUG.match(fm["slug"]):
         probs.append(f"`slug` `{fm['slug']}` bukan kebab-case")
     if fm.get("dibuat") and not STAMP.match(fm["dibuat"]):
@@ -315,18 +334,19 @@ def run_check(root: Path, report_path: Path) -> Tuple[Checks, Dict[str, Any]]:
     c.add(1, "Frontmatter", probs)
 
     probs = []
-    if tuple(rep["sections"]) != SECTIONS:
-        probs.append("seksi wajib berurutan: " + ", ".join(f"`## {s}`" for s in SECTIONS)
+    sections = SECTIONS_ALUR if alur else SECTIONS
+    if tuple(rep["sections"]) != sections:
+        probs.append("seksi wajib berurutan: " + ", ".join(f"`## {s}`" for s in sections)
                      + "; ditemukan: " + (", ".join(f"`## {s}`" for s in rep["sections"]) or "tidak ada"))
-    probs += [f"`## {s}` kosong" for s in SECTIONS if s in rep["body"] and not rep["body"][s].strip()]
-    for title, n in TABLE_COLS.items():
+    probs += [f"`## {s}` kosong" for s in sections if s in rep["body"] and not rep["body"][s].strip()]
+    for title, n in (TABLE_COLS_ALUR if alur else TABLE_COLS).items():
         body = rep["body"].get(title, "")
         rows = table_rows(body)
         if body.strip() and not rows and body.strip() != "- Tidak ada.":
             probs.append(f"`## {title}` wajib tabel {n} kolom atau `- Tidak ada.`")
         probs += [f"`## {title}` baris {i} punya {len(r)} kolom, wajib {n}" for i, r in enumerate(rows, 1)
                   if len(r) != n]
-        if title != "Jahitan":
+        if title in ("Endpoint", "Panggilan"):
             col = 1 if title == "Endpoint" else 2
             probs += [f"`## {title}` baris {i}: metode `{plain(r[col])}` tidak dikenal" for i, r in enumerate(rows, 1)
                       if len(r) == n and plain(r[col]).upper() not in METHODS]
@@ -348,18 +368,21 @@ def run_check(root: Path, report_path: Path) -> Tuple[Checks, Dict[str, Any]]:
             probs.append(f"`{ref}:{m.group(2)}{'-' + m.group(3) if m.group(3) else ''}` melewati {count} baris berkas")
     c.add(3, "Rujukan path:baris", probs)
 
-    probs = []
-    layanan, err = load_layanan(root)
-    if err:
-        probs.append(err)
+    if alur:
+        c.add(4, "Alur per repo", _alur_per_repo(rep, fm_dirs))
     else:
-        want = [_row_key([r["pemanggil"], r["target"], r["metode"], r["path"], r["penerima"], r["status"]])
-                for r in seam_rows(rep, sc, layanan)]
-        got = [_row_key(r) for r in table_rows(rep["body"].get("Jahitan", ""))]
-        if want != got:
-            probs.append(f"tabel `## Jahitan` ({len(got)} baris) berbeda dari keluaran `seam` ({len(want)} baris); "
-                         "jalankan `explore.py seam --write`")
-    c.add(4, "Jahitan = seam", probs)
+        probs = []
+        layanan, err = load_layanan(root)
+        if err:
+            probs.append(err)
+        else:
+            want = [_row_key([r["pemanggil"], r["target"], r["metode"], r["path"], r["penerima"], r["status"]])
+                    for r in seam_rows(rep, sc, layanan)]
+            got = [_row_key(r) for r in table_rows(rep["body"].get("Jahitan", ""))]
+            if want != got:
+                probs.append(f"tabel `## Jahitan` ({len(got)} baris) berbeda dari keluaran `seam` ({len(want)} baris); "
+                             "jalankan `explore.py seam --write`")
+        c.add(4, "Jahitan = seam", probs)
 
     probs = []
     arahan = rep["body"].get("Arahan Lanjut", "")
@@ -368,16 +391,56 @@ def run_check(root: Path, report_path: Path) -> Tuple[Checks, Dict[str, Any]]:
             probs.append(f"repo `{plain(r[0])}` berprofil {plain(r[4])} tanpa butir di `## Arahan Lanjut`")
     c.add(5, "Arahan profil", probs)
 
-    probs = []
-    celah = rep["body"].get("Celah", "")
-    for r in table_rows(rep["body"].get("Jahitan", "")):
-        if len(r) == 6 and plain(r[5]) in ("DUGAAN", "AMBIGU") and plain(r[1]) not in celah:
-            probs.append(f"jahitan {plain(r[5])} `{plain(r[0])}` → `{plain(r[1])}` tanpa butir di `## Celah`")
-    c.add(6, "Celah pemetaan", probs)
+    if alur:
+        c.add(6, "Bukti tabel", _bukti_tabel(rep, fm_dirs))
+    else:
+        probs = []
+        celah = rep["body"].get("Celah", "")
+        for r in table_rows(rep["body"].get("Jahitan", "")):
+            if len(r) == 6 and plain(r[5]) in ("DUGAAN", "AMBIGU") and plain(r[1]) not in celah:
+                probs.append(f"jahitan {plain(r[5])} `{plain(r[0])}` → `{plain(r[1])}` tanpa butir di `## Celah`")
+        c.add(6, "Celah pemetaan", probs)
 
     hits = sorted({m.group(1) for m in PLACEHOLDER.finditer(text)})
     c.add(7, "Tanpa placeholder", [f"`{h}` masih ada" for h in hits])
     return c, rep
+
+
+def _alur_per_repo(rep: Dict[str, Any], fm_dirs: List[str]) -> List[str]:
+    """Check 4 ALUR: tiap repo frontmatter punya langkah alur berbukti, atau tercatat belum disisir (23 L1)."""
+    probs = []
+    belum = subsections(rep["body"].get("Celah", "")).get("Belum disisir", "")
+    langkah: Dict[str, int] = {}
+    for title, body in subsections(rep["body"].get("Alur", "")).items():
+        m = SUBJUDUL.match(title)
+        if not m:
+            probs.append(f"subseksi `### {title}` di `## Alur` wajib berjudul `<repo> (BE)` atau `<repo> (FE)`")
+            continue
+        dir_ = m.group(1).strip()
+        if dir_ not in fm_dirs:
+            probs.append(f"`### {title}` menunjuk repo di luar frontmatter `repo`")
+            continue
+        steps = [ln for ln in body.splitlines() if LANGKAH.match(ln)]
+        probs += [f"`### {title}` langkah tanpa rujukan: `{ln.strip()[:60]}`" for ln in steps if not POINTER.search(ln)]
+        langkah[dir_] = langkah.get(dir_, 0) + sum(1 for ln in steps if POINTER.search(ln))
+    for d in fm_dirs:
+        if not langkah.get(d) and not re.search(rf"(?<![\w/.-]){re.escape(d)}(?![\w/.-])", belum):
+            probs.append(f"repo `{d}` tanpa langkah alur berbukti di `## Alur` dan tanpa butir di `### Belum disisir`")
+    return probs
+
+
+def _bukti_tabel(rep: Dict[str, Any], fm_dirs: List[str]) -> List[str]:
+    """Check 6 ALUR: tiap baris `Aturan Bisnis` dan `Permukaan` milik repo frontmatter dan berbukti (23 L1)."""
+    probs = []
+    for title, n in TABLE_COLS_ALUR.items():
+        for i, r in enumerate(table_rows(rep["body"].get(title, "")), 1):
+            if len(r) != n:
+                continue
+            if plain(r[0]) not in fm_dirs:
+                probs.append(f"`## {title}` baris {i}: repo `{plain(r[0])}` di luar frontmatter `repo`")
+            if not POINTER.search(r[-1]):
+                probs.append(f"`## {title}` baris {i} tanpa rujukan `<repo>/<path>:<baris>`")
+    return probs
 
 
 def format_check(report: str, c: Checks) -> str:
@@ -406,8 +469,16 @@ def repo_table(sc: Dict[str, Any], lingkup: List[str], dirs: List[str]) -> str:
     return "\n".join(out)
 
 
-def new_report(root: Path, slug: str, objective: str, lingkup: List[str], dirs: List[str]) -> Tuple[str, str]:
+def new_report(root: Path, slug: str, objective: str, lingkup: List[str], dirs: List[str],
+               jalur: str = "TELUSUR", kedalaman: str = "") -> Tuple[str, str]:
     """(path relatif laporan, galat)."""
+    alur = jalur == "ALUR"
+    if jalur not in JALUR:
+        return "", f"`--jalur {jalur}` di luar TELUSUR/ALUR"
+    if alur and kedalaman not in KEDALAMAN:
+        return "", "`--kedalaman ringkas|menyeluruh` wajib untuk `--jalur ALUR`"
+    if not alur and kedalaman:
+        return "", "`--kedalaman` hanya untuk `--jalur ALUR`"
     if not SLUG.match(slug):
         return "", f"`--slug {slug}` bukan kebab-case"
     objective = " ".join(objective.split())
@@ -421,18 +492,23 @@ def new_report(root: Path, slug: str, objective: str, lingkup: List[str], dirs: 
     bad = [bukan_di_root(sc, "proyek", p) for p in lingkup if p not in proyek]
     bad += [bukan_di_root(sc, "repo", d) for d in dirs if d not in repos]
     bad += [f"repo `{d}` tanpa commit" for d in dirs if d in repos and not repos[d]["head"]]
+    if alur:  # 23 K5: profil adalah peta sisir explorer
+        bad += [f"repo `{d}` tanpa profil VALID; jalankan `<plugin>:profile` di dalam repo itu"
+                for d in dirs if d in repos and not peran_valid(repos[d])]
     if not lingkup or not dirs:
         bad.append("`--lingkup` dan `--repo` wajib diisi")
     if bad:
         return "", "; ".join(bad)
-    template = read_text(TEMPLATE)
+    tpl = TEMPLATE_ALUR if alur else TEMPLATE
+    template = read_text(tpl)
     if template is None:
-        return "", f"template `{TEMPLATE.name}` tidak ada; pasang ulang plugin fullstack"
+        return "", f"template `{tpl.name}` tidak ada; pasang ulang plugin fullstack"
     rel = f"{EXPLORE_DIR}/{stamp()}-{slug}.md"
     if (root / rel).exists():
         return "", f"`{rel}` sudah ada"
     shas = ", ".join(f"{d}@{repos[d]['head']}" for d in dirs)
-    fm = (f"---\nslug: {slug}\nobjective: {objective}\ndibuat: {rel.rsplit('/', 1)[1][:10]}\n"
+    extra = f"jalur: ALUR\nkedalaman: {kedalaman}\n" if alur else ""
+    fm = (f"---\nslug: {slug}\nobjective: {objective}\n{extra}dibuat: {rel.rsplit('/', 1)[1][:10]}\n"
           f"lingkup: {', '.join(lingkup)}\nrepo: {shas}\nconfidence:\n---\n")
     body = template.split("\n## ", 1)
     text = fm + "\n## " + body[1] if len(body) == 2 else fm + template
@@ -465,7 +541,8 @@ def list_reports(root: Path) -> Dict[str, Any]:
             stale = not (now and sha and (now.startswith(sha) or sha.startswith(now)))
             items.append({"dir": dir_, "sha": sha, "sekarang": now, "basi": stale})
         fm = rep["fm"]
-        out["laporan"].append({"berkas": rel, "slug": fm["slug"], "objective": fm["objective"], "dibuat": fm["dibuat"],
+        out["laporan"].append({"berkas": rel, "slug": fm["slug"], "objective": fm["objective"],
+                               "jalur": jalur_of(rep), "kedalaman": fm.get("kedalaman", ""), "dibuat": fm["dibuat"],
                                "lingkup": split_list(fm["lingkup"]), "confidence": fm["confidence"], "repo": items,
                                "basi": any(i["basi"] for i in items)})
     return out
@@ -524,6 +601,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     p_new.add_argument("--objective", required=True)
     p_new.add_argument("--lingkup", required=True, help="proyek dipisah koma; `.` untuk repo langsung di root")
     p_new.add_argument("--repo", required=True, help="dir repo yang disisir, dipisah koma")
+    p_new.add_argument("--jalur", default="TELUSUR", help="TELUSUR (default) atau ALUR")
+    p_new.add_argument("--kedalaman", default="", help="ringkas atau menyeluruh; wajib untuk ALUR")
     p_list = sub.add_parser("list")
     p_seam = sub.add_parser("seam")
     p_check = sub.add_parser("check")
@@ -543,7 +622,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     root = Path(args.root or ".").resolve()
 
     if args.cmd == "new":
-        rel, err = new_report(root, args.slug, args.objective, split_list(args.lingkup), split_list(args.repo))
+        rel, err = new_report(root, args.slug, args.objective, split_list(args.lingkup), split_list(args.repo),
+                              args.jalur, args.kedalaman)
         print(dump_json({"status": "FAIL" if err else "OK", "berkas": rel, "galat": err}) if args.json
               else (err or f"Tertulis: {rel}"))
         return 1 if err else 0
@@ -554,7 +634,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(dump_json(out))
         else:
             lines = [f"LAPORAN: {len(out['laporan'])} di {EXPLORE_DIR}"]
-            lines += [f"- {r['berkas']}{' [BASI]' if r['basi'] else ''} · {r['confidence']} · {r['objective']}"
+            lines += [f"- {r['berkas']}{' [BASI]' if r['basi'] else ''} · {r['jalur']} · {r['confidence']} · "
+                      f"{r['objective']}"
                       for r in out["laporan"]]
             lines += [f"- {r['berkas']} [RUSAK] {r['alasan']}" for r in out["rusak"]]
             print("\n".join(lines))
@@ -591,6 +672,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(dump_json({"status": "FAIL", "galat": msg}) if args.json else msg)
         return 1
     rep = parse_report(text)
+    if jalur_of(rep) != "TELUSUR":  # 23 K9
+        msg = f"`seam` hanya untuk laporan TELUSUR; `{args.report}` berjalur {jalur_of(rep)}"
+        print(dump_json({"status": "FAIL", "galat": msg}) if args.json else msg)
+        return 1
     rows = seam_rows(rep, scan(root), layanan)
     table = render_seam(rows)
     if args.write:
