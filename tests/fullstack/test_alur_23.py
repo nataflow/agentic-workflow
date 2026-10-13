@@ -294,3 +294,16 @@ def test_dispatcher_merujuk_agent_slot_dan_balikan():
     for title in ("`## Alur`", "`## Aturan Bisnis`", "`## Permukaan`", "`## Celah`"):
         assert title in handling, title
     assert "maksimal 4 dispatch" in text and "satu putaran" in text
+
+
+@pytest.mark.regression("23 L4")
+def test_skill_mengenal_jalur_alur_dan_menutup_explore_bawaan():
+    text = (FULLSTACK / "skills" / "explore" / "SKILL.md").read_text(encoding="utf-8")
+    head, body = text.split("\n---\n", 1)
+    desc = next(ln for ln in head.splitlines() if ln.startswith("description:"))
+    assert "backend-explorer" in desc and "memahami alur" in desc and "Explore bawaan" in desc
+    assert len(desc) - len("description: ") <= 1536
+    assert "### Jalur `ALUR`" in body and "`dispatcher/explorer.md`" in body
+    assert "--jalur ALUR --kedalaman" in body
+    assert "fullstack:backend-explorer" in body and "fullstack:frontend-explorer" in body
+    assert "**SUBAGENT MILIK PLUGIN INI SAJA**" in body and "`Explore`, `general-purpose`" in body
