@@ -197,3 +197,27 @@ plugin yang bersangkutan berpindah utuh di tahapnya sendiri.
   pembaruan metadata tanpa `content`.
 - Dokumen tingkat repo (`backenddev/issues/`, `docs/api/`, `frontenddev/reviews/`), profil, dan plugin analyst,
   quickdev, product, fullstack, nataflow.
+
+## Pelaksanaan
+
+### Tahap 1 — peta blast radius (sebelum kode)
+
+| Berkas | Perubahan | Yang bisa pecah |
+|---|---|---|
+| `backend/skills/_common/docs_git.py` (baru, CLI) | G1: `status`, `ensure`, `migrate --answer - [--terima-terbuka]`, `--json`. Pustaka untuk gerbang tahap 2–3: `docs_prefix`, `docs_ignored`, `ensure_ignored`, `tracked_docs`, `open_legacy_taskdirs`, `head_sha`, `base_commit_problem` (G3) | `test_smoke::test_inventaris_lengkap` (skrip ber-`__main__` wajib masuk `CASES`); jalur `FAIL` di keadaan repo `bukan-git`/`tanpa-commit`/`detached`/`rusak` wajib tetap JSON. Berkas tidak boleh mengimpor `precondition_lib` (berbeda antarplugin), dan prefix tidak boleh diturunkan dari `__file__` saat impor: `load_module` di test membuang modul sebelah, tetapi salinan yang termuat lebih dulu bisa milik plugin lain |
+| `frontend/skills/_common/docs_git.py` (baru) | Salinan byte-identik | Test kesamaan baru |
+| `tests/test_24_docs_git.py` (baru) | Kontrak CLI dan pustaka, kesamaan dua salinan | — |
+| `tests/test_smoke.py` | `CASES`: `status --json` dan `ensure --json` per plugin | Keadaan `rusak` merusak `TASK.md`; `status` wajib memvonisnya terbaca, bukan traceback |
+| `CLAUDE.md` | `docs_git.py` masuk daftar salinan byte-identik | — |
+
+Keputusan tambahan:
+
+- **G4 tidak menjadi fungsi baru.** Frontend sudah punya `content_snapshot`/`strip_status_line`, yang menjadi dasar
+  `Sidik:` materai approve, dan backend punya pola `ticket_seal`. Sidik konten ditulis di tahap plugin masing-masing di
+  atas fungsi yang sudah ada, supaya `Sidik` lama dan baru tetap satu definisi.
+- **Taskdir era git yang terbuka** adalah taskdir ber-`TASK.md` tanpa `REPORT.md`, dengan `status` `ACTIVE` atau
+  kosong, dan tanpa `base_commit`. Backend tidak punya jalur `abandon`, jadi `migrate` tidak hanya menolak: user bisa
+  meneruskan dengan `--terima-terbuka`, yang menyatakan bahwa taskdir itu tidak bisa dilanjutkan. Berkasnya tetap di
+  disk.
+- **Commit migrasi hanya berisi penghapusan dari index.** `migrate` menolak bila index sudah memuat perubahan lain
+  ter-stage, karena `git commit --only <path>` justru men-stage ulang isi working tree path itu.

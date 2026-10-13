@@ -47,7 +47,7 @@ CI (`.github/workflows/ci.yml`) runs pytest on Python 3.9–3.13 plus macOS, val
   existence by the lint (R-checks). Rename a file → update every reference.
 - **Byte-identical copies across `backend` and `frontend`**: `hooks/detect.py`,
   `skills/profile/scripts/migrate_profile.py`, `skills/_common/verify_scope.py`,
-  `skills/_common/run_verification.py`. Tests assert equality; edit both together. (`guard_bash.py`,
+  `skills/_common/run_verification.py`, `skills/_common/docs_git.py`. Tests assert equality; edit both together. (`guard_bash.py`,
   `precondition_lib.py`, and `validate_doc.py` are plugin-specific and differ on purpose, though some
   helper functions in `guard_bash.py` are asserted identical.)
 
