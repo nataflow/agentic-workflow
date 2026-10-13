@@ -303,8 +303,8 @@ tidak tersentuh. Kegagalannya tidak menahan gate maupun eksekusi.
 - **Aktif per repo** lewat `.claude/nataflow.json` (ter-commit, dibaca juga oleh `analyst`, `backend`, dan
   `quickdev`): `mcp_server` (default `nataflow-api`), `workspaces` (objek alias → UUID workspace;
   kosong → workspace milik key, satu entri → otomatis, lebih dari satu → user memilih saat task baru atau
-  dokumen repo disinkron), `pic_id`, dan `repo` (default: remote `origin` ternormalisasi). Berkas absen → dilewati; ada tetapi
-  rusak → `GAGAL`. Server MCP didaftarkan user di Claude Code; plugin tidak menyimpan key.
+  dokumen repo disinkron), `pic_id`, dan `repo` (default: remote `origin` ternormalisasi). Berkas absen → dilewati, dan check 10 prasyarat `task` memberi `WARN` karena dokumen taskdir lalu
+  hanya ada di disk; ada tetapi rusak → `GAGAL`. Server MCP didaftarkan user di Claude Code; plugin tidak menyimpan key.
 - **Jangkar**: satu taskdir = satu workdir `frontenddev:<repo>:<path taskdir>`, tertaut ke task tiket analyst
   bila `TASK.md` membawa `ticket_source` (taskdir backend dari tiket yang sama bernaung di task itu juga), atau
   ke task baru dari `TASK.md`.

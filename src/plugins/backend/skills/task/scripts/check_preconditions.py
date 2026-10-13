@@ -79,6 +79,7 @@ class PreconditionChecker:
         self.td = check_taskdir(self.root, taskdir)
         self.ticket_source = (ticket_source or "").strip()
         self.results: List[Dict[str, Any]] = []
+        self.warnings: List[str] = []
 
 
     def run_all(self) -> bool:
@@ -322,6 +323,9 @@ class PreconditionChecker:
                               "atau merutekan migrasi; dokumen taskdir tidak di-commit.",
                 })
                 return
+            if not (self.root / docs_git.NATAFLOW_CONFIG).is_file():     # 24 K2: tanpa cermin, disk satu-satunya
+                self.warnings.append(f"`{docs_git.NATAFLOW_CONFIG}` tidak ada — dokumen taskdir hanya tersimpan di "
+                                     "disk ini, tanpa cermin nataflow")
             # Laci kerja `.explore/` milik `code-explorer` bukan artefak rantai:
             # tidak pernah di-stage maupun di-commit, jadi dibuang dirty_paths.
             dirty_outside = [p for p in dirty_paths(self.root)
@@ -376,11 +380,12 @@ class PreconditionChecker:
             })
 
     def format_text(self) -> str:
-        return format_text("task", self.results)
+        banner = "\n".join(f"[PERINGATAN] {w}" for w in self.warnings) or None
+        return format_text("task", self.results, banner=banner)
 
     def to_json(self) -> str:
         return to_json(self.root, self.results, taskdir=self.taskdir_arg, lane=self.lane_arg, chain=self.chain_arg,
-                       ticket_source=self.ticket_source)
+                       ticket_source=self.ticket_source, peringatan=self.warnings)
 
 
 def main():

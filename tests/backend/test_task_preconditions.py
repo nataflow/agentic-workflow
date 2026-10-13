@@ -1,7 +1,9 @@
-"""Prasyarat `task` backend: taskdir (L5.2), chain (L5.4), dirty -z (L5.5)."""
+"""Prasyarat `task` backend: taskdir (L5.2), chain (L5.4), dirty -z (L5.5), dokumen taskdir di luar git (24)."""
+import json
+
 import pytest
 
-from conftest import be_checks, be_profile, commit, git, write_files
+from conftest import be_checks, be_profile, be_run, commit, git, write_files
 
 TD = "backenddev/docs/2601011200-refund"
 TK = "task/scripts/check_preconditions.py"
@@ -55,3 +57,16 @@ def test_dokumen_taskdir_wajib_di_luar_git(repo):
     write_files(repo, {"backenddev/docs/.gitignore": "*\n"})
     c = tk(repo, "--lane", "DIRECT_BRIEF", "--chain", "BRIEF")[5]
     assert c["status"] == "FAIL" and "masih ter-track" in c["summary"] and "tech-lead" in c["action"], c
+
+
+@pytest.mark.regression("24 K2")
+def test_tanpa_config_nataflow_peringatan_tanpa_menggagalkan(repo):
+    proc = be_run(repo, TK, "--root", str(repo), "--taskdir", TD, "--lane", "DIRECT_BRIEF", "--chain", "BRIEF")
+    assert proc.returncode == 0 and proc.stdout.startswith("[PERINGATAN] `.claude/nataflow.json` tidak ada"), proc.out
+    data = json.loads(be_run(repo, TK, "--json", "--root", str(repo), "--taskdir", TD, "--lane", "DIRECT_BRIEF",
+                             "--chain", "BRIEF").stdout)
+    assert data["status"] == "PASS" and len(data["peringatan"]) == 1, data
+    write_files(repo, {".claude/nataflow.json": "{}"})
+    commit(repo, "chore: aktifkan sinkron nataflow", ".claude/nataflow.json")
+    proc = be_run(repo, TK, "--root", str(repo), "--taskdir", TD, "--lane", "DIRECT_BRIEF", "--chain", "BRIEF")
+    assert proc.returncode == 0 and "PERINGATAN" not in proc.stdout, proc.out

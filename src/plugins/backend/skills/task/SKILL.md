@@ -16,7 +16,7 @@ user-invocable: false
 ## Precondition [REQUIRED]
 
 1. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/task/scripts/check_preconditions.py --taskdir <taskdir> --lane <lane> [--chain <chain>] [--ticket-source <ticket_source>]`. Hilangkan `--chain` pada lane `DEFECT_RCA`/`EXEC_BRIEF`.
-2. `PASS` (7/7 checks) → lanjut ke Workflow. `FAIL` → hentikan dan remediasi butir gagal: taskdir belum sah → minta alokasi ke `backend:tech-lead`; profil atau commit convention belum lengkap → `backend:profile`; `TASK.md` sudah ada → serahkan ke gerbang; `chain` di luar enum atau tak selaras dengan `lane` → kembalikan ke `backend:analyst`; working tree kotor → bersihkan dulu; `ticket_source` tidak `READY` atau disunting sesudah approve (check 7) → hentikan dan kembalikan ke gerbang, yang mengembalikannya ke `analyst:spec`.
+2. `PASS` (7/7 checks) → lanjut ke Workflow. Baris `[PERINGATAN]` di atas hasil (JSON `peringatan`: `.claude/nataflow.json` tidak ada) tidak menahan: sebut sekali ke user bahwa dokumen taskdir hanya tersimpan di disk ini, lalu lanjut. `FAIL` → hentikan dan remediasi butir gagal: taskdir belum sah → minta alokasi ke `backend:tech-lead`; profil atau commit convention belum lengkap → `backend:profile`; `TASK.md` sudah ada → serahkan ke gerbang; `chain` di luar enum atau tak selaras dengan `lane` → kembalikan ke `backend:analyst`; working tree kotor → bersihkan dulu; `ticket_source` tidak `READY` atau disunting sesudah approve (check 7) → hentikan dan kembalikan ke gerbang, yang mengembalikannya ke `analyst:spec`.
 
 ## Parameter [REQUIRED]
 
