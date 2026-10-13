@@ -7,8 +7,8 @@ memahami seluruh aplikasi satu perusahaan dan kerja langsung dengan server nataf
 | Plugin | Versi | Fungsi | Titik masuk |
 |---|---|---|---|
 | [`analyst`](src/plugins/analyst/README.md) | 0.16.0 | Permintaan pengguna/stakeholder (satu, atau hingga lima sekaligus secara berurutan) menjadi `TICKET.md` non-teknis (user story, acceptance criteria, aturan bisnis), atau perubahan struktur dari lead engineer menjadi tiket `TECH` berbukti `file:baris`, lewat elisitasi, review independen, dan persetujuan; catatan kasar rapat menjadi `NOTULEN.md` | `/analyst:intake`, `/analyst:notulen` |
-| [`backend`](src/plugins/backend/README.md) | 0.14.1 | Kerja backend 7 stack (Java Spring, Go, Node, Bun, Rust, PHP, CodeIgniter 4): profil, TASK/BRD/PRD/brief, eksekusi, review, dan laporan | `/backend:tech-lead` |
-| [`frontend`](src/plugins/frontend/README.md) | 0.13.1 | Kerja frontend (React + Vite, React Native/Expo, SvelteKit, Svelte + Vite): alur layar, bentuk layar, kontrak, brief, eksekusi, review, dan laporan dengan ledger approval | `/frontend:lead` |
+| [`backend`](src/plugins/backend/README.md) | 0.15.0 | Kerja backend 7 stack (Java Spring, Go, Node, Bun, Rust, PHP, CodeIgniter 4): profil, TASK/BRD/PRD/brief, eksekusi, review, dan laporan | `/backend:tech-lead` |
+| [`frontend`](src/plugins/frontend/README.md) | 0.14.0 | Kerja frontend (React + Vite, React Native/Expo, SvelteKit, Svelte + Vite): alur layar, bentuk layar, kontrak, brief, eksekusi, review, dan laporan dengan ledger approval | `/frontend:lead` |
 | [`quickdev`](src/plugins/quickdev/README.md) | 0.8.0 | Alur ringan untuk stack apa pun: profil, explore, clarify, satu berkas rencana, execute, dan review, tanpa taskdir dan tanpa subagent | `/quickdev:profile`, `/quickdev:plan` |
 | [`nataflow`](src/plugins/nataflow/README.md) | 0.1.0 | Artifact nataflow: halaman HTML mandiri yang dinilai gerbang kontrak halaman lalu di-upsert ke project milik MCP key, tanpa berkas di repo | `/nataflow:create-artifact` |
 | [`product`](src/plugins/product/README.md) | 0.1.0 | Inisiasi produk baru (folder kosong), fitur baru, atau improvement fitur (codebase) menjadi `CHARTER.md` enam pilar — Purpose, Actors, Business Process, Business Rules, Success Criteria, Scope — dengan guard permintaan yang terlalu umum, elisitasi, review independen, dan persetujuan | `/product:init` |
@@ -82,11 +82,20 @@ Ketujuh plugin biasanya dipasang user-wide. Yang menentukan perilaku di satu rep
   repo itu, dipisah spasi atau baris. Hook yang namanya tidak tercantum akan diam. Isi `quickdev` membuat
   kedua hook engineer diam; isi `frontend quickdev` hanya menyalakan frontend. Bila berkas tidak ada,
   semua hook berjalan normal.
+- **Dokumen taskdir di luar git.** `backend` dan `frontend` tidak pernah meng-commit dokumen taskdir
+  (`backenddev/docs/**`, `frontenddev/docs/**`). Penanda `<prefix>/docs/.gitignore` (berisi `*`, ikut
+  mengabaikan dirinya sendiri) ditulis gerbangnya, dan keutuhan rantai dijaga materai di disk: `doc_seal.py`
+  di backend dan `## Riwayat Rantai` tulisan `chain.py` di frontend. Yang tetap di-commit hanya kode, profil,
+  dan dokumen tingkat repo (`backenddev/issues/`, `docs/api/`, `frontenddev/reviews/`). Repo yang sudah
+  meng-commit dokumen taskdir dimigrasikan sekali lewat `skills/_common/docs_git.py migrate` sesudah
+  persetujuan user.
 - **Sinkron nataflow (opsional).** `.claude/nataflow.json` di repo pengguna mengaktifkan cermin artefak ke
   server MCP nataflow untuk keempat plugin sekaligus: tiket analyst menjadi task, taskdir backend/frontend dan
   rencana quickdev menjadi workdir beserta dokumennya. Taskdir yang berangkat dari tiket menempel ke task tiket
-  itu. Pustaka `skills/_common/nataflow_sync.py` identik byte-per-byte di keempat plugin; disk dan git tetap
-  sumber kebenaran, dan kegagalan sinkron tidak pernah menahan rantai.
+  itu. Pustaka `skills/_common/nataflow_sync.py` identik byte-per-byte di keempat plugin. Disk tetap sumber
+  kebenaran, dan untuk dokumen taskdir nataflow menjadi satu-satunya salinan di luar mesin kerja; tanpa config,
+  gerbang `task` memperingatkan bahwa dokumen taskdir hanya ada di disk itu. Kegagalan sinkron tidak pernah
+  menahan rantai.
 
 ## Pengembangan
 
@@ -108,10 +117,10 @@ python3 scripts/lint_plugins.py            # --json, --strict, --ignore R2, --ba
 claude plugin validate .                   # sebelum rilis
 ```
 
-CI saat ini menjalankan lint dengan `--ignore R2`, yang harus sinkron dengan `deferred` di
+CI menjalankan lint dengan `LINT_IGNORE` kosong, yang harus sinkron dengan `deferred` di
 `tests/test_lint_plugins.py`. Salinan berkas yang sengaja identik antar-plugin (`hooks/detect.py`,
-`profile/scripts/migrate_profile.py`, `_common/verify_scope.py`, `_common/run_verification.py`) dijaga oleh
-test. Ubah keduanya bersama-sama.
+`profile/scripts/migrate_profile.py`, `_common/verify_scope.py`, `_common/run_verification.py`,
+`_common/docs_git.py`) dijaga oleh test. Ubah keduanya bersama-sama.
 
 **Kebijakan versi.** `version` hanya ditulis di `src/plugins/<plugin>/.claude-plugin/plugin.json`, tidak
 di `marketplace.json`, karena Claude Code selalu memakai nilai `plugin.json`. Setiap PR yang mengubah

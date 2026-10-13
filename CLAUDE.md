@@ -81,11 +81,21 @@ skeletons), `dispatcher/` (prompts used to dispatch subagents), `scripts/`, and 
   document chain (TASK → optional BRD → optional PRD → briefs) with reviewer subagents and user approval,
   then `backend:architect` runs READY briefs sequentially through `code-implementor` (commits per brief),
   closing verification, a single `code-reviewer` pass, and `report`. Artifacts live in the *user's* repo
-  under `backenddev/docs/<taskdir>/`.
+  under `backenddev/docs/<taskdir>/`, which is gitignored and never committed (step 24). Integrity is a content
+  seal on disk written by `skills/_common/doc_seal.py`: `root` (`base_commit` = HEAD), `approve` (BRD/PRD
+  `approved_seal` + ledger tick `@ APPROVED <sidik12>`), `lock-briefs` (`sidik_kontrak`), `tick --hop BRIEF`,
+  `cabut-halt` (`HALT.md` `status: DICABUT`). Brief DONE is proven by a code commit with the brief's
+  `commit_message` in `base_commit..HEAD`; `REVIEW.md` is stale once code lands after its `range:` head.
 - **frontend** — same shape with entry `frontend:lead`: TASK → FLOW (ux-design) → UI (ui-design) →
-  CONTRACT → briefs → architect → review → report, under `frontenddev/docs/<taskdir>/`. Progress is an
-  approval **ledger** managed by `_common/chain.py`; reviewer rounds are tracked by
-  `_common/review_round.py` with a "sidik" (content fingerprint) that the reviewer must echo.
+  CONTRACT → briefs → architect → review → report, under `frontenddev/docs/<taskdir>/` (gitignored, never
+  committed). Progress is an approval **ledger** managed by `_common/chain.py`, which also writes the
+  numbered `## Riwayat Rantai` event log at the end of `TASK.md` (`akar`, `draft`, `approve`, `reopen`,
+  `eskalasi`, `amandemen`, `abandon`) that replaces doc commits: approval stamps, caps, review epochs, and lane
+  replay are read from it, and a malformed log fails every gate closed. `chain.py root` locks the root
+  (`base_commit` + root sidik), `draft` records presented content, `amend` re-seals a root amendment; no
+  subcommand runs git commit. Reviewer rounds are tracked by `_common/review_round.py` with a "sidik"
+  (content fingerprint) that the reviewer must echo. Only code commits remain
+  (`feat(<slug>): implement unit NN - …`), and `REVIEW.md` carries `head:` for freshness.
 - **quickdev** — lightweight, no taskdir and no subagents: `repo-profile.md` + one `plan/<task>.md`
   guarded by `_common/plan_lock.py`.
 - **nataflow** — direct work against the nataflow server over MCP, no repo artifacts. `create-artifact`
@@ -117,6 +127,12 @@ Repo profiles are per plugin: `.claude/profile/backenddev/` and `.claude/profile
 (`index.json` + fixed set of `.md` files; see `BE_PROFILE_MD`/`FE_PROFILE_MD` in `tests/conftest.py`).
 The legacy flat `.claude/profile/` location is migrated by `migrate_profile.py`.
 
+Taskdir docs live outside git (step 24): `skills/_common/docs_git.py` writes the self-ignoring marker
+`<prefix>/docs/.gitignore` (`*`) from the entry gates (backend `tech-lead` check 3, frontend `task` check 10)
+and runs the one-time `migrate` for repos that still track taskdir docs (route `MIGRASI`). Without
+`.claude/nataflow.json` the `task` gate warns that taskdir docs exist only on that disk. Profiles and
+repo-level docs (`backenddev/issues/`, `docs/api/`, `frontenddev/reviews/`) stay committed.
+
 ### Hooks (backend and frontend only)
 
 - **SessionStart** → `hooks/detect.py --plugin <name>` detects stack/profile and injects a gate block
@@ -128,7 +144,8 @@ The legacy flat `.claude/profile/` location is migrated by `migrate_profile.py`.
 - **PreToolUse** (`Bash|Edit|Write`) → `hooks/guard_bash.py hook` fences the plugin's subagents by
   `agent_type`. It is **fail-closed** (internal error ⇒ deny, exit 2). The implementor may only touch
   paths in a lease file written by `architect` to `<git-dir>/nataflow/lease-<plugin>.json`; explorers may
-  only write `.explore/*.md`; reviewers are read-only except their report. Calls without a matching
+  only write `.explore/*.md`; reviewers are read-only except their report. The frontend implementor may
+  write its taskdir `report-NN.md` even though the path is gitignored. Calls without a matching
   `agent_type` pass through.
 
 ### Reference docs in this repo
@@ -146,9 +163,11 @@ Tests live outside `src/` so they never ship. They invoke plugin scripts via `su
 `tests/conftest.py`:
 
 - `make_repo`, `be_profile`/`fe_profile`, `run_script`, `run_hook`, `git`, `commit`.
-- Chain fixtures: `chain_repo` (backend taskdir on a work branch), `fe_chain_repo`, `fe_approved_chain`,
-  `fe_round`, `fe_minor_chain` (built by `tests/frontend/fixtures/minor_chain_reviewed.sh`), and
-  `ticket_review` for analyst.
+- Chain fixtures: `chain_repo` (backend taskdir on a work branch, root sealed on disk via `base_commit`),
+  `fe_chain_repo` (root locked with `chain.py root`), `fe_approved_chain`, `fe_round`, `fe_minor_chain` (built by
+  `tests/frontend/fixtures/minor_chain_reviewed.sh`), and `ticket_review` for analyst. Taskdir docs are never
+  committed in fixtures (the ignore marker makes `commit()` without paths skip them), and helpers `fe_lock_root`/`fe_seal_root`/`fe_draft`
+  drive `chain.py`.
 - product tests import `tests/product_helpers.py` (`from product_helpers import …`): fixture `ws` runs each test
   once per mode (`NEW_PRODUCT`/`NEW_FEATURE`/`IMPROVEMENT`), `empty_ws` is an empty non-git folder, and
   `Workspace.to_closed()`/`to_reviewed()`/`to_approved()` build a charter in each lifecycle state.
