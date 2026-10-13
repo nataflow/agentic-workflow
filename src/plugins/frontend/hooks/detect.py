@@ -76,6 +76,13 @@ class Profile:
 
 
 @dataclass
+class WorkspaceRepo:
+    dir: str    # anak langsung root multi-repo, mis. "api"
+    stack: str
+    source: str  # "profile" atau path manifest relatif repo itu
+
+
+@dataclass
 class Verdict:
     plugin: str
     root: str
@@ -86,6 +93,8 @@ class Verdict:
     hits: List[Hit] = field(default_factory=list)
     out_of_scope: List[Hit] = field(default_factory=list)   # frontend: next/cra/tanpa-vite
     opted_out: bool = False
+    workspace: List[WorkspaceRepo] = field(default_factory=list)   # root multi-repo (21 F1)
+    workspace_size: int = 0     # jumlah repo anak; 0 = bukan root multi-repo
 
 
 # ------------------------------------------------------------------ manifest
@@ -451,10 +460,49 @@ def opted_out(root: Path, plugin: str) -> bool:
     return plugin not in words and PLUGIN_NAMES[plugin] not in words
 
 
+def workspace_children(root: Path) -> List[Path]:
+    """Anak langsung ber-`.git` bila root bukan repo git dan punya >= 2 anak seperti itu (21 F1).
+
+    Root seperti ini adalah folder yang menampung beberapa repo (`wms/api`, `wms/frontend`), bukan repo:
+    precondition gerbang pasti gagal di sana. Daftar kosong = bukan root multi-repo.
+    """
+    if (root / ".git").exists():
+        return []
+    try:
+        children = sorted(root.iterdir())
+    except OSError:
+        return []
+    repos = []
+    for d in children:
+        try:
+            if d.name.startswith(".") or d.name in SKIP_DIRS or not d.is_dir():
+                continue
+            if (d / ".git").exists():
+                repos.append(d)
+        except OSError:
+            continue
+    return repos if len(repos) >= 2 else []
+
+
+def _workspace_repo(d: Path, plugin: str) -> Optional[WorkspaceRepo]:
+    prof = read_profile(d, plugin)
+    if prof.state not in ("ABSENT", "OTHER_OWNER", "INVALID_JSON"):
+        return WorkspaceRepo(d.name, prof.stack, "profile")
+    hits = detect_backend(d) if plugin == "backenddev" else detect_frontend(d)[0]
+    return WorkspaceRepo(d.name, hits[0].stack, hits[0].path) if hits else None
+
+
 def evaluate(root: Path, plugin: str) -> Verdict:
     v = Verdict(plugin=plugin, root=str(root))
     if opted_out(root, plugin):
         v.opted_out = True
+        return v
+    children = workspace_children(root)
+    if children:
+        v.workspace_size = len(children)
+        v.workspace = [r for r in (_workspace_repo(d, plugin) for d in children) if r]
+        v.emit = bool(v.workspace)
+        v.source = "workspace"
         return v
     v.profile = read_profile(root, plugin)
     if plugin == "backenddev":

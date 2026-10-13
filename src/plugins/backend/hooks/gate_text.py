@@ -61,7 +61,19 @@ def _profile_note(v) -> str:
             "Gerbang merutekan `backend:profile` mode REFRESH sebelum rute lain.")
 
 
+def _workspace(v) -> str:
+    """Root multi-repo (21 F1): bukan gerbang, hanya penunjuk ke repo backend."""
+    repos = ", ".join(f"`{r.dir}/` ({r.stack}, sumber: {'profil' if r.source == 'profile' else r.source})"
+                      for r in v.workspace)
+    return (f"<backend-tech-lead-gate>\nFolder ini root multi-repo (bukan repo git) berisi {v.workspace_size} repo. "
+            "Gerbang backend tidak berlaku di sini: skrip prasyarat skill backend butuh repo git.\n\n"
+            f"Kerja backend dijalankan dari dalam repo backend: {repos}. Penelusuran lintas repo dari root: "
+            "`/fullstack:explore` (bila plugin fullstack terpasang).\n</backend-tech-lead-gate>")
+
+
 def render(v) -> str:
+    if getattr(v, "workspace_size", 0):   # Verdict lama tanpa field ini (21 F1)
+        return _workspace(v)
     head = f"Repo backend, stack terdeteksi: {v.stack or 'tidak terbaca'} (sumber: {v.source}). Plugin `backend` aktif."
     extra = [f"{h.path} → {h.stack}" for h in v.hits[1:4]]
     if extra:
