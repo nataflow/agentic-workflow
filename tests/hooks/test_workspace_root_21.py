@@ -119,3 +119,11 @@ def test_opt_out_tetap_membungkam(satu_proyek):
     write_files(satu_proyek, {".claude/workflow": "fullstack\n"})
     assert _context("backenddev", satu_proyek) is None
     assert _context("frontenddev", satu_proyek) is None
+
+
+@pytest.mark.regression("23 L5")
+@pytest.mark.parametrize("plugin", ["backenddev", "frontenddev"])
+def test_root_menunjuk_fullstack_untuk_semua_penelusuran(satu_proyek, plugin):
+    text = _context(plugin, satu_proyek)
+    assert "alur di dalam satu repo" in text and "jahitan lintas repo" in text
+    assert "bukan subagent `Explore` atau `general-purpose` bawaan" in text
