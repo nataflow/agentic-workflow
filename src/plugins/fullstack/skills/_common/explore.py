@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Laporan explore `TELUSUR` plugin `fullstack`: panen, jahitan, pagar, dan pemetaan layanan.
 
+    python3 explore.py new   --slug <slug> --objective <teks> --lingkup <proyek,...> --repo <dir,...>
+                             [--root <dir>] [--json]
     python3 explore.py list  [--root <dir>] [--json]
     python3 explore.py seam  --report <path> [--root <dir>] [--write] [--json]
     python3 explore.py check --report <path> [--root <dir>] [--json]
@@ -8,7 +10,8 @@
     python3 explore.py layanan set   --pemanggil <dir> --target <nama-config> --repo <dir> [--prefix <path>]
     python3 explore.py layanan hapus --pemanggil <dir> --target <nama-config>
 
-`list` membaca frontmatter laporan di `.fullstack/explore/` dan menandai laporan `basi` bila HEAD salah satu
+`new` menulis kerangka laporan dari `templates/explore-template.md` skill `explore`, dengan frontmatter dan tabel
+`## Repo` yang sudah terisi dari `scan`. `list` membaca frontmatter laporan di `.fullstack/explore/` dan menandai laporan `basi` bila HEAD salah satu
 repo sudah bergeser (K18–K19). `seam` mencocokkan tabel `## Panggilan` dengan `## Endpoint` (K20–K26); dengan
 `--write` tabel `## Jahitan` laporan ditulis ulang dari hasilnya. `check` adalah pagar laporan (exit 0 PASS,
 1 FAIL). `layanan` mengelola `.fullstack/layanan.json`, satu-satunya sumber target pasti BE → BE (K21).
@@ -37,6 +40,7 @@ from fullstack_lib import (  # noqa: E402
     repo_index,
     save_layanan,
     scan,
+    stamp,
     write_atomic,
 )
 
@@ -49,6 +53,8 @@ TABLE_COLS = {"Endpoint": 4, "Panggilan": 5, "Jahitan": 6}
 POINTER = re.compile(r"`([\w.\-()\[\]+@~]+(?:/[\w.\-()\[\]+@~]+)+):(\d+)(?:-(\d+))?`")
 PLACEHOLDER = re.compile(r"\b(TBD|TODO)\b")
 NONE_CELLS = ("", "-", "—")
+COMMENT = re.compile(r"<!--.*?-->", re.S)
+TEMPLATE = Path(__file__).resolve().parents[1] / "explore" / "templates" / "explore-template.md"
 
 
 # ------------------------------------------------------------------ parsing laporan
@@ -83,7 +89,8 @@ def parse_report(text: str) -> Dict[str, Any]:
             continue
         if current is not None:
             out["body"][current].append(raw)
-    out["body"] = {k: "\n".join(v).strip("\n") for k, v in out["body"].items()}
+    # Komentar penjelas template bukan isi: contoh tabel di dalamnya tidak boleh terbaca sebagai tabel.
+    out["body"] = {k: COMMENT.sub("", "\n".join(v)).strip("\n") for k, v in out["body"].items()}
     return out
 
 
@@ -378,6 +385,60 @@ def format_check(report: str, c: Checks) -> str:
     return "\n".join(lines)
 
 
+# ------------------------------------------------------------------ new
+
+def repo_table(sc: Dict[str, Any], lingkup: List[str], dirs: List[str]) -> str:
+    """Tabel `## Repo`: repo yang disisir, ditambah repo lain di proyek lingkup yang profilnya ada tetapi tidak `VALID`.
+
+    Repo tanpa profil sama sekali (pustaka, infra) cukup tercatat di `PETA.md`; mencantumkannya di sini memaksa
+    tiap laporan menulis arahan untuk repo yang mungkin memang bukan aplikasi.
+    """
+    rows = [r for r in sc["repo"] if r["dir"] in dirs
+            or (r["proyek"] in lingkup and r["profil"] and not peran_valid(r))]
+    out = ["| Dir | Proyek | Peran | Stack | Profil | HEAD |", "|---|---|---|---|---|---|"]
+    for r in rows:
+        prof = r["profil"]
+        out.append(f"| `{cell(r['dir'])}` | {cell(r['proyek'])} | {', '.join(p['peran'] or '?' for p in prof) or '—'} | "
+                   f"{', '.join(p['stack'] or '-' for p in prof) or '—'} | "
+                   f"{', '.join(p['status'] for p in prof) or 'ABSENT'} | {r['head'] or 'tanpa commit'} |")
+    return "\n".join(out)
+
+
+def new_report(root: Path, slug: str, objective: str, lingkup: List[str], dirs: List[str]) -> Tuple[str, str]:
+    """(path relatif laporan, galat)."""
+    if not SLUG.match(slug):
+        return "", f"`--slug {slug}` bukan kebab-case"
+    objective = " ".join(objective.split())
+    if not objective:
+        return "", "`--objective` kosong"
+    sc = scan(root)
+    if sc["mode"] == "DALAM_REPO":
+        return "", "root berada di dalam repo git"
+    repos = repo_index(sc)
+    proyek = {r["proyek"] for r in sc["repo"]}
+    bad = [f"proyek `{p}` tidak ada" for p in lingkup if p not in proyek]
+    bad += [f"repo `{d}` tidak ada" for d in dirs if d not in repos]
+    bad += [f"repo `{d}` tanpa commit" for d in dirs if d in repos and not repos[d]["head"]]
+    if not lingkup or not dirs:
+        bad.append("`--lingkup` dan `--repo` wajib diisi")
+    if bad:
+        return "", "; ".join(bad)
+    template = read_text(TEMPLATE)
+    if template is None:
+        return "", f"template `{TEMPLATE.name}` tidak ada; pasang ulang plugin fullstack"
+    rel = f"{EXPLORE_DIR}/{stamp()}-{slug}.md"
+    if (root / rel).exists():
+        return "", f"`{rel}` sudah ada"
+    shas = ", ".join(f"{d}@{repos[d]['head']}" for d in dirs)
+    fm = (f"---\nslug: {slug}\nobjective: {objective}\ndibuat: {rel.rsplit('/', 1)[1][:10]}\n"
+          f"lingkup: {', '.join(lingkup)}\nrepo: {shas}\nconfidence:\n---\n")
+    body = template.split("\n## ", 1)
+    text = fm + "\n## " + body[1] if len(body) == 2 else fm + template
+    text = replace_section(text, "Repo", repo_table(sc, lingkup, dirs))
+    write_atomic(root / rel, text)
+    return rel, ""
+
+
 # ------------------------------------------------------------------ list
 
 def list_reports(root: Path) -> Dict[str, Any]:
@@ -455,6 +516,11 @@ def _report_path(root: Path, value: str) -> Path:
 def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
+    p_new = sub.add_parser("new")
+    p_new.add_argument("--slug", required=True)
+    p_new.add_argument("--objective", required=True)
+    p_new.add_argument("--lingkup", required=True, help="proyek dipisah koma; `.` untuk repo langsung di root")
+    p_new.add_argument("--repo", required=True, help="dir repo yang disisir, dipisah koma")
     p_list = sub.add_parser("list")
     p_seam = sub.add_parser("seam")
     p_check = sub.add_parser("check")
@@ -467,11 +533,17 @@ def main(argv: Optional[List[str]] = None) -> int:
     p_lay.add_argument("--target", default="")
     p_lay.add_argument("--repo", default="")
     p_lay.add_argument("--prefix", default="")
-    for p in (p_list, p_seam, p_check, p_lay):
+    for p in (p_new, p_list, p_seam, p_check, p_lay):
         p.add_argument("--root", default=None, help="root multi-repo; default cwd")
         p.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
     root = Path(args.root or ".").resolve()
+
+    if args.cmd == "new":
+        rel, err = new_report(root, args.slug, args.objective, split_list(args.lingkup), split_list(args.repo))
+        print(dump_json({"status": "FAIL" if err else "OK", "berkas": rel, "galat": err}) if args.json
+              else (err or f"Tertulis: {rel}"))
+        return 1 if err else 0
 
     if args.cmd == "list":
         out = list_reports(root)
