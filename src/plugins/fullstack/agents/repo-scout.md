@@ -33,9 +33,12 @@ Prompt pendispatch membawa slot berikut:
    - `BE`: `.claude/profile/backenddev/index.json` (`source_root`), `domain-map.md` (domain, path modul, entry
      registrasi), dan `surface-map.md` baris `http:` (letak route dan prefix grup), `external:` (klien HTTP ke luar),
      dan `config:` (letak konfigurasi).
-   - `FE`: `.claude/profile/frontenddev/index.json` (`source_root`), `structure.md` (path fitur, definisi rute), dan
-     tabel `surface-map.md` baris **Routing & Navigation**, **HTTP Service**, **Shared HTTP Client**, **DTO**, dan
-     **Framework Boundary**. Kolom **Penanda Pengenal Kode** adalah pola `Grep`-mu.
+   - `FE`: `.claude/profile/frontenddev/index.json` (`source_root`), `structure.md` (butir **Features Path** beserta
+     sub-butir `services/` dan `dto/`, dan **Route Definitions**), tabel `surface-map.md` baris **Routing &
+     Navigation**, **Data Fetching & Cache**, **Shared HTTP Client**, dan **Framework Boundary**, serta tabel
+     `layer-adoption.md` baris **HTTP Service Layer** dan **DTO Isolation**. Kolom **Penanda Pengenal Kode**
+     `surface-map.md` adalah pola `Grep`-mu. Profil yang menambah baris sendiri (mis. **HTTP Service** di
+     `surface-map.md`) boleh dipakai juga.
 
    Profil tidak ada atau `index.json` rusak → jangan menyisir; semua butir masuk `Belum disisir` beralasan "profil
    tidak ada". Kamu tidak boleh menebak struktur repo dari nama stack.
