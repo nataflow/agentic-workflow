@@ -11,6 +11,21 @@ test di `tests/hooks/test_workspace_root_21.py` (dua plugin) dan satu kasus smok
 Suite penuh hijau (2500), subset fullstack/hooks/smoke hijau di Python 3.9, lint `--base 31aa5d3` 0 FAIL, dan `claude plugin validate .` lolos.
 Versi: fullstack 0.3.0, backend 0.14.1, frontend 0.13.1.
 
+**Uji ujung ke ujung (2026-10-13).** Root scratch `root/{backend-a,backend-b}` (dua repo Go berprofil backend `VALID`,
+alur order → reservasi stok lewat `STOK_API_URL`), Claude Code headless dengan `--plugin-dir` fullstack dan backend
+dari working tree, prompt tanpa menyebut skill: "tolong pelajari alur pembuatan order di backend-a dan backend-b,
+saya mau paham flow dan aturannya". Hasil:
+
+- `fullstack:explore` terpanggil sendiri, jalur `ALUR`; dua `fullstack:backend-explorer` didispatch paralel. Tidak
+  ada `Explore`/`general-purpose`.
+- Seluruh 18 pembacaan kode repo anak (`Read`/`Grep`/`Glob`) dilakukan subagent; konteks utama hanya membaca keluaran
+  skrip, `dispatcher/explorer.md`, dan laporannya sendiri.
+- `explore.py new --jalur ALUR --kedalaman ringkas` menulis kerangka; `check` pertama FAIL karena rujukan berbentuk
+  daftar (`service.go:8,17-19`), diperbaiki model, lalu PASS 7/7 dengan `confidence: medium`.
+- Jawaban menjelaskan langkah handler → service → transaksi → repository → panggilan stok, aturan bisnis (minimal
+  satu item, batas total 50.000.000, stok tidak cukup), dan menandai hubungan `STOK_API_URL` → `backend-b` sebagai
+  belum dikonfirmasi serta menawarkan `TELUSUR` untuk jahitannya.
+
 Selisih pelaksanaan terhadap Kontrak di bawah:
 
 - **`new` TELUSUR tidak menulis `jalur`.** Kerangka `TELUSUR` tetap persis seperti Langkah 21; hanya `ALUR` yang
