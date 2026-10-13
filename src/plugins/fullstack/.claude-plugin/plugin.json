@@ -1,7 +1,7 @@
 {
   "name": "fullstack",
   "description": "Skill dan subagent untuk memahami seluruh aplikasi di satu perusahaan dari root multi-repo (satu proyek seperti wms/{api,frontend}, atau banyak proyek sekaligus): peta aplikasi PETA.md yang dibangun skrip dari profil backend dan frontend tiap repo tanpa membaca kode, lalu explore permukaan atas satu pertanyaan konkret lewat subagent repo-scout dengan jahitan frontend ke backend dan API ke API yang dicocokkan skrip. Read-only: tidak mengubah repo anak, kerja lanjutan diarahkan ke gerbang backend/frontend di dalam repo",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": {
     "name": "Fakhrul Nugroho",
     "email": "fakhrulnugroho15@gmail.com"
