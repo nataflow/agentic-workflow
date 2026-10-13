@@ -464,3 +464,49 @@ Selisih pelaksanaan terhadap peta:
   cabang "kotoran milik taskdir sendiri" dibuang beserta parameternya.
 - **K2 (`WARN` tanpa `.claude/nataflow.json`)** baru berlaku di `docs_git.py status` dan check 10 prasyarat `task`
   frontend. Gerbang masuk backend menyusul di tahap 4.
+
+### Tahap 4 — peta blast radius (sebelum kode)
+
+Inventaris dari `grep` atas `flow/*.md`, `README.md`, `CLAUDE.md`, dan dokumen Langkah 15, ditambah sisa K2 dari tahap
+3. Plugin lain (analyst, quickdev, product, fullstack, nataflow) tidak merujuk dokumen taskdir backend/frontend, jadi
+tidak tersentuh.
+
+**Dokumen repo ini** (tidak ikut terpasang ke cache plugin):
+
+| Berkas | Perubahan | Yang bisa pecah |
+|---|---|---|
+| `flow/backend.md` | Header versi. Tabel komponen ditambah `doc_seal.py` dan `docs_git.py`; `code-implementor` meng-commit kode saja, `code-reviewer` menulis `REVIEW.md` dan meng-commit indeks saja. Diagram ("brief READY ter-commit", "REVIEW.md commit sendiri"). Butir "Gerbang & commit" `tech-lead`, `analyst` (Fase 4 approve dan Fase 6 tutup ledger lewat `doc_seal.py`), `task`, `business-analysis`, `system-analysis`, `plan` (`lock-briefs`), `architect`, `report`, dan `debug`. Tabel agent dan hook. Pohon artefak (penanda `.gitignore`, `counters-log.json`). Cermin nataflow dari disk (K14, G5). Siklus status brief, BRD/PRD, dan `HALT.md` (`DICABUT`). Tabel kepemilikan commit menjadi matriks penguncian, selaras README plugin. Tabel kegagalan: `MIGRASI`, akar belum terkunci, materai tidak cocok, dan review basi dari `range` | Tidak ada test. Sumber kebenarannya skrip dan SKILL hasil tahap 2 |
+| `flow/frontend.md` | Header versi. Tabel komponen (`chain.py` `root`/`amend`/`draft`, `review_round.py` tanpa `commit`, `docs_git.py`). Diagram. Prinsip butir 4: materai di `## Riwayat Rantai`. Tabel keadaan `lead` Phase 2 mengikuti urutan `taskdir_state.py` baru (`MIGRASI`, `AKAR` akar belum terkunci, `TUNTAS` warisan, `LAPORAN TERTUNDA` = validator gagal). Butir "Gerbang & commit" tiap skill. Matriks bukti `architect`: commit unit membawa kode saja, dan BLOCKED berupa suntingan disk. `code-reviewer` mendapat slot `head`. Kebijakan `chain.py`/`review_round.py`. Pohon artefak, siklus status, dan tabel commit rantai menjadi commit kode + kejadian Riwayat. Tabel kegagalan (`rebuild` dari Riwayat, Riwayat rusak, akar disunting tanpa `amend`) | Tidak ada test. Sumber kebenarannya skrip dan SKILL hasil tahap 3 |
+| `README.md` (akar) | Versi tabel plugin. Butir sinkron di Hidup Berdampingan: dokumen taskdir diabaikan git dan nataflow menjadi satu-satunya salinan di luar disk. Daftar salinan byte-identik ditambah `_common/docs_git.py`. Ralat kalimat CI `--ignore R2` yang basi (`LINT_IGNORE` kini kosong) | — |
+| `CLAUDE.md` | Ringkasan backend dan frontend: dokumen taskdir tidak di-commit, `doc_seal.py`, `## Riwayat Rantai`, dan `chain.py root`/`draft`/`amend`. PreToolUse: pengecualian `report-NN.md` (K13). Fixture test `chain_repo`/`fe_chain_repo` (akar terkunci di disk, tanpa commit dokumen) | — |
+| `issues/15-sinkron-artefak-nataflow/01-mcp-tools.md` | Catatan di E6 dan E7: untuk dokumen taskdir digantikan K14 dan G5 Langkah 24. Dokumen tingkat repo tetap mengikuti E6/E7 (`removed: true` tetap terbit untuk berkas repo yang dihapus dari git) | — |
+| `issues/24-dokumen-taskdir-lepas-git.md` | Baris Status, hasil tahap 4 | — |
+
+**Kode** (sisa K2 di backend):
+
+| Berkas | Perubahan | Yang bisa pecah |
+|---|---|---|
+| `backend/skills/task/scripts/check_preconditions.py` | K2: bila `.claude/nataflow.json` tidak ada, keluaran teks mendapat banner `[PERINGATAN]` dan JSON mendapat field `peringatan`. Check 5 tetap `PASS`, jadi hitungan 7/7 tidak berubah. Format keluaran backend (`format_text`/`to_json` di `precondition_lib.py`) tidak mengenal status `WARN`, sehingga pola yang dipakai adalah banner `[TERDEGRADASI]` milik `tech-lead`, bukan status baru yang akan mengubah vonis semua gerbang backend | `test_task_preconditions` (keluaran teks, kunci JSON), `test_smoke` (JSON sah) |
+| `backend/skills/task/SKILL.md` | Precondition butir 2: banner `[PERINGATAN]` disebut ke user sekali, lalu lanjut | — |
+| `tests/backend/test_task_preconditions.py` | Test 24 K2: banner ada tanpa config dan hilang dengan config, vonis tetap `PASS` | — |
+
+**Rilis:** `version` backend 0.15.0 dan frontend 0.14.0 (K16, lint M7) dalam commit `chore(release)` terpisah, lalu
+`claude plugin validate .`.
+
+**Uji ujung ke ujung:**
+
+- **Rantai digerakkan skrip, bukan model.** `claude -p --plugin-dir` tidak deterministik, dan `AskUserQuestion` tidak
+  bisa dijawab di mode non-interaktif. Karena itu uji ini menjalankan skrip yang sama dengan urutan yang
+  diperintahkan SKILL, di repo scratch:
+  - satu rantai backend lane `DIRECT_BRIEF` risk `MINOR`;
+  - satu rantai frontend lane `HOTFIX_MINOR`.
+- **Yang diperiksa di ujung:**
+  - `git log` hanya berisi commit kode, dan `git status` bersih;
+  - penanda `<prefix>/docs/.gitignore` diabaikan dan tidak ter-track;
+  - gerbang penutup `PASS`;
+  - `sync_payload.py` membaca dokumen dari disk.
+- **Migrasi `nataflow-api` disimulasikan di klon sementara**, bukan di repo aslinya:
+  - `docs_git.py status`, lalu `migrate --answer -`;
+  - commit migrasi hanya berisi penghapusan dari index, dan berkas tetap di disk;
+  - check 3 `tech-lead` sesudahnya `PASS`;
+  - perilaku `sync_payload.py` atas taskdir warisan dicatat.
