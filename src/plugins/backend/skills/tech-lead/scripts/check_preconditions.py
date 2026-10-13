@@ -23,9 +23,10 @@ from typing import Any, Dict, List, Optional
 # Zona artefak yang kepemilikan commit-nya ada di gerbang tech-lead
 # (references/gate-scope.md bagian 3). Pada mode re-entry berkas kotor di
 # bawah prefix ini menunggu commit Fase 5, jadi tidak menggagalkan check 3.
+# `backenddev/docs/` tidak di sini: dokumen taskdir diabaikan git (Langkah 24)
+# dan tidak pernah tampak kotor.
 RE_ENTRY_ALLOWED_PREFIXES = (
     ".claude/profile/backenddev/",
-    "backenddev/docs/",
     "backenddev/issues/",
     "docs/api/",
 )
@@ -54,6 +55,7 @@ from precondition_lib import (  # noqa: E402
     PROFILE_FILES,
 )
 from precondition_lib import cli  # noqa: E402
+import docs_git  # noqa: E402
 
 # Selama masa transisi MIGRATE: `git mv` meninggalkan penghapusan berkas profil
 # backend di lokasi lama `.claude/profile/<berkas>`. Cabut di rilis berikutnya.
@@ -205,10 +207,39 @@ class PreconditionChecker:
                 "action": "Pastikan HEAD terhubung ke branch aktif dan direktori memiliki .git sah."
             })
 
+    def _docs_outside_git(self, check_id: int, name: str) -> bool:
+        """Dokumen taskdir di luar git (24 G2): False bila check 3 sudah divonis FAIL di sini.
+
+        Berkas `backenddev/docs/` yang masih ter-track → rute MIGRASI (`docs_git.py migrate` sesudah
+        persetujuan user). Selain itu penanda ignore ditulis sebelum tree dinilai, kecuali mode read-only.
+        """
+        tracked = docs_git.tracked_docs(self.root, docs_git.PREFIXES["backend"])
+        if tracked and not self.read_only:
+            self.results.append({
+                "id": check_id,
+                "name": name,
+                "status": "FAIL",
+                "summary": f"MIGRASI: {len(tracked)} berkas `backenddev/docs/` masih ter-track git — dokumen taskdir "
+                           "kini hanya di disk dan dicerminkan ke nataflow",
+                "action": "Jalankan prosedur migrasi `references/gate-lifecycle.md` bagian 0: AskUserQuestion, lalu "
+                          "`skills/_common/docs_git.py migrate --answer -`; taskdir era git yang masih terbuka ikut "
+                          "disebut skrip itu."
+            })
+            return False
+        if not self.read_only:
+            _, problem = docs_git.ensure_ignored(self.root, docs_git.PREFIXES["backend"])
+            if problem:
+                self.results.append({"id": check_id, "name": name, "status": "FAIL", "summary": problem,
+                                     "action": "Perbaiki `.gitignore` di bawah `backenddev/docs/`, lalu ulangi."})
+                return False
+        return True
+
     def _check_3_git_status(self):
         check_id = 3
         name = "Git Clean Working Tree"
         try:
+            if not self._docs_outside_git(check_id, name):
+                return
             # porcelain -z -uall: path apa adanya (tanpa kutip/escape oktal) dan direktori
             # untracked tidak diringkas jadi satu baris, sehingga perbandingan zona
             # artefak per segmen tidak meleset. Laci kerja `.explore/` milik

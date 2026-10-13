@@ -62,6 +62,7 @@ CASES = [
     ("backend/hooks/detect.py", ["--plugin", "backend"], "hook", HOOK_STDIN),
     ("backend/hooks/guard_bash.py", ["hook"], "hook", BASH_STDIN),
     ("backend/skills/_common/docs_git.py", ["status", "--json"], True, None),
+    ("backend/skills/_common/doc_seal.py", ["status", "--taskdir", BE_TD, "--json"], True, None),
     ("backend/skills/_common/validate_doc.py", ["--kind", "task", "--taskdir", BE_TD, "--json"], True, None),
     ("backend/skills/_common/sync_payload.py", ["--taskdir", BE_TD, "--json"], True, None),
     ("backend/skills/_common/sync_payload.py", ["--repo-docs", "audit", "--json"], True, None),

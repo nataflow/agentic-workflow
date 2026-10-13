@@ -33,6 +33,7 @@ from precondition_lib import (  # noqa: E402
     to_json,
 )
 from precondition_lib import cli  # noqa: E402
+import docs_git  # noqa: E402
 
 VALID_LANES = {
     "PRD_CONVERSION",
@@ -307,6 +308,20 @@ class PreconditionChecker:
             return
 
         try:
+            # Akar ditulis ke `backenddev/docs/` yang wajib sudah di luar git (24 G2): penanda ignore ditulis
+            # prasyarat penuh `tech-lead` (check 3), dan berkas yang masih ter-track menunggu migrasi.
+            tracked = docs_git.tracked_docs(self.root, docs_git.PREFIXES["backend"])
+            if tracked or not docs_git.docs_ignored(self.root, docs_git.PREFIXES["backend"]):
+                self.results.append({
+                    "id": check_id,
+                    "name": name,
+                    "status": "FAIL",
+                    "summary": (f"{len(tracked)} berkas `backenddev/docs/` masih ter-track git" if tracked else
+                                "`backenddev/docs/` belum diabaikan git"),
+                    "action": "Kembalikan ke `backend:tech-lead`: prasyarat penuhnya (check 3) menulis penanda ignore "
+                              "atau merutekan migrasi; dokumen taskdir tidak di-commit.",
+                })
+                return
             # Laci kerja `.explore/` milik `code-explorer` bukan artefak rantai:
             # tidak pernah di-stage maupun di-commit, jadi dibuang dirty_paths.
             dirty_outside = [p for p in dirty_paths(self.root)
@@ -323,9 +338,9 @@ class PreconditionChecker:
                 })
                 return
 
-            # Akar rantai di-commit di branch kerja taskdir ini (11 H20): HEAD di base atau detached
-            # mendaratkannya di base/entah di mana, dan HEAD di branch rantai lain menyembunyikannya
-            # dari branch kerja yang dicabangkan gerbang sesudahnya.
+            # Akar rantai dikunci di branch kerja taskdir ini (11 H20): `base_commit` diambil dari HEAD, dan
+            # commit kode unit mendarat di branch yang sama. HEAD di base atau detached mendaratkan kode di
+            # base/entah di mana, dan HEAD di branch rantai lain mengikat akar ke rantai yang salah.
             base = (load_profile_index(self.root, required=()).data or {}).get("base_branch")
             ok, detail = check_base_branch(self.root, base if isinstance(base, str) else None)
             slug = self.td.rel.rsplit("/", 1)[-1].split("-", 1)[-1] if self.td.rel else ""
@@ -340,7 +355,7 @@ class PreconditionChecker:
                     "status": "FAIL",
                     "summary": detail,
                     "action": "Kembalikan ke `backend:tech-lead`: isolasi branch kerja taskdir (Fase 3 butir 2) "
-                              "berangkat sebelum akar ditulis; dilarang meng-commit TASK.md di base atau branch lain.",
+                              "berangkat sebelum akar ditulis; dilarang mengunci TASK.md di base atau branch lain.",
                 })
                 return
 

@@ -1,7 +1,7 @@
 """Prasyarat `plan`: status PRD/RCA dari frontmatter (L5.1), taskdir (L5.2), chain/risk (L5.4), path plugin (L5.5)."""
 import pytest
 
-from conftest import be_checks, be_profile, commit, write_files
+from conftest import be_checks, be_profile, be_sealed, commit, write_files
 
 TD = "backenddev/docs/2601011200-refund"
 PL = "plan/scripts/check_preconditions.py"
@@ -21,9 +21,8 @@ def plan(repo, *args, td=TD):
 
 
 def test_prd_approved_kalimat_status_draft(repo):
-    write_files(repo, {f"{TD}/PRD.md": "---\ntitle: Refund\nsource_brd: x\nstatus: APPROVED\n---\n# PRD\n\n"
-                                        "## Business rules\n- Order dengan status: DRAFT ditolak.\n"})
-    commit(repo, "docs(spec): approve PRD refund", f"{TD}/PRD.md")      # 11 H17
+    write_files(repo, {f"{TD}/PRD.md": be_sealed("---\ntitle: Refund\nsource_brd: x\nstatus: APPROVED\n---\n# PRD\n\n"
+                                                 "## Business rules\n- Order dengan status: DRAFT ditolak.\n")})  # 11 H17
     assert plan(repo, "--entry-mode", "PRD", "--chain", "BRD_PRD_BRIEF")[3]["status"] == "PASS"
 
 

@@ -21,7 +21,8 @@ ARCH = "architect/scripts/check_preconditions.py"
 REPORT = "report/scripts/check_preconditions.py"
 SCAFFOLD = "plan/scripts/scaffold_brief.py"
 LEDGER_DONE = "- [x] BRIEF — backend:plan → brief-*.md @ READY 1111111\n"
-TASK = ("---\nchain: BRIEF\nlane: DIRECT_BRIEF\nrisk: MINOR\nstatus: ACTIVE\n---\n# Order fix\n\n## Chain\n\n{ledger}\n"
+TASK = ("---\nchain: BRIEF\nlane: DIRECT_BRIEF\nrisk: MINOR\nstatus: ACTIVE\nbase_commit: {base}\n---\n# Order fix\n\n"
+        "## Chain\n\n{ledger}\n"
         "## Success Criteria\n\n- [ ] **SC-1**: lock\n- [ ] **SC-2**: endpoint\n\n## Out of Scope\n\n- x — y\n")
 
 
@@ -38,15 +39,14 @@ def _implement(repo, name, line):
     bs.set_frontmatter(repo / TD / name, status="DONE")
     write_files(repo, {"src/order.go": (repo / "src/order.go").read_text() + line})
     msg = bs.read_frontmatter(repo / TD / name)["commit_message"]
-    commit(repo, msg, "src/order.go", f"{TD}/{name}")
+    commit(repo, msg, "src/order.go")                      # brief tidak di-commit (Langkah 24)
 
 
 def _fixture(repo):
     """Langkah 0: 01 DONE, 02 BLOCKED (wip + report-02.md), 03 READY, ledger BRIEF [x], tanpa `.explore/`."""
-    write_files(repo, {f"{TD}/TASK.md": TASK.format(ledger=LEDGER_DONE)})
+    write_files(repo, {f"{TD}/TASK.md": TASK.format(ledger=LEDGER_DONE, base=git(repo, "rev-parse", "HEAD").strip())})
     git(repo, "checkout", "-q", "-b", "fix/order")
     brief(repo, "01", "lock", "READY", body=_obj("SC-1"))
-    commit(repo, "docs(plan): add 1 briefs for order-fix", f"{TD}/brief-01-lock.md")
     _implement(repo, "brief-01-lock.md", "// lock\n")
     brief(repo, "02", "endpoint", "BLOCKED", body=_obj("SC-2"))
     brief(repo, "03", "recap", "READY", body=_obj("SC-2"))
@@ -70,7 +70,6 @@ def _through_review(repo):
     task = repo / TD / "TASK.md"
     task.write_text(task.read_text().replace(
         LEDGER_DONE, "- [~] BRIEF — backend:plan → brief-*.md @ re-entry 1 (was 1111111)\n"))
-    commit(repo, "docs(order-fix): re-entry hop BRIEF ke-1", f"{TD}/TASK.md")
     # 4 — pengganti 02 saja ditolak: 03 READY akan berjalan lebih dulu (D2-A)
     spec = _spec_path(repo)
     spec.write_text(json.dumps({"briefs": [_row("04", "endpoint-fix", supersedes=["02"])]}))
@@ -93,8 +92,8 @@ def _through_review(repo):
     assert not any("SUPERSEDED" in d for d in checks["C"]["details"]), checks["C"]
     assert not any("brief terbit `READY`" in d for d in checks["S"]["details"])
     assert checks["G"]["status"] == "PASS", checks["G"]
-    # 8 — commit agregat plan; predikat E: READY/DONE/SUPERSEDED bertaut
-    commit(repo, "docs(plan): add 2 briefs for order-fix", *(f"{TD}/{b['name']}" for b in fm.values()))
+    # 8 — plan mengunci batch (`doc_seal.py lock-briefs`); predikat E: READY/DONE/SUPERSEDED bertaut
+    assert be_run(repo, "_common/doc_seal.py", "lock-briefs", "--taskdir", TD).returncode == 0
     assert bs.validate_links(bs.scan_briefs(repo / TD)) == []
     # 9 — architect mulai di brief-04, tanpa HALT.md
     checks = be_checks(repo, ARCH, "--taskdir", TD)
@@ -103,10 +102,11 @@ def _through_review(repo):
     _implement(repo, "brief-04-endpoint-fix.md", "// endpoint fix\n")
     _implement(repo, "brief-05-recap.md", "// recap\n")
     assert be_checks(repo, ARCH, "--taskdir", TD)[3]["entry"] == "FASE_4"
-    # 11 — reviewer meng-commit REVIEW.md + indeks issues (L2.1)
-    write_files(repo, {f"{TD}/REVIEW.md": "---\nhighest: CLEAN\n---\n# Review\n",
+    # 11 — reviewer menulis REVIEW.md (`range:` menilai HEAD) dan meng-commit indeks issues saja (L2.1, Langkah 24)
+    head = git(repo, "rev-parse", "--short=7", "HEAD").strip()
+    write_files(repo, {f"{TD}/REVIEW.md": f"---\nrange: aaaaaaa..{head} (4 commit)\nhighest: CLEAN\n---\n# Review\n",
                        "backenddev/issues/README.md": "# Issues Index\n| Date | Issue ID | Target | Severity | Status |\n"})
-    commit(repo, "docs(order-fix): add final review report", f"{TD}/REVIEW.md", "backenddev/issues/README.md")
+    commit(repo, "docs(order-fix): add final review report", "backenddev/issues/README.md")
     assert git(repo, "status", "--porcelain") == ""
     assert be_checks(repo, ARCH, "--taskdir", TD)[3]["entry"] == "FASE_5"
 

@@ -1,6 +1,7 @@
-"""L2.7 — matriks dan hitungan ronde plan bertahan saat laci `.explore/` hilang."""
+"""L2.7 — matriks plan bertahan saat laci `.explore/` hilang; hitungan ronde tinggal di laci (Langkah 24)."""
 import json
-import shutil
+
+import pytest
 
 from conftest import TD, be_run, brief, commit, git
 
@@ -49,26 +50,17 @@ def _round(repo, verdict):
     return be_run(repo, VALIDATE, "--taskdir", TD, "--record-round", verdict)
 
 
-def test_review_state_survives_explore_loss(chain_repo):
+@pytest.mark.regression("24 K15")
+def test_review_state_hanya_dari_laci(chain_repo):
+    """Brief tidak di-commit (Langkah 24): hitungan ronde hanya di laci `.explore/`, trailer git tidak dibaca lagi."""
     brief(chain_repo, "01", "lock", "READY")
     _round(chain_repo, "Issues Found")
     out = _round(chain_repo, "Approved")
-    trailer = next(l.split(": ", 1)[1] for l in out.stdout.splitlines() if "trailer commit agregat" in l)
-    assert trailer.startswith("Brief-Review-Rounds: ") and "rounds=2 total=2" in trailer
-    git(chain_repo, "add", f"{TD}/brief-01-lock.md")
-    git(chain_repo, "commit", "-qm", "docs(plan): add 1 briefs for order-fix", "-m", trailer)
-    shutil.rmtree(chain_repo / TD / ".explore")
+    assert "trailer" not in out.stdout
+    git(chain_repo, "commit", "--allow-empty", "-qm", "docs(plan): add 1 briefs", "-m",
+        "Brief-Review-Rounds: gen=abc123 rounds=1 total=3")
     state = be_run(chain_repo, VALIDATE, "--taskdir", TD, "--review-state").stdout
     assert "ronde terpakai 2/2" in state and "taskdir 2/4" in state
-
-
-def test_trailer_parse_ignores_other_trailers(chain_repo):
-    brief(chain_repo, "01", "lock", "READY")
-    git(chain_repo, "add", "-A")
-    git(chain_repo, "commit", "-qm", "docs(plan): add 1 briefs", "-m",
-        "Co-Authored-By: x <x@x>\nBrief-Review-Rounds: gen=abc123 rounds=1 total=3\nReviewed-by: y")
-    state = be_run(chain_repo, VALIDATE, "--taskdir", TD, "--review-state").stdout
-    assert "taskdir 3/4" in state
 
 
 def test_b11_spec_di_luar_laci_ditolak(chain_repo):

@@ -156,7 +156,8 @@ def test_lookup_tiket_sama_di_analyst_backend_frontend(repo):
     source = f"ticket_source: {TDIR}/TICKET.md\n"
     be_td, fe_td = "backenddev/docs/2609241000-cicilan-api", "frontenddev/docs/2609241000-cicilan-ui"
     write_files(repo, {
-        f"{be_td}/TASK.md": f"---\nstatus: ACTIVE\nchain: BRIEF\nrisk: MINOR\n{source}---\n# Cicilan API\n",
+        f"{be_td}/TASK.md": (f"---\nstatus: ACTIVE\nchain: BRIEF\nrisk: MINOR\n{source}"     # akar backend terkunci (24)
+                             f"base_commit: {git(repo, 'rev-parse', 'HEAD').strip()}\n---\n# Cicilan API\n"),
         f"{fe_td}/TASK.md": (f"---\nstatus: ACTIVE\nlane: FAST_FORWARD\nsections: [architecture]\n{source}---\n"
                              "# Cicilan UI\n"),
     })

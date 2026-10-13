@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
     TASKDIR_ACTION,
+    task_base_commit,
     check_taskdir,
     check_base_branch,
     dirty_paths,
@@ -155,15 +156,22 @@ class PreconditionChecker:
                              "Kembalikan ke `backend:tech-lead` → lane PLANNING taskdir yang sama "
                              "(`reentry_reason` = brief + sebab `report-NN.md`); `plan` menerbitkan "
                              "pengganti ber-`supersedes`.")
-        # Brief `DONE` wajib punya commit transisi statusnya: DONE tanpa bukti di git (ditulis tangan,
-        # atau belum di-commit) dulu dipercaya begitu saja, dan rantai lanjut ke brief berikutnya (09 E18).
+        # Bukti dari git hanya commit kode yang dicari sejak `base_commit` (24 K6); akar yang belum terkunci
+        # membuat setiap brief DONE tampak tanpa bukti, jadi akarnya divonis lebih dulu.
+        _, base_problem = task_base_commit(self.root, td)
+        if base_problem:
+            return self._add(cid, name, "FAIL", f"TASK.md: {base_problem}",
+                             "Kembalikan ke `backend:tech-lead`: akar dikunci `backend:task` lewat "
+                             "`doc_seal.py root`; dilarang mengisi `base_commit` dengan tangan.")
+        # Brief `DONE` wajib punya commit unit yang membawa kode: DONE tanpa bukti di git (ditulis tangan, atau
+        # kodenya belum di-commit) dulu dipercaya begitu saja, dan rantai lanjut ke brief berikutnya (09 E18).
         unproven = [b for b in briefs if b["status"] == "DONE"
                     and not done_sha(self.root, f"{self.td.rel}/{b['name']}", b["commit_message"])]
         if unproven:
             names = ", ".join(b["name"] for b in unproven)
-            return self._add(cid, name, "FAIL", f"Brief DONE tanpa commit transisi status di git: {names}",
+            return self._add(cid, name, "FAIL", f"Brief DONE tanpa commit unit ber-`commit_message` yang membawa kode: {names}",
                              "Jalankan matriks bukti disk (`references/lifecycle-recovery.md` bagian 3): kode unit "
-                             "ada tetapi belum di-commit → commit bersama brief lewat koreksi; kode tidak ada → "
+                             "ada tetapi belum di-commit → commit kodenya lewat koreksi; kode tidak ada → "
                              "kembalikan status brief ke `READY`. Dilarang melanjutkan ke brief berikutnya.")
         start = next((b for b in briefs if b["status"] not in CLOSED), None)
         if start:
@@ -366,11 +374,12 @@ class PreconditionChecker:
         })
 
     def _check_7_halt_marker(self):
-        """`{taskdir}/HALT.md` ter-commit menahan rantai lintas sesi.
+        """`{taskdir}/HALT.md` yang belum dicabut menahan rantai lintas sesi.
 
         Vonis gerbang kompilasi, scope, simbol, dan berkas liar jatuh sesudah
-        brief ter-commit `DONE`; tanpa penanda di disk sesi berikutnya memilih
-        `NN+1` dan melanjutkan di atas kode yang diketahui rusak.
+        commit unit mendarat; tanpa penanda di disk sesi berikutnya memilih
+        `NN+1` dan melanjutkan di atas kode yang diketahui rusak. HALT yang
+        dicabut (`status: DICABUT`, `doc_seal.py cabut-halt`) tidak menahan.
         """
         cid, name = 7, "Halt Marker"
         fm = read_halt(self.td.path) if self.td.ok else None
@@ -380,7 +389,7 @@ class PreconditionChecker:
                 f"HALT.md menahan rantai di {fm.get('brief', '?')} "
                 f"(verdict {fm.get('verdict', '?')} @ {fm.get('sha', '?')})",
                 "Kembalikan ke `backend:tech-lead`: SCOPE/SYMBOL → tanya user terima/reset; COMPILE/STRAY → "
-                "lane PLANNING taskdir sama, `plan` menambah baris `repairs`. Architect dilarang menghapus HALT.md.")
+                "lane PLANNING taskdir sama, `plan` menambah baris `repairs`. Architect dilarang mencabut HALT.md.")
         self._add(cid, name, "PASS", "Tidak ada HALT.md")
 
     def format_text(self) -> str:

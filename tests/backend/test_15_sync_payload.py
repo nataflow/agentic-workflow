@@ -3,9 +3,10 @@ import json
 
 import pytest
 
-from conftest import BE_SKILLS, TD, brief, commit, git, run_script, write_files
+from conftest import BE_SKILLS, TD, be_run, brief, commit, git, load_module, run_script, write_files
 
 SP = BE_SKILLS / "_common" / "sync_payload.py"
+PL = load_module(BE_SKILLS / "_common" / "precondition_lib.py", "be_precondition_lib_sync24")
 WS = "11111111-2222-3333-4444-555555555555"
 TICKET = "analyst/tickets/2609231400-cicilan-pembayaran"
 
@@ -33,6 +34,16 @@ def keys(out):
     return [d["key"] for d in out["documents"]]
 
 
+def sealed(text):
+    """BRD/PRD `APPROVED` bermaterai utuh, seperti tulisan `doc_seal.py approve` (Langkah 24)."""
+    return text.replace("status: APPROVED\n", f"status: APPROVED\napproved_seal: {PL.doc_seal(text)}\n")
+
+
+def lock(repo):
+    r = be_run(repo, "_common/doc_seal.py", "lock-briefs", "--taskdir", TD)
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
 def view(doc, **over):
     v = {"key": doc["key"], "type": doc["type"], "mimetype": "text/markdown",
          "content_sha256": doc["content_sha256"], "metadata": json.loads(doc["metadata"])}
@@ -51,11 +62,11 @@ def test_config_rusak_fail(repo):
     assert code == 1 and out["problems"][0].startswith(".claude/nataflow.json rusak")
 
 
-def test_taskdir_tidak_sah_dan_akar_belum_commit(repo):
+def test_taskdir_tidak_sah_dan_akar_belum_terkunci(repo):
     assert "pola kanonik" in sp(repo, "--taskdir", "backenddev/docs/salah")[1]["problems"][0]
     td = "backenddev/docs/2609241000-baru"
     write_files(repo, {f"{td}/TASK.md": "---\nstatus: ACTIVE\n---\n# Baru\n"})
-    assert "belum ter-commit" in sp(repo, "--taskdir", td)[1]["problems"][0]
+    assert "akar belum terkunci" in sp(repo, "--taskdir", td)[1]["problems"][0]
 
 
 @pytest.mark.regression("15 B2")
@@ -77,34 +88,35 @@ def test_fase_satu_task_sendiri(repo):
     assert out["documents_total"] == 1 and '"content":' not in json.dumps(out)
 
 
-def test_pilihan_berkas_head_saja(repo):
-    write_files(repo, {f"{TD}/BRD.md": "---\nstatus: DRAFT\n---\n# BRD\n",
-                       f"{TD}/PRD.md": "---\nstatus: APPROVED\n---\n# PRD\n",
-                       f"{TD}/.explore/gate-x.md": "catatan\n", f"{TD}/NOTES.md": "bukan artefak\n"})
-    commit(repo, "docs: artefak")
-    write_files(repo, {f"{TD}/RCA.md": "belum di-commit\n"})
-    (repo / TD / "PRD.md").write_text("---\nstatus: APPROVED\n---\n# PRD disunting\n", encoding="utf-8")
+@pytest.mark.regression("24 K14")
+def test_pilihan_berkas_stabil_dari_disk(repo):
+    prd = sealed("---\nstatus: APPROVED\n---\n# PRD\n")
+    write_files(repo, {f"{TD}/BRD.md": "---\nstatus: DRAFT\n---\n# BRD\n", f"{TD}/PRD.md": prd,
+                       f"{TD}/RCA.md": "# RCA di disk\n", f"{TD}/.explore/gate-x.md": "catatan\n",
+                       f"{TD}/NOTES.md": "bukan artefak\n"})
+    brief(repo, "01", "order-lock", "READY")                                   # belum dikunci
     out = push(repo)
-    assert keys(out) == ["PRD.md", "TASK.md"], "DRAFT, .explore/, non-artefak, dan berkas belum commit tidak ikut"
-    prd = out["documents"][0]
-    assert prd["content"] == "---\nstatus: APPROVED\n---\n# PRD\n", "isi blob HEAD, bukan working tree"
-    meta = json.loads(prd["metadata"])
-    assert meta["status"] == "APPROVED" and meta["path"] == f"{TD}/PRD.md" and len(meta["commit"]) == 40
+    assert keys(out) == ["PRD.md", "RCA.md", "TASK.md"], "DRAFT, brief belum terkunci, .explore/, non-artefak tidak ikut"
+    doc = out["documents"][0]
+    assert doc["content"] == prd, "isi disk apa adanya"
+    meta = json.loads(doc["metadata"])
+    assert meta["status"] == "APPROVED" and meta["path"] == f"{TD}/PRD.md" and meta["commit"] == ""
+    assert meta["head"] == git(repo, "rev-parse", "HEAD").strip()
+    (repo / TD / "PRD.md").write_text(prd.replace("# PRD", "# PRD disunting"), encoding="utf-8")
+    assert "PRD.md" not in keys(push(repo)), "APPROVED yang disunting sesudah approve tidak dicerminkan"
 
 
 @pytest.mark.regression("15 B9")
 def test_status_workdir_dan_task_dari_disk(repo):
     b1 = brief(repo, "01", "order-lock", "READY")
-    commit(repo, "docs: brief", str(b1.relative_to(repo)))
+    lock(repo)
     out = sp(repo, "--taskdir", TD)[1]
     assert out["workdir"]["status"] == "active" and out["task"]["status"] is None
     b1.write_text(b1.read_text(encoding="utf-8").replace("status: READY", "status: BLOCKED"), encoding="utf-8")
-    commit(repo, "docs: blocked", str(b1.relative_to(repo)))
     out = sp(repo, "--taskdir", TD)[1]
     assert out["workdir"]["status"] == "blocked"
     assert out["task"]["status"] == {"status": "in_progress", "from": ["todo"]}
     write_files(repo, {f"{TD}/REPORT.md": "# Order fix — Report\n"})
-    commit(repo, "docs: laporan")
     out = sp(repo, "--taskdir", TD)[1]
     assert out["workdir"]["status"] == "done"
     assert out["task"]["status"] == {"status": "done", "from": ["todo", "in_progress"]}
@@ -135,55 +147,56 @@ def test_ticket_source_rusak(repo):
 @pytest.mark.regression("15 B8")
 def test_diff_hanya_yang_berbeda(repo):
     b1 = brief(repo, "01", "order-lock", "READY")
-    commit(repo, "docs: brief", str(b1.relative_to(repo)))
+    lock(repo)
     first = push(repo)
     assert keys(first) == ["TASK.md", "brief-01-order-lock.md"] and first["same"] == 0
     remote = [view(d) for d in first["documents"]]
     assert push(repo, json.dumps(remote))["documents"] == []
     b1.write_text(b1.read_text(encoding="utf-8").replace("status: READY", "status: DONE"), encoding="utf-8")
-    commit(repo, "docs: done", str(b1.relative_to(repo)))
     out = push(repo, json.dumps(remote))
     assert keys(out) == ["brief-01-order-lock.md"] and out["same"] == 1
 
 
-@pytest.mark.regression("15 B2")
-def test_halt_dicabut_didorong_removed(repo):
+@pytest.mark.regression("24 K11")
+def test_halt_dicabut_didorong_berstatus_dicabut(repo):
     write_files(repo, {f"{TD}/HALT.md": "---\nbrief: brief-01\nverdict: SCOPE\n---\n# HALT\n"})
-    commit(repo, "docs: halt")
     halt = next(d for d in push(repo)["documents"] if d["key"] == "HALT.md")
-    git(repo, "rm", "-q", f"{TD}/HALT.md")
-    git(repo, "commit", "-qm", "docs: cabut halt")
+    assert sp(repo, "--taskdir", TD)[1]["workdir"]["status"] == "blocked"
+    r = be_run(repo, "_common/doc_seal.py", "cabut-halt", "--taskdir", TD, "--alasan", "scope diterima user")
+    assert r.returncode == 0, r.stdout
     out = push(repo, json.dumps([view(halt)]))
     (doc,) = [d for d in out["documents"] if d["key"] == "HALT.md"]
-    meta = json.loads(doc["metadata"])
-    assert meta["removed"] is True and meta["status"] == "SCOPE" and doc["content"] == halt["content"]
-    assert meta["commit"] == git(repo, "rev-parse", "HEAD").strip()
+    assert json.loads(doc["metadata"])["status"] == "DICABUT" and "removed" not in json.loads(doc["metadata"])
     assert sp(repo, "--taskdir", TD)[1]["workdir"]["status"] == "active", "HALT dicabut → tidak lagi blocked"
 
+
+@pytest.mark.regression("24 G5")
+def test_dokumen_taskdir_yang_hilang_tidak_didorong(repo):
+    write_files(repo, {f"{TD}/RCA.md": "# RCA\n"})
+    rca = next(d for d in push(repo)["documents"] if d["key"] == "RCA.md")
+    (repo / TD / "RCA.md").unlink()
+    assert "RCA.md" not in keys(push(repo, json.dumps([view(rca)]))), "isi terakhir dibiarkan di server"
 
 
 @pytest.mark.regression("15 E11")
 def test_type_mengikuti_format_server(repo):
-    write_files(repo, {f"{TD}/PRD.md": "---\nstatus: APPROVED\n---\n# PRD\n", f"{TD}/RCA.md": "# RCA\n",
+    write_files(repo, {f"{TD}/PRD.md": sealed("---\nstatus: APPROVED\n---\n# PRD\n"), f"{TD}/RCA.md": "# RCA\n",
                        f"{TD}/HALT.md": "---\nverdict: SCOPE\n---\n# HALT\n", f"{TD}/report-01.md": "# r\n",
                        f"{TD}/REVIEW.md": "# review\n", f"{TD}/REPORT.md": "# report\n"})
-    commit(repo, "docs: artefak lengkap")
     docs = push(repo)["documents"]
     assert {d["key"]: d["type"] for d in docs} == {
         "PRD.md": "prd", "RCA.md": "rca", "HALT.md": "halt", "report-01.md": "unit.report",
         "REVIEW.md": "review", "REPORT.md": "report", "TASK.md": "task"}
-    halt = next(d for d in docs if d["key"] == "HALT.md")
-    git(repo, "rm", "-q", f"{TD}/HALT.md")
-    git(repo, "commit", "-qm", "docs: cabut halt")
-    (doc,) = [d for d in push(repo, json.dumps([view(halt, type="HALT")]))["documents"] if d["key"] == "HALT.md"]
-    assert doc["type"] == "halt", "type remote bergaya lama dinormalkan sebelum dikirim ulang"
+    prd = next(d for d in docs if d["key"] == "PRD.md")
+    write_files(repo, {f"{TD}/PRD.md": "---\nstatus: DRAFT\n---\n# PRD v2\n"})          # tidak lagi terpilih
+    (doc,) = [d for d in push(repo, json.dumps([view(prd, type="PRD")]))["documents"] if d["key"] == "PRD.md"]
+    assert doc["type"] == "prd", "type remote bergaya lama dinormalkan sebelum dikirim ulang"
+
 
 def test_dokumen_tercermin_yang_kembali_draft_diperbarui(repo):
-    write_files(repo, {f"{TD}/BRD.md": "---\nstatus: APPROVED\n---\n# BRD\n"})
-    commit(repo, "docs: approve")
+    write_files(repo, {f"{TD}/BRD.md": sealed("---\nstatus: APPROVED\n---\n# BRD\n")})
     brd = next(d for d in push(repo)["documents"] if d["key"] == "BRD.md")
     write_files(repo, {f"{TD}/BRD.md": "---\nstatus: DRAFT\n---\n# BRD v2\n"})
-    commit(repo, "docs: amandemen")
     (doc,) = [d for d in push(repo, json.dumps([view(brd)]))["documents"] if d["key"] == "BRD.md"]
     assert json.loads(doc["metadata"])["status"] == "DRAFT" and "removed" not in json.loads(doc["metadata"])
 

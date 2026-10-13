@@ -24,7 +24,7 @@ def test_implementor_staging_includes_finding_source(chain_repo):
     (repo / FINDING).write_text((repo / FINDING).read_text().replace(
         "### P1-1 stok negatif\n", "### P1-1 stok negatif\n> Status: FIXED 2026-09-24 — lihat brief-01\n"))
     brief(repo, "01", "guard", "DONE", finding_source=FINDING)
-    sha = commit(repo, "fix(order): implement guard", "src/order.go", f"{TD}/brief-01-guard.md", FINDING)
+    sha = commit(repo, "fix(order): implement guard", "src/order.go", FINDING)    # brief tidak di-stage (Langkah 24)
     assert git(repo, "status", "--porcelain") == ""
     assert bs.finding_diff_ok(repo, sha, FINDING)
 

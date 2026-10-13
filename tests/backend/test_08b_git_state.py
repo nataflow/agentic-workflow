@@ -95,7 +95,8 @@ def test_b3_report_base_tidak_resolve_dan_detached(chain_repo):
 
 def test_b3_report_lolos_dengan_diff(chain_repo):
     brief(chain_repo, "01", "lock", "DONE")
-    write_files(chain_repo, {f"{TD}/REVIEW.md": "# Review\n"})
+    # Dokumen taskdir tidak di-commit (Langkah 24): diff merge-base hanya berisi kode unit.
+    write_files(chain_repo, {f"{TD}/REVIEW.md": "# Review\n", "src/lock.go": "package order\n"})
     commit(chain_repo, "done")
     c = be_checks(chain_repo, REPORT, "--taskdir", TD)[8]
     assert c["status"] == "PASS", c

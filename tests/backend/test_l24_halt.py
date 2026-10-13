@@ -1,7 +1,7 @@
-"""L2.4 — vonis henti architect ter-commit sebagai `HALT.md`; `plan` mencabutnya lewat baris `repairs`."""
+"""L2.4 — vonis henti architect di `HALT.md`; `plan` mencabutnya lewat baris `repairs` (`status: DICABUT`)."""
 import json
 
-from conftest import TD, be_checks, be_run, brief, commit, land, write_files
+from conftest import TD, be_checks, be_run, brief, commit, git, land, write_files
 
 def _spec_path(repo):
     """Spec batch di laci `.explore/` taskdir — satu-satunya lokasi yang diterima scaffold (B11)."""
@@ -62,22 +62,24 @@ def test_append_requires_reissue_of_ready_after_halt(chain_repo):
     assert _append(chain_repo, FIX, REISSUE).returncode == 0
 
 
-def test_scaffold_repairs_removes_halt(chain_repo):
+def test_scaffold_repairs_mencabut_halt(chain_repo):
     _halted(chain_repo)
     assert _append(chain_repo, FIX, REISSUE).returncode == 0
     out = be_run(chain_repo, SCAFFOLD, "--taskdir", TD, "--nn", "04")
     assert out.returncode == 0, out.stdout + out.stderr
-    assert not (chain_repo / TD / "HALT.md").exists()
-    assert "git rm -q HALT.md" in out.stdout
+    halt = (chain_repo / TD / "HALT.md").read_text()
+    assert "status: DICABUT" in halt and "dicabut: \"brief-04 (repairs)\"" not in halt, halt
+    assert "dicabut: brief-04 (repairs)" in halt, "jejak penahanan tetap di disk (24 K11)"
+    assert "HALT.md (status: DICABUT)" in out.stdout
+    assert be_checks(chain_repo, ARCH, "--taskdir", TD)[7]["status"] == "PASS"
     fm = (chain_repo / TD / "brief-04-endpoint-compile-fix.md").read_text().split("---")[1]
     assert "repairs: brief-02" in fm
 
 
 def test_halt_under_taskdir_keeps_review_fresh(chain_repo):
     land(chain_repo, brief(chain_repo, "01", "lock", "READY"))
-    write_files(chain_repo, {f"{TD}/REVIEW.md": "---\nhighest: CLEAN\n---\n"})
-    commit(chain_repo, "docs(order-fix): add final review report")
-    write_files(chain_repo, {f"{TD}/HALT.md": HALT})
-    commit(chain_repo, "chore(order-fix): tahan rantai di brief-01 (STRAY)")
+    head = git(chain_repo, "rev-parse", "--short=7", "HEAD").strip()
+    write_files(chain_repo, {f"{TD}/REVIEW.md": f"---\nrange: aaaaaaa..{head} (1 commit)\nhighest: CLEAN\n---\n"})
+    write_files(chain_repo, {f"{TD}/HALT.md": HALT.replace("verdict: COMPILE", "verdict: STRAY")})
     c3 = be_checks(chain_repo, ARCH, "--taskdir", TD)[3]
     assert c3["entry"] == "FASE_5"

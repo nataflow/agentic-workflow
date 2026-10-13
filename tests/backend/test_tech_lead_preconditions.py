@@ -74,9 +74,34 @@ def test_l55_reentry_berkas_unicode_di_zona_artefak(make_repo):
     proc = run_script(BE_SKILLS / "tech-lead/scripts/check_preconditions.py", "--root", str(root),
                       "--re-entry", "--json")
     c = {c["id"]: c for c in _json.loads(proc.stdout)["checks"]}[3]
-    assert c["status"] == "PASS" and "2 berkas artefak" in c["summary"]
+    # Langkah 24: penanda ignore ditulis sebelum tree dinilai, jadi dokumen taskdir tidak pernah tampak kotor.
+    assert c["status"] == "PASS" and "bersih" in c["summary"], c
+    assert (root / "backenddev/docs/.gitignore").is_file()
     write_files(root, {"backenddev/docsx/a.md": "x\n"})
     proc = run_script(BE_SKILLS / "tech-lead/scripts/check_preconditions.py", "--root", str(root),
                       "--re-entry", "--json")
     c = {c["id"]: c for c in _json.loads(proc.stdout)["checks"]}[3]
     assert c["status"] == "FAIL" and "backenddev/docsx/a.md" in c["summary"]
+
+
+# -- Langkah 24 (G2): dokumen taskdir di luar git -----------------------------------------------
+
+def test_g2_dokumen_ter_track_dirutekan_migrasi(make_repo):
+    root = _committed_repo(make_repo)
+    write_files(root, {"backenddev/docs/2601011200-refund/TASK.md": "# T\n"})
+    git(root, "add", "-A")
+    git(root, "commit", "-qm", "docs: era git")
+    c = _check(_run(root), 3)
+    assert c["status"] == "FAIL" and c["summary"].startswith("MIGRASI: 1 berkas") and "docs_git.py migrate" in c["action"]
+    assert _check(_run(root, "--re-entry"), 3)["status"] == "FAIL"
+    assert not (root / "backenddev/docs/.gitignore").exists(), "penolakan tidak menulis penanda ignore"
+
+
+def test_g2_read_only_tidak_menulis_penanda(make_repo):
+    root = _committed_repo(make_repo)
+    write_files(root, {"backenddev/docs/2601011200-refund/TASK.md": "# T\n"})
+    assert _check(_run(root, "--read-only"), 3)["status"] == "PASS"
+    assert not (root / "backenddev/docs/.gitignore").exists()
+    assert _check(_run(root), 3)["status"] == "PASS"
+    assert (root / "backenddev/docs/.gitignore").is_file()
+    assert git(root, "status", "--porcelain") == ""

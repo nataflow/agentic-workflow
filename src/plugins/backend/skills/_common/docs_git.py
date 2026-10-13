@@ -93,8 +93,9 @@ def docs_ignored(root: Path, prefix: str) -> bool:
 
 
 def ensure_ignored(root: Path, prefix: str) -> Tuple[bool, str]:
-    """(berkas ignore ditulis, masalah). Sudah diabaikan → (False, ""). Masalah = tetap tidak diabaikan sesudah ditulis."""
-    if docs_ignored(root, prefix):
+    """(berkas ignore ditulis, masalah). Sudah diabaikan atau bukan repo git → (False, ""). Masalah = tetap tidak
+    diabaikan sesudah ditulis."""
+    if _git(root, "rev-parse", "--is-inside-work-tree")[0] != 0 or docs_ignored(root, prefix):
         return False, ""
     target = root / docs_rel(prefix) / ".gitignore"
     target.parent.mkdir(parents=True, exist_ok=True)

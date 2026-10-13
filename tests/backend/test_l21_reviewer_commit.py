@@ -1,8 +1,8 @@
-"""L2.1 — `code-reviewer` meng-commit `REVIEW.md` bersama baris indeks `backenddev/issues/README.md`."""
+"""L2.1 — `code-reviewer` meng-commit baris indeks `backenddev/issues/README.md`; `REVIEW.md` di disk (Langkah 24)."""
 import re
 import shlex
 
-from conftest import PLUGINS, TD, be_checks, brief, commit, git, write_files
+from conftest import PLUGINS, TD, be_checks, brief, commit, git, land, write_files
 
 BE = PLUGINS / "backend"
 REVIEWER = BE / "agents/code-reviewer.md"
@@ -21,12 +21,12 @@ def _fase4_git_add() -> list:
 
 
 def _review_session(repo, *paths):
-    brief(repo, "01", "lock", "DONE")
-    commit(repo, "fix(order): implement lock")
+    land(repo, brief(repo, "01", "lock", "READY"))
     write_files(repo, {f"{TD}/REVIEW.md": "---\nhighest: CLEAN\n---\n# Review\n",
                        "backenddev/issues/README.md":
                            "# Issues Index\n| Date | Issue ID | Target | Severity | Status |\n"})
-    commit(repo, "docs(order-fix): add final review report", *paths)
+    if paths:
+        commit(repo, "docs(order-fix): add final review report", *paths)
 
 
 def test_reviewer_staging_leaves_tree_clean(chain_repo):
@@ -50,7 +50,7 @@ def test_commit_matrix_owner_single():
     assert "catat ke `issues/README.md`" not in LIFECYCLE.read_text(encoding="utf-8")
 
 
-def test_regression_only_review_staged_fails(chain_repo):
-    _review_session(chain_repo, f"{TD}/REVIEW.md")
-    assert git(chain_repo, "status", "--porcelain").strip() == "?? backenddev/issues/"
+def test_regression_indeks_tidak_di_commit_gagal(chain_repo):
+    _review_session(chain_repo)                                   # REVIEW.md di disk, indeks tertinggal
+    assert git(chain_repo, "status", "--porcelain", "-uall").strip() == "?? backenddev/issues/README.md"
     assert be_checks(chain_repo, "report/scripts/check_preconditions.py", "--taskdir", TD)[7]["status"] == "FAIL"

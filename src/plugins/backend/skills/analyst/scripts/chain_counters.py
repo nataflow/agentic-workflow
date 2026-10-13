@@ -6,13 +6,17 @@ penolakan user per hop, pengembalian `## Open questions` per hop), dan
 `business-analysis`/`system-analysis` masing-masing plafon ronde reviewer.
 Hitungan yang hanya hidup di ingatan sesi hilang saat compaction atau
 pemanggilan ulang, sehingga loop analyst ↔ gerbang dapat melewati plafonnya
-tanpa terdeteksi. Skrip ini satu-satunya penulis tabel `## Counters`; perubahan
-`TASK.md`-nya ikut commit pembaruan `TASK.md` berikutnya milik penulisnya.
+tanpa terdeteksi. Skrip ini satu-satunya penulis tabel `## Counters`.
+
+`TASK.md` tidak di-commit (Langkah 24), jadi riwayat tabel tidak lagi dibaca dari
+git: tiap tulisan skrip ini menambah satu entri ke `<taskdir>/.explore/counters-log.json`
+(tabel sesudah tulis + operasinya). Penurunan di tabel disk yang tidak dijelaskan
+entri log tertangkap sebagai suntingan tangan (09 E20, 11 H13).
 
     --bump <kunci>   naikkan satu; melewati plafon → FAIL exit 1, tabel tidak berubah;
                      `reject:<HOP>`/`oq_return:<HOP>` sekaligus menolkan `review_round:<HOP>`
     --check          cetak seluruh kunci; exit 1 bila ada yang melebihi plafon, kunci tak dikenal,
-                     atau nilai yang turun di luar `--reset-hop` menurut riwayat git `TASK.md`
+                     atau nilai yang turun di luar `--reset-hop` menurut log tulisan skrip
     --reset-hop HOP  nolkan kunci ber-hop milik HOP dan hop hilirnya — dipanggil
                      re-entry (Fase 3 butir 0) sesudah `--bump reentry` lolos, supaya
                      revisi hop yang dibuka ulang mendapat ronde reviewer baru;
@@ -25,11 +29,11 @@ Zero external dependencies (Python Standard Library only).
 """
 
 import argparse
+import json
 import re
-import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 PLAFON = {"reentry": 2, "chain_transition": 2, "root_amendment": 2,
           "reject": 2, "oq_return": 2, "review_round": 2}
@@ -56,48 +60,60 @@ def unknown_keys(counters: Dict[str, int]) -> List[str]:
     return bad
 
 
-def history(taskdir: Path) -> List[Dict[str, int]]:
-    """Tabel `## Counters` tiap versi `TASK.md` ter-commit, tertua dulu; kosong di luar git."""
-    task = taskdir / "TASK.md"
+LOG = ".explore/counters-log.json"
+
+
+def history(taskdir: Path) -> List[Tuple[Dict[str, int], str]]:
+    """Entri log tulisan skrip `[(tabel sesudah tulis, operasi)]`, tertua dulu; log absen atau rusak → `[]`.
+
+    Operasi: `bump:<kunci>` atau `reset:<HOP>`. Log tinggal di laci `.explore/` taskdir yang, seperti
+    `TASK.md`, hanya ada di disk.
+    """
     try:
-        top = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=taskdir, capture_output=True,
-                             text=True)
-        if top.returncode != 0:
-            return []
-        root = Path(top.stdout.strip()).resolve()
-        rel = task.resolve().relative_to(root).as_posix()     # pathspec git relatif cwd → jalankan dari root
-        shas = subprocess.run(["git", "log", "--reverse", "--format=%H", "--", rel], cwd=root,
-                              capture_output=True, text=True).stdout.split()
-        out = []
-        for sha in shas:
-            r = subprocess.run(["git", "show", f"{sha}:{rel}"], cwd=root, capture_output=True)
-            out.append(parse(r.stdout.decode("utf-8", errors="replace")) if r.returncode == 0 else {})
-        return out
+        raw = json.loads((taskdir / LOG).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return []
+    out = []
+    for item in raw if isinstance(raw, list) else []:
+        table, op = (item.get("counters"), item.get("op")) if isinstance(item, dict) else (None, None)
+        if isinstance(table, dict) and isinstance(op, str):
+            out.append(({str(k): int(v) for k, v in table.items() if str(v).isdigit()}, op))
+    return out
 
 
-def tampered(versions: List[Dict[str, int]]) -> List[str]:
-    """Penurunan yang tidak dijelaskan `--reset-hop` antar-versi berurutan (09 E20).
+def record(taskdir: Path, counters: Dict[str, int], op: str) -> None:
+    """Tambah satu entri log sesudah tabel ditulis."""
+    entries = [{"counters": c, "op": o} for c, o in history(taskdir)] + [{"counters": dict(counters), "op": op}]
+    path = taskdir / LOG
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(entries, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
 
-    Kunci global (`reentry`, `chain_transition`, `root_amendment`) tidak pernah turun. Kunci ber-hop
-    hanya boleh turun (atau hilang) di versi yang sama dengan kenaikan `reentry`: re-entry menaikkan
-    `reentry` lalu `--reset-hop`, dan keduanya ikut satu commit pembaruan `TASK.md`. `review_round:<HOP>`
-    juga boleh turun bersama kenaikan `reject:<HOP>` atau `oq_return:<HOP>`.
+
+def tampered(entries: List[Tuple[Dict[str, int], str]], current: Dict[str, int]) -> List[str]:
+    """Penurunan yang tidak dijelaskan operasi skrip, antar-entri log berurutan dan dari entri terakhir ke
+    tabel disk sekarang (09 E20).
+
+    Kunci global (`reentry`, `chain_transition`, `root_amendment`) tidak pernah turun. Kunci ber-hop hanya
+    boleh turun (atau hilang) di entri `reset:<HOP>` untuk hop itu dan hilirnya, dan hanya bila entri tepat
+    sebelumnya `bump:reentry` — urutan re-entry Fase 3 butir 0. `review_round:<HOP>` juga boleh turun di entri
+    `bump:reject:<HOP>` atau `bump:oq_return:<HOP>` (11 H27). Tabel disk tidak membawa operasi: penurunan apa
+    pun dari entri terakhir adalah suntingan tangan.
     """
+    versions = [({}, "")] + entries + [(current, "disk")]
     problems = []
-    for before, after in zip(versions, versions[1:]):
-        reentered = after.get("reentry", 0) > before.get("reentry", 0)
+    for (before, prev_op), (after, op) in zip(versions, versions[1:]):
+        kind, _, arg = op.partition(":")
+        reentered = kind == "reset" and arg in HOPS and prev_op == "bump:reentry"
+        reopened = HOPS[HOPS.index(arg):] if reentered else ()
         for k, v in before.items():
             now = after.get(k, 0)
             if now >= v:
                 continue
-            if ":" in k and reentered:
-                continue
             base, _, hop = k.partition(":")
-            if base == "review_round" and any(after.get(f"{t}:{hop}", 0) > before.get(f"{t}:{hop}", 0)
-                                              for t in ("reject", "oq_return")):
-                continue              # `--bump reject|oq_return:<HOP>` menolkan ronde reviewer hop itu (11 H27)
+            if hop and hop in reopened:
+                continue
+            if base == "review_round" and op in (f"bump:reject:{hop}", f"bump:oq_return:{hop}"):
+                continue
             problems.append(f"{k} turun {v} → {now} tanpa `--reset-hop` sesudah `--bump reentry`")
     return problems
 
@@ -149,28 +165,29 @@ def main():
 
     if args.check:
         over = [k for k, v in counters.items() if k.split(":")[0] in PLAFON and v > PLAFON[k.split(":")[0]]]
-        # Versi disk sekarang ikut dinilai sebagai versi terakhir: penurunan yang belum di-commit juga tertangkap.
-        drops = tampered(history(Path(args.taskdir)) + [counters])
+        # Tabel disk dinilai terhadap entri log terakhir: penurunan tangan apa pun tertangkap.
+        drops = tampered(history(Path(args.taskdir)), counters)
         status = "FAIL" if over or bad or drops else "PASS"
         print(f"COUNTER: [{status}] {summary(counters)}")
         for k in over:
             print(f"    - {k} melebihi plafon — jalankan Failure path analyst yang sesuai")
         for k in bad:
-            print(f"    - kunci `{k}` tak dikenal — tabel `## Counters` hanya ditulis skrip ini; pulihkan dari git")
+            print(f"    - kunci `{k}` tak dikenal — tabel `## Counters` hanya ditulis skrip ini; pulihkan dari "
+                  f"entri terakhir `{LOG}`")
         for d in drops:
-            print(f"    - {d} — tabel disunting tangan; pulihkan nilainya dari riwayat git")
+            print(f"    - {d} — tabel disunting tangan; pulihkan nilainya dari entri terakhir `{LOG}`")
         sys.exit(1 if status == "FAIL" else 0)
 
     if bad:
         print(f"COUNTER: [FAIL] kunci tak dikenal di `## Counters`: {', '.join(bad)} — tabel disunting tangan; "
-              f"pulihkan dari riwayat git sebelum menulis")
+              f"pulihkan dari entri terakhir `{LOG}` sebelum menulis")
         sys.exit(1)
     # Menulis di atas nilai yang diturunkan tangan menghapus jejak penurunannya dari versi berikutnya;
     # `--check` saja tidak cukup karena tidak ada fase yang memanggilnya (11 H13, regresi 09 E20).
-    drops = tampered(history(Path(args.taskdir)) + [counters])
+    drops = tampered(history(Path(args.taskdir)), counters)
     if drops:
-        print("COUNTER: [FAIL] tabel `## Counters` disunting tangan — pulihkan nilainya dari riwayat git "
-              "sebelum menulis:")
+        print(f"COUNTER: [FAIL] tabel `## Counters` disunting tangan — pulihkan nilainya dari entri terakhir "
+              f"`{LOG}` sebelum menulis:")
         for d in drops:
             print(f"    - {d}")
         sys.exit(1)
@@ -181,6 +198,7 @@ def main():
         for k in dropped:
             del counters[k]
         task.write_text(render(text, counters), encoding="utf-8")
+        record(Path(args.taskdir), counters, f"reset:{args.reset_hop}")
         print(f"COUNTER: [PASS] hop {', '.join(reopened)} dibuka ulang — dinolkan: {', '.join(dropped) or '—'}")
         sys.exit(0)
 
@@ -202,8 +220,8 @@ def main():
         if counters.pop(f"review_round:{hop}", 0):
             reset = f" · review_round:{hop} dinolkan"
     task.write_text(render(text, counters), encoding="utf-8")
+    record(Path(args.taskdir), counters, f"bump:{args.bump}")
     print(f"COUNTER: [PASS] {args.bump} {n}/{PLAFON[base]}{reset}")
-    print(f"    stage bersama commit pembaruan TASK.md berikutnya: {task}")
     sys.exit(0)
 
 

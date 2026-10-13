@@ -151,21 +151,41 @@ def brief(repo: Path, nn: str, unit: str, status: str, body: str = "# Brief\n", 
 
 
 def land(repo: Path, brief_path: Path, code: str = "src/order.go", line: str = "// unit\n") -> str:
-    """Unit mendarat sesuai protokol implementor: `status: DONE` + kode dalam SATU commit bersubjek
-    `commit_message` brief. Brief `DONE` tanpa commit semacam ini ditolak architect (09 E18)."""
+    """Unit mendarat sesuai protokol implementor: `status: DONE` di disk + commit kode bersubjek `commit_message`
+    brief; brief tidak di-commit (Langkah 24). Brief `DONE` tanpa commit semacam ini ditolak architect (09 E18)."""
     text = brief_path.read_text(encoding="utf-8")
     brief_path.write_text(re.sub(r"^status: \w+$", "status: DONE", text, count=1, flags=re.M), encoding="utf-8")
     target = repo / code
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text((target.read_text(encoding="utf-8") if target.exists() else "") + line, encoding="utf-8")
     msg = re.search(r'^commit_message: "?(.*?)"?$', text, re.M).group(1)
-    return commit(repo, msg, code, str(brief_path.relative_to(repo)))
+    return commit(repo, msg, code)
 
 
 def commit(repo: Path, msg: str, *paths: str) -> str:
+    """Commit `paths` (default: semua perubahan) dan kembalikan sha7 `HEAD`.
+
+    Tanpa `paths` dan tanpa perubahan ter-stage tidak ada commit yang dibuat: dokumen taskdir backend diabaikan
+    git (Langkah 24), jadi "commit sesudah menulis dokumen" tidak lagi menghasilkan apa pun. Path eksplisit yang
+    diabaikan git tetap gagal di `git add`.
+    """
     git(repo, "add", *(paths or ("-A",)))
+    if not paths and subprocess.run(["git", "-C", str(repo), "diff", "--cached", "--quiet"],
+                                    env={**os.environ, **GIT_ENV}).returncode == 0:
+        return git(repo, "rev-parse", "--short=7", "HEAD").strip()
     git(repo, "commit", "-qm", msg)
     return git(repo, "rev-parse", "--short=7", "HEAD").strip()
+
+
+_BE_PL = []
+
+
+def be_sealed(text: str) -> str:
+    """BRD/PRD `APPROVED` bermaterai utuh seperti tulisan `doc_seal.py approve` (Langkah 24)."""
+    if not _BE_PL:
+        _BE_PL.append(load_module(BE_SKILLS / "_common" / "precondition_lib.py", "be_precondition_lib_sealed"))
+    nl = "\r\n" if "\r\n" in text else "\n"
+    return text.replace(f"status: APPROVED{nl}", f"status: APPROVED{nl}approved_seal: {_BE_PL[0].doc_seal(text)}{nl}", 1)
 
 
 def be_run(repo: Path, skill_script: str, *args: str) -> subprocess.CompletedProcess:
@@ -180,13 +200,22 @@ def be_checks(repo: Path, skill_script: str, *args: str) -> Dict[int, dict]:
     return {c["id"]: c for c in json.loads(proc.stdout)["checks"]}
 
 
+BE_DOCS_IGNORE = "*\n"   # `backenddev/docs/.gitignore` tulisan `docs_git.py ensure` (Langkah 24)
+
+
+def be_task(root: Path, base: str, extra: str = "") -> None:
+    """`{TD}/TASK.md` akar terkunci di disk (`base_commit`), tidak di-commit; `backenddev/docs/` diabaikan git."""
+    write_files(root, {"backenddev/docs/.gitignore": BE_DOCS_IGNORE,
+                       f"{TD}/TASK.md": (f"---\nchain: BRIEF\nrisk: MINOR\nstatus: ACTIVE\nbase_commit: {base}\n{extra}"
+                                         "---\n# Order fix\n## Success Criteria\n- SC-1 lock\n- SC-2 endpoint\n")})
+
+
 @pytest.fixture
 def chain_repo(make_repo):
-    """Repo ber-profil backend (stack go), `{TD}/TASK.md` ter-commit di `main`; HEAD di branch kerja `fix/order-fix`."""
+    """Repo ber-profil backend (stack go); HEAD di branch kerja `fix/order-fix`. `{TD}/TASK.md` hanya di disk dengan
+    `base_commit` = commit awal `main` (Langkah 24: dokumen taskdir diabaikan git dan tidak pernah di-commit)."""
     root = make_repo({
         ".gitignore": ".explore/\n",
-        f"{TD}/TASK.md": ("---\nchain: BRIEF\nrisk: MINOR\nstatus: ACTIVE\n---\n# Order fix\n"
-                          "## Success Criteria\n- SC-1 lock\n- SC-2 endpoint\n"),
         "src/order.go": "package order\n",
     })
     git(root, "checkout", "-q", "-b", "main")
@@ -194,6 +223,7 @@ def chain_repo(make_repo):
     write_files(root, {".claude/profile/backenddev/commands.md":
                        "## Commands\n- build: go build ./...\n- test: go test ./...\n"})
     commit(root, "init")
+    be_task(root, git(root, "rev-parse", "HEAD").strip())
     git(root, "checkout", "-q", "-b", "fix/order-fix")   # rantai berjalan di branch kerja, bukan base
     return root
 
