@@ -46,6 +46,10 @@ CASES = [
 
     ("fullstack/skills/_common/workspace.py", ["scan", "--json"], True, None),
     ("fullstack/skills/_common/workspace.py", ["peta", "--json"], True, None),
+    ("fullstack/skills/_common/explore.py", ["list", "--json"], True, None),
+    ("fullstack/skills/_common/explore.py", ["layanan", "list", "--json"], True, None),
+    ("fullstack/skills/_common/explore.py", ["check", "--report", ".fullstack/explore/x.md", "--json"], True, None),
+    ("fullstack/skills/_common/explore.py", ["seam", "--report", ".fullstack/explore/x.md", "--json"], True, None),
 
     ("backend/hooks/detect.py", ["--plugin", "backend"], "hook", HOOK_STDIN),
     ("backend/hooks/guard_bash.py", ["hook"], "hook", BASH_STDIN),
