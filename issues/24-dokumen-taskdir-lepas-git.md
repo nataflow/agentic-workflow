@@ -305,3 +305,118 @@ Selisih pelaksanaan terhadap peta:
   cermin nataflow; seksi `## Amendments` tetap dilarang (`gate-lifecycle.md` bagian 1a).
 - **Helper test `commit()` tanpa path** tidak membuat commit bila tidak ada yang ter-stage, karena dokumen taskdir
   yang ditulis test kini diabaikan git. Path eksplisit yang di-ignore tetap gagal di `git add`.
+
+### Tahap 3 — peta blast radius frontend (sebelum kode)
+
+Inventaris pemanggilan git di skrip frontend (`grep` atas `skills/**/*.py` dan `hooks/*.py`). Hampir seluruh
+integritas rantai frontend dibaca dari subjek dan badan commit dokumen `TASK.md`. Karena itu tahap ini mengganti
+satu sumber kebenaran dengan sumber lain, bukan menambal titik per titik.
+
+**Keputusan rancangan** (dari pembacaan kode, menajamkan K5, K8, K9, K10, K13, dan K15):
+
+- **Satu seksi `## Riwayat Rantai` di `TASK.md`, tanpa seksi `## Materai` terpisah.** Materai approve adalah
+  kejadian `approve` di Riwayat. Dengan begitu `approval_stamp` tetap bekerja seperti pembacaan `git log`: pindai
+  mundur, `reopen` yang membuka hop itu → hop tidak bermaterai, `approve` hop itu → materainya. Satu baris per
+  kejadian, bernomor urut, dan hanya ditulis `chain.py`:
+
+  ```text
+  ## Riwayat Rantai
+
+  - 1 · akar · base 1a2b3c4 · lane FAST_FORWARD · sections architecture · akar 0123456789ab · 2026-10-13T10:00:00Z
+  - 2 · draft CONTRACT · sidik 0123456789ab · review contract r1 t1 PASS 0123456789ab · 2026-10-13T10:05:00Z
+  - 3 · approve CONTRACT · sidik 0123…(40) · review contract r1 t1 PASS 0123456789ab · sc 0123456789ab · 2026-…Z · persetujuan: Setujui
+  - 4 · reopen BRIEF · target BRIEF · berkas brief-01-a.md=DONE:0123456789ab;brief-02-b.md=BLOCKED:… · 2026-…Z · alasan: …
+  - 5 · eskalasi · lane HOTFIX_MINOR → FAST_FORWARD · sections - → architecture · akar … · 2026-…Z · alasan: …
+  ```
+
+  Teks bebas (`persetujuan:`, `alasan:`) selalu di ujung baris dan wajib satu baris (12 J46 tetap berlaku). Nomor
+  yang tidak berurut, field ganda, atau baris tak terurai membuat Riwayat dinyatakan rusak, dan semua gerbang
+  menolak dengan remedi `frontend:lead`.
+- **Subperintah `chain.py` baru menggantikan commit dokumen.**
+  - `root`: kunci akar. Menulis `base_commit` = `HEAD` dan kejadian `akar` (lane, sections, sidik akar). Mengganti
+    commit `kunci TASK sebagai akar rantai`.
+  - `amend --reason`: amandemen akar. Menjalankan `validate_task.py --amend` sendiri, lalu mencatat sidik akar baru.
+    Mengganti commit `amandemen akar TASK`.
+  - `draft --row`: catat draft atau revisi hop. Validator gate harus `PASS`. Untuk CONTRACT, dan BRIEF lane
+    non-MINOR yang punya brief `READY`, ronde reviewer terakhir juga harus `PASS` atas konten itu, dan field
+    `review` ikut dicatat. Mengganti `git commit` draft `FLOW.md`/`UI.md`/brief MINOR dan `review_round.py commit`.
+- **Sidik akar** (sha1 frontmatter tanpa `status:` + isi sebelum `## Chain`) menggantikan `is_committed(TASK.md)`
+  di `check_task_root`. Suntingan akar di luar `amend`/`escalate` → FAIL dengan remedi amandemen akar. Tanpa
+  pengganti ini, akar frontend yang dulu terkunci commit bisa disunting diam-diam.
+- **Revisi** dihitung sebagai draft ke-2 dan seterusnya sejak `reopen` apa pun atau `approve` hop itu. Ini setara
+  dengan hitungan subjek `revise` + `draft` berulang yang lama.
+- **Pemulihan ronde tetap ada (K15 frontend tidak menggugurkan apa pun).** Field `review <gate> r<n> t<total>` di
+  kejadian `draft`/`approve` menggantikan trailer `Review-Round`. `committed_rounds`, deteksi state yang terpotong,
+  dan `rebuild` membaca Riwayat.
+- **`presented`** (putaran ronde): ronde `PASS` dianggap sudah diajukan bila ada kejadian `draft` hop gate itu
+  sesudah ronde dibuka (`riwayat` = jumlah kejadian saat `open`) dengan sidik yang sama. Ronde format lama yang
+  hanya ber-`head` dianggap belum diajukan (konservatif).
+- **Approve:**
+  - Approve hop dokumen menuntut kejadian `draft` terakhir hop itu sesudah reopen terakhirnya bersidik sama dengan
+    isi disk. Ini pengganti `require_clean`: konten yang disetujui adalah konten yang tercatat diajukan.
+  - Approve BRIEF tanpa brief `READY` (approval ulang tanpa kerja baru) tidak menuntut draft.
+  - Approve BRIEF menulis `sidik_kontrak` ke tiap brief `READY` (K10). Kejadiannya memuat sidik per berkas dan
+    status, sidik agregat, `brief` (sidik brief saja, pembanding `Review-Round`), dan `sc`.
+- **`strip_status_line` juga membuang baris `sidik_kontrak:` pertama di frontmatter.** Penulisan sidik saat approve
+  tidak boleh mengubah sidik konten yang sudah direview.
+- **Bukti `DONE` (K7):** brief `DONE` di disk ditambah commit `<type>(<slug>): implement unit <NN>` di
+  `base_commit..HEAD` yang membawa kode. Urutan architect: status `DONE` di disk lebih dulu, lalu commit kode.
+  Terputus di antaranya → matriks bukti disk.
+- **Kesegaran review (K9):** field `head:` baru di `REVIEW.md`. Review segar bila `head` leluhur `HEAD` dan tidak ada
+  commit rantai (`(<slug>)`) pembawa kode sesudahnya.
+- **Keadaan taskdir:**
+  - `TUNTAS`: `REPORT.md` lolos `validate_report.py`. `LAPORAN TERTUNDA`: `REPORT.md` ada tetapi gagal validator.
+  - Pemeriksaan `TUNTAS` sebelum ledger (12 J44, demi squash-merge) dibuang, karena materai kini di disk.
+  - Taskdir era git tanpa `base_commit`:
+    - ber-`REPORT.md` → `TUNTAS` (warisan);
+    - ber-centang atau ber-artefak → `RUSAK`, rute `chain.py abandon`;
+    - selain itu → `AKAR` (kunci akar).
+- **Pagar implementor (K13):** pengecualian hanya `frontenddev/docs/<taskdir>/report-NN.md`. Implementor frontend
+  tidak pernah menyunting brief (`agents/code-implementor.md` [FORBIDDEN]); status ditulis architect.
+- **G2 di frontend:**
+  - `lead` tidak punya skrip prasyarat. `taskdir_state.py` (Phase 2) keluar `FAIL` dengan rute `MIGRASI` bila
+    `frontenddev/docs/` masih ter-track. Ia tetap read-only: `sync_payload` memanggilnya.
+  - Check 10 baru di prasyarat `task` menjalankan `ensure_ignored`.
+  - Cabang "kotoran milik taskdir sendiri" di `check_worktree` dibuang, karena dokumen taskdir tidak pernah lagi
+    tampak kotor.
+
+**Skrip:**
+
+| Berkas | Perubahan | Yang bisa pecah |
+|---|---|---|
+| `skills/_common/precondition_lib.py` | Blok Riwayat baru: `read_history`, `history_problem`, `root_sidik`, `sc_sidik`, `history_line`. `check_task_root`: Riwayat + `base_commit` + sidik akar, bukan `is_committed`. `lane_tamper` me-replay Riwayat. `reopen_epoch`, `revisions_since_open`, `approval_stamp`, `verify_chain_row`, `brief_set_drift`, `doc_drift`, dan `locked_brief_problems` membaca Riwayat. `task_root_sha` = `base_commit`. `done_landed` mengikuti K7. `review_is_fresh` mengikuti K9. `check_worktree` tanpa cabang kotoran sendiri. Dibuang: `show_at`, `snapshot_at`, `gate_targets_at`, `count_subjects`, `_log_entries`, `stamp_fields`, `approve_subject_ok`, `review_required_at`, `_status_at`, `is_committed` | test_12_ledger (±40), test_12_validators, test_12_verification (`is_committed`, `lane_tamper`), test_09_robustness (`lane_tamper`, `review_is_fresh`, `revisions_since_open`), test_gate_preconditions, test_chain_reopen |
+| `skills/_common/chain.py` | `init` tanpa perubahan. `root`, `amend`, `draft` baru. `approve`, `reopen`, `abandon`, `escalate` menulis disk + Riwayat, tanpa `git add`/`commit`. `files` dan `revisions` membaca Riwayat. Plafon dari Riwayat | test_12_ledger, test_chain_reopen, test_08c_chain_newline, `fe_chain_repo`/`fe_approved_chain`/`fe_minor_chain` |
+| `skills/_common/review_round.py` | `commit` dibuang (digantikan `chain.py draft`). `epoch`, `presented`, `committed_rounds`, dan `rebuild` dari Riwayat. Ronde mencatat `riwayat`, bukan `head` | test_review_round (±30) |
+| `skills/lead/scripts/taskdir_state.py` | Urutan vonis baru (lihat Keputusan). Keluar `FAIL` `MIGRASI` bila dokumen masih ter-track | test_08c_taskdir_state, test_phase_report, test_12_orchestration |
+| `skills/architect/scripts/check_preconditions.py` | `implemented` = `report-NN.md` + `done_landed` K7. `LAPORAN TERTUNDA` dari `validate_report.py`. `check_worktree` tanpa `allow`/`own_action` | test_08c_architect_preconditions, test_12_orchestration |
+| `skills/architect/scripts/validate_review.py` | `base` = `base_commit`, `head` wajib leluhur `HEAD`, dan `reviewed_at` dibandingkan dengan tanggal `base_commit`. `_first_unit` sejak `base_commit` | test_validate_review, test_08c_text, `fe_review_md` |
+| `skills/plan/scripts/validate_briefs.py` | Check M: `_first_blocked`, `_born_after`, dan `_contract_reentries` membaca kejadian `reopen` Riwayat | test_validate_briefs_check_m |
+| `skills/plan/scripts/check_preconditions.py` | Mode REVISE: `revisions_since_open` baru | test_gate_preconditions |
+| `skills/report/scripts/check_preconditions.py` | Check 3: `REVIEW.md` tanpa `is_committed`. Check 5: tertunda = gagal `validate_report.py`. Check 7 tanpa `own_action` | test_08c_task_report, test_phase_report |
+| `skills/review/scripts/check_preconditions.py`, `skills/report/scripts/validate_report.py` | `chain_files` sejak `base_commit` (tanpa perubahan kode bila `task_root_sha` sudah bermakna baru) | test_08c_review_preconditions, test_validate_report, test_parsing_l5 |
+| `skills/task/scripts/check_preconditions.py` | Check 5: `finding_source` ter-track dan bersih tanpa `is_committed`. Check 10 baru: G2 | test_a1_ticket_source, test_17_tech_handoff |
+| `skills/task/scripts/validate_task.py` | Heading sah: empat heading lama, ditambah `## Riwayat Rantai` opsional di ujung. `base_commit` di frontmatter | test_08c_task_report |
+| `skills/_common/sync_payload.py` | K14 seperti backend. `TASK.md` tanpa akar terkunci → FAIL | test_15_sync_payload, smoke |
+| `hooks/guard_bash.py` | K13: `report-NN.md` taskdir dikecualikan dari penolakan "diabaikan git" | test_12_guard |
+| `skills/_common/verify_scope.py` | Tidak berubah (sudah ber-`sidik_kontrak` sejak tahap 2) | — |
+
+**Prosa** (±120 sebutan `commit` di ±40 berkas, mayoritas commit dokumen). Arah perubahannya sama dengan backend.
+
+| Berkas | Perubahan |
+|---|---|
+| `skills/task/SKILL.md`, `templates/task-template.md` | Phase 4 butir 5: `chain.py root` menggantikan commit. Template mendapat `base_commit` dan `## Riwayat Rantai` |
+| `skills/lead/SKILL.md`, `references/lane-routing-matrix.md`, `references/nataflow-sync.md` | Rute `MIGRASI`, keadaan baru (`LAPORAN TERTUNDA`, `TUNTAS`, warisan), amandemen akar lewat `chain.py amend`, plafon dari Riwayat |
+| `skills/ux-design/SKILL.md`, `skills/ui-design/SKILL.md` | Commit draft/revisi → `chain.py draft` |
+| `skills/contract/SKILL.md`, `dispatcher/reviewer.md` | `review_round.py commit` → `chain.py draft`. Materai approve di Riwayat |
+| `skills/plan/SKILL.md`, `dispatcher/reviewer.md`, `templates/brief-template.md` | Tabel subjek commit Phase 4 → `chain.py draft --row BRIEF`. Brief mendapat `sidik_kontrak` |
+| `skills/architect/SKILL.md`, `references/execution-protocol.md`, `dispatcher/implementor.md`, `dispatcher/reviewer.md`, `templates/review-template.md` | Commit unit men-stage kode saja (status `DONE` di disk lebih dulu). Commit BLOCKED menjadi suntingan disk. `REVIEW.md` tanpa commit (field `head`). Phase 5 butir 4 tanpa commit |
+| `skills/report/SKILL.md`, `skills/review/SKILL.md`, `skills/profile/SKILL.md` | `REPORT.md` tidak di-commit. Profil Fase 5: baris `.explore/` diganti penanda `docs_git.py` |
+| `agents/code-implementor.md`, `agents/code-reviewer.md`, `agents/doc-reviewer.md`, `agents/contract-reviewer.md` | Kalimat commit |
+| `README.md` (plugin) | Tabel subjek commit, `chain.py`, keadaan taskdir, sinkron |
+
+**Test:** fixture `fe_chain_repo` ditulis ulang (`frontenddev/docs/.gitignore`, `chain.py root`, `CONTRACT.md` DRAFT
+di disk), begitu juga `fe_approved_chain` (`chain.py draft` menggantikan `review_round.py commit`), `fe_brief`,
+`fe_review_md` (`head`), dan `minor_chain_reviewed.sh` (tanpa `git add` dokumen, `chain.py root`/`draft`, commit
+kode saja, `REVIEW.md` ber-`head`). Test berbasis git dokumen ditulis ulang ke Riwayat dengan ID regresi yang sama.
+Test baru: `tests/frontend/test_24_riwayat.py` (format dan keutuhan Riwayat, `root`/`amend`/`draft`, sidik akar,
+K13, dan G2 frontend).
