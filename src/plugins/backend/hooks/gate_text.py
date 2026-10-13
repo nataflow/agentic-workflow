@@ -62,13 +62,15 @@ def _profile_note(v) -> str:
 
 
 def _workspace(v) -> str:
-    """Root multi-repo (21 F1): bukan gerbang, hanya penunjuk ke repo backend."""
+    """Root multi-repo (21 F1): bukan gerbang, hanya penunjuk ke repo backend dan `/fullstack:explore` (23 L5)."""
     repos = ", ".join(f"`{r.dir}/` ({r.stack}, sumber: {'profil' if r.source == 'profile' else r.source})"
                       for r in v.workspace)
     return (f"<backend-tech-lead-gate>\nFolder ini root multi-repo (bukan repo git) berisi {v.workspace_size} repo. "
             "Gerbang backend tidak berlaku di sini: skrip prasyarat skill backend butuh repo git.\n\n"
-            f"Kerja backend dijalankan dari dalam repo backend: {repos}. Penelusuran lintas repo dari root: "
-            "`/fullstack:explore` (bila plugin fullstack terpasang).\n</backend-tech-lead-gate>")
+            f"Kerja backend dijalankan dari dalam repo backend: {repos}. Memahami atau menelusuri kode repo anak "
+            "dari root (peta aplikasi, alur di dalam satu repo, atau jahitan lintas repo) lewat `/fullstack:explore` "
+            "(bila plugin fullstack terpasang), bukan subagent `Explore` atau `general-purpose` bawaan.\n"
+            "</backend-tech-lead-gate>")
 
 
 def render(v) -> str:
