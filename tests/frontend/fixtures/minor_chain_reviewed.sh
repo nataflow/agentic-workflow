@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Rantai HOTFIX_MINOR frontend yang tuntas sampai `closing review PASS` (ter-commit) dan
-# `REPORT.md` tertulis tetapi belum di-commit. Pemakaian: minor_chain_reviewed.sh <repo> <skills>.
+# Rantai HOTFIX_MINOR frontend yang tuntas: unit 01 mendarat (commit kode), `REVIEW.md` PASS ber-`head`,
+# dan `REPORT.md` tertulis. Dokumen taskdir hanya di disk dan diabaikan git (Langkah 24): akar dikunci
+# `chain.py root`, breakdown dicatat `chain.py draft`. Pemakaian: minor_chain_reviewed.sh <repo> <skills>.
 # Asal: reproduksi L4.6 (`issues/04-frontenddev-revisi-validator.md`).
 set -eu
 export PYTHONDONTWRITEBYTECODE=1
@@ -43,7 +44,7 @@ Tombol order wajib berlabel Pesan (`src/App.tsx:1`).
 
 EOF
 q $CH init --taskdir $T
-git add $T/TASK.md; git commit -qm "docs(order-checkout): kunci TASK.md"
+q $CH root --taskdir $T
 BASE=$(git rev-parse --short HEAD)
 cat > $T/brief-01-order-button.md <<EOF
 ---
@@ -98,15 +99,16 @@ export interface OrderButtonUI { label: string }
 - [ ] tombol berlabel Pesan
 - [ ] (verifikasi penutup) pnpm test — nol galat baru
 EOF
-git add $T/brief-01-order-button.md; git commit -qm "docs(order-checkout): draft breakdown (1 briefs)"
+q $CH draft --taskdir $T --row BRIEF
 q $CH approve --taskdir $T --row BRIEF --answer "setuju"
 mkdir -p src/features/order
 echo 'export const OrderButton = () => <button>Pesan</button>;' > src/features/order/OrderButton.tsx
 echo 'test("x", () => { expect(1).toBe(1) })' > src/features/order/OrderButton.test.tsx
 printf -- '---\nartifact: UNIT_REPORT\nunit: "01"\nbrief: brief-01-order-button.md\nstatus: DONE\n---\n\n# Unit 01 — order-button\n' > $T/report-01.md
 sed 's/^status: READY/status: DONE/' $T/brief-01-order-button.md > $T/brief-01.tmp && mv $T/brief-01.tmp $T/brief-01-order-button.md
-git add src $T/brief-01-order-button.md $T/report-01.md
+git add src
 git commit -qm "feat(order-checkout): implement unit 01 - order button"
+HEAD7=$(git rev-parse --short HEAD)
 cat > $T/REVIEW.md <<EOF
 ---
 artifact: REVIEW
@@ -117,6 +119,7 @@ p1: 0
 p2: 0
 p3: 0
 base: $BASE
+head: $HEAD7
 reviewed_at: $(git log -1 --format=%cs $BASE)
 ---
 
@@ -165,5 +168,4 @@ reviewed_at: $(git log -1 --format=%cs $BASE)
 | 8 | Performance & Leaks | PASS |
 | 9 | Test Quality | PASS |
 EOF
-git add $T/REVIEW.md; git commit -qm "docs(order-checkout): closing review PASS"
 printf '# Order button — perbaikan label — Report\n\n## Ringkasan\n\nTombol order kini berlabel Pesan.\n\n## Perubahan\n\n- tombol order baru beserta test (src/features/order)\n' > $T/REPORT.md

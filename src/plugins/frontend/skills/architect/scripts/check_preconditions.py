@@ -14,7 +14,7 @@ titik mulai tidak ditebak dari membaca frontmatter satu per satu.
 
 **Ingest** (`--brief NN`) — dijalankan sebelum tiap dispatch implementor:
 ditambah brief target `READY` ber-`files_touched`, seluruh `depends_on` `DONE`
-dan ter-commit lewat commit `implement unit`, `report-<NN>.md` belum ada, dan
+dengan commit `implement unit` berkode sejak `base_commit`, `report-<NN>.md` belum ada, dan
 kesegaran `based_on` (`WARN`, bukan `FAIL`).
 
 Zero external dependencies (Python Standard Library only). Satu impor
@@ -47,7 +47,6 @@ from precondition_lib import (  # noqa: E402
     find_repo_root,
     format_report,
     git,
-    is_committed,
     normalize_taskdir,
     parse_frontmatter,
     read_status,
@@ -60,6 +59,7 @@ from precondition_lib import (  # noqa: E402
 from precondition_lib import cli  # noqa: E402
 
 VALIDATE_BRIEFS = Path(__file__).resolve().parents[2] / "plan" / "scripts" / "validate_briefs.py"
+VALIDATE_REPORT = Path(__file__).resolve().parents[2] / "report" / "scripts" / "validate_report.py"
 
 BRIEF_PATTERN = re.compile(r"^brief-(\d{2})-[a-z0-9-]+\.md$")
 PLUGIN_FILES = ("dispatcher/implementor.md", "dispatcher/reviewer.md",
@@ -67,11 +67,6 @@ PLUGIN_FILES = ("dispatcher/implementor.md", "dispatcher/reviewer.md",
                 "scripts/validate_review.py", "../../agents/code-implementor.md",
                 "../../agents/code-reviewer.md")
 BRIEF_STATUS = ("READY", "DONE", "BLOCKED")
-# Kotoran yang seluruhnya milik taskdir ini (12 J22) — bukan kerja user.
-OWN_DIRT_ACTION = ("Seluruhnya artefak taskdir ini dari sesi lalu, bukan kerja user: `report-<NN>.md`/brief unit "
-                   "yang terputus → matriks bukti disk (`references/execution-protocol.md` bagian 3); `REVIEW.md` "
-                   "belum ter-commit → Phase 4 (`validate_review.py` lalu commit); `REPORT.md` → Phase 5 butir 4. "
-                   "Dilarang men-stash atau menghapusnya.")
 # Kotoran di luar taskdir pada fase PENUTUP (12 J55): prasyarat dijalankan ulang sesudah verifikasi penutup,
 # sebelum reviewer — jejak perintah verifikasi akan divonis check TREE `validate_review.py` sebagai mutasi reviewer.
 CLOSING_DIRT_ACTION = ("Fase PENUTUP: kotoran di luar taskdir sesudah verifikasi penutup adalah jejak perintah "
@@ -122,14 +117,12 @@ class PreconditionChecker:
         return self._closure.get(nn, ("", False))[1]
 
     def implemented(self, nn: str) -> bool:
-        """Brief `DONE` sah hanya bila riwayatnya memuat commit `implement unit <NN>`, laporannya ada, dan
-        transisi `→ DONE`-nya mendarat bersama kode (12 J15, padanan 09 E18)."""
+        """Brief `DONE` sah hanya bila laporannya ada dan commit `implement unit <NN>` pembawa kode mendarat sejak
+        `base_commit` (12 J15, padanan 09 E18; 24 K7 — status brief tidak lagi ada di riwayat git)."""
         path = self.briefs().get(nn)
         if path is None or not (self.taskdir / f"report-{nn}.md").is_file():
             return False
-        rel = f"{self.taskdir_rel}/{path.name}"
-        subjects = git(self.root, "log", "--format=%s", "--", rel)
-        return any(f"implement unit {nn}" in sub for sub in subjects.splitlines()) and bool(done_landed(self.root, rel))
+        return bool(done_landed(self.root, f"{self.taskdir_rel}/{path.name}"))
 
     def briefs(self) -> Dict[str, Path]:
         out: Dict[str, Path] = {}
@@ -159,11 +152,8 @@ class PreconditionChecker:
         self.stack = check_profile(self._add, 5, self.profile_dir, PROFILE_FILES)
         check_adapter(self._add, 6, self.stack)
         check_plugin_files(self._add, 7, self.skill_dir, PLUGIN_FILES)
-        # REPORT.md tertunda (tertulis, gagal di-commit) adalah satu-satunya kotoran yang boleh
-        # ada: architect Phase 5 butir 4 memvalidasi dan menguncinya.
+        # Dokumen taskdir diabaikan git (Langkah 24): yang dinilai kotor hanya kode dan dokumen tingkat repo.
         check_worktree(self._add, 8, self.root, self.taskdir_rel,
-                       allow=[f"{self.taskdir_rel}/REPORT.md"] if self.phase == "LAPORAN TERTUNDA" else [],
-                       own_action=OWN_DIRT_ACTION,
                        foreign_action=CLOSING_DIRT_ACTION if self.phase == "PENUTUP" else "")
         self._check_9_head()
         if self.brief_nn:
@@ -192,8 +182,9 @@ class PreconditionChecker:
         if fake:
             self._add(4, name, "FAIL", "brief DONE tanpa commit `implement unit NN` berkode atau "
                       "`report-NN.md`: " + ", ".join(fake),
-                      "Status DONE hanya ditulis architect bersama commit unit; status yang diketik "
-                      "tangan dikembalikan ke READY lewat revisi brief dan dieksekusi sungguhan.")
+                      "Status DONE hanya ditulis architect tepat sebelum commit unit; terputus di antaranya → "
+                      "matriks bukti disk (`references/execution-protocol.md` bagian 3). Status yang diketik "
+                      "tangan dikembalikan ke READY dan unitnya dieksekusi sungguhan.")
             return
         # Brief BLOCKED tanpa remedi divonis **sebelum** validate_briefs: janji yang dipikulnya kini tak
         # dipikul brief READY/DONE mana pun (Check G), jadi validator pasti FAIL dan menutupi fase TERHENTI
@@ -238,7 +229,9 @@ class PreconditionChecker:
             self.phase = "PENUTUP"
         elif not report.is_file():
             self.phase = "LAPORAN" if read_status(review, "verdict") in ("PASS", "WARNING") else "TEMUAN (REVIEW BLOCKED)"
-        elif not is_committed(self.root, f"{self.taskdir_rel}/REPORT.md"):
+        elif subprocess.run([sys.executable, str(VALIDATE_REPORT), "--taskdir", self.taskdir_rel,
+                             "--root", str(self.root)], stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL).returncode != 0:
             self.phase = "LAPORAN TERTUNDA"
         else:
             self.phase = "TUNTAS"
@@ -309,7 +302,7 @@ class PreconditionChecker:
             if read_status(dep_path) != "DONE":
                 continue
             if not self.implemented(dep):
-                problems.append(f"unit `{dep}` DONE tanpa commit `implement unit {dep}` di riwayatnya")
+                problems.append(f"unit `{dep}` DONE tanpa commit `implement unit {dep}` berkode sejak `base_commit`")
         if problems:
             self._add(11, name, "FAIL", "; ".join(problems),
                       "Selesaikan dan commit unit prasyarat lebih dulu, berurutan.")

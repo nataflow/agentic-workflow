@@ -158,10 +158,10 @@ def test_lookup_tiket_sama_di_analyst_backend_frontend(repo):
     write_files(repo, {
         f"{be_td}/TASK.md": (f"---\nstatus: ACTIVE\nchain: BRIEF\nrisk: MINOR\n{source}"     # akar backend terkunci (24)
                              f"base_commit: {git(repo, 'rev-parse', 'HEAD').strip()}\n---\n# Cicilan API\n"),
-        f"{fe_td}/TASK.md": (f"---\nstatus: ACTIVE\nlane: FAST_FORWARD\nsections: [architecture]\n{source}---\n"
-                             "# Cicilan UI\n"),
+        f"{fe_td}/TASK.md": (f"---\nstatus: ACTIVE\nlane: FAST_FORWARD\nsections: [architecture]\n{source}"
+                             f"base_commit: {git(repo, 'rev-parse', 'HEAD').strip()}\n---\n# Cicilan UI\n"),
     })
-    commit(repo, "docs: akar engineer", be_td, fe_td)
+    commit(repo, "docs: akar engineer", be_td)          # akar frontend hanya di disk (Langkah 24)
     analyst = payload(repo)[1]["lookup"]
     backend = json.loads(run_script(BE_SP, "--taskdir", be_td, "--json", cwd=repo).stdout)["task"]["lookup"]
     frontend = json.loads(run_script(FE_SP, "--taskdir", fe_td, "--json", cwd=repo).stdout)["task"]["lookup"]

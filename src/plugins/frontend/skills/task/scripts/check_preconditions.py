@@ -4,7 +4,9 @@
 Memvonis prasyarat `frontend:task` sebelum Phase 1 dibuka: bentuk taskdir,
 profil, ketiadaan `TASK.md`, keabsahan pasangan `lane`/`sections`, keberadaan
 `finding_source`, berkas template, kebersihan working tree, `ticket_source`
-analyst yang READY serta terkunci, dan slug yang belum dipakai taskdir lain.
+analyst yang READY serta terkunci, slug yang belum dipakai taskdir lain, dan
+dokumen taskdir di luar git (24 G2): `frontenddev/docs/` yang masih ter-track →
+rute MIGRASI; selain itu penanda ignore `frontenddev/docs/.gitignore` ditulis.
 
 Zero external dependencies (Python Standard Library only). Satu impor
 intra-plugin: `skills/_common/precondition_lib.py`, di-bootstrap relatif
@@ -19,6 +21,7 @@ from typing import Any, Dict, List, Optional
 
 # Bootstrap path relatif terhadap berkas ini, bukan terhadap cwd.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
+import docs_git  # noqa: E402
 from precondition_lib import (  # noqa: E402
     profile_dir_for,
     check_plugin_files,
@@ -67,7 +70,7 @@ class PreconditionChecker:
         })
 
     def run_all(self) -> bool:
-        """Jalankan 9 check; hanya `FAIL` yang menahan."""
+        """Jalankan 10 check; hanya `FAIL` yang menahan."""
         taskdir_ok = check_taskdir(self._add, 1, self.root, self.taskdir_rel)
         self.stack = check_profile(self._add, 2, self.profile_dir, PROFILE_REQUIRED)
         self._check_3_absent(taskdir_ok)
@@ -78,7 +81,29 @@ class PreconditionChecker:
         # Ditambahkan di akhir supaya nomor check 1–7 yang sudah dirujuk tetap.
         self._add(8, "ticket_source READY & terkunci", *ticket_source_verdict(self.root, self.ticket_source))
         self._check_9_slug(taskdir_ok)
+        self._check_10_docs_git()
         return not any(r["status"] == "FAIL" for r in self.results)
+
+    def _check_10_docs_git(self) -> None:
+        """Dokumen taskdir di luar git (24 G2): ter-track → MIGRASI; selain itu penanda ignore ditulis."""
+        name = "Dokumen taskdir di luar git"
+        prefix = docs_git.PREFIXES["frontend"]
+        tracked = docs_git.tracked_docs(self.root, prefix)
+        if tracked:
+            self._add(10, name, "FAIL", f"MIGRASI: {len(tracked)} berkas `{prefix}/docs/` masih ter-track git",
+                      "Kembali ke `frontend:lead`: prosedur migrasi (`AskUserQuestion`, lalu "
+                      "`docs_git.py migrate --answer -`) sebelum akar baru ditulis.")
+            return
+        written, problem = docs_git.ensure_ignored(self.root, prefix)
+        if problem:
+            self._add(10, name, "FAIL", problem, f"Perbaiki `.gitignore` di bawah `{prefix}/docs/`, lalu ulangi.")
+            return
+        if not docs_git.docs_ignored(self.root, prefix):
+            self._add(10, name, "FAIL", "repo git tidak terbaca — penanda ignore tidak dapat dipastikan",
+                      "Jalankan di root repo git yang sah (lihat check 7).")
+            return
+        self._add(10, name, "PASS", f"`{prefix}/docs/` diabaikan git"
+                  + (" (penanda `.gitignore` baru ditulis)" if written else ""))
 
     def _check_3_absent(self, taskdir_ok: bool) -> None:
         name = "TASK.md belum ada"

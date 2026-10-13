@@ -1,7 +1,10 @@
-"""Check M `validate_briefs.py` — re-entry kontrak mencakup eskalasi dari HOTFIX_MINOR (L4.4)."""
+"""Check M `validate_briefs.py` — re-entry kontrak mencakup eskalasi dari HOTFIX_MINOR (L4.4). Urutan BLOCKED dan
+re-entry dibaca dari `## Riwayat Rantai` (Langkah 24), bukan dari subjek commit."""
+import re
+
 import pytest
 
-from conftest import FE_TD, commit, fe_run, write_files
+from conftest import FE_TD, fe_lib, fe_run, write_files
 
 TASK_MINOR = """---
 status: ACTIVE
@@ -31,17 +34,30 @@ def check_m(repo):
 
 
 def subject(repo, text):
+    """Kejadian Riwayat persis tulisan `chain.py` (`reopen BRIEF …` atau `eskalasi lane A → B`)."""
+    lib = fe_lib()
     p = repo / FE_TD / "TASK.md"
-    p.write_text(p.read_text(encoding="utf-8") + "\n", encoding="utf-8")
-    commit(repo, f"docs(orders-lacak): {text}", f"{FE_TD}/TASK.md")
+    task = p.read_text(encoding="utf-8")
+    n = len(lib.read_history(task)[0]) + 1
+    m = re.match(r"eskalasi lane (\S+) → (\S+)", text)
+    if m:
+        line = lib.history_line(n, "eskalasi", [], [("lane", f"{m.group(1)} → {m.group(2)}"),
+                                                     ("sections", "- → architecture"), ("akar", "0" * 12)],
+                                ("alasan", text))
+    else:
+        names = sorted(x.name for x in (repo / FE_TD).glob("brief-*.md"))
+        line = lib.history_line(n, "reopen", ["BRIEF"], [("target", "BRIEF"),
+                                                         ("berkas", lib.berkas_value(repo, FE_TD, names))],
+                                ("alasan", text))
+    p.write_text(lib.append_history(task, line), encoding="utf-8")
 
 
 @pytest.fixture
 def minor(make_repo):
-    repo = make_repo({f"{FE_TD}/TASK.md": TASK_MINOR})
-    commit(repo, "docs(orders-lacak): kunci TASK sebagai akar rantai")
+    repo = make_repo({f"{FE_TD}/TASK.md": TASK_MINOR + "## Riwayat Rantai\n\n- 1 · akar · base 0000000 · lane "
+                      "HOTFIX_MINOR · sections - · akar 000000000000 · waktu 2026-10-13T00:00:00Z\n"})
     mk(repo, "01", "BLOCKED"); mk(repo, "02", "BLOCKED", "01"); mk(repo, "03", "BLOCKED", "01")
-    commit(repo, "docs(orders-lacak): unit 03 BLOCKED - galat kompilasi baru")
+    subject(repo, "reopen BRIEF — unit 03 BLOCKED, galat kompilasi baru")     # Riwayat mencatat BLOCKED
     return repo
 
 

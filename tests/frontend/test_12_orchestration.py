@@ -5,7 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from conftest import FE_SKILLS, PLUGINS, REPO, commit, fe_profile, git, load_module, run_script, write_files
+from conftest import FE_SKILLS, PLUGINS, REPO, commit, fe_profile, fe_seal_root, git, load_module, run_script, \
+    write_files
 
 FE = PLUGINS / "frontend"
 TD = "frontenddev/docs/2609270900-label"
@@ -127,19 +128,24 @@ def brief(base: str, nn: str, name: str, status: str = "READY", total: int = 1, 
 
 
 def minor_root(make_repo, status: str = "ACTIVE", row: str = OPEN_ROW):
-    root = make_repo({".gitignore": ".explore/\n", f"{TD}/TASK.md": TASK.format(status=status, row=row),
-                      "src/App.tsx": "export const App = () => null;\n"})
+    """Akar HOTFIX_MINOR terkunci di disk (Langkah 24): commit kode awal, lalu `base_commit` + kejadian `akar`."""
+    root = make_repo({".gitignore": ".explore/\n", "src/App.tsx": "export const App = () => null;\n"})
     fe_profile(root, "react-vite")
     write_files(root, {".claude/profile/frontenddev/commands.md":
                        "| Perintah | Status |\n|---|---|\n| `pnpm test` | OK |\n"})
     git(root, "checkout", "-q", "-b", "main")
-    base = commit(root, "docs(label): kunci TASK sebagai akar rantai")
+    base = commit(root, "init")
+    write_files(root, {f"{TD}/TASK.md": TASK.format(status=status, row=row)})
+    fe_seal_root(root, TD)
     return root, base
 
 
 def approve_brief(root):
-    proc = run_script(CHAIN, "approve", "--taskdir", TD, "--row", "BRIEF", "--answer", "setuju", cwd=root)
-    assert proc.returncode == 0, proc.stdout
+    """Batch brief dicatat (`chain.py draft`) lalu disetujui — jalur `plan` Phase 4–5 lane MINOR."""
+    for args in (("draft", "--taskdir", TD, "--row", "BRIEF"),
+                 ("approve", "--taskdir", TD, "--row", "BRIEF", "--answer", "setuju")):
+        proc = run_script(CHAIN, *args, cwd=root)
+        assert proc.returncode == 0, proc.stdout
 
 
 def architect(root, *args):
@@ -167,10 +173,8 @@ def test_architect_terhenti_dilaporkan_sebelum_validate_briefs(make_repo):
     `TERHENTI` beserta rute reopen BRIEF → plan APPEND, bukan "validate_briefs.py FAIL"."""
     root, base = minor_root(make_repo)
     write_files(root, {f"{TD}/brief-01-label-a.md": brief(base, "01", "LabelA")})
-    commit(root, "docs(label): draft breakdown (1 briefs)")
     approve_brief(root)
     write_files(root, {f"{TD}/brief-01-label-a.md": brief(base, "01", "LabelA", status="BLOCKED")})
-    commit(root, "docs(label): unit 01 BLOCKED - galat")
     data = architect(root)
     c4 = check(data, 4)
     assert data["phase"] == "TERHENTI (brief-01 BLOCKED)", c4
@@ -187,7 +191,6 @@ def dag_taskdir(make_repo):
     write_files(root, {f"{TD}/brief-01-label-a.md": brief(base, "01", "LabelA", status="BLOCKED", total=2),
                        f"{TD}/brief-02-label-b.md": brief(base, "02", "LabelB", total=2, deps='"01"',
                                                           remedies="01")})
-    commit(root, "docs(label): brief legacy")
     return root, base
 
 
@@ -224,7 +227,6 @@ def test_j58c_check_d_menolak_remedi_bergantung_pada_unit_asal(make_repo):
 @pytest.mark.regression("J58")
 def test_j58b_rusak_nama_di_luar_pola_dipindah_bukan_abandon(make_repo):
     root = make_repo({"frontenddev/docs/2609270900-Label/TASK.md": TASK.format(status="ACTIVE", row=OPEN_ROW)})
-    commit(root, "docs(Label): kunci TASK sebagai akar rantai")
     out = run_script(STATE, "--root", str(root), "--json")
     row = json.loads(out.stdout)[0]
     assert row["state"] == "RUSAK"
@@ -245,7 +247,6 @@ def test_j55_artefak_verifikasi_ditahan_sebelum_reviewer(make_repo):
     root, base = minor_root(make_repo)
     rel = f"{TD}/brief-01-label-a.md"
     write_files(root, {rel: brief(base, "01", "LabelA")})
-    commit(root, "docs(label): draft breakdown (1 briefs)")
     approve_brief(root)
     write_files(root, {rel: brief(base, "01", "LabelA", status="DONE"),
                        f"{TD}/report-01.md": REPORT.format(nn="01"),

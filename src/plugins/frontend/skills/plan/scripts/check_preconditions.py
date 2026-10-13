@@ -54,7 +54,6 @@ from precondition_lib import (  # noqa: E402
     read_status,
     report_json,
     revisions_since_open,
-    taskdir_slug,
 )
 from precondition_lib import cli  # noqa: E402
 
@@ -174,8 +173,7 @@ class PreconditionChecker:
                 problem = (f"baris BRIEF ledger `[{mark}]` — breakdown yang sudah disetujui dibuka "
                            "lewat `chain.py reopen --row BRIEF` lalu mode APPEND")
             else:
-                slug = taskdir_slug(self.taskdir_rel)
-                used = revisions_since_open(self.root, [f"{self.taskdir_rel}/brief-*.md"], slug, "breakdown")
+                used = revisions_since_open(self.root, self.taskdir_rel, "BRIEF")
                 if used >= MAX_REVISIONS:
                     self._add(3, name, "WARN", f"plafon {MAX_REVISIONS} revisi breakdown habis",
                               "Hanya approval (Phase 5) yang boleh — batch tidak ditulis ulang. Penolakan "

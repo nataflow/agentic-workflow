@@ -1,7 +1,7 @@
 """08c C4 — taskdir_state.py: vonis tidak menyesatkan, tanpa kode mati."""
 import json
 
-from conftest import FE_SKILLS, commit, fe_profile, git, run_script, write_files
+from conftest import FE_SKILLS, commit, fe_profile, fe_seal_root, run_script, write_files
 
 SCRIPT = FE_SKILLS / "lead" / "scripts" / "taskdir_state.py"
 TD = "frontenddev/docs/2609240900-label"
@@ -100,7 +100,6 @@ def test_c4_taskdir_yang_tidak_ada_bukan_akar(make_repo):
 
 def test_c4_nama_di_luar_pola_dilaporkan_saat_pindai(make_repo):
     root = make_repo({"frontenddev/docs/2609240900-Order-Checkout/TASK.md": TASK.format(row=OPEN_ROW)})
-    commit(root, "docs(Order-Checkout): kunci TASK sebagai akar rantai")
     proc = state(root)
     assert "nol taskdir terbuka" not in proc.stdout
     assert "2609240900-Order-Checkout" in proc.stdout and "RUSAK" in proc.stdout
@@ -121,21 +120,21 @@ def test_c4_repo_non_git_gagal_eksplisit(make_repo):
 
 
 def test_c4_blocked_tanpa_remedi_menang_atas_ready(make_repo):
-    """Dulu ledger dicentang dengan materai tulisan tangan; sejak 12 J46 materai tanpa `Sidik:` tidak sah,
-    jadi breakdown disetujui lewat `chain.py approve` sungguhan."""
-    root = make_repo({f"{TD}/TASK.md": TASK.format(row=OPEN_ROW), "src/App.tsx": "export const App = () => null;\n"})
+    """Dulu ledger dicentang dengan materai tulisan tangan; sejak 12 J46 materai tanpa sidik tidak sah, jadi
+    breakdown dicatat dan disetujui lewat `chain.py draft`/`approve` sungguhan (Langkah 24: tanpa commit)."""
+    root = make_repo({"src/App.tsx": "export const App = () => null;\n"})
     fe_profile(root, "react-vite")
     write_files(root, {".claude/profile/frontenddev/commands.md": "| Perintah | Status |\n|---|---|\n| `pnpm test` | OK |\n"})
-    base = commit(root, "docs(label): kunci TASK sebagai akar rantai")
+    base = commit(root, "init")
+    write_files(root, {f"{TD}/TASK.md": TASK.format(row=OPEN_ROW)})
+    fe_seal_root(root, TD)
     write_files(root, {f"{TD}/brief-01-label-a.md": VALID_BRIEF.format(status="READY", base=base, nn="01", name="LabelA"),
                        f"{TD}/brief-02-label-b.md": VALID_BRIEF.format(status="READY", base=base, nn="02", name="LabelB")})
-    commit(root, "docs(label): draft breakdown (2 briefs)")
-    proc = run_script(FE_SKILLS / "_common" / "chain.py", "approve", "--taskdir", TD, "--row", "BRIEF",
-                      "--answer", "setuju", cwd=root)
-    assert proc.returncode == 0, proc.stdout
+    for args in (("draft", "--row", "BRIEF"), ("approve", "--row", "BRIEF", "--answer", "setuju")):
+        proc = run_script(FE_SKILLS / "_common" / "chain.py", *args, "--taskdir", TD, cwd=root)
+        assert proc.returncode == 0, proc.stdout
     write_files(root, {f"{TD}/brief-02-label-b.md": VALID_BRIEF.format(status="BLOCKED", base=base, nn="02",
                                                                      name="LabelB")})
-    commit(root, "docs(label): unit 02 BLOCKED - galat")
     proc = state(root, "--taskdir", TD)
     assert "TERHENTI" in proc.stdout, proc.stdout
 
@@ -143,3 +142,30 @@ def test_c4_blocked_tanpa_remedi_menang_atas_ready(make_repo):
 def test_c4_kode_mati_dibuang():
     src = SCRIPT.read_text(encoding="utf-8")
     assert "def followups" not in src and "DILANJUTKAN" not in src and "successors" not in src
+
+
+def test_24_akar_belum_terkunci_ke_task(make_repo):
+    root = make_repo({f"{TD}/TASK.md": TASK.format(row=OPEN_ROW)})
+    commit(root, "init", ".gitignore") if (root / ".gitignore").exists() else None
+    proc = state(root, "--taskdir", TD)
+    assert "AKAR" in proc.stdout and "chain.py root" in proc.stdout, proc.stdout
+
+
+def test_24_warisan_era_git(make_repo):
+    """Taskdir era git (tanpa `base_commit`/Riwayat): tuntas → TUNTAS warisan; berjalan → RUSAK (abandon)."""
+    done = "frontenddev/docs/2609010000-lama"
+    root = make_repo({f"{done}/TASK.md": TASK.format(row="- [x] BRIEF    — frontend:plan          → brief-*.md "
+                                                         "@ READY abc1234"),
+                      f"{done}/REPORT.md": "# Label — Report\n",
+                      f"{TD}/TASK.md": TASK.format(row="- [x] BRIEF    — frontend:plan          → brief-*.md "
+                                                       "@ READY abc1234")})
+    rows = {r["taskdir"]: r for r in json.loads(state(root, "--all", "--json").stdout)}
+    assert rows[done]["state"] == "TUNTAS" and "warisan" in rows[done]["detail"], rows[done]
+    assert rows[TD]["state"] == "RUSAK" and "abandon" in rows[TD]["next"], rows[TD]
+
+
+def test_24_dokumen_ter_track_rute_migrasi(make_repo):
+    root = make_repo({f"{TD}/TASK.md": TASK.format(row=OPEN_ROW)})
+    commit(root, "docs: era git")
+    proc = state(root, "--json")
+    assert proc.returncode == 1 and "MIGRASI" in json.loads(proc.stdout)["error"]

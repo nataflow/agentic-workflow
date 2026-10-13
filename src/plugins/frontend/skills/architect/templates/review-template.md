@@ -15,7 +15,8 @@ verdict: <PASS | WARNING | BLOCKED>
 p1: <n>
 p2: <n>
 p3: <n>
-base: <sha 7 digit commit akar TASK.md>
+base: <sha 7 digit `base_commit` TASK.md>
+head: <sha 7 digit HEAD yang dinilai>
 reviewed_at: <YYYY-MM-DD>
 ---
 
@@ -83,7 +84,7 @@ reviewed_at: <YYYY-MM-DD>
 
 Ditagih `validate_review.py`; `FAIL` menahan commit `REVIEW.md` dan membuat dispatch reviewer dianggap gagal (maks satu ulang):
 
-1. **Frontmatter**: `artifact: REVIEW`; `taskdir` = path taskdir yang divalidasi; `stack` = `stack` profil; `verdict` enum; `p1`/`p2`/`p3` bilangan; `base` = sha commit akar `TASK.md` (commit yang melahirkannya) — sha lain `FAIL`; `reviewed_at` tanggal kalender sah `YYYY-MM-DD`, tidak lebih awal dari commit akar.
+1. **Frontmatter**: `artifact: REVIEW`; `taskdir` = path taskdir yang divalidasi; `stack` = `stack` profil; `verdict` enum; `p1`/`p2`/`p3` bilangan; `base` = `base_commit` frontmatter `TASK.md` (HEAD saat akar dikunci `chain.py root`) — sha lain `FAIL`; `head` = sha `HEAD` yang dinilai reviewer, wajib leluhur `HEAD` (kesegaran review diukur darinya: commit kode rantai sesudah `head` membuat review basi); `reviewed_at` tanggal kalender sah `YYYY-MM-DD`, tidak lebih awal dari tanggal `base_commit`.
 2. **Struktur**: tepat satu H1 persis `# Review Findings — <slug>`, lalu delapan heading `##` persis urutan bagian 1.
 3. **Cakupan Success Criteria**: tepat satu baris per `SC-{n}` aktif `TASK.md` (SC gugur — `~~…~~ — gugur: <alasan>` — tidak divonis), vonis `terbukti` | `belum terbukti` | `PERLU VERIFIKASI MANUAL`. `terbukti` menuntut `path:baris` berkas rantai yang ada (baris dalam rentang berkas), atau perintah yang `HIJAU` di `## Verifikasi Penutup` — SC yang dibuktikan test lama yang tidak disentuh rantai memakai perintah hijau; `PERLU VERIFIKASI MANUAL` hanya sah untuk SC ber-alat-ukur `QA manual:`.
 4. **Cakupan Acceptance Criteria**: tepat satu baris per `AC-{n}` `CONTRACT.md` (lane non-MINOR), vonis `terbukti` | `belum terbukti` | `QA manual`. `terbukti` menuntut bukti seperti butir 3; AC ber-*Cara verifikasi* `test otomatis` hanya dibuktikan `path:baris` berkas test rantai (`*.test.*`/`*.spec.*`) — test yang tidak pernah dibuat berarti `belum terbukti`.
@@ -113,6 +114,7 @@ p1: 0
 p2: 1
 p3: 0
 base: 540364c
+head: 9f1c2ab
 reviewed_at: 2026-09-25
 ---
 

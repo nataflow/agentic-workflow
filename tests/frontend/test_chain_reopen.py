@@ -3,7 +3,7 @@ import sys
 
 import pytest
 
-from conftest import FE_SKILLS, FE_TD, commit, fe_approved_chain, fe_run, git
+from conftest import FE_SKILLS, FE_TD, fe_approved_chain, fe_run
 
 TASK = f"{FE_TD}/TASK.md"
 CONTRACT = f"{FE_TD}/CONTRACT.md"
@@ -14,10 +14,12 @@ def reopen(repo, row, reason="uji"):
 
 
 def fake_reopen(repo, rows, reason):
-    """Commit ber-subjek reopen atas TASK.md — riwayat kuota tanpa mengubah ledger."""
+    """Kejadian `reopen` di `## Riwayat Rantai` — riwayat kuota tanpa mengubah ledger (Langkah 24)."""
     p = repo / TASK
-    p.write_text(p.read_text(encoding="utf-8") + "\n", encoding="utf-8")
-    commit(repo, f"docs(orders-lacak): reopen {rows} — {reason}", TASK)
+    text = p.read_text(encoding="utf-8")
+    n = sum(1 for l in text.split("## Riwayat Rantai", 1)[1].splitlines() if l.startswith("- ")) + 1
+    p.write_text(text + f"- {n} · reopen {rows} · target {rows.split()[0]} · waktu 2026-10-13T00:00:00Z · "
+                        f"alasan: {reason}\n", encoding="utf-8")
 
 
 @pytest.fixture
@@ -33,20 +35,19 @@ def test_reopen_frontmatter_rusak_fail_rapi(approved):
     p = approved / CONTRACT
     p.write_text(p.read_text(encoding="utf-8").replace("sections: [architecture]\n---\n", "sections: [architecture]\n", 1),
                  encoding="utf-8")
-    commit(approved, "docs(orders-lacak): rusak", CONTRACT)
     r = reopen(approved, "CONTRACT")
     assert r.returncode == 1 and r.out.startswith("CHAIN REOPEN: [FAIL]") and "Traceback" not in r.out
-    assert "git show " in r.out and "Tidak ada berkas yang diubah" in r.out
+    assert "pulihkan frontmatter" in r.out and "Tidak ada berkas yang diubah" in r.out
 
 
 def test_reopen_gagal_tidak_mengubah_berkas(approved):
     p = approved / CONTRACT
     p.write_text(p.read_text(encoding="utf-8").replace("sections: [architecture]\n---\n", "sections: [architecture]\n", 1),
                  encoding="utf-8")
-    commit(approved, "docs(orders-lacak): rusak", CONTRACT)
+    before = {rel: (approved / rel).read_text(encoding="utf-8") for rel in (TASK, CONTRACT)}
     reopen(approved, "CONTRACT")
-    assert git(approved, "status", "--porcelain").strip() == ""
-    assert "- [x] CONTRACT" in (approved / TASK).read_text(encoding="utf-8")
+    assert {rel: (approved / rel).read_text(encoding="utf-8") for rel in (TASK, CONTRACT)} == before
+    assert "- [x] CONTRACT" in before[TASK]
 
 
 def test_reopen_gagal_tulis_dipulihkan(approved, monkeypatch):

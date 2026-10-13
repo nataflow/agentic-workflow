@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 """Argumen tool MCP nataflow untuk satu taskdir frontend atau dokumen tingkat repo (15 F2, F9, F11–F13).
 
-Read-only: tidak menulis berkas dan tidak meng-commit (D5), sehingga materai approve (`Konten disetujui:`, `Sidik:`)
-tidak tersentuh. Model mengirim nilai keluarannya apa adanya lewat prosedur `lead/references/nataflow-sync.md` (D4).
+Read-only: tidak menulis berkas dan tidak meng-commit (D5), sehingga materai approve (kejadian `approve` di
+`## Riwayat Rantai`) tidak tersentuh. Model mengirim nilai keluarannya apa adanya lewat prosedur `lead/references/nataflow-sync.md` (D4).
 Sengaja bukan subperintah `chain.py`: `chain.py` satu-satunya penulis ledger, sedangkan sinkron hanya membaca.
 
 - `--taskdir <td>`: workdir `frontenddev:<repo>:<td>` tertaut ke task tiket analyst (`ticket_source`) atau ke task
-  baru ber-`workdir_key`. Isi dokumen diambil dari blob `HEAD` (E6). `TASK.md` selalu; `FLOW.md`/`UI.md`/
-  `CONTRACT.md` hanya bila baris ledger-nya `[x]` dan sah (`verify_chain_row`, definisi "stabil" yang sama dengan
-  gerbang); brief dan `REVIEW-PLAN.md` bila hop BRIEF `[x]` sah, atau brief sudah `DONE`/`BLOCKED`;
-  `report-NN.md`, `REVIEW.md`, dan `REPORT.md` bila ter-commit; `.explore/` tidak pernah. Status workdir dari
-  `taskdir_state.py`: `TUNTAS` → `done`, `DITUTUP` → `abandoned`, `TERHENTI`/`TEMUAN` → `blocked`, selain itu `active`.
+  baru ber-`workdir_key`. Dokumen taskdir tidak di-commit (Langkah 24), jadi isinya diambil dari disk (24 K14).
+  `TASK.md` selalu, asal akarnya terkunci (`base_commit`); `FLOW.md`/`UI.md`/`CONTRACT.md` hanya bila baris
+  ledger-nya `[x]` dan sah (`verify_chain_row`, definisi "stabil" yang sama dengan gerbang); brief dan
+  `REVIEW-PLAN.md` bila hop BRIEF `[x]` sah, atau brief sudah `DONE`/`BLOCKED`; `report-NN.md`, `REVIEW.md`, dan
+  `REPORT.md` apa adanya; `.explore/` tidak pernah. Metadata `commit` kosong, `head` = sha `HEAD` saat sinkron.
+  Status workdir dari `taskdir_state.py`: `TUNTAS` → `done`, `DITUTUP` → `abandoned`, `TERHENTI`/`TEMUAN` →
+  `blocked`, selain itu `active`.
 - `--repo-docs review|profile`: `frontenddev/reviews/` atau profil sebagai dokumen `adhoc.review`/`profile` di bawah
   workspace, dengan key `<repo>/<path>` (T10).
 
@@ -21,8 +23,9 @@ workspace tanpa `--workspace` → `workspace_choices`, user memilih, lalu skrip 
 
 Tanpa `--remote`: argumen task, workdir, dan manifest, tanpa isi dokumen. `--remote -`: dokumen yang berbeda dari
 teks balikan `list_document include_content=false` di stdin, ditambah key remote yang tidak lagi terpilih (E7): hop
-yang dibuka ulang didorong dengan status terbarunya (F9), berkas yang dihapus dari git dengan `removed: true`. Hop
-yang DRIFT tidak pernah didorong ulang: cermin tetap menampilkan isi yang disetujui.
+yang dibuka ulang didorong dari disk dengan status terbarunya (F9); berkas taskdir yang sudah tidak ada dibiarkan
+dengan isi terakhirnya di server (24 G5), sedangkan dokumen repo yang dihapus dari git didorong dengan
+`removed: true`. Hop yang DRIFT tidak pernah didorong ulang: cermin tetap menampilkan isi yang disetujui.
 
 Keluaran `--json` selalu JSON: `SKIP` (config absen), `FAIL` (`problems`), atau `PASS`.
 
@@ -40,8 +43,8 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import nataflow_sync as ns  # noqa: E402
+from docs_git import head_sha  # noqa: E402
 from precondition_lib import (  # noqa: E402
-    DOC_ROWS,
     PROFILE_DIR_REL,
     TASKDIR_PATTERN,
     TICKET_PATH_RE,
@@ -78,9 +81,22 @@ def doc_status(text: str) -> str:
 
 def build_doc(root: Path, table: str, key: str, rel: str, doc_type_: str, text: str, repo: str,
               removed_commit: str = "") -> Dict[str, Any]:
+    """Dokumen tingkat repo (ter-commit): metadata `commit` = commit terakhir berkasnya."""
     commit = removed_commit or ns.last_commit(root, rel)
     meta = ns.doc_meta(SOURCE, repo, rel, doc_status(text), commit, removed=bool(removed_commit))
     return ns.document(table, key, doc_type_, text, meta)
+
+
+def build_disk_doc(key: str, rel: str, doc_type_: str, text: str, repo: str, head: str) -> Dict[str, Any]:
+    """Dokumen taskdir (di disk, tidak di-commit): metadata `commit` kosong, `head` = `HEAD` saat sinkron (24 K14)."""
+    meta = ns.doc_meta(SOURCE, repo, rel, doc_status(text), "", head=head)
+    return ns.document("workdir", key, doc_type_, text, meta)
+
+
+def taskdir_files(root: Path, td: str) -> List[str]:
+    """Nama berkas langsung di bawah taskdir di disk (tanpa subdirektori), terurut."""
+    path = root / td
+    return sorted(p.name for p in path.iterdir() if p.is_file()) if path.is_dir() else []
 
 
 def ledger(root: Path, td: str, task_text: str) -> Tuple[Set[str], Set[str]]:
@@ -96,16 +112,16 @@ def ledger(root: Path, td: str, task_text: str) -> Tuple[Set[str], Set[str]]:
     return stable, drift
 
 
-def select_taskdir(root: Path, td: str, repo: str):
-    """Dokumen terpilih, isi per nama berkas di `HEAD`, berkas yang ditahan (DRIFT), dan masalah."""
+def select_taskdir(root: Path, td: str, repo: str, head: str):
+    """Dokumen terpilih dari disk, isi per nama berkas, berkas yang ditahan (DRIFT), dan masalah."""
     texts: Dict[str, str] = {}
     problems: List[str] = []
-    for name in ns.head_files(root, td):
+    for name in taskdir_files(root, td):
         if not doc_type(name):
             continue
-        text, problem = ns.head_text(root, f"{td}/{name}")
+        text, problem = ns.disk_text(root / td / name)
         if problem:
-            problems.append(problem)
+            problems.append(f"{td}/{problem}")
         elif text is not None:
             texts[name] = text
     if problems or "TASK.md" not in texts:
@@ -119,7 +135,7 @@ def select_taskdir(root: Path, td: str, repo: str):
             continue
         if kind in ("brief", "review.plan") and "BRIEF" not in stable and doc_status(text) not in ("DONE", "BLOCKED"):
             continue
-        docs.append(build_doc(root, "workdir", name, f"{td}/{name}", kind, text, repo))
+        docs.append(build_disk_doc(name, f"{td}/{name}", kind, text, repo, head))
     held = drift | ({n for n in texts if doc_type(n) == "brief"} if "BRIEF" in drift else set())
     return docs, texts, held, []
 
@@ -139,9 +155,28 @@ def select_repo_docs(root: Path, kind: str, repo: str) -> Tuple[str, List[Dict[s
     return rel_dir, docs, problems
 
 
+def disk_extras(root: Path, remote: Dict[str, Dict[str, Any]], chosen: List[Dict[str, Any]], td: str, repo: str,
+                head: str, held: Set[str]) -> List[Dict[str, Any]]:
+    """Key remote taskdir yang tidak lagi terpilih tetap dicerminkan (E7) bila berkasnya masih di disk, dengan isi
+    dan status terbarunya (mis. hop yang dibuka ulang), kecuali berkas yang ditahan karena DRIFT. Berkas yang sudah
+    tidak ada tidak didorong (24 G5)."""
+    chosen_keys = {d["key"] for d in chosen}
+    extras = []
+    for key in sorted(set(remote) - chosen_keys - held):
+        if "/" in key:
+            continue
+        text, _ = ns.disk_text(root / td / key)
+        if text is None:
+            continue
+        kind = ns.remote_type(remote[key]["type"]) or doc_type(key) or "doc"
+        extras.append(build_disk_doc(key, f"{td}/{key}", kind, text, repo, head))
+    return extras
+
+
 def mirrored_extras(root: Path, table: str, remote: Dict[str, Dict[str, Any]], chosen: List[Dict[str, Any]],
                     key_to_rel, repo: str, held: Set[str]) -> List[Dict[str, Any]]:
-    """Key remote yang tidak lagi terpilih tetap dicerminkan (E7), kecuali berkas yang ditahan karena DRIFT."""
+    """Key remote dokumen repo yang tidak lagi terpilih tetap dicerminkan (E7): isi `HEAD` terbaru, atau versi
+    terakhir sebelum dihapus dengan `removed: true`."""
     chosen_keys = {d["key"] for d in chosen}
     extras = []
     for key in sorted(set(remote) - chosen_keys - held):
@@ -202,16 +237,15 @@ def run_taskdir(args, root: Path, config: Dict[str, Any]) -> int:
     td = normalize_taskdir(args.taskdir)
     if not TASKDIR_PATTERN.match(td) or not (root / td).is_dir():
         return ns.emit_fail(args.json, PREFIX, [f"`{td}` bukan taskdir frontenddev/docs/<YYMMDDhhmm>-<slug> yang ada"])
-    repo = ns.repo_identity(root, config)
-    docs, texts, held, problems = select_taskdir(root, td, repo)
+    repo, head = ns.repo_identity(root, config), head_sha(root)
+    docs, texts, held, problems = select_taskdir(root, td, repo, head)
     if problems:
         return ns.emit_fail(args.json, PREFIX, problems)
     task_text = texts.get("TASK.md")
-    if task_text is None:
-        return ns.emit_fail(args.json, PREFIX, [f"{td}/TASK.md belum ter-commit — akar belum terkunci"])
+    if task_text is None or not ns.frontmatter_value(task_text, "base_commit"):
+        return ns.emit_fail(args.json, PREFIX, [f"{td}/TASK.md tanpa `base_commit` — akar belum terkunci"])
     if args.remote is not None:
-        return diff_phase(args, config, docs, lambda remote: mirrored_extras(
-            root, "workdir", remote, docs, lambda key: f"{td}/{key}" if "/" not in key else "", repo, held))
+        return diff_phase(args, config, docs, lambda remote: disk_extras(root, remote, docs, td, repo, head, held))
     tkey, problem = ticket_key(task_text)
     if problem:
         return ns.emit_fail(args.json, PREFIX, [problem])

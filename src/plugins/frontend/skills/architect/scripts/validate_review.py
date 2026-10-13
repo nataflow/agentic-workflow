@@ -21,10 +21,10 @@ sesi yang sama dengan `run_verification.py closing`) mencocokkan tabel
 baru wajib identik, `MERAH` bergalat baru 0 sah hanya di atas baseline yang
 juga merah, dan tiap baseline wajib diukur (`baseline_head`) di leluhur commit
 `implement unit` pertama rantai — baseline di atas unit yang sudah mendarat
-menelan galatnya sebagai warisan (12 J13). Tanpa `--log` (laci `.explore/` tidak di-commit, jadi `report` dan
+menelan galatnya sebagai warisan (12 J13). Tanpa `--log` (laci `.explore/` tidak dicerminkan, jadi `report` dan
 sesi lain tidak dapat menuntutnya) check `LOG` dicatat `SKIP`.
 
-Dipakai `architect` sebelum commit `REVIEW.md`, dan `frontend:report` sebagai
+Dipakai `architect` sesudah reviewer menulis `REVIEW.md` (tanpa commit, Langkah 24), dan `frontend:report` sebagai
 prasyarat — janji akar yang belum terbukti tidak pernah sampai ke laporan.
 
 Zero external dependencies (Python Standard Library only).
@@ -167,7 +167,13 @@ class ReviewValidator:
         base = str(self.fm.get("base", "")).strip()
         root_sha = task_root_sha(self.root, self.taskdir_rel)
         if not re.fullmatch(r"[0-9a-f]{7,40}", base) or not root_sha.startswith(base):
-            p.append(f"`base: {base or '(kosong)'}` bukan commit akar TASK.md ({root_sha[:7] or 'tak terbaca'})")
+            p.append(f"`base: {base or '(kosong)'}` bukan `base_commit` akar TASK.md ({root_sha[:7] or 'tak terbaca'})")
+        # 24 K9: `head` = HEAD yang dinilai reviewer; kesegaran review diukur dari sha ini, bukan dari commit REVIEW.md
+        head = str(self.fm.get("head", "")).strip()
+        full = git(self.root, "rev-parse", "--verify", "-q", f"{head}^{{commit}}").strip() \
+            if re.fullmatch(r"[0-9a-f]{7,40}", head) else ""
+        if not full or not self._is_ancestor(full, "HEAD"):
+            p.append(f"`head: {head or '(kosong)'}` bukan commit leluhur `HEAD` — isi dengan `HEAD` saat review")
         raw = str(self.fm.get("reviewed_at", "")).strip()
         try:
             if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw):
@@ -176,7 +182,7 @@ class ReviewValidator:
             born = git(self.root, "log", "-1", "--format=%cs", root_sha).strip() if root_sha else ""
             # sengaja tanpa pembanding "tanggal masa depan": zona waktu mesin menggesernya
             if born and reviewed < datetime.date.fromisoformat(born):
-                p.append(f"`reviewed_at: {raw}` lebih awal dari commit akar ({born})")
+                p.append(f"`reviewed_at: {raw}` lebih awal dari `base_commit` akar ({born})")
         except ValueError:
             p.append(f"`reviewed_at: {raw or '(kosong)'}` bukan tanggal kalender YYYY-MM-DD")
         if str(self.fm.get("taskdir", "")).strip() != self.taskdir_rel:
@@ -462,7 +468,7 @@ class ReviewValidator:
     def _check_log(self) -> None:
         name = "Verifikasi vs log mesin"
         if not self.log:
-            self._add("LOG", name, [], "dilewati — tanpa `--log` (laci `.explore/` tidak di-commit)", "",
+            self._add("LOG", name, [], "dilewati — tanpa `--log` (laci `.explore/` tidak dicerminkan)", "",
                       status="SKIP")
             return
         path = Path(self.log) if Path(self.log).is_absolute() else self.root / self.log

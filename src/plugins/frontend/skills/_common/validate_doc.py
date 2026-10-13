@@ -17,8 +17,8 @@ predikat struktur tidak bergantung pada ingatan penulis maupun reviewer:
 Yang menuntut penilaian (apakah alurnya masuk akal, apakah DTO memenuhi data
 demand secara semantik) tetap milik model dan `contract-reviewer`.
 
-Dipanggil penulis dokumen sebelum commit draft, dan oleh `chain.py approve`
-sebagai syarat approval.
+Dipanggil penulis dokumen sebelum draft diajukan, dan oleh `chain.py draft`/`approve`
+sebagai syarat pencatatan draft dan approval.
 
 Zero external dependencies (Python Standard Library only).
 """

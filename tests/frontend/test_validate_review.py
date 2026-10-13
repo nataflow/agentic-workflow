@@ -3,7 +3,8 @@ import json
 
 import pytest
 
-from conftest import FE_MINOR_TD as TD, FE_P2_FINDING, FE_SKILLS, commit, fe_profile, fe_review_md, fe_run, git, write_files
+from conftest import FE_MINOR_TD as TD, FE_P2_FINDING, FE_SKILLS, commit, fe_base_commit, fe_profile, fe_review_md, \
+    fe_run, git, write_files
 
 REVIEW = f"{TD}/REVIEW.md"
 
@@ -80,9 +81,9 @@ def test_bukti_perintah_hijau_sah(fe_minor_chain):
 
 
 def log(repo, *entries):
-    """Log mesin `run_verification.py closing`; baseline yang ada diukur di akar `TASK.md` (12 J13)."""
+    """Log mesin `run_verification.py closing`; baseline yang ada diukur di `base_commit` akar (12 J13)."""
     rel = f"{TD}/.explore/closing-verification.json"
-    akar = git(repo, "log", "--diff-filter=A", "--format=%H", "--", f"{TD}/TASK.md").split()[-1]
+    akar = fe_base_commit(repo, TD)
     rows = [dict(zip(("cmd", "status", "new_errors", "baseline_status"), e)) for e in entries]
     for r in rows:
         if r["baseline_status"] is not None:
@@ -122,7 +123,15 @@ def test_reviewed_at_sebelum_commit_akar_fail(fe_minor_chain):
     write_files(fe_minor_chain, {REVIEW: fe_review_md(fe_minor_chain, reviewed_at="2000-01-01")})
     rc, data = validate(fe_minor_chain)
     c = check(data, "F")
-    assert rc == 1 and any("`reviewed_at: 2000-01-01` lebih awal dari commit akar" in d for d in c["details"]), c
+    assert rc == 1 and any("`reviewed_at: 2000-01-01` lebih awal dari `base_commit` akar" in d
+                           for d in c["details"]), c
+
+
+@pytest.mark.regression("24 K9")
+def test_head_bukan_leluhur_fail(fe_minor_chain):
+    write_files(fe_minor_chain, {REVIEW: fe_review_md(fe_minor_chain, head="abcdef1")})
+    rc, data = validate(fe_minor_chain)
+    assert rc == 1 and any("`head: abcdef1` bukan commit leluhur" in d for d in check(data, "F")["details"])
 
 
 def test_contoh_template_bagian_3_pass(make_repo):
@@ -136,18 +145,21 @@ def test_contoh_template_bagian_3_pass(make_repo):
     contract = ("---\nstatus: APPROVED\n---\n\n# Contract\n\n## 5. Acceptance Criteria\n\n"
                 "| ID | Skenario | Cara verifikasi | Sumber |\n|---|---|---|---|\n"
                 + "".join(f"| `AC-{i}` | s | t | `SC-1` |\n" for i in range(1, 6)))
-    repo = make_repo({f"{TD}/TASK.md": task})
+    repo = make_repo({"frontenddev/docs/.gitignore": "*\n"})
     fe_profile(repo, "react-vite")
-    git(repo, "commit", "-q", "--allow-empty", "-m", "init")
-    commit(repo, "docs(order-checkout): kunci TASK sebagai akar rantai", f"{TD}/TASK.md")
+    commit(repo, "init")
     base = git(repo, "rev-parse", "--short=7", "HEAD").strip()
+    full = git(repo, "rev-parse", "HEAD").strip()
+    write_files(repo, {f"{TD}/TASK.md": task.replace("created: 2026-09-23\n", f"created: 2026-09-23\nbase_commit: {full}\n")})
     lines = "".join(f"// {i}\n" for i in range(50))
     src = {f"src/features/checkout/{p}": lines for p in
            ("pages/CheckoutPage.test.tsx", "hooks/useCheckoutPage.test.ts", "pages/CheckoutPage.tsx")}
     write_files(repo, {**src, f"{TD}/CONTRACT.md": contract})
-    commit(repo, "feat(order-checkout): implement unit 01", *src, f"{TD}/CONTRACT.md")
+    commit(repo, "feat(order-checkout): implement unit 01", *src)
     born = git(repo, "log", "-1", "--format=%cs", base).strip()
-    example = example.replace("base: 540364c", f"base: {base}").replace("reviewed_at: 2026-09-25", f"reviewed_at: {born}")
+    head = git(repo, "rev-parse", "--short=7", "HEAD").strip()
+    example = example.replace("base: 540364c", f"base: {base}").replace("head: 9f1c2ab", f"head: {head}") \
+        .replace("reviewed_at: 2026-09-25", f"reviewed_at: {born}")
     write_files(repo, {REVIEW: example})
     rc, data = validate(repo)
     assert rc == 0, [c for c in data["checks"] if c["status"] == "FAIL"]

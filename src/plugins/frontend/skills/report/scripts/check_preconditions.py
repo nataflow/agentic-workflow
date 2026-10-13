@@ -3,13 +3,17 @@
 
 Memvonis prasyarat `frontend:report` sebelum Phase 1 dibuka: bentuk
 taskdir, akar `TASK.md` beserta ledger `## Chain` tercentang penuh dan utuh,
-`REVIEW.md` penutup ter-commit, lolos `validate_review.py`, dan ber-verdict
+`REVIEW.md` penutup yang segar (`head:` tanpa commit kode rantai sesudahnya), lolos `validate_review.py`, dan
+ber-verdict
 `PASS`/`WARNING`, seluruh brief tertutup (`DONE`, atau `BLOCKED` ber-remedi
 `DONE`), ketiadaan `REPORT.md`, berkas rantai tidak kosong, dan kebersihan
 working tree.
 
-Skrip ini juga **menyelesaikan tiga fakta** di baris `Terselesaikan:`: SHA
-commit akar, slug, dan jumlah berkas rantai — rentang yang dipakai Phase 2.
+Skrip ini juga **menyelesaikan tiga fakta** di baris `Terselesaikan:`: `base_commit`
+akar, slug, dan jumlah berkas rantai — rentang yang dipakai Phase 2.
+
+Dokumen taskdir tidak di-commit (Langkah 24): `REPORT.md` yang sudah ada dinilai
+terbit bila lolos `validate_report.py`, tertunda bila tidak.
 
 Zero external dependencies (Python Standard Library only). Satu impor
 intra-plugin: `skills/_common/precondition_lib.py`, di-bootstrap relatif
@@ -33,7 +37,6 @@ from precondition_lib import (  # noqa: E402
     expected_rows,
     find_repo_root,
     format_report,
-    is_committed,
     normalize_taskdir,
     read_status,
     report_json,
@@ -44,6 +47,7 @@ from precondition_lib import (  # noqa: E402
 from precondition_lib import cli  # noqa: E402
 
 VALIDATE_REVIEW = Path(__file__).resolve().parents[2] / "architect" / "scripts" / "validate_review.py"
+VALIDATE_REPORT = Path(__file__).resolve().parent / "validate_report.py"
 
 
 class PreconditionChecker:
@@ -73,10 +77,7 @@ class PreconditionChecker:
             else:
                 self._add(cid, fn.__doc__ or "", "FAIL", "taskdir tidak sah",
                           "Perbaiki Check 1 lebih dulu.")
-        check_worktree(self._add, 7, self.root, self.taskdir_rel if ok else "", own_action=(
-            "Seluruhnya artefak taskdir ini, bukan kerja user (12 J22): `REPORT.md` tertunda dikunci lewat "
-            "`frontend:architect` Phase 5 butir 4 (validasi lalu commit), bukan ditulis ulang; berkas rantai lain "
-            "yang berubah → kembali ke `frontend:lead`."))
+        check_worktree(self._add, 7, self.root, self.taskdir_rel if ok else "")
         if ok and self.sections is not None:
             check_chain_rows(self._add, 8, self.root, self.taskdir_rel,
                              expected_rows(self.sections), self.sections)
@@ -86,7 +87,7 @@ class PreconditionChecker:
         return not any(r["status"] == "FAIL" for r in self.results)
 
     def _check_2_task(self, cid: int) -> None:
-        """TASK.md akar ter-commit"""
+        """TASK.md akar terkunci"""
         lane, sections = check_task_root(self._add, cid, self.root, self.taskdir_rel)
         if lane:
             self.sections = sections
@@ -100,19 +101,16 @@ class PreconditionChecker:
             self._add(cid, name, "FAIL", "`REVIEW.md` belum ada",
                       "Review penutup belum jalan; kembali ke `frontend:architect` Fase 4.")
             return
-        if not is_committed(self.root, rel):
-            self._add(cid, name, "FAIL", "`REVIEW.md` belum ter-commit",
-                      "Commit `REVIEW.md` lewat `frontend:architect` Fase 4 lebih dulu.")
-            return
         proc = subprocess.run([sys.executable, str(VALIDATE_REVIEW), "--taskdir", self.taskdir_rel,
                                "--root", str(self.root)], stdout=subprocess.PIPE,
                               stderr=subprocess.STDOUT, universal_newlines=True)
         if proc.returncode != 0:
             self._add(cid, name, "FAIL", "`validate_review.py` FAIL — " + proc.stdout.splitlines()[0][:120],
-                      "REVIEW.md yang ter-commit tidak sah; kembali ke `frontend:architect` Fase 4.")
+                      "REVIEW.md tidak sah; kembali ke `frontend:architect` Fase 4.")
             return
         if not review_is_fresh(self.root, self.taskdir_rel):
-            self._add(cid, name, "FAIL", "`REVIEW.md` lebih tua daripada commit `implement unit` terakhir",
+            self._add(cid, name, "FAIL", "`REVIEW.md` basi — `head:`-nya tidak sah, atau commit kode rantai "
+                                         "mendarat sesudahnya",
                       "Unit yang mendarat sesudah review belum pernah dinilai; kembali ke `frontend:architect` Phase 4.")
             return
         verdict = read_status(self.root / rel, "verdict")
@@ -143,13 +141,16 @@ class PreconditionChecker:
         """REPORT.md belum ada"""
         name = self._check_5_absent.__doc__
         if (self.taskdir / "REPORT.md").is_file():
-            if is_committed(self.root, f"{self.taskdir_rel}/REPORT.md"):
-                self._add(cid, name, "FAIL", "`REPORT.md` sudah terbit (ter-commit)",
+            valid = subprocess.run([sys.executable, str(VALIDATE_REPORT), "--taskdir", self.taskdir_rel,
+                                    "--root", str(self.root)], stdout=subprocess.DEVNULL,
+                                   stderr=subprocess.DEVNULL).returncode == 0
+            if valid:
+                self._add(cid, name, "FAIL", "`REPORT.md` sudah terbit (lolos `validate_report.py`)",
                           "Dilarang ditimpa; serahkan keputusan penulisan ulang ke user.")
             else:
-                self._add(cid, name, "FAIL", "`REPORT.md` tertunda — tertulis tetapi belum ter-commit",
-                          "Jangan tulis ulang: kunci lewat `frontend:architect` Phase 5 butir 4 "
-                          "(validasi lalu commit).")
+                self._add(cid, name, "FAIL", "`REPORT.md` tertunda — tertulis tetapi tidak lolos `validate_report.py`",
+                          "Jangan tulis ulang di sini: `frontend:architect` Phase 5 butir 4 memvalidasinya, "
+                          "lalu menghapus dan memanggil `report` sekali lagi bila tetap gagal.")
             return
         self._add(cid, name, "PASS", "siap ditulis baru")
 
