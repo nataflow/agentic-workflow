@@ -100,10 +100,14 @@ skeletons), `dispatcher/` (prompts used to dispatch subagents), `scripts/`, and 
   items carry stable `S<n>` IDs prepared for a future hand-off to `analyst`. The backend/frontend gate texts
   exempt `/product:*`.
 - **fullstack** — read-only understanding of many repos from a non-git root that holds them (`<root>/<repo>` or
-  `<root>/<proyek>/<repo>`), driven by each repo's backend/frontend profile. One skill `fullstack:explore` with two
+  `<root>/<proyek>/<repo>`), driven by each repo's backend/frontend profile. One skill `fullstack:explore` with three
   paths: `PETA` (`skills/_common/workspace.py peta` writes `<root>/.fullstack/PETA.md` from profiles and git only,
-  no code reading) and `TELUSUR` (parallel `repo-scout` subagents per repo, report under `.fullstack/explore/` built
-  by `explore.py new`, FE→BE and API→API seams computed by `explore.py seam`, gated by `explore.py check`). Target
+  no code reading), `TELUSUR` (parallel `repo-scout` subagents per repo, report under `.fullstack/explore/` built
+  by `explore.py new`, FE→BE and API→API seams computed by `explore.py seam`, gated by `explore.py check`), and
+  `ALUR` (how something works inside a repo: parallel `backend-explorer`/`frontend-explorer` subagents, sonnet,
+  `Read`/`Grep`/`Glob` only, adapted from the backend/frontend `code-explorer`; report built by `explore.py new
+  --jalur ALUR`, no seam; a test pins the read-window numbers to the source agents). Reports without a `jalur`
+  frontmatter field are `TELUSUR`. Target
   repos for API→API calls are certain only via user-confirmed `.fullstack/layanan.json`; projects/repos listed
   in `.fullstack/abaikan` (gitignore-style patterns) are skipped by every script. `fullstack_lib.py` copies
   `SKIP_DIRS`/`STACKS` from backend `hooks/detect.py` (a test asserts equality), and `tests/fullstack/
@@ -118,7 +122,8 @@ The legacy flat `.claude/profile/` location is migrated by `migrate_profile.py`.
 - **SessionStart** → `hooks/detect.py --plugin <name>` detects stack/profile and injects a gate block
   (text from `hooks/gate_text.py`) telling the model which requests must go through the entry skill.
   Output must be empty or valid JSON. A non-git cwd with ≥ 2 direct git children is a multi-repo root:
-  the block only points at the plugin's child repo(s) and `/fullstack:explore` instead of gating. A
+  the block only points at the plugin's child repo(s) and `/fullstack:explore` (for all code understanding there,
+  not the built-in `Explore` subagent) instead of gating. A
   user-repo `.claude/workflow` file listing plugin names opts hooks in/out. `precondition_lib.py` imports `detect.py` so hook and scripts reach the same verdict.
 - **PreToolUse** (`Bash|Edit|Write`) → `hooks/guard_bash.py hook` fences the plugin's subagents by
   `agent_type`. It is **fail-closed** (internal error ⇒ deny, exit 2). The implementor may only touch

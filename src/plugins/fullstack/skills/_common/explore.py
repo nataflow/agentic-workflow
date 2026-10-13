@@ -12,10 +12,11 @@
 
 `new` menulis kerangka laporan dari `templates/explore-template.md` (`TELUSUR`) atau `templates/alur-template.md`
 (`ALUR`) skill `explore`, dengan frontmatter dan tabel `## Repo` yang sudah terisi dari `scan`. Laporan tanpa field
-`jalur` adalah laporan `TELUSUR` (23 K8). `list` membaca frontmatter laporan di `.fullstack/explore/` dan menandai laporan `basi` bila HEAD salah satu
-repo sudah bergeser (K18–K19). `seam` mencocokkan tabel `## Panggilan` dengan `## Endpoint` (K20–K26); dengan
-`--write` tabel `## Jahitan` laporan ditulis ulang dari hasilnya; laporan `ALUR` ditolak (23 K9). `check` adalah
-pagar laporan (exit 0 PASS, 1 FAIL) dengan aturan menurut `jalur`. `layanan` mengelola `.fullstack/layanan.json`, satu-satunya sumber target pasti BE → BE (K21).
+`jalur` adalah laporan `TELUSUR` (23 K8). `list` membaca frontmatter laporan di `.fullstack/explore/` dan menandai
+laporan `basi` bila HEAD salah satu repo sudah bergeser (K18–K19). `seam` mencocokkan tabel `## Panggilan` dengan
+`## Endpoint` (K20–K26); dengan `--write` tabel `## Jahitan` laporan ditulis ulang dari hasilnya; laporan `ALUR`
+ditolak (23 K9). `check` adalah pagar laporan (exit 0 PASS, 1 FAIL) dengan aturan menurut `jalur`. `layanan`
+mengelola `.fullstack/layanan.json`, satu-satunya sumber target pasti BE → BE (K21).
 
 Standard library saja.
 """

@@ -6,7 +6,23 @@ subagent `Explore` bawaan Claude Code. User lalu meminta subagent explorer khusu
 `code-explorer` milik `backend` dan `frontend`, dan menyetujui seluruh rekomendasi di sesi desain yang sama. Basis
 kode: commit `31aa5d3` (fullstack 0.2.0, backend 0.14.0, frontend 0.13.0).
 
-**Status:** rencana, belum dikerjakan.
+**Status (2026-10-13):** L1–L6 dan D1 selesai. Test baru di `tests/fullstack/test_alur_23.py` (25), ditambah satu
+test di `tests/hooks/test_workspace_root_21.py` (dua plugin) dan satu kasus smoke `explore.py new --jalur ALUR`.
+Suite penuh hijau (2500), subset fullstack/hooks/smoke hijau di Python 3.9, lint `--base 31aa5d3` 0 FAIL, dan `claude plugin validate .` lolos.
+Versi: fullstack 0.3.0, backend 0.14.1, frontend 0.13.1.
+
+Selisih pelaksanaan terhadap Kontrak di bawah:
+
+- **`new` TELUSUR tidak menulis `jalur`.** Kerangka `TELUSUR` tetap persis seperti Langkah 21; hanya `ALUR` yang
+  menulis `jalur: ALUR` dan `kedalaman`. Sesuai K8, laporan tanpa `jalur` adalah `TELUSUR`.
+- **`--kedalaman` tanpa `--jalur ALUR` ditolak**, begitu pula `--jalur` di luar `TELUSUR`/`ALUR`.
+- **Check 4 ALUR** juga menolak subseksi `## Alur` yang judulnya bukan `<repo> (BE|FE)` atau menunjuk repo di luar
+  frontmatter. Repo dianggap tercatat di `### Belum disisir` bila namanya muncul utuh di subseksi itu.
+- **Check 6 ALUR** juga menolak baris `Aturan Bisnis`/`Permukaan` yang kolom `Repo`-nya di luar frontmatter.
+- **Prasyarat** memeriksa keberadaan `alur-template.md`, `dispatcher/explorer.md`, dan kedua agent baru.
+- **Deskripsi plugin** (`plugin.json` dan `marketplace.json`) menyebut penelusuran alur lewat kedua explorer.
+- **Test drift (K12)** juga memaku bahwa pelonggaran `menyeluruh` (120 baris, 3 jendela, 400 baris) ada di sumber
+  dan turunan BE saja, sehingga perubahan sumber FE yang menambahkannya ikut terdeteksi.
 
 ## Tujuan
 
@@ -219,7 +235,7 @@ harus disesuaikan, bukan test baru.
 | D1 | `fullstack/README.md`, `flow/fullstack.md`, `flow/backend.md` dan `flow/frontend.md` (teks hook root), `plugin.json` ×3, `README.md` root, `CLAUDE.md` repo | manusia, lint M4/M7 | ya | `test_lint_plugins.py` | Nihil |
 
 ## L1 [Tinggi] Laporan `explore.py` hanya mengenal `TELUSUR`
-- [ ] Selesai
+- [x] Selesai
 
 `new --jalur/--kedalaman`, `alur-template.md`, `list` dengan `jalur`, `check` per jalur (tabel Kontrak), dan `seam`
 yang menolak `ALUR`. Test: `new` ALUR menulis frontmatter `jalur`/`kedalaman` dan seksi `ALUR`; `--kedalaman` wajib
@@ -228,38 +244,38 @@ sebagai TELUSUR; check 4 ALUR (repo tanpa subseksi, subseksi tanpa langkah berbu
 check 6 ALUR (baris tabel tanpa rujukan); `seam` atas ALUR ditolak; `list` melaporkan `jalur`.
 
 ## L2 [Tinggi] Belum ada subagent penelusur alur di root
-- [ ] Selesai
+- [x] Selesai
 
 `agents/backend-explorer.md` dan `agents/frontend-explorer.md` menurut Kontrak: diadaptasi dari
 `backend/agents/code-explorer.md` dan `frontend/agents/code-explorer.md`. Bacaan profil FE mengikuti jangkar yang
 dipaku `tests/fullstack/test_profile_anchor_21.py`.
 
 ## L3 [Sedang] Belum ada template dispatch explorer
-- [ ] Selesai
+- [x] Selesai
 
 `skills/explore/dispatcher/explorer.md`: slot, gerbang masuk, plafon K7, dan Penanganan Balikan.
 
 ## L4 [Tinggi] Skill tidak punya jalur alur dan tidak menutup jalan ke `Explore` bawaan
-- [ ] Selesai
+- [x] Selesai
 
 `SKILL.md`: deskripsi, Phase 0 jalur `ALUR`, langkah jalur `ALUR`, transisi dari `TELUSUR`, Guardrails, Output, dan
 Failure path (explorer gagal dua kali, `check` ALUR masih FAIL sesudah 3 putaran).
 
 ## L5 [Sedang] Gerbang root hanya menunjuk `/fullstack:explore` untuk penelusuran lintas repo
-- [ ] Selesai
+- [x] Selesai
 
 `_workspace` backend dan frontend (K11). Test: kalimat baru muncul di root multi-repo, menyebut `Explore` bawaan
 sebagai yang tidak dipakai, dan keluaran repo tunggal tidak berubah.
 
 ## L6 [Rendah] Drift dan smoke
-- [ ] Selesai
+- [x] Selesai
 
 `tests/fullstack/test_alur_23.py`: frontmatter kedua agent (`tools` tanpa `Write`/`Edit`/`Bash`, `model: sonnet`),
 seksi balikan yang dibaca dispatcher ada di agent, slot dispatcher terisi semua di Penanganan Balikan, dan angka
 jendela baca (K12) sama dengan `code-explorer` sumbernya. Smoke: `explore.py new --jalur ALUR` di empat keadaan repo.
 
 ## D1 [Rendah] Dokumen dan versi
-- [ ] Selesai
+- [x] Selesai
 
 README `fullstack` (jalur dan subagent baru), `flow/fullstack.md` (komponen, alur `ALUR`, catatan turunan K12),
 `flow/backend.md` dan `flow/frontend.md` (teks hook root), README root, dan paragraf `fullstack` di `CLAUDE.md`.
