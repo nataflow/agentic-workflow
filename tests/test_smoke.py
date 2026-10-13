@@ -44,6 +44,9 @@ CASES = [
     ("product/skills/init/scripts/check_preconditions.py", ["--json"], True, None),
     ("product/skills/_common/validate_doc.py", ["--kind", "charter", "--charterdir", PR_TD, "--json"], True, None),
 
+    ("fullstack/skills/_common/workspace.py", ["scan", "--json"], True, None),
+    ("fullstack/skills/_common/workspace.py", ["peta", "--json"], True, None),
+
     ("backend/hooks/detect.py", ["--plugin", "backend"], "hook", HOOK_STDIN),
     ("backend/hooks/guard_bash.py", ["hook"], "hook", BASH_STDIN),
     ("backend/skills/_common/validate_doc.py", ["--kind", "task", "--taskdir", BE_TD, "--json"], True, None),
