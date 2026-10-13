@@ -10,8 +10,9 @@ dokumen itu di-gitignore dan tidak perlu di-commit lagi. Diperjelas di sesi yang
 
 Basis kode: commit `e875ff6` (backend 0.14.1, frontend 0.13.1).
 
-**Status (2026-10-13):** RENCANA. Belum ada kode yang diubah. Peta blast radius di bawah disusun dari pembacaan
-kode di basis itu. Tiap tahap tetap membuat peta per berkas sebelum menulis kode, seperti Langkah 15.
+**Status (2026-10-13):** SELESAI. Keempat tahap mendarat di branch `claude/sleepy-hypatia-8hcwbo`, dirilis sebagai
+backend 0.15.0 dan frontend 0.14.0. Tiap tahap didahului peta blast radius per berkas (bagian Pelaksanaan), dan
+selisih pelaksanaan terhadap rencana dicatat di hasil tiap tahap.
 
 ## Tujuan
 
@@ -510,3 +511,63 @@ tidak tersentuh.
   - commit migrasi hanya berisi penghapusan dari index, dan berkas tetap di disk;
   - check 3 `tech-lead` sesudahnya `PASS`;
   - perilaku `sync_payload.py` atas taskdir warisan dicatat.
+
+**Hasil tahap 4 (2026-10-13):**
+
+- **Dokumen.**
+  - `flow/backend.md` dan `flow/frontend.md` diselaraskan. Peta frontend sebelumnya masih bertanda v0.12.2.
+  - README akar dan kedua README plugin (K2), `CLAUDE.md`, serta catatan E6/E7 Langkah 15 ikut diperbarui.
+- **K2 backend.** Prasyarat `task` mencetak banner `[PERINGATAN]` dan field JSON `peringatan`, dipaku test 24 K2 di
+  `test_task_preconditions.py`.
+- **Rilis.** Backend 0.15.0 dan frontend 0.14.0. `claude plugin validate` lolos untuk marketplace dan kedua plugin.
+- **Verifikasi.** Suite penuh hijau di Python 3.9 dan 3.12, lint 0 FAIL, dan shellcheck bersih.
+- **Uji ujung ke ujung** (digerakkan skrip, di repo scratch; driver-nya tidak ikut di-commit):
+  - **Backend `DIRECT_BRIEF`/`MINOR`.** Urutannya:
+    1. `tech-lead` read-only (tanpa penanda), lalu prasyarat penuh yang menulis penanda.
+    2. Prasyarat `task` dengan `[PERINGATAN]`, `validate_doc.py --fresh`, dan `doc_seal.py root`.
+    3. `plan`: matriks, scaffold, `validate_briefs.py`, dan ronde `brief-reviewer`, lalu `doc_seal.py lock-briefs`
+       dan `tick`.
+    4. Re-entry `tech-lead`, lalu architect `FASE_3:01`, lease, pagar hook, dan commit kode unit, diikuti
+       `verify_scope.py --commit`, `symbol_map.py`, dan `FASE_4`.
+    5. Verifikasi penutup, `REVIEW.md` di disk dengan commit indeks issues saja (`FASE_5`), prasyarat `report`,
+       lalu `REPORT.md` sampai `TUNTAS`.
+    6. `sync_payload.py` membaca dari disk.
+
+    Riwayat branch kerja hanya memuat commit unit, commit indeks review, dan config. Nol berkas `backenddev/docs/`
+    di commit mana pun.
+  - **Frontend `HOTFIX_MINOR`.** Urutannya:
+    1. `taskdir_state.py`, lalu prasyarat `task`: check 10 `WARN` dan penanda ditulis.
+    2. `chain.py init`, `validate_task.py`, dan `chain.py root` sampai `GATE`.
+    3. Prasyarat `plan` MINOR, `validate_briefs.py`, lalu `chain.py draft`/`approve`/`verify` BRIEF sampai
+       `EKSEKUSI`.
+    4. Prasyarat architect dan ingest `--brief 01`. Pagar hook K13: `report-01.md` boleh, path ter-ignore lain
+       ditolak. Lalu `verify_scope.py --worktree`, commit kode unit, dan `PENUTUP`.
+    5. Verifikasi penutup, `validate_review.py`, `LAPORAN`, prasyarat `report`, dan `validate_report.py` sampai
+       `TUNTAS`.
+    6. `sync_payload.py` mencerminkan `TASK.md` beserta Riwayat.
+
+    Riwayat hanya memuat commit unit dan config.
+- **Simulasi migrasi `nataflow-api`** di klon sementara (repo asli tidak disentuh):
+  - Sebelum migrasi: `docs_git.py status` menghitung 191 berkas ter-track dan nol taskdir era git yang terbuka.
+    Check 3 `tech-lead` divonis `MIGRASI`.
+  - Migrasi: `migrate --answer -` menghasilkan satu commit `chore: lepas backenddev/docs dari git` berisi 191
+    penghapusan dari index saja. Berkas di luar `backenddev/docs/` tidak tersentuh, dan seluruh berkas tetap di disk
+    (berkas baru hanya penanda).
+  - Sesudah migrasi: check 3 `PASS`. Check 6 klon gagal hanya karena klon dangkal tidak membawa `main`; repo asli
+    memilikinya.
+
+Selisih pelaksanaan terhadap peta:
+
+- **K2 backend memakai banner, bukan status `WARN`.** Format keluaran backend menghitung vonis dari `PASS` saja, jadi
+  status baru akan mengubah vonis semua gerbang backend. Hitungan 7/7 tidak berubah.
+- **Penanda ignore berisi dua baris komentar ditambah `*`**, bukan `*` saja. Prosa menyebutnya "berisi `*`"; yang
+  menentukan adalah pola itu.
+- **Taskdir warisan backend ditolak, bukan divonis `TUNTAS`.** Architect check 3 FAIL `base_commit kosong`,
+  `doc_seal.py status` FAIL, dan `sync_payload.py` FAIL "akar belum terkunci". Akibatnya sinkron ulang taskdir
+  warisan tidak bisa dilakukan. Ini sesuai K4: taskdir era git tidak dilanjutkan, dan tabel pemakaian ulang taskdir
+  gerbang membuka taskdir baru untuk taskdir ber-`REPORT.md`. Frontend memvonisnya `TUNTAS` (warisan) karena
+  `lead` memindai semua taskdir.
+- **`nataflow-api` belum punya `.claude/nataflow.json`.** Sesudah migrasi, dokumen taskdir repo itu tidak
+  dicerminkan ke mana pun. Isi lama tetap ada di riwayat git, karena migrasi hanya melepas berkas dari index, dan
+  prasyarat `task` akan memperingatkannya (K2). Bila cermin dikehendaki, config perlu ditambahkan sebelum rantai
+  berikutnya.
