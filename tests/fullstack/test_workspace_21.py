@@ -154,7 +154,7 @@ def test_plafon_repo(tmp_path):
     for name in ("a", "b", "p/c", "q/d"):
         (root / name / ".git").mkdir(parents=True)
     lib.MAX_REPO = 2
-    kept, cut = lib.find_repos(root)
+    kept, cut, _excluded = lib.find_repos(root)
     assert [k[0] for k in kept] == ["a", "b"] and cut == ["p", "q"]
 
 

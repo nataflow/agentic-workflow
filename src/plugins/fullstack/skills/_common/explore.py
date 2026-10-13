@@ -32,6 +32,7 @@ from fullstack_lib import (  # noqa: E402
     LAYANAN_FILE,
     SLUG,
     STAMP,
+    bukan_di_root,
     cell,
     dump_json,
     load_layanan,
@@ -306,9 +307,10 @@ def run_check(root: Path, report_path: Path) -> Tuple[Checks, Dict[str, Any]]:
         probs.append("`dibuat` wajib YYMMDDhhmm")
     if fm.get("confidence") and fm["confidence"] not in CONFIDENCE:
         probs.append(f"`confidence` `{fm['confidence']}` di luar high/medium/low")
-    probs += [f"`lingkup` `{p}` bukan proyek di root" for p in split_list(fm.get("lingkup", "")) if p not in proyek]
+    probs += [f"`lingkup`: {bukan_di_root(sc, 'proyek', p)}" for p in split_list(fm.get("lingkup", ""))
+              if p not in proyek]
     fm_dirs = [d for d, _sha in fm_repos(fm.get("repo", ""))]
-    probs += [f"`repo` `{d}` tidak ada di root" for d in fm_dirs if d not in repos]
+    probs += [f"`repo`: {bukan_di_root(sc, 'repo', d)}" for d in fm_dirs if d not in repos]
     probs += [f"`repo` `{d}@{sha}` tanpa SHA" for d, sha in fm_repos(fm.get("repo", "")) if not sha]
     c.add(1, "Frontmatter", probs)
 
@@ -416,8 +418,8 @@ def new_report(root: Path, slug: str, objective: str, lingkup: List[str], dirs: 
         return "", "root berada di dalam repo git"
     repos = repo_index(sc)
     proyek = {r["proyek"] for r in sc["repo"]}
-    bad = [f"proyek `{p}` tidak ada" for p in lingkup if p not in proyek]
-    bad += [f"repo `{d}` tidak ada" for d in dirs if d not in repos]
+    bad = [bukan_di_root(sc, "proyek", p) for p in lingkup if p not in proyek]
+    bad += [bukan_di_root(sc, "repo", d) for d in dirs if d not in repos]
     bad += [f"repo `{d}` tanpa commit" for d in dirs if d in repos and not repos[d]["head"]]
     if not lingkup or not dirs:
         bad.append("`--lingkup` dan `--repo` wajib diisi")
@@ -476,11 +478,12 @@ def layanan_set(root: Path, pemanggil: str, target: str, repo: str, prefix: str)
     peta, err = load_layanan(root)
     if err:
         return err
-    repos = repo_index(scan(root))
+    sc = scan(root)
+    repos = repo_index(sc)
     if pemanggil not in repos:
-        return f"`--pemanggil {pemanggil}` bukan repo di root"
+        return f"`--pemanggil`: {bukan_di_root(sc, 'repo', pemanggil)}"
     if repo not in repos:
-        return f"`--repo {repo}` bukan repo di root"
+        return f"`--repo`: {bukan_di_root(sc, 'repo', repo)}"
     if "BE" not in peran_valid(repos[repo]):
         return f"`--repo {repo}` bukan repo BE berprofil VALID"
     if pemanggil == repo:

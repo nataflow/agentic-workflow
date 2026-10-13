@@ -46,6 +46,7 @@ CASES = [
 
     ("fullstack/skills/_common/workspace.py", ["scan", "--json"], True, None),
     ("fullstack/skills/_common/workspace.py", ["peta", "--json"], True, None),
+    ("fullstack/skills/_common/workspace.py", ["abaikan", "list", "--json"], True, None),
     ("fullstack/skills/_common/explore.py", ["new", "--slug", "smoke", "--objective", "x", "--lingkup", ".",
                                               "--repo", "api", "--json"], True, None),
     ("fullstack/skills/_common/explore.py", ["list", "--json"], True, None),

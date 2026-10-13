@@ -89,7 +89,7 @@ def test_check_frontmatter(ws):
     code, checks = _check(ws, path)
     s = checks[1]["summary"]
     assert code == 1 and "kebab-case" in s and "YYMMDDhhmm" in s and "high/medium/low" in s
-    assert "`lingkup` `erp`" in s and "`worker` tidak ada" in s and "tanpa SHA" in s
+    assert "proyek `erp` tidak ada di root" in s and "repo `worker` tidak ada di root" in s and "tanpa SHA" in s
 
 
 @pytest.mark.regression("21 F4")
@@ -318,8 +318,8 @@ def test_layanan_set_list_timpa_hapus(company):
 
 @pytest.mark.regression("21 F6")
 @pytest.mark.parametrize("args, alasan", [
-    (["--pemanggil", "x/api", "--target", "T", "--repo", "wms/api"], "bukan repo di root"),
-    (["--pemanggil", "erp/api", "--target", "T", "--repo", "x/api"], "bukan repo di root"),
+    (["--pemanggil", "x/api", "--target", "T", "--repo", "wms/api"], "repo `x/api` tidak ada di root"),
+    (["--pemanggil", "erp/api", "--target", "T", "--repo", "x/api"], "repo `x/api` tidak ada di root"),
     (["--pemanggil", "erp/api", "--target", "T", "--repo", "wms/web"], "bukan repo BE"),
     (["--pemanggil", "wms/api", "--target", "T", "--repo", "wms/api"], "sama dengan"),
     (["--pemanggil", "erp/api", "--target", "T", "--repo", "wms/api", "--prefix", "api"], "diawali `/`"),

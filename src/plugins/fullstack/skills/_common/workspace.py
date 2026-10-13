@@ -3,12 +3,14 @@
 
     python3 workspace.py scan [--root <dir>] [--json]
     python3 workspace.py peta [--root <dir>] [--write] [--json]
+    python3 workspace.py abaikan list|tambah <pola>|hapus <pola> [--root <dir>] [--json]
 
 `scan` exit 0 bila minimal satu profil `VALID`, 1 bila tidak atau root berada di dalam repo git.
 `peta` membangun peta aplikasi dari profil repo dan `layanan.json` saja, tanpa membaca kode (K12–K15).
 Isi BE di-parse dari `domain-map.md`/`surface-map.md`; isi FE dikutip dari `structure.md` dan tabel
 `surface-map.md`. Baris di luar format masuk `## Belum terpetakan`, bukan ditebak. `peta` exit 1 hanya bila
-root berada di dalam repo git.
+root berada di dalam repo git. `abaikan` mengelola `.fullstack/abaikan`: pola proyek/repo yang dikecualikan dari
+semua skrip fullstack (Langkah 22).
 
 Standard library saja.
 """
@@ -22,12 +24,16 @@ from typing import Any, Dict, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fullstack_lib import (  # noqa: E402
+    ABAIKAN_FILE,
     BATAS_TERTINGGAL,
     NAMA_PLUGIN,
     PETA_FILE,
     arahan_profil,
     cell,
+    clean_pola,
     dump_json,
+    find_repos,
+    inside_git,
     load_layanan,
     read_text,
     scan,
@@ -173,10 +179,12 @@ def _fe_card(root: Path, repo: Dict[str, Any], prof: Dict[str, Any], gaps: List[
 def build_peta(root: Path) -> Dict[str, Any]:
     sc = scan(root)
     model: Dict[str, Any] = {"root": sc["root"], "mode": sc["mode"], "ringkasan": sc["proyek"],
-                             "terpotong": sc["terpotong"], "proyek": [], "hubungan": [], "belum_terpetakan": []}
+                             "terpotong": sc["terpotong"], "proyek": [], "hubungan": [], "belum_terpetakan": [],
+                             "dikecualikan": sc["dikecualikan"]}
     if sc["mode"] == "DALAM_REPO":
         return model
     gaps: List[str] = model["belum_terpetakan"]
+    gaps.extend(sc["abaikan"]["galat"])
     by_proyek: Dict[str, List[Dict[str, Any]]] = {}
     for repo in sc["repo"]:
         cards = []
@@ -246,9 +254,12 @@ def _profil_line(card: Dict[str, Any], dir_: str) -> str:
 
 def render(model: Dict[str, Any], when: str) -> str:
     n_repo = sum(len(p["repo"]) for p in model["proyek"])
+    excluded = model.get("dikecualikan", [])
+    n_skip = sum(e.get("repo", 1) for e in excluded)
     out = [f"# Peta Aplikasi — {Path(model['root']).name}", "",
-           f"Dibangun: {when} · {len(model['proyek'])} proyek · {n_repo} repo · sumber: profil repo dan "
-           "`layanan.json`, tanpa membaca kode.", "",
+           f"Dibangun: {when} · {len(model['proyek'])} proyek · {n_repo} repo"
+           + (f" · {n_skip} repo dikecualikan" if n_skip else "")
+           + " · sumber: profil repo dan `layanan.json`, tanpa membaca kode.", "",
            "## Ringkasan", "",
            "| Proyek | Repo BE | Repo FE | Tanpa profil | Profil tertinggal |",
            "|---|---|---|---|---|"]
@@ -289,9 +300,78 @@ def render(model: Dict[str, Any], when: str) -> str:
                 for h in model["hubungan"]]
     else:
         out.append("- Tidak ada.")
+    out += ["", "## Dikecualikan", ""]
+    if excluded:
+        out += [f"Dari `{ABAIKAN_FILE}`.", "", "| Proyek/Repo | Pola |", "|---|---|"]
+        out += [f"| `{cell(e['dir'])}`" + (f" (proyek, {e['repo']} repo)" if e["jenis"] == "proyek" else "")
+                + f" | `{cell(e['pola'])}` |" for e in excluded]
+    else:
+        out.append("- Tidak ada.")
     out += ["", "## Belum terpetakan", ""]
     out += [f"- {g}" for g in model["belum_terpetakan"]] or ["- Tidak ada."]
     return "\n".join(out) + "\n"
+
+
+# ------------------------------------------------------------------ abaikan (22)
+
+def _abaikan_lines(root: Path) -> Tuple[List[str], str]:
+    path = root / ABAIKAN_FILE
+    if not path.exists():
+        return [], ""
+    text = read_text(path) if path.is_file() else None
+    if text is None:
+        return [], f"`{ABAIKAN_FILE}` tidak terbaca; perbaiki atau hapus berkasnya"
+    return text.splitlines(), ""
+
+
+def _pola_baris(line: str) -> str:
+    """Pola bersih dari satu baris berkas, atau '' untuk komentar, baris kosong, dan baris tidak sah."""
+    text = line.strip()
+    return "" if not text or text.startswith("#") else clean_pola(text)[0]
+
+
+def _terkena(root: Path, pola: str) -> List[str]:
+    """Proyek/repo di root yang dikenai `pola`."""
+    _kept, _cut, excluded = find_repos(root, [pola])
+    return [e["dir"] + (" (proyek)" if e["jenis"] == "proyek" else "") for e in excluded]
+
+
+def abaikan(root: Path, aksi: str, raw: str) -> Dict[str, Any]:
+    out: Dict[str, Any] = {"berkas": ABAIKAN_FILE, "aksi": aksi, "pola": "", "terkena": [], "galat": "",
+                           "peringatan": ""}
+    if inside_git(root):
+        out["galat"] = "root berada di dalam repo git"
+        return out
+    lines, err = _abaikan_lines(root)
+    if err:
+        out["galat"] = err
+        return out
+    current = [p for p in (_pola_baris(ln) for ln in lines) if p]
+    if aksi == "list":
+        out["daftar"] = [{"pola": p, "terkena": _terkena(root, p)} for p in current]
+        out["tidak_sah"] = [ln.strip() for ln in lines
+                            if ln.strip() and not ln.strip().startswith("#") and not _pola_baris(ln)]
+        return out
+    pola, err = clean_pola(raw)
+    out["pola"] = pola or raw.strip()
+    if err:
+        out["galat"] = f"pola `{raw.strip()}` {err}"
+        return out
+    if aksi == "tambah":
+        if pola in current:
+            out["galat"] = f"pola `{pola}` sudah ada"
+            return out
+        new_lines = lines + [pola]
+    else:
+        if pola not in current:
+            out["galat"] = f"pola `{pola}` tidak ada di `{ABAIKAN_FILE}`"
+            return out
+        new_lines = [ln for ln in lines if _pola_baris(ln) != pola]
+    write_atomic(root / ABAIKAN_FILE, "\n".join(new_lines) + ("\n" if new_lines else ""))
+    out["terkena"] = _terkena(root, pola)
+    if aksi == "tambah" and not out["terkena"]:
+        out["peringatan"] = "pola belum mengenai proyek atau repo mana pun; tetap disimpan"
+    return out
 
 
 # ------------------------------------------------------------------ CLI
@@ -310,20 +390,41 @@ def _scan_text(sc: Dict[str, Any]) -> str:
         lines.append(f"- {r['dir']} (proyek {_nama_proyek(r['proyek'])}, HEAD {r['head'] or '-'}): {prof}")
     if sc["terpotong"]:
         lines.append("Terpotong plafon 60 repo: " + ", ".join(sc["terpotong"]))
+    if sc.get("dikecualikan"):
+        lines.append("Dikecualikan: " + ", ".join(f"{e['dir']} (pola {e['pola']})" for e in sc["dikecualikan"]))
+    lines += [f"Peringatan: {g}" for g in sc.get("abaikan", {}).get("galat", [])]
     return "\n".join(lines)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in ("scan", "peta"):
+    for name in ("scan", "peta", "abaikan"):
         p = sub.add_parser(name)
         p.add_argument("--root", default=None, help="root multi-repo; default cwd")
         p.add_argument("--json", action="store_true")
         if name == "peta":
             p.add_argument("--write", action="store_true", help=f"tulis ke <root>/{PETA_FILE}")
+        if name == "abaikan":
+            p.add_argument("aksi", choices=("list", "tambah", "hapus"))
+            p.add_argument("pola", nargs="?", default="")
     args = ap.parse_args(argv)
     root = Path(args.root or ".").resolve()
+
+    if args.cmd == "abaikan":
+        out = abaikan(root, args.aksi, args.pola)
+        if args.json:
+            print(dump_json(out))
+        elif out["galat"]:
+            print(f"ABAIKAN FAIL: {out['galat']}")
+        elif args.aksi == "list":
+            rows = [f"- {d['pola']}: " + (", ".join(d["terkena"]) or "belum mengenai apa pun") for d in out["daftar"]]
+            rows += [f"- tidak sah: {t}" for t in out["tidak_sah"]]
+            print("\n".join(rows) or f"`{ABAIKAN_FILE}` kosong atau belum ada.")
+        else:
+            print(f"ABAIKAN {args.aksi.upper()}: `{out['pola']}` → " + (", ".join(out["terkena"]) or "-")
+                  + (f"\nPeringatan: {out['peringatan']}" if out["peringatan"] else ""))
+        return 1 if out["galat"] else 0
 
     if args.cmd == "scan":
         sc = scan(root)

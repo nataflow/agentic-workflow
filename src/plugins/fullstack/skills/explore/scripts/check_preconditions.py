@@ -4,7 +4,7 @@
 Memvonis root sebelum peta dibangun atau scout didispatch: berkas plugin lengkap, root bukan bagian repo git, ada
 repo di bawahnya, minimal satu profil `VALID`, `.fullstack/` bisa ditulis, dan `layanan.json` terbaca. Kurang dari
 dua profil `VALID` → WARN (penelusuran lintas repo terbatas); `layanan.json` rusak → WARN (jalur `PETA` tetap jalan,
-`seam` berhenti sampai berkas diperbaiki).
+`seam` berhenti sampai berkas diperbaiki); `.fullstack/abaikan` tak terbaca atau berbaris tidak sah → WARN.
 
 Exit 0 = PASS, 1 = FAIL. `--json` untuk keluaran mesin.
 
@@ -22,6 +22,7 @@ from typing import Any, Dict, List
 COMMON = Path(__file__).resolve().parents[2] / "_common"
 sys.path.insert(0, str(COMMON))
 from fullstack_lib import (  # noqa: E402
+    ABAIKAN_FILE,
     EXPLORE_DIR,
     FULLSTACK_DIR,
     LAYANAN_FILE,
@@ -90,9 +91,16 @@ def main() -> int:
         _peta, err = load_layanan(root)
         _add(res, 6, "layanan.json", "WARN" if err else "PASS", err or "terbaca atau belum ada",
              f"Perbaiki atau hapus `{LAYANAN_FILE}` sebelum jalur TELUSUR menjalankan `seam`.")
+        ab = sc["abaikan"]
+        _add(res, 7, "abaikan", "WARN" if ab["galat"] else "PASS",
+             "; ".join(ab["galat"]) or (f"{len(ab['pola'])} pola, {len(sc['dikecualikan'])} dikecualikan"
+                                        if ab["ada"] else "belum ada"),
+             f"Perbaiki baris yang disebut di `{ABAIKAN_FILE}` lewat `workspace.py abaikan`; baris tidak sah "
+             "diabaikan sehingga proyek/repo-nya tetap dipetakan.")
 
     failed = any(r["status"] == "FAIL" for r in res)
-    resolved = {"root": str(root), "mode": sc["mode"], "repo": str(len(sc["repo"])), "profil_valid": str(valid),
+    resolved = {"root": str(root), "mode": sc["mode"], "repo": str(len(sc["repo"])),
+                "dikecualikan": str(len(sc["dikecualikan"])), "profil_valid": str(valid),
                 "proyek": ",".join(p["nama"] for p in sc["proyek"]) or "-",
                 "peta": PETA_FILE if (root / PETA_FILE).is_file() else "belum ada",
                 "laporan": str(len(list((root / EXPLORE_DIR).glob("*.md")))) if (root / EXPLORE_DIR).is_dir() else "0"}

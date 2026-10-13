@@ -12,6 +12,7 @@ Standard library saja.
 """
 from __future__ import annotations
 
+import fnmatch
 import json
 import os
 import re
@@ -44,6 +45,7 @@ FULLSTACK_DIR = ".fullstack"
 EXPLORE_DIR = f"{FULLSTACK_DIR}/explore"
 PETA_FILE = f"{FULLSTACK_DIR}/PETA.md"
 LAYANAN_FILE = f"{FULLSTACK_DIR}/layanan.json"
+ABAIKAN_FILE = f"{FULLSTACK_DIR}/abaikan"
 STAMP = re.compile(r"^\d{10}$")
 SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
@@ -204,29 +206,116 @@ def _children(d: Path) -> List[Path]:
         return []
 
 
-def find_repos(root: Path) -> Tuple[List[Tuple[str, str, Path]], List[str]]:
-    """([(dir relatif, proyek, path)], proyek/repo yang terpotong plafon)."""
+# ------------------------------------------------------------------ abaikan (22)
+
+def clean_pola(raw: str) -> Tuple[str, str]:
+    """(pola bersih, galat). `/` di awal dan akhir dibuang; pola tanpa `/` mencocokkan nama di tingkat mana pun."""
+    text = raw.strip()
+    if text.startswith("~") or re.match(r"^[A-Za-z]:[\\/]", text) or "\\" in text:
+        return "", "bukan path relatif root"
+    pola = text.strip("/")
+    if not pola:
+        return "", "pola kosong"
+    segs = pola.split("/")
+    if any(seg in ("", ".", "..") for seg in segs):
+        return "", "memuat segmen kosong, `.`, atau `..`"
+    if len(segs) > 2:
+        return "", "lebih dari dua tingkat (root hanya `<proyek>/<repo>`)"
+    return pola, ""
+
+
+def load_abaikan(root: Path) -> Dict[str, Any]:
+    """{berkas, ada, pola, galat}. Berkas tak terbaca atau baris tidak sah tidak menghentikan scan (22 K4)."""
+    out: Dict[str, Any] = {"berkas": ABAIKAN_FILE, "ada": False, "pola": [], "galat": []}
+    path = root / ABAIKAN_FILE
+    if not path.exists():
+        return out
+    out["ada"] = True
+    text = read_text(path) if path.is_file() else None
+    if text is None:
+        out["galat"].append(f"`{ABAIKAN_FILE}` tidak terbaca; tanpa pengecualian")
+        return out
+    for no, raw in enumerate(text.splitlines(), 1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        pola, err = clean_pola(line)
+        if err:
+            out["galat"].append(f"`{ABAIKAN_FILE}` baris {no} `{line}`: {err}")
+        elif pola not in out["pola"]:
+            out["pola"].append(pola)
+    return out
+
+
+def cocok_abaikan(rel: str, pola: List[str]) -> Optional[str]:
+    """Pola pertama yang mengena `rel` (path relatif root), atau None."""
+    name = rel.rsplit("/", 1)[-1]
+    for p in pola:
+        if fnmatch.fnmatchcase(rel if "/" in p else name, p):
+            return p
+    return None
+
+
+def find_repos(root: Path, pola: Optional[List[str]] = None
+               ) -> Tuple[List[Tuple[str, str, Path]], List[str], List[Dict[str, Any]]]:
+    """([(dir relatif, proyek, path)], proyek/repo terpotong plafon, dikecualikan `.fullstack/abaikan`)."""
+    pola = pola or []
     found: List[Tuple[str, str, Path]] = []
+    excluded: List[Dict[str, Any]] = []
     for child in _children(root):
+        hit = cocok_abaikan(child.name, pola)
         if _is_repo(child):
-            found.append((child.name, ".", child))
+            if hit:
+                excluded.append({"dir": child.name, "jenis": "repo", "pola": hit})
+            else:
+                found.append((child.name, ".", child))
+            continue
+        if hit:                                     # proyek dilewati utuh, tanpa membaca repo di dalamnya (22 K3)
+            n = sum(1 for sub in _children(child) if _is_repo(sub))
+            if n:
+                excluded.append({"dir": child.name, "jenis": "proyek", "pola": hit, "repo": n})
             continue
         for sub in _children(child):
-            if _is_repo(sub):
-                found.append((f"{child.name}/{sub.name}", child.name, sub))
+            if not _is_repo(sub):
+                continue
+            rel = f"{child.name}/{sub.name}"
+            hit = cocok_abaikan(rel, pola)
+            if hit:
+                excluded.append({"dir": rel, "jenis": "repo", "pola": hit})
+            else:
+                found.append((rel, child.name, sub))
     kept, cut = found[:MAX_REPO], found[MAX_REPO:]
-    return kept, sorted({proyek if proyek != "." else dir_ for dir_, proyek, _ in cut})
+    return kept, sorted({proyek if proyek != "." else dir_ for dir_, proyek, _ in cut}), excluded
+
+
+def alasan_dikecualikan(scan_result: Dict[str, Any], name: str) -> Optional[str]:
+    """Pola yang mengecualikan repo atau proyek `name`, atau None."""
+    for e in scan_result.get("dikecualikan", []):
+        if e["dir"] == name or (e["jenis"] == "proyek" and name.startswith(e["dir"] + "/")):
+            return e["pola"]
+    return None
+
+
+def bukan_di_root(scan_result: Dict[str, Any], kind: str, name: str) -> str:
+    """Pesan untuk repo/proyek yang tidak ada di scan: dikecualikan, atau memang tidak ada."""
+    pola = alasan_dikecualikan(scan_result, name)
+    if pola:
+        return f"{kind} `{name}` dikecualikan `{ABAIKAN_FILE}` (pola `{pola}`)"
+    return f"{kind} `{name}` tidak ada di root"
 
 
 def scan(root: Path) -> Dict[str, Any]:
     root = root.resolve()
     result: Dict[str, Any] = {"root": str(root), "mode": "WORKSPACE", "repo": [], "proyek": [], "terpotong": [],
-                              "valid": 0}
+                              "valid": 0, "dikecualikan": [], "abaikan": {"berkas": ABAIKAN_FILE, "ada": False,
+                                                                          "pola": [], "galat": []}}
     if inside_git(root):
         result["mode"] = "DALAM_REPO"
         return result
-    repos, cut = find_repos(root)
+    result["abaikan"] = load_abaikan(root)
+    repos, cut, excluded = find_repos(root, result["abaikan"]["pola"])
     result["terpotong"] = cut
+    result["dikecualikan"] = excluded
     per_proyek: Dict[str, Dict[str, Any]] = {}
     for dir_, proyek, path in repos:
         profil = read_profiles(path)
