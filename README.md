@@ -1,17 +1,18 @@
 # nataflow
 
-Marketplace plugin Claude Code `nataflow`: enam plugin untuk alur kerja rekayasa perangkat lunak,
-mulai dari inisiasi produk dan tiket stakeholder sampai kode yang direview, ditambah kerja langsung dengan
-server nataflow.
+Marketplace plugin Claude Code `nataflow`: tujuh plugin untuk alur kerja rekayasa perangkat lunak,
+mulai dari inisiasi produk dan tiket stakeholder sampai kode yang direview, ditambah peta lintas repo untuk
+memahami seluruh aplikasi satu perusahaan dan kerja langsung dengan server nataflow.
 
 | Plugin | Versi | Fungsi | Titik masuk |
 |---|---|---|---|
-| [`analyst`](src/plugins/analyst/README.md) | 0.15.0 | Permintaan pengguna/stakeholder (satu, atau hingga lima sekaligus secara berurutan) menjadi `TICKET.md` non-teknis (user story, acceptance criteria, aturan bisnis), atau perubahan struktur dari lead engineer menjadi tiket `TECH` berbukti `file:baris`, lewat elisitasi, review independen, dan persetujuan; catatan kasar rapat menjadi `NOTULEN.md` | `/analyst:intake`, `/analyst:notulen` |
-| [`backend`](src/plugins/backend/README.md) | 0.13.2 | Kerja backend 7 stack (Java Spring, Go, Node, Bun, Rust, PHP, CodeIgniter 4): profil, TASK/BRD/PRD/brief, eksekusi, review, dan laporan | `/backend:tech-lead` |
-| [`frontend`](src/plugins/frontend/README.md) | 0.12.2 | Kerja frontend (React + Vite, React Native/Expo, SvelteKit, Svelte + Vite): alur layar, bentuk layar, kontrak, brief, eksekusi, review, dan laporan dengan ledger approval | `/frontend:lead` |
+| [`analyst`](src/plugins/analyst/README.md) | 0.16.0 | Permintaan pengguna/stakeholder (satu, atau hingga lima sekaligus secara berurutan) menjadi `TICKET.md` non-teknis (user story, acceptance criteria, aturan bisnis), atau perubahan struktur dari lead engineer menjadi tiket `TECH` berbukti `file:baris`, lewat elisitasi, review independen, dan persetujuan; catatan kasar rapat menjadi `NOTULEN.md` | `/analyst:intake`, `/analyst:notulen` |
+| [`backend`](src/plugins/backend/README.md) | 0.14.0 | Kerja backend 7 stack (Java Spring, Go, Node, Bun, Rust, PHP, CodeIgniter 4): profil, TASK/BRD/PRD/brief, eksekusi, review, dan laporan | `/backend:tech-lead` |
+| [`frontend`](src/plugins/frontend/README.md) | 0.13.0 | Kerja frontend (React + Vite, React Native/Expo, SvelteKit, Svelte + Vite): alur layar, bentuk layar, kontrak, brief, eksekusi, review, dan laporan dengan ledger approval | `/frontend:lead` |
 | [`quickdev`](src/plugins/quickdev/README.md) | 0.8.0 | Alur ringan untuk stack apa pun: profil, explore, clarify, satu berkas rencana, execute, dan review, tanpa taskdir dan tanpa subagent | `/quickdev:profile`, `/quickdev:plan` |
 | [`nataflow`](src/plugins/nataflow/README.md) | 0.1.0 | Artifact nataflow: halaman HTML mandiri yang dinilai gerbang kontrak halaman lalu di-upsert ke project milik MCP key, tanpa berkas di repo | `/nataflow:create-artifact` |
 | [`product`](src/plugins/product/README.md) | 0.1.0 | Inisiasi produk baru (folder kosong), fitur baru, atau improvement fitur (codebase) menjadi `CHARTER.md` enam pilar — Purpose, Actors, Business Process, Business Rules, Success Criteria, Scope — dengan guard permintaan yang terlalu umum, elisitasi, review independen, dan persetujuan | `/product:init` |
+| [`fullstack`](src/plugins/fullstack/README.md) | 0.1.0 | Memahami seluruh aplikasi dari root multi-repo (satu proyek atau banyak proyek satu perusahaan): peta aplikasi `PETA.md` dari profil backend/frontend tiap repo tanpa membaca kode, dan explore permukaan satu pertanyaan konkret dengan jahitan frontend → backend dan API → API yang dicocokkan skrip; read-only terhadap repo | `/fullstack:explore` |
 
 Skill internal (mis. `backend:plan`, `frontend:contract`, `analyst:spec`) tidak muncul di menu `/`.
 Model memanggilnya dari gerbang masing-masing.
@@ -26,6 +27,7 @@ Model memanggilnya dari gerbang masing-masing.
 /plugin install quickdev@nataflow
 /plugin install nataflow@nataflow
 /plugin install product@nataflow
+/plugin install fullstack@nataflow
 ```
 
 Untuk salinan lokal: `/plugin marketplace add ./path/ke/agentic-workflow`. Marketplace direktori lokal
@@ -34,10 +36,12 @@ Marketplace git memakai `version` di `plugin.json`: pengguna hanya mendapat peru
 
 ## Prasyarat
 
-- `python3` ≥ 3.9 di `PATH` untuk hook dan skrip `analyst`, `backend`, `frontend`, `nataflow`, dan `product`. Semua skrip
+- `python3` ≥ 3.9 di `PATH` untuk hook dan skrip `analyst`, `backend`, `frontend`, `nataflow`, `product`, dan `fullstack`. Semua skrip
   hanya memakai stdlib. Python 3.11+ disarankan untuk repo Rust ber-workspace (`tomllib`).
 - `git`. `backend` dan `frontend` mewajibkan repo git, sedangkan `analyst` dan `product` bisa berjalan di
   folder dokumen biasa atau folder kosong. `nataflow` tidak butuh repo, tetapi butuh server MCP nataflow yang berjalan.
+  `fullstack` justru berjalan di folder non-git yang menampung repo git (`<root>/<repo>` atau
+  `<root>/<proyek>/<repo>`), dan butuh repo aplikasinya sudah diprofilkan `backend`/`frontend`.
 - Di Windows yang hanya punya `py`/`python` tanpa `python3`, hook SessionStart tidak jalan.
 
 ## Memilih Plugin
@@ -51,6 +55,7 @@ Marketplace git memakai `version` di `plugin.json`: pengguna hanya mendapat peru
 | Repo React + Vite, React Native/Expo, SvelteKit, atau Svelte + Vite | `frontend` |
 | Perubahan kecil–menengah, stack lain (Next.js, FastAPI, …), tanpa taskdir | `quickdev` |
 | Laporan, dashboard, atau diagram HTML yang dibuka anggota project di nataflow | `nataflow` |
+| Memahami banyak repo sekaligus dari folder induknya: aplikasi apa saja, siapa memanggil siapa, atau alur satu fitur lintas frontend dan backend | `fullstack` |
 
 Rantai `product` → `analyst`: butir Scope `S<n>` charter `APPROVED` dibawa satu per satu ke `/analyst:intake`
 (serah-terima otomatis belum aktif; ID `S<n>` sudah disiapkan untuk itu).
@@ -61,12 +66,13 @@ sendiri.
 
 ## Hidup Berdampingan
 
-Keenam plugin biasanya dipasang user-wide. Yang menentukan perilaku di satu repo:
+Ketujuh plugin biasanya dipasang user-wide. Yang menentukan perilaku di satu repo:
 
 - **Hook SessionStart.** Hanya `backend` dan `frontend` yang punya hook. Keduanya berbagi
   `hooks/detect.py` yang identik byte-per-byte, dan masing-masing menyala bila profilnya ada atau
   manifest repo memuat penanda stack-nya. Di repo fullstack keduanya menyala dan menyuntik blok gerbang
-  masing-masing. Di repo lain keduanya diam.
+  masing-masing. Di repo lain keduanya diam. Di root multi-repo (folder non-git dengan ≥ 2 repo anak),
+  keduanya tidak menggerbangi: bloknya hanya menunjuk repo miliknya dan `/fullstack:explore`.
 - **Profil per plugin.** `.claude/profile/backenddev/` dan `.claude/profile/frontenddev/` terpisah. Profil
   lama di `.claude/profile/` dimigrasikan oleh pemiliknya (mode MIGRATE) dan tidak disentuh plugin lain.
   `quickdev` memakai `repo-profile.md` sendiri.

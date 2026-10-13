@@ -531,6 +531,7 @@ Penulis dan penilai selalu berada di context terpisah. Sebabnya, penilai yang be
 - Gate boleh dilewati hanya untuk empat hal (`hooks/gate_text.py`): jawaban yang memasok informasi ke rute yang sudah diputuskan, pertanyaan pengetahuan umum, operasi VCS atas kerja yang sudah selesai, dan alur `/analyst:*`, `/product:*`, atau `/quickdev:*` yang dipanggil eksplisit.
 - Hook hanya menyala kalau profil frontend ada, atau manifest (root, workspace, `apps/*`, `packages/*`, `services/*`, anak langsung root, maksimal 200 kandidat) memuat penanda stack yang didukung. Next.js, CRA, dan React/Svelte tanpa Vite membuat hook diam.
 - **Opt-out** lewat berkas `.claude/workflow` yang berisi daftar plugin yang boleh menggerbangi repo, dipisah spasi, koma, atau baris. Kalau nama plugin ini tidak ada di dalamnya (termasuk berkas kosong), hook diam (`detect.py` `opted_out`).
+- **Root multi-repo** (21 F1): bila cwd bukan repo git dan punya ≥ 2 anak langsung ber-`.git` (mis. `wms/api`, `wms/frontend`), hook tidak menggerbangi. Bloknya hanya menyebut repo frontend di antara anak itu (dari profil atau manifest) beserta `/fullstack:explore`, karena skrip prasyarat skill frontend butuh repo git. Root tanpa anak frontend diam. Root multi-proyek (`company/<proyek>/<repo>`) di luar jangkauan deteksi dan tetap diam.
 - `detect.py` identik byte-per-byte dengan milik `backend` dan diimpor skrip prasyarat lewat `precondition_lib.py`, sehingga vonis hook sama dengan vonis skrip.
 
 **`PreToolUse` → `hooks/guard_bash.py hook`** (matcher `Bash|Edit|Write`, timeout 10 detik):

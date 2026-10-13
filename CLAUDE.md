@@ -4,10 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-`nataflow` is a Claude Code **plugin marketplace**, not an application. It ships six plugins under
-`src/plugins/`: `analyst`, `backend`, `frontend`, `quickdev`, `nataflow`, and `product`. Each plugin is a set of skills
-(`SKILL.md` prose), subagents (`agents/*.md`), hooks, and stdlib-only Python scripts that skills call to
-enforce their gates mechanically. Everything under `src/plugins/<plugin>/` is copied into the user's
+`nataflow` is a Claude Code **plugin marketplace**, not an application. It ships seven plugins under
+`src/plugins/`: `analyst`, `backend`, `frontend`, `quickdev`, `nataflow`, `product`, and `fullstack`. Each
+plugin is a set of skills (`SKILL.md` prose), subagents (`agents/*.md`), hooks, and stdlib-only Python scripts
+that skills call to enforce their gates mechanically. Everything under `src/plugins/<plugin>/` is copied into the user's
 plugin cache, so dev-only files (tests, `__pycache__`, `src/plugins` paths in prose) must not live there.
 
 All prose, skill text, commit messages, and issue docs are written in **Indonesian**. Keep that language
@@ -99,6 +99,14 @@ skeletons), `dispatcher/` (prompts used to dispatch subagents), `scripts/`, and 
   `product:spec` (card, `charter-reviewer`, approval). `skills/_common/charter.py` is the state machine; scope
   items carry stable `S<n>` IDs prepared for a future hand-off to `analyst`. The backend/frontend gate texts
   exempt `/product:*`.
+- **fullstack** — read-only understanding of many repos from a non-git root that holds them (`<root>/<repo>` or
+  `<root>/<proyek>/<repo>`), driven by each repo's backend/frontend profile. One skill `fullstack:explore` with two
+  paths: `PETA` (`skills/_common/workspace.py peta` writes `<root>/.fullstack/PETA.md` from profiles and git only,
+  no code reading) and `TELUSUR` (parallel `repo-scout` subagents per repo, report under `.fullstack/explore/` built
+  by `explore.py new`, FE→BE and API→API seams computed by `explore.py seam`, gated by `explore.py check`). Target
+  repos for API→API calls are certain only via user-confirmed `.fullstack/layanan.json`. `fullstack_lib.py` copies
+  `SKIP_DIRS`/`STACKS` from backend `hooks/detect.py` (a test asserts equality), and `tests/fullstack/
+  test_profile_anchor_21.py` pins the backend/frontend profile-template anchors the parser reads. No hooks.
 
 Repo profiles are per plugin: `.claude/profile/backenddev/` and `.claude/profile/frontenddev/`
 (`index.json` + fixed set of `.md` files; see `BE_PROFILE_MD`/`FE_PROFILE_MD` in `tests/conftest.py`).
@@ -108,8 +116,9 @@ The legacy flat `.claude/profile/` location is migrated by `migrate_profile.py`.
 
 - **SessionStart** → `hooks/detect.py --plugin <name>` detects stack/profile and injects a gate block
   (text from `hooks/gate_text.py`) telling the model which requests must go through the entry skill.
-  Output must be empty or valid JSON. A user-repo `.claude/workflow` file listing plugin names opts
-  hooks in/out. `precondition_lib.py` imports `detect.py` so hook and scripts reach the same verdict.
+  Output must be empty or valid JSON. A non-git cwd with ≥ 2 direct git children is a multi-repo root:
+  the block only points at the plugin's child repo(s) and `/fullstack:explore` instead of gating. A
+  user-repo `.claude/workflow` file listing plugin names opts hooks in/out. `precondition_lib.py` imports `detect.py` so hook and scripts reach the same verdict.
 - **PreToolUse** (`Bash|Edit|Write`) → `hooks/guard_bash.py hook` fences the plugin's subagents by
   `agent_type`. It is **fail-closed** (internal error ⇒ deny, exit 2). The implementor may only touch
   paths in a lease file written by `architect` to `<git-dir>/nataflow/lease-<plugin>.json`; explorers may
@@ -137,6 +146,9 @@ Tests live outside `src/` so they never ship. They invoke plugin scripts via `su
 - product tests import `tests/product_helpers.py` (`from product_helpers import …`): fixture `ws` runs each test
   once per mode (`NEW_PRODUCT`/`NEW_FEATURE`/`IMPROVEMENT`), `empty_ws` is an empty non-git folder, and
   `Workspace.to_closed()`/`to_reviewed()`/`to_approved()` build a charter in each lifecycle state.
+- fullstack tests import `tests/fullstack_helpers.py`: `repo(root, rel, be=…, fe=…)` builds a git repo with a
+  realistic profile under a multi-repo root, `satu_proyek()` builds `wms/{api,frontend}`, and `run()` returns
+  `(proc, json)`.
 - `load_module(path, name)` imports a plugin script under a unique name and purges sibling modules,
   because backend and frontend have same-named modules (`precondition_lib`, `detect`).
 

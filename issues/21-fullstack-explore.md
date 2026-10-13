@@ -6,7 +6,40 @@ multi project bisa juga?"), API to API ("ada komunikasi api to api … tolong si
 ("ga harus komunikasi api to api sih, tapi supaya fleksibel aja bisa banyak project sekaligus di 1 company, jadi bisa
 paham semua aplikasi di 1 company"). Basis kode plugin: commit `3a66412` (backend 0.13.2, frontend 0.12.2).
 
-**Status (2026-10-13):** rencana, belum dikerjakan.
+**Status (2026-10-13):** F1–F10 dan D1 selesai. Test baru: `tests/hooks/test_workspace_root_21.py` (9),
+`tests/fullstack/test_workspace_21.py` (26), `test_explore_21.py` (37), `test_skill_21.py` (10),
+`test_profile_anchor_21.py` (6), ditambah sembilan kasus smoke. Suite penuh hijau (2446), subset fullstack/hooks/smoke
+hijau di Python 3.9, lint `--base main` 0 FAIL, dan `claude plugin validate .` lolos. Versi: fullstack 0.1.0 (baru),
+backend 0.14.0, frontend 0.13.0. Diuji juga terhadap root `nataflow/` sungguhan: gerbang hanya menunjuk repo,
+`peta` membaca profil asli (`backend` tertinggal 56 commit `internal/`, `frontend` 8 commit `src/`).
+
+Selisih pelaksanaan terhadap Kontrak di bawah:
+
+- **Letak skrip.** `workspace.py`, `explore.py`, dan pustaka `fullstack_lib.py` tinggal di `skills/_common/` (pola
+  `product`); hanya `check_preconditions.py` di `skills/explore/scripts/`.
+- **`explore.py new` (tambahan).** Kerangka laporan dibuat skrip dari `templates/explore-template.md`: frontmatter
+  (`slug`, `objective`, `dibuat`, `lingkup`, `repo@sha`) dan tabel `## Repo` terisi dari `scan`, `confidence` kosong
+  sampai diisi skill. Model tidak mengetik SHA atau stamp sendiri.
+- **`seam --write` (tambahan).** Tabel `## Jahitan` ditulis langsung ke laporan; check 4 tetap menghitung ulang.
+- **Status profil `TIDAK_SAH` (tambahan).** `index.json` sah tetapi `stack` kosong atau `plugin` milik lain; diarahkan
+  ke REFRESH seperti `INVALID_JSON`.
+- **Jangkar FE.** Template `surface-map.md` frontend tidak punya baris **HTTP Service** dan **DTO** (profil nataflow
+  menambahkannya sendiri). Scout FE membaca baris kanonik **Routing & Navigation**, **Data Fetching & Cache**,
+  **Shared HTTP Client**, **Framework Boundary**, ditambah `layer-adoption.md` (**HTTP Service Layer**, **DTO
+  Isolation**) dan sub-butir `services/`/`dto/` di **Features Path**. F9 menjaga jangkar itu.
+- **Tabel `## Repo`.** Memuat repo yang disisir dan repo di proyek lingkup yang profilnya ada tetapi tidak `VALID`.
+  Repo tanpa profil sama sekali (pustaka, infra) cukup di `PETA.md` `## Belum terpetakan`, supaya tiap laporan tidak
+  wajib menulis arahan untuk repo yang mungkin bukan aplikasi.
+- **Komentar template.** Komentar HTML dibuang dari badan seksi saat laporan di-parse; seksi yang hanya berisi
+  komentar dihitung kosong, dan contoh tabel di dalam komentar tidak terbaca sebagai tabel.
+- **Rujukan `path:baris`.** Check 3 hanya menilai token ber-backtick yang memuat `/` (mis.
+  `` `wms/api/x.go:12` ``), sehingga jam `10:30` dan `localhost:8080` tidak ikut dinilai.
+- **Prasyarat.** `layanan.json` rusak dan root di atas plafon 60 repo menjadi WARN, bukan FAIL; jalur `PETA` tetap
+  jalan.
+- **F1.** `Verdict` mendapat `workspace` dan `workspace_size`, `source` bernilai `workspace`. Root multi-repo tanpa
+  anak milik plugin itu tetap diam. `gate_text.render` memakai `getattr` karena test lama memanggilnya dengan
+  `SimpleNamespace` tanpa field baru.
+- **D1.** Versi `analyst` di tabel README root dikoreksi ke 0.16.0 (sebelumnya tertinggal 0.15.0).
 
 ## Tujuan
 
@@ -342,7 +375,7 @@ Kerja backend dijalankan dari dalam repo backend: `api/`. Penelusuran lintas rep
 Root multi-proyek tidak tersentuh F1, karena kedua gerbang sudah diam di sana (Temuan awal).
 
 ## F1 [Tinggi] Gerbang backend/frontend salah menyala di root satu proyek
-- [ ] Selesai
+- [x] Selesai
 
 Kontrak di atas. Test: root multi-repo (dua anak ber-git) → blok pendek tanpa kata "jalan lebih dulu", dan nama
 anak berperan benar; root dengan satu anak ber-git → perilaku lama; root multi-proyek → tetap tanpa emit; repo git
@@ -350,7 +383,7 @@ biasa → keluaran sama byte dengan sebelum perubahan; `.claude/workflow` di roo
 `detect.py` tetap terjaga.
 
 ## F2 [Tinggi] Belum ada peta proyek dan repo beserta profilnya
-- [ ] Selesai
+- [x] Selesai
 
 `workspace.py scan`. Test: root satu proyek; root multi-proyek; root campuran (repo langsung + proyek); satu repo
 dengan dua profil; repo tanpa profil; profil `INVALID_JSON`; profil lokasi lama; anak tanpa commit (`head: null`,
@@ -359,7 +392,7 @@ dengan dua profil; repo tanpa profil; profil `INVALID_JSON`; profil lokasi lama;
 dilewati; scan tidak turun ke dalam repo; plafon 60 repo; cwd di dalam repo → `DALAM_REPO`.
 
 ## F3 [Tinggi] Belum ada gambaran seluruh aplikasi perusahaan
-- [ ] Selesai
+- [x] Selesai
 
 `workspace.py peta`. Test:
 - BE: tabel domain dari `domain-map.md` (termasuk baris induk berisi anak dalam kurung), daftar kunci permukaan,
@@ -373,14 +406,14 @@ dilewati; scan tidak turun ke dalam repo; plafon 60 repo; cwd di dalam repo → 
   dan repo alfabetis).
 
 ## F4 [Tinggi] Laporan explore tanpa pagar dan tanpa panen
-- [ ] Selesai
+- [x] Selesai
 
 `explore.py list` dan `check`. Test per butir check 1–7, termasuk rujukan ke repo di luar frontmatter, baris
 melewati panjang berkas, `lingkup` berisi proyek yang tidak ada, dan laporan `basi` sesudah commit baru di salah satu
 repo.
 
 ## F5 [Tinggi] Jahitan FE → BE dan API → API belum punya pencocok mekanis
-- [ ] Selesai
+- [x] Selesai
 
 `explore.py seam`. Test:
 - normalisasi: `/projects/${id}` + base `/api/v1` = `/api/v1/projects/{id}` dari chi; `:id`, `[id]`, `<id>`; query
@@ -394,14 +427,14 @@ repo.
 - laporan tanpa panggilan sama sekali → tabel jahitan hanya berisi `TAK_TERPANGGIL` atau `- Tidak ada.`.
 
 ## F6 [Sedang] Pemetaan layanan belum punya tempat yang tahan antar sesi
-- [ ] Selesai
+- [x] Selesai
 
 `explore.py layanan list/set/hapus` dan `.fullstack/layanan.json`. Test: set lalu list; set ulang menimpa; tolak
 repo yang tidak ada, repo bukan BE, dan pemanggil sama dengan repo; hapus; berkas rusak → FAIL; berkas tidak ada →
 peta kosong.
 
 ## F7 [Tinggi] Belum ada scout lintas repo
-- [ ] Selesai
+- [x] Selesai
 
 `agents/repo-scout.md` (frontmatter dalam whitelist `AGENT_FIELDS`) dan `skills/explore/dispatcher/scout.md`: slot,
 gerbang masuk (slot rusak → balikan satu butir `Belum disisir`), daftar berkas profil per peran, kuota, putaran
@@ -409,7 +442,7 @@ verifikasi endpoint, larangan (menulis, membaca nilai `.env*`, menelusuri rantai
 aturan K27, dan tabel penanganan balikan.
 
 ## F8 [Tinggi] Skill `fullstack:explore`
-- [ ] Selesai
+- [x] Selesai
 
 `SKILL.md`:
 - Iron Law (K6, K7).
@@ -432,7 +465,7 @@ aturan K27, dan tabel penanganan balikan.
   menghapus berkasnya; root melewati plafon 60 repo → `PETA` tetap jalan untuk yang tercakup dan menyebut sisanya.
 
 ## F9 [Sedang] Kopling ke format profil tanpa pengaman
-- [ ] Selesai
+- [x] Selesai
 
 `tests/fullstack/test_profile_anchor_21.py`:
 - backend: `scan-guide.md` titik 14 masih memuat permukaan kanonik `http`, `external`, dan `config`; template
@@ -446,14 +479,14 @@ aturan K27, dan tabel penanganan balikan.
 Bila backend/frontend mengganti jangkar ini, test gagal dan `peta` serta dispatcher `fullstack` ikut diperbarui.
 
 ## F10 [Rendah] Smoke untuk skrip baru
-- [ ] Selesai
+- [x] Selesai
 
 `CASES` di `tests/test_smoke.py`: `workspace.py scan --json`, `workspace.py peta --json`, `explore.py list --json`,
 `explore.py layanan list --json`, dan `check_preconditions.py --json`. Keadaan "bukan repo git" adalah keadaan
 normal plugin ini, jadi harapan exit-nya ditulis per keadaan.
 
 ## D1 [Rendah] Dokumen dan versi
-- [ ] Selesai
+- [x] Selesai
 
 - `src/plugins/fullstack/README.md` dan `flow/fullstack.md` (Peta Komponen, Alur Utama, Artefak, Jalur, Handoff
   Lintas Plugin, Titik Gagal & Pemulihan; struktur sama dengan `flow/product.md`). Sertakan contoh root satu proyek
