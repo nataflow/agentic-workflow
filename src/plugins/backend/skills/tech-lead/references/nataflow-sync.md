@@ -2,7 +2,7 @@
 
 Dimuat di main loop oleh `backend:analyst` (Fase 2 sesudah akar terkunci, Fase 4 sesudah centang ledger BRD/PRD) dan `backend:tech-lead` (Fase 5 sesudah artefak yang menunggu di-commit, serta rute "sinkron ulang"). Subagent tidak pernah menjalankannya. Hasilnya tepat satu segmen untuk slot **Nataflow**: `workdir <nama> · <n> dokumen (<c> baru, <u> diperbarui, <s> sama)`, `repo · <n> dokumen (…)`, `dilewati`, atau `GAGAL: <sebab>`.
 
-Disk dan git tetap satu-satunya sumber kebenaran; nataflow hanya cermin. Prosedur ini tidak menulis berkas dan tidak meng-commit, sehingga check `Git Clean Working Tree`, kesegaran `REVIEW.md`, dan materai approve tidak tersentuh. `GAGAL` tidak menahan rantai: langkah lanjut ditentukan seperti biasa, dan sinkron diulang lewat rute "sinkron ulang".
+Dokumen taskdir hanya ada di disk dan tidak pernah di-commit (Langkah 24); nataflow satu-satunya salinannya di luar mesin ini. Dokumen tingkat repo (audit, API, profil) tetap ter-commit. Prosedur ini tidak menulis berkas dan tidak meng-commit, sehingga check `Git Clean Working Tree`, kesegaran `REVIEW.md`, dan materai approve tidak tersentuh. `GAGAL` tidak menahan rantai: langkah lanjut ditentukan seperti biasa, dan sinkron diulang lewat rute "sinkron ulang".
 
 `<sync_payload.py>` di bawah adalah `python3 <root plugin backend>/skills/_common/sync_payload.py`, root yang sama dengan skrip prasyarat skill pemanggil.
 
@@ -53,8 +53,8 @@ Dipakai untuk laporan `audit` (`backenddev/issues/`), `docs/api/`, dan profil. U
 ## Larangan
 
 - Dilarang menyusun, menyunting, meringkas, atau menerjemahkan nilai argumen di luar keluaran `sync_payload.py`. Satu-satunya nilai dari balikan tool adalah `task_id`, `workspace_id` task untuk `upsert_workdir`, dan `reference_id`. `metadata` dikirim sebagai teks JSON persis seperti tercetak.
-- Dilarang memilih berkas sendiri: `.explore/`, BRD/PRD `DRAFT`, dan berkas yang belum ter-commit sengaja tidak ada di payload.
-- Dilarang memanggil `upsert_documents` (batch) atau `delete_document`. Berkas yang dihapus dari git sudah diterbitkan skrip dengan metadata `removed: true`.
+- Dilarang memilih berkas sendiri: `.explore/`, BRD/PRD `DRAFT` atau yang materai approve-nya tidak utuh, brief yang belum dikunci (`sidik_kontrak`), dan `TASK.md` tanpa `base_commit` sengaja tidak ada di payload.
+- Dilarang memanggil `upsert_documents` (batch) atau `delete_document`. Dokumen repo yang dihapus dari git sudah diterbitkan skrip dengan metadata `removed: true`; dokumen taskdir yang hilang dari disk dibiarkan dengan isi terakhirnya di server.
 - Dilarang memilih workspace sendiri: `workspace_choices` selalu ditanyakan ke user, dan `--workspace` hanya menerima alias yang dipilih user.
 - Dilarang mengulang `create_task` sesudah tool galat tanpa `list_task` ulang. Tulisan yang ternyata sampai di server membuat task kembar.
 - Dilarang menjalankan prosedur ini dari subagent, menulis berkas, atau meng-commit sebagai bagiannya.

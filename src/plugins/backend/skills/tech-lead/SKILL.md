@@ -14,7 +14,7 @@ description: Gunakan ketika ada permintaan kerja baru atau susulan di repo backe
 ## Precondition [REQUIRED]
 
 1. Fase 0 (tiap permintaan): `python3 ${CLAUDE_PLUGIN_ROOT}/skills/tech-lead/scripts/check_preconditions.py --read-only`. `FAIL` = repo tak terbaca (bukan git, `index.json` rusak) → hentikan dan laporkan.
-2. Fase 3 butir 0 (lane `PLANNING`, `DEFECT_RCA`, `EXEC_BRIEF`, `AUDIT_SWEEP`, `API_DOCS`): skrip yang sama tanpa `--read-only`, ditambah `--re-entry` bila masuk lewat Fase 5. `PASS` (6/6) → lanjut. `FAIL` → remediasi: profil (`commands.md`, `base_branch`) bermasalah → rute `PROFILE`; tree kotor di luar zona artefak → minta user stash/commit; HEAD detached → minta checkout `base_branch`.
+2. Fase 3 butir 0 (lane `PLANNING`, `DEFECT_RCA`, `EXEC_BRIEF`, `AUDIT_SWEEP`, `API_DOCS`): skrip yang sama tanpa `--read-only`, ditambah `--re-entry` bila masuk lewat Fase 5. `PASS` (6/6) → lanjut. `FAIL` → remediasi: profil (`commands.md`, `base_branch`) bermasalah → rute `PROFILE`; tree kotor di luar zona artefak → minta user stash/commit; `MIGRASI` → `gate-lifecycle.md` bagian 0; HEAD detached → minta checkout `base_branch`.
 
 ## Parameter [REQUIRED]
 
@@ -87,7 +87,7 @@ Jalankan untuk rute yang menghasilkan artefak rancangan atau kode; lewati pada l
 ### Fase 5 — Re-entry Rantai: Commit Artefak & Langkah Lanjut
 
 1. Jalankan prasyarat penuh dengan `--re-entry` (zona artefak yang boleh kotor: `references/gate-lifecycle.md` bagian 6 butir 1).
-2. Commit artefak yang menunggu (profil, laporan `audit`, `RCA.md`, `docs/api/`) dengan staging path eksplisit tiap path slot `Menunggu commit` pengirim (`references/gate-scope.md` bagian 3), lalu sinkron nataflow (`gate-lifecycle.md` bagian 6 butir 2a).
+2. Commit artefak repo yang menunggu (profil, laporan `audit`, `docs/api/`) dengan staging path eksplisit tiap path slot `Menunggu commit` pengirim (`references/gate-scope.md` bagian 3), lalu sinkron nataflow (`gate-lifecycle.md` bagian 6 butir 2a).
 3. Tentukan langkah lanjut dari tabel pengirim balik `references/gate-lifecycle.md` bagian 6 butir 3 (mis. `architect` `COMPLETED (WARNING)` = rantai selesai).
 4. Perlakukan severity `P1` dari `architect` sebagai kerja lanjutan pada **taskdir yang sama**; dilarang memperbaiki di gerbang dan dilarang memprovisi taskdir baru. Klasifikasikan ulang lewat Keputusan 2, seleksi temuan lewat `references/gate-scope.md` bagian 6, lalu berangkatkan lane `PLANNING` dengan `finding_source` `{taskdir}/REVIEW.md` **dan** `reentry_reason` `REVIEW P1: <ID temuan terpilih>` (taskdir tanpa ledger: Fase 3 butir 1).
 5. Skill hilir menutup `BLOCKED` atau rantai terputus → selesaikan akar masalah sesuai `## Failure path`; jangan menutupinya dengan taskdir baru.
@@ -96,7 +96,7 @@ Jalankan untuk rute yang menghasilkan artefak rancangan atau kode; lewati pada l
 
 - **FASE PLANNING MILIK `analyst`**: gerbang berhenti pada provisi taskdir, branch, dan `risk`. Dilarang memanggil `task`, `business-analysis`, `system-analysis`, atau `plan` langsung pada lane `PLANNING`, dan dilarang memutuskan temuan cukup dikerjakan tanpa `PRD.md`.
 - **PENCABANGAN HANYA DARI BASE BRANCH**: dilarang mencabangkan di atas branch kerja lain.
-- **COMMIT ARTEFAK MILIK PENULISNYA**: gerbang meng-commit hanya artefak `profile`, `audit`, `debug`, `document-api` di Fase 5, amandemen akar `TASK.md`, dan pencabutan `HALT.md` scope yang diterima user. Dilarang commit ulang dokumen terkunci atau staging wildcard.
+- **COMMIT ARTEFAK MILIK PENULISNYA**: gerbang meng-commit hanya artefak `profile`, `audit`, `document-api` di Fase 5; dokumen taskdir tidak pernah di-commit. Dilarang staging wildcard.
 - **LARANGAN GIT DESTRUKTIF**: dilarang `git push`, `git merge`, `git rebase`, `gh pr create`, atau `git branch -D` tanpa otorisasi eksplisit user.
 - **RATIONALIZATION PREVENTION**: dilarang menganggap perubahan field response sebagai MINOR; menutupi taskdir `BLOCKED` dengan direktori baru; mendispatch implementor tanpa `architect`; berasumsi user setuju breaking tanpa PRD; melanjutkan sapuan setelah kuota habis; atau meminta stash/commit untuk pertanyaan baca-kode.
 

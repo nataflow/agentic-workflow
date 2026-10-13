@@ -24,7 +24,7 @@ ticket_source: <path TICKET.md analyst>
 - [ ] PRD   — backend:system-analysis  → PRD.md
 - [ ] BRIEF — backend:plan             → brief-*.md
 
-<Ledger rantai planning. Muat **tepat** hop milik `chain:` frontmatter, berurutan — hop di luar chain dihapus barisnya, bukan dibiarkan tak tercentang. Hop tuntas dicentang `backend:analyst` beserta jejaknya (`- [x] PRD — backend:system-analysis → PRD.md @ APPROVED a1b2c3d`). Rumah kanonik enum dan aturan pencentangannya di `analyst/references/chain-rules.md` bagian 2. Lane non-planning (`DEFECT_RCA`, `EXEC_BRIEF`): hilangkan seksi ini beserta baris `chain:` frontmatter.>
+<Ledger rantai planning. Muat **tepat** hop milik `chain:` frontmatter, berurutan — hop di luar chain dihapus barisnya, bukan dibiarkan tak tercentang. Hop tuntas dicentang skrip `doc_seal.py` atas perintah `backend:analyst` beserta sidik materainya (`- [x] PRD — backend:system-analysis → PRD.md @ APPROVED 3f9a1c2b7d40`). Rumah kanonik enum dan aturan pencentangannya di `analyst/references/chain-rules.md` bagian 2. Lane non-planning (`DEFECT_RCA`, `EXEC_BRIEF`): hilangkan seksi ini beserta baris `chain:` frontmatter.>
 
 ## Description
 
@@ -53,11 +53,13 @@ ticket_source: <path TICKET.md analyst>
 
 Baris `ticket_source:` hanya ditulis bila akar berangkat dari tiket analyst (`SKILL.md` Fase 3 butir 7); permintaan lain menghilangkannya sepenuhnya.
 
+Baris `base_commit:` tidak ditulis `task` dengan tangan: `skills/_common/doc_seal.py root` menambahkannya saat akar dikunci (`SKILL.md` Fase 5 butir 4), dan sejak itu nilainya tidak berubah. `TASK.md` tidak di-commit — `backenddev/docs/` diabaikan git dan dicerminkan ke nataflow.
+
 ______________________________________________________________________
 
 ## 2. Self-test Akar
 
-Dijalankan `task` atas `TASK.md` yang baru ditulis, sebelum commit Fase 5 berangkat, lewat `skills/_common/validate_doc.py --kind task --taskdir <taskdir> --fresh [--finding-source <path>]`. `backend:analyst` sesudah transisi eskalasi chain dan gerbang sesudah amandemen menjalankannya ulang tanpa `--fresh`. Validator menagih butir mekanis (ID check di kurung siku); butir `MANUAL` dinilai penulis memakai prosa di bawah. Satu `FAIL` berarti `TASK.md` diperbaiki seketika lalu validator dijalankan ulang. `TASK.md` adalah akar rantai — cacat di sini menular ke BRD, PRD, dan tiap brief tanpa satu pun gerbang hilir yang memeriksanya kembali.
+Dijalankan `task` atas `TASK.md` yang baru ditulis, sebelum akar dikunci di Fase 5, lewat `skills/_common/validate_doc.py --kind task --taskdir <taskdir> --fresh [--finding-source <path>]`. `backend:analyst` sesudah transisi eskalasi chain dan gerbang sesudah amandemen menjalankannya ulang tanpa `--fresh`. Validator menagih butir mekanis (ID check di kurung siku); butir `MANUAL` dinilai penulis memakai prosa di bawah. Satu `FAIL` berarti `TASK.md` diperbaiki seketika lalu validator dijalankan ulang. `TASK.md` adalah akar rantai — cacat di sini menular ke BRD, PRD, dan tiap brief tanpa satu pun gerbang hilir yang memeriksanya kembali.
 
 1. **Struktur & frontmatter** [T1]: `status: ACTIVE`, `lane` dan `risk` dari 4 enum masing-masing, `created` `YYYY-MM-DD`; tepat satu H1 dan heading `## Chain` (hanya lane planning), `## Description`, `## Success Criteria`, `## Out of Scope` persis urutan bagian 1, boleh diikuti `## Counters` penutup milik skrip.
 2. **Penomoran `SC-{n}`** [T2]: baris `- [ ] **SC-{n}**:` urut mulai `SC-1` tanpa lompatan dan tanpa ganda, 1–7 butir; butir yang dicoret amandemen gerbang (`- [ ] ~~**SC-{n}**: …~~`) tetap dihitung.
@@ -76,7 +78,7 @@ Dijalankan `task` atas `TASK.md` yang baru ditulis, sebelum commit Fase 5 berang
 9. **Kecukupan akar** [T9 MANUAL]: tiap `SC-{n}` menamai permukaan yang disebut `request` atau terbukti di `evidence` — endpoint, modul, aturan, status, atau artefak. Butir yang memperkenalkan permukaan di luar keduanya adalah kegagalan: hapus butirnya, dilarang dicarikan akar susulan. Jumlah butir dinilai dari cakupan, bukan dari plafon — rangkaian yang sudah menutup seluruh permukaan yang diminta lalu ditambah butir demi mendekati angka 7 gagal di butir ini, sekalipun tiap butirnya lolos butir 2–4.
 10. **Keterpikulan tiket** [T10, hanya bila frontmatter `ticket_source:` ada]: tiap `AC-{n}` kartu `TICKET.md` disebut sebagai `TAC-{n}` di minimal satu butir `SC-{n}` aktif atau di `## Out of Scope`, dan tidak ada `TAC-{n}` yang nomornya absen dari kartu. Nomor tiket selalu ber-prefix `T` — `AC-{n}` polos tetap token terlarang butir 3.
 
-Hasilnya: keluaran validator ditambah satu baris per butir `MANUAL` (`butir <n>: lolos` atau `butir <n>: gagal — <rincian>`), dan commit Fase 5 dilarang berangkat sebelum seluruhnya lolos.
+Hasilnya: keluaran validator ditambah satu baris per butir `MANUAL` (`butir <n>: lolos` atau `butir <n>: gagal — <rincian>`), dan penguncian akar Fase 5 dilarang berangkat sebelum seluruhnya lolos.
 
 ______________________________________________________________________
 

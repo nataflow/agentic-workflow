@@ -92,7 +92,7 @@ Tidak ada rantai yang sedang berjalan, sehingga migrasi bisa langsung dijalankan
 | K12 | **Commit kode tetap, commit dokumen hilang.** Implementor men-stage kode saja, ditambah `finding_source` di `backenddev/issues/` bila ada. Reviewer backend meng-commit `backenddev/issues/README.md` saja. Skrip `chain.py`/`review_round.py` tidak menjalankan git commit lagi. | Subjek commit kode tidak berubah, jadi `symbol_map.py`, `chain_files`, dan bukti `DONE` K7 tetap bekerja. |
 | K13 | **Pagar implementor frontend:** `guard_bash.py` mengecualikan `frontenddev/docs/<taskdir>/brief-*.md` dan `report-NN.md` dari penolakan "path diabaikan git". Path ter-ignore lain tetap ditolak. | Hanya dua berkas itu keluaran sah implementor di taskdir. Pagar "tulisan tak terlihat `verify_scope`" tetap berlaku untuk kode. |
 | K14 | **Sinkron membaca disk.** Kriteria "stabil" (D2) dinilai dari status dan materai yang sah, bukan dari keberadaan di `HEAD`. DRAFT tetap tidak didorong. Metadata `commit` diganti `sidik` (sha256 isi) dan `head` (sha `HEAD` saat sinkron). | Tanpa ini cermin mati (15 E6 gugur). `nataflow_sync.disk_text` sudah tersedia, jadi pustaka byte-identik tidak disentuh. |
-| K15 | **Regresi tidak dihapus diam-diam.** Tiap test git-based ditulis ulang ke mekanisme materai dengan ID regresinya tetap. Yang memang gugur (09 E20 deteksi counter turun dari riwayat, rebuild trailer `Review-Round`) dicatat di bagian "Selisih pelaksanaan" beserta alasannya. | `xfail_strict` dan penandaan `regression("<ID>")` tetap bermakna. |
+| K15 | **Regresi tidak dihapus diam-diam.** Tiap test git-based ditulis ulang ke mekanisme materai dengan ID regresinya tetap. Yang memang gugur (pemulihan hitungan ronde dari trailer git: `Brief-Review-Rounds` backend, `Review-Round` frontend) dicatat di bagian "Selisih pelaksanaan" beserta alasannya. | `xfail_strict` dan penandaan `regression("<ID>")` tetap bermakna. |
 | K16 | **Versi:** backend 0.15.0, frontend 0.14.0. Perilaku berubah dan repo lama butuh migrasi. | Lint M7. |
 
 ## Kontrak
@@ -187,7 +187,7 @@ plugin yang bersangkutan berpindah utuh di tahapnya sendiri.
 - **Rantai yang sedang berjalan hanya ada di satu mesin.** DRAFT dan `.explore/` tidak pernah dikirim ke nataflow.
   Disk yang hilang berarti rantai yang sedang berjalan ikut hilang. Dokumen stabil tetap ada di nataflow.
 - **Repo tanpa `.claude/nataflow.json`** tidak punya salinan dokumen taskdir di mana pun selain disk lokal (K2).
-- **Deteksi counter yang diturunkan tangan (09 E20)** dan pemulihan hitungan ronde dari trailer git gugur (K15).
+- **Pemulihan hitungan ronde dari trailer git gugur** (K15): state ronde kini hanya di laci `.explore/`, dengan daya tahan yang sama dengan dokumen taskdir. Deteksi counter yang diturunkan tangan (09 E20) dipertahankan lewat log lokal (hasil tahap 2).
 
 ## Di luar cakupan
 
@@ -221,3 +221,87 @@ Keputusan tambahan:
   disk.
 - **Commit migrasi hanya berisi penghapusan dari index.** `migrate` menolak bila index sudah memuat perubahan lain
   ter-stage, karena `git commit --only <path>` justru men-stage ulang isi working tree path itu.
+
+**Hasil tahap 1:** `docs_git.py` di kedua plugin (byte-identik), `tests/test_24_docs_git.py` (36 test), dua `CASES`
+smoke. Suite penuh hijau, subset di Python 3.9 hijau (`Path.write_text(newline=)` baru ada di 3.10, jadi diganti
+`write_bytes`), lint 0 FAIL.
+
+### Tahap 2 — peta blast radius backend (sebelum kode)
+
+Inventaris pemanggilan git di skrip backend (`grep` atas `skills/**/*.py` dan `hooks/*.py`). Gerbang berbasis
+commit dokumen hanya ada di baris berikut; sisanya membaca disk, membaca commit kode, atau sekadar memeriksa
+`rev-parse --is-inside-work-tree`.
+
+**Skrip:**
+
+| Berkas | Perubahan | Yang bisa pecah |
+|---|---|---|
+| `skills/_common/doc_seal.py` (baru, CLI) | B1, enam subperintah. `root`: tulis `base_commit` = `HEAD` ke frontmatter `TASK.md`. `approve --doc BRD\|PRD --answer -`: `DRAFT` → `APPROVED` + `approved_seal`, lalu centang ledger `@ APPROVED <sidik12>`. `lock-briefs`: tulis `sidik_kontrak` ke tiap brief `READY`. `tick --hop BRIEF`: centang `BRIEF @ READY <sidik12>`. `cabut-halt --alasan`: `HALT.md` `status: DICABUT`. `status [--json]`: vonis semua materai | `test_smoke::test_inventaris_lengkap` (masuk `CASES`), lint S1/R |
+| `skills/_common/precondition_lib.py` | B2: `doc_seal(text)` (sidik isi tanpa baris `status`/`approved_*`). `approval_verdict` memeriksa `approved_seal`, bukan commit `docs(spec): approve`. Helper `task_base_commit(taskdir)` | `test_11_robustness` H17 (×3), `test_system_analysis_preconditions` (3), `test_plan_preconditions` (1) |
+| `skills/_common/brief_status.py` | B3: `landed_sha` merentang `base_commit..HEAD` (bukan commit lahir brief). `done_sha` = commit unit bersubjek `commit_message` yang membawa kode, karena transisi status tidak lagi ada di riwayat. B4: `review_freshness` dari ujung `range:` `REVIEW.md` (tidak ada commit kode sesudahnya). B5: `read_halt` mengabaikan `status: DICABUT` | `test_brief_status` (2), `test_l23_stale_review` (5), `test_l210_recovery` (2), `test_09_robustness` E18 (×3), `test_11_robustness` H5 (×2), `test_l22_supersede`, `test_l24_halt` |
+| `skills/architect/scripts/check_preconditions.py` | Check 3: `base_commit` wajib sah sebelum pemindaian brief. Pesan "DONE tanpa commit transisi" menjadi "DONE tanpa commit unit". Docstring check 7 HALT | `test_09_robustness` E18, `test_l210_recovery`, `test_e2e_langkah2` |
+| `skills/report/scripts/check_preconditions.py` | Check 3 memakai `review_freshness` baru (pesan "REVIEW.md belum ter-commit" hilang) | `test_report_preconditions`, `test_l23_stale_review` |
+| `skills/plan/scripts/check_preconditions.py`, `skills/system-analysis/scripts/check_preconditions.py` | Pesan FAIL approval: "tidak terikat materai approve", remedi `doc_seal.py approve` | idem B2 |
+| `skills/_common/verify_scope.py` (+ salinan frontend) | B6: brief ber-`sidik_kontrak` → suntingan kontrak dinilai terhadap sidik itu, di mode `--commit` maupun `--worktree`. Brief tanpa sidik tetap memakai jalur git lama, karena frontend baru pindah di tahap 3. `brief_contract` mengosongkan baris `sidik_kontrak:` | `test_11_robustness` H3 (×3), `test_12_verification` kedua plugin (salinan identik) |
+| `skills/analyst/scripts/chain_counters.py`, `skills/analyst/scripts/check_preconditions.py` | B7: `history`/`tampered` dibuang, `--check` hanya plafon dan kunci | `test_09_robustness` E20 (×4), `test_11_robustness` H13 |
+| `skills/plan/scripts/validate_briefs.py` | B8: `_trailer_rounds` dan baris `trailer` di keluaran `--review-state` dibuang | `test_l27_plan_state` (2) |
+| `skills/plan/scripts/scaffold_brief.py` | Instruksi `git rm HALT.md` menjadi `doc_seal.py cabut-halt`, dan catatan "stage bersama di commit agregat" dibuang | `test_l24_halt`, `test_l22_supersede` |
+| `skills/_common/sync_payload.py` | B9: dokumen dari disk (`ns.disk_text`). `TASK.md` tanpa `base_commit` → FAIL "akar belum terkunci". BRD/PRD hanya bila `APPROVED` dengan `approved_seal` cocok. Brief hanya bila ber-`sidik_kontrak`. Metadata `commit` kosong dan `head` = `HEAD`. Key remote yang berkasnya hilang tidak didorong (G5). `HALT.md` `DICABUT` tidak membuat workdir `blocked` | `test_15_sync_payload` (±14 dari 16), `CASES` smoke |
+| `skills/tech-lead/scripts/check_preconditions.py` | G2 di check 3: berkas `backenddev/docs/` yang masih ter-track → FAIL rute `MIGRASI`; selain itu `docs_git.ensure_ignored` sebelum menilai tree kotor (mode penuh dan `--re-entry`; mode `--read-only` tidak menulis). `backenddev/docs/` keluar dari `RE_ENTRY_ALLOWED_PREFIXES` | `test_l28_tech_lead`, test re-entry |
+| `skills/task/scripts/check_preconditions.py` | Check git: `backenddev/docs/` wajib sudah diabaikan dan nol berkas ter-track | `test_11_robustness` H20, `test_a1_ticket_source`, `test_17_tech_handoff` |
+| `hooks/guard_bash.py` | Tidak berubah. Lease sudah memuat brief dan `report-NN.md` dari disk, dan reviewer tetap boleh `git add` atas `backenddev/issues/README.md` | `test_l34_guard_bash` (tetap) |
+
+**Prosa** (±20 titik commit dokumen di ±30 berkas). Arah perubahan: "commit" dokumen taskdir diganti "kunci" lewat
+skrip, atau dihapus bila tidak ada yang perlu dikunci.
+
+| Berkas | Perubahan |
+|---|---|
+| `skills/tech-lead/references/gate-scope.md` bagian 3 | Matriks kepemilikan commit menjadi matriks penguncian. Baris dokumen taskdir berganti skrip materai atau "tanpa kunci (disk)". Baris `REVIEW.md` tetap menyebut `backenddev/issues/README.md` dan `code-reviewer` (`test_l21`) |
+| `skills/tech-lead/SKILL.md` | Fase 3 (ensure/migrasi), Fase 5 (artefak taskdir tidak di-commit), dan kalimat commit `HALT`. Anggaran 14000 byte (sisa 7 byte): penambahan dibayar pemadatan |
+| `skills/tech-lead/references/gate-lifecycle.md` | 1a amandemen akar tanpa commit, bagian 6 (commit artefak hanya dokumen tingkat repo dan profil), pencabutan HALT lewat `doc_seal.py cabut-halt`, dan "reset" HALT |
+| `skills/tech-lead/references/nataflow-sync.md`, `decisions.md` | Sinkron dari disk; kalimat commit |
+| `skills/task/SKILL.md`, `templates/task-template.md` | Fase 5: `doc_seal.py root` menggantikan commit. Template mendapat `base_commit`, dan contoh ledger `@ APPROVED <sidik12>` |
+| `skills/analyst/SKILL.md`, `references/chain-rules.md` | Jangkar verdict tanpa commit draft. Approval lewat `doc_seal.py approve`. Ledger, re-entry, dan eskalasi tanpa commit `TASK.md`. Tutup ledger lewat `doc_seal.py tick --hop BRIEF` |
+| `skills/business-analysis/SKILL.md`, `skills/system-analysis/SKILL.md` | "Commit draft" diganti "draft dikunci di disk", tanpa commit |
+| `skills/plan/SKILL.md`, `references/review-and-commit.md`, `templates/brief-template.md` | Commit agregat diganti `doc_seal.py lock-briefs`. Trailer `Brief-Review-Rounds` dibuang. HALT dicabut lewat skrip |
+| `skills/architect/SKILL.md`, `references/lifecycle-recovery.md`, `dispatcher/implementor.md`, `dispatcher/reviewer.md` | Commit HALT dan koreksi status diganti suntingan disk. Matriks bukti disk, kesegaran review, dan "reset" HALT |
+| `agents/code-implementor.md` | Stage kode + `finding_source` saja, brief tidak di-stage. Status `DONE` ditulis ke disk sebelum commit (`test_l26` memaku frasa `finding_source`) |
+| `agents/code-reviewer.md` | `git add backenddev/issues/README.md` saja; `REVIEW.md` ditulis tanpa commit (`test_l21`, `test_l36`, `test_h31`) |
+| `skills/report/SKILL.md`, `skills/debug/SKILL.md`, `skills/audit/SKILL.md`, `skills/document-api/SKILL.md`, `skills/profile/SKILL.md` | `REPORT.md`/`RCA.md` tidak di-commit. Profil Fase 5 butir 4 (peringatan "artefak lokal") menjadi perilaku baku |
+| `README.md` | Seksi commit dan seksi sinkron |
+
+**Test:** `tests/conftest.py` `chain_repo` ditulis ulang. `TASK.md` tidak di-commit,
+`backenddev/docs/.gitignore` (`*`) ada, dan `base_commit` diisi `HEAD` sesudah commit awal. `land()` men-commit kode
+saja dan menulis `DONE` di disk. Test berbasis git dokumen ditulis ulang ke mekanisme materai dengan ID regresi
+yang sama (K15). E20 (deteksi counter turun dari riwayat) dan trailer `Brief-Review-Rounds` gugur dan dicatat.
+Test baru: `tests/backend/test_24_doc_seal.py`.
+
+**Hasil tahap 2 (2026-10-13):** backend berpindah utuh. `doc_seal.py` (6 subperintah) dan
+`tests/backend/test_24_doc_seal.py` (13 test). ±40 test lama ditulis ulang ke mekanisme materai dengan ID
+regresinya tetap, ditambah test baru 24 G2 (`test_task_preconditions`, `test_tech_lead_preconditions`), 24 K11,
+dan 24 G5 (`test_15_sync_payload`). Suite penuh hijau (2566 passed), subset backend di Python 3.9 hijau, dan lint
+0 FAIL.
+
+Selisih pelaksanaan terhadap peta:
+
+- **09 E20 tidak gugur.** Deteksi counter yang diturunkan tangan dipertahankan lewat log tulisan skrip
+  `<taskdir>/.explore/counters-log.json` (tabel sesudah tulis beserta operasinya), menggantikan `git log -- TASK.md`.
+  Entri `reset:<HOP>` hanya sah bila tepat didahului `bump:reentry`, sesuai urutan re-entry Fase 3 butir 0. K15
+  dan bagian Batas disesuaikan: yang gugur hanya pemulihan hitungan ronde brief dari trailer git.
+- **`finding_diff_ok` dipertahankan.** Fungsi ini tidak berkaitan dengan dokumen taskdir (`backenddev/issues/`
+  tetap ter-commit), dan `test_l26` masih mengujinya.
+- **`ensure_ignored` tidak menulis apa pun di luar repo git**, supaya check 3 `tech-lead` di folder non-git tidak
+  meninggalkan `backenddev/docs/.gitignore`.
+- **`approved_seal` mengecualikan field `approval`** (jawaban user, pola analyst `clean_value`), sehingga approve
+  ulang atas isi yang sama menghasilkan sidik yang sama.
+- **`doc_seal.py approve` menerima `status: APPROVED`** selama hop ledger-nya belum `[x]`. Jalur re-entry membuka hop
+  `[~]` tanpa menurunkan status dokumen (`analyst` Fase 3 butir 0), jadi approve ulang sesudah revisi harus lolos.
+- **`profile` Fase 5 tidak lagi menulis baris `.explore/`.** Laci `.explore/` berada di bawah `backenddev/docs/`, dan
+  penanda `backenddev/docs/.gitignore` milik `docs_git.py` sudah menutupnya. Butir 2 kini memperingatkan bila
+  `backenddev/issues/` ikut di-ignore.
+- **`plan` tetap punya satu commit**: penanda `OBSOLETE`/`DROPPED` di berkas `finding_source`
+  (`backenddev/issues/`, dokumen repo), dengan subjek `docs(plan): tandai temuan <ID> untuk <slug>`.
+- **Riwayat amandemen akar** tidak lagi tersimpan di luar isi terakhir `TASK.md`, hitungan `root_amendment`, dan
+  cermin nataflow; seksi `## Amendments` tetap dilarang (`gate-lifecycle.md` bagian 1a).
+- **Helper test `commit()` tanpa path** tidak membuat commit bila tidak ada yang ter-stage, karena dokumen taskdir
+  yang ditulis test kini diabaikan git. Path eksplisit yang di-ignore tetap gagal di `git add`.

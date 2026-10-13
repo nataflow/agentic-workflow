@@ -1,6 +1,6 @@
 ---
 name: report
-description: Dipanggil backend:architect sesudah REVIEW.md terbit dan seluruh brief tertutup - perumusan REPORT.md dari diff merge-base yang dipasangkan dengan Success Criteria TASK.md, dikunci satu commit sebelum rantai dinyatakan selesai
+description: Dipanggil backend:architect sesudah REVIEW.md terbit dan seluruh brief tertutup - perumusan REPORT.md dari diff merge-base yang dipasangkan dengan Success Criteria TASK.md, ditulis di disk tanpa commit sebelum rantai dinyatakan selesai
 user-invocable: false
 ---
 
@@ -10,13 +10,13 @@ user-invocable: false
 - Setiap butir `## Perubahan` wajib berakar pada berkas yang muncul di diff merge-base; klaim tanpa berkas dibuang, bukan diloloskan.
 - Skill ini melaporkan, bukan menilai — dilarang menerbitkan severity, verdict, atau temuan baru.
 - Dilarang menyentuh `src/`, mengedit `TASK.md`, `REVIEW.md`, atau brief mana pun.
-- Kunci berkas dalam satu commit path-eksplisit sebelum mengembalikan kendali ke gerbang.
+- Tulis berkas di disk tanpa commit — dokumen taskdir diabaikan git dan dicerminkan ke nataflow — sebelum mengembalikan kendali ke gerbang.
 
 ## Precondition [REQUIRED]
 
 1. Jalankan skrip verifikasi prasyarat: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/report/scripts/check_preconditions.py --taskdir <taskdir> [--base-branch <base_branch>]`.
 2. Evaluasi output skrip secara deterministik:
-   - `PASS` (8/8 checks): Lanjutkan ke perumusan laporan rantai dan commit REPORT.md.
+   - `PASS` (8/8 checks): Lanjutkan ke perumusan laporan rantai dan penulisan REPORT.md.
    - `FAIL`: Hentikan eksekusi segera dan jalankan tindakan remediasi pada butir yang gagal (taskdir hilang → verifikasi inisialisasi taskdir; `TASK.md` hilang → kembalikan ke `backend:tech-lead` untuk backfill akar (`gate-lifecycle.md` bagian 1a), taskdir lama tanpa akar di luar cakupan; REVIEW.md belum ada → tuntaskan review via `architect`; brief belum tertutup → selesaikan brief lewat `architect`; REPORT.md sudah ada → minta otorisasi user; working tree kotor atau operasi git (merge/cherry-pick/revert/rebase) menggantung → bersihkan/selesaikan sebelum melanjutkan; `base_branch` tak resolve, HEAD detached/di base, atau nol commit di atas merge-base → kembali ke `backend:tech-lead`).
 
 ## Parameter [REQUIRED]
@@ -29,7 +29,7 @@ user-invocable: false
 ### Fase 0 — Verifikasi Prasyarat & Penolakan Dini
 
 1. Jalankan skrip prasyarat `## Precondition` dan hentikan eksekusi segera bila hasilnya `FAIL`. Laporkan butir yang gagal beserta nilai terbacanya; dilarang menambal prasyarat yang hilang.
-2. Baca `base_branch` dan `commit_convention` dari profil; catat keduanya untuk Fase 4.
+2. Baca `base_branch` dari profil; catat untuk Fase 2.
 
 ### Fase 1 — Penyerapan Akar & Hasil Rantai
 
@@ -53,13 +53,12 @@ user-invocable: false
 3. Isi `## Catatan` hanya dari tiga sumber: temuan `REVIEW.md` yang belum dituntaskan, penyimpangan File scope yang tercatat di laporan `architect`, dan butir `## Success Criteria` yang belum terbukti terpenuhi.
 4. Hapus heading `## Catatan` seluruhnya dari berkas jika ketiga sumber tersebut kosong. Dilarang menuliskannya berisi `-`, `N/A`, atau kalimat penyangkalan.
 
-### Fase 4 — Penulisan & Penguncian Commit
+### Fase 4 — Penulisan Laporan
 
 1. Baca `templates/report-template.md`, isi seluruh placeholder-nya dari Fase 1–3, lalu tulis hasilnya ke `{taskdir}/REPORT.md`.
 2. Verifikasi berkas: tepat satu H1, `## Ringkasan` berisi satu kalimat, `## Perubahan` berisi minimal dua butir, dan `## Catatan` hadir berisi atau tidak hadir sama sekali.
-3. Stage path eksplisit `{taskdir}/REPORT.md`, lalu commit memakai `commit_convention` profil dengan subjek `docs(<slug>): laporkan hasil rantai <slug>`. Dilarang `git add .` maupun `git add -A`.
-4. Pertahankan berkas di working tree bila commit gagal (`## Failure path` butir 5).
-5. Catat SHA hasil commit, lalu kembalikan kendali ke `backend:architect`.
+3. Dilarang men-stage atau meng-commit `{taskdir}/REPORT.md`: `backenddev/docs/` diabaikan git (Langkah 24), dan gerbang mencerminkannya ke nataflow di Fase 5-nya.
+4. Kembalikan kendali ke `backend:architect`.
 
 ## Guardrails
 
@@ -69,19 +68,19 @@ user-invocable: false
 - **GIT TERBATAS**: Dilarang `git push`, `git merge`, `git rebase`, `gh pr create`, dan staging wildcard. Commit tunggal, path eksplisit.
 - **KEPUTUSAN DEFINITIF SAAT INI**: Seluruh isi dokumen berprinsip "Yang ditulis = Keputusan saat ini" tanpa memori temporal atau komparasi masa lalu.
 - **KEPUTUSAN MILIK USER**: Penetapan bahwa rantai layak di-push, di-PR, atau di-merge tetap milik mutlak user; skill ini berhenti pada laporan terkunci.
-- **RATIONALIZATION PREVENTION**: Dilarang menulis report saat `REVIEW.md` belum ada dengan dalih "kodenya sudah jelas selesai"; mengisi `## Catatan` dengan basa-basi demi seksi terlihat penuh; mengarang butir `## Perubahan` dari isi brief alih-alih dari diff; atau menunda commit dengan dalih menunggu approval — REPORT.md tidak mengenal gerbang approval.
+- **RATIONALIZATION PREVENTION**: Dilarang menulis report saat `REVIEW.md` belum ada dengan dalih "kodenya sudah jelas selesai"; mengisi `## Catatan` dengan basa-basi demi seksi terlihat penuh; mengarang butir `## Perubahan` dari isi brief alih-alih dari diff; atau menunda penulisan dengan dalih menunggu approval — REPORT.md tidak mengenal gerbang approval.
 
 ## Output [REQUIRED]
 
-Tulis `{taskdir}/REPORT.md` persis mengikuti `templates/report-template.md` — seksi wajib dan aturan penghapusan `## Catatan` kosong ada di sana. Commit mendarat → tutup satu baris tanpa blok: `### REPORT LOCKED — <taskdir>/REPORT.md @ <sha> · <n> butir dari <n> berkas · <n> isu tercatat | tanpa isu`. Commit gagal → sajikan:
+Tulis `{taskdir}/REPORT.md` persis mengikuti `templates/report-template.md` — seksi wajib dan aturan penghapusan `## Catatan` kosong ada di sana. Berkas tertulis → tutup satu baris tanpa blok: `### REPORT LOCKED — <taskdir>/REPORT.md · <n> butir dari <n> berkas · <n> isu tercatat | tanpa isu`. Penulisan gagal → sajikan:
 
 ```markdown
 ### REPORT LOCKED — GAGAL
-- **Path**  : backenddev/docs/<YYMMDDhhmm>-<slug>/REPORT.md · tertulis, belum terkunci
-- **Commit**: GAGAL — <pesan git>
+- **Path**  : backenddev/docs/<YYMMDDhhmm>-<slug>/REPORT.md · tidak tertulis
+- **Tulis** : GAGAL — <galat mentah>
 ```
 
-Tutup satu baris: `kembali ke backend:architect | Taskdir: <path> | Laporan: REPORT.md @ <sha | belum terkunci>`.
+Tutup satu baris: `kembali ke backend:architect | Taskdir: <path> | Laporan: REPORT.md <tertulis | gagal>`.
 
 ## Failure path
 
@@ -89,7 +88,7 @@ Tutup satu baris: `kembali ke backend:architect | Taskdir: <path> | Laporan: REP
 2. **REVIEW.md Absen atau Brief Belum Tertutup**: Hentikan eksekusi, sebut brief yang belum tertutup (`DONE`, atau `SUPERSEDED` yang bertaut ke pengganti), dan arahkan rantai ke `backend:architect`.
 3. **Severity P1 di REVIEW.md**: Jalankan Fase 1 butir 4 — hentikan sebelum menulis berkas, laporkan temuan `P1`-nya, kembalikan kendali ke `backend:tech-lead`.
 4. **Diff Kosong**: Hentikan eksekusi jika `git merge-base` resolve tetapi diff tidak memuat satu berkas pun. Laporkan branch aktif dan `base_branch` terbaca. Dilarang mengarang butir dari isi brief.
-5. **Commit Gagal**: Tulis berkasnya tetap jika working tree kotor di luar taskdir atau `commit_convention` tak terbaca. Laporkan `Commit: GAGAL` beserta pesan git, dan nyatakan penguncian diserahkan ke gerbang.
+5. **Penulisan Gagal**: `Write` atas `REPORT.md` gagal (izin, disk penuh) → laporkan `Tulis: GAGAL` beserta galat mentah, dan serahkan ke gerbang. Dilarang menulis laporan di luar taskdir.
 6. **Base Branch Tak Resolve**: Hentikan eksekusi, laporkan nilai terbacanya, dan minta perbaikan profil lewat `backend:profile`. Dilarang menebak `main` atau `master`.
 
 ## STYLE

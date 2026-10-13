@@ -86,11 +86,9 @@ Uji perintah hasil Fase 2 titik 7 sebelum ditulis ke `commands.md`:
 Satu-satunya berkas di luar `.claude/profile/backenddev/` yang boleh disentuh adalah `.gitignore`:
 
 1. `git rev-parse --git-dir`. Bila gagal, catat status non-git dan tulis `commit_convention`, `base_branch`, serta `branch_convention` sebagai `tidak terdeteksi` dan `commit_template` sebagai `""`.
-2. `git check-ignore -q backenddev`. Bila exit code 0, peringatkan bahwa artefak `backenddev/` berstatus lokal dan tidak di-track git.
+2. `git check-ignore -q backenddev/issues/x.md`. Bila exit code 0, peringatkan bahwa laporan audit dan indeks `backenddev/issues/` ikut tidak di-track git — hanya dokumen taskdir `backenddev/docs/` yang sengaja di luar git (Langkah 24).
 3. `git check-ignore -q .backenddev`. Bila exit code bukan 0, tambahkan baris `.backenddev/` di akhir `.gitignore` akar repo (buat berkas bila belum ada); lewati bila exit code 0.
-4. `git check-ignore -q backenddev/docs/x/.explore/y`. Bila exit code bukan 0, tambahkan baris `.explore/` di akhir `.gitignore` akar repo; lewati bila exit code 0.
-
-   Laci `.explore/` adalah zona kerja `code-explorer` beserta berkas kerja `plan` (`brief-matrix.*`, `brief-review-state.json`). Ia hidup **di dalam taskdir** supaya laporannya ko-lokasi dengan artefak yang lahir darinya — `plan` Fase 3 langkah 3 memanennya ulang tepat sebelum mengisi `## File scope`. Konsekuensinya ia berkas untracked di dalam direktori yang ter-track, dan tanpa baris ignore ini ia muncul di tiap `git status --porcelain`: `architect` menolak start karena working tree kotor, dan siapa pun yang menambal baris ignore itu belakangan menghasilkan commit tanpa brief pengklaim yang dihukum `code-reviewer` sebagai temuan. Satu baris berpemilik di sini menutup ketiganya. Pola tanpa awalan path sekaligus mencakup laci gerbang di `backenddev/docs/.explore/`.
+4. Dokumen taskdir `backenddev/docs/` — termasuk laci `.explore/` zona kerja `code-explorer` dan berkas kerja `plan` — diabaikan lewat penanda `backenddev/docs/.gitignore` (berisi `*`) yang ditulis `skills/_common/docs_git.py` di prasyarat penuh gerbang (Langkah 24), bukan oleh skill ini. Dilarang menambah baris `backenddev/docs/` atau `.explore/` ke `.gitignore` akar; baris `.explore/` lama yang sudah ada dibiarkan.
 
 5. **Laporkan `.gitignore` sebagai artefak yang menunggu commit.** Skill ini menulis barisnya tetapi tidak meng-commit-nya sendiri — penguncian artefak profil milik gerbang `backend:tech-lead` di Fase 5-nya. Sebut path `.gitignore` eksplisit di slot `Artefak` laporan penutup, sejajar dengan berkas `.claude/profile/backenddev/`, supaya gerbang menariknya ke dalam commit yang sama. Baris yang ditulis lalu tidak ikut ter-commit tiba di `architect` sebagai working tree kotor — persis keadaan yang ia ada untuk mencegahnya.
 
@@ -121,7 +119,7 @@ Tulis `<repo>/.claude/profile/backenddev/` persis mengikuti skema, format, dan b
 
 - **READ-ONLY KODE SUMBER**: dilarang membuat, mengedit, memformat, atau menghapus berkas kode sumber selama profiling.
 - **BUKTI KONFIGURASI AKTUAL**: dilarang mencatat dependensi, versi runtime, atau invariant dari tebakan tanpa bukti manifest atau konfigurasi nyata.
-- **OUTPUT MODULAR TUNGGAL**: profil HANYA ditulis ke `.claude/profile/backenddev/`; satu-satunya tulisan lain yang sah adalah baris `.backenddev/` dan `.explore/` pada `.gitignore` (Fase 5), dan keduanya dilaporkan ke gerbang sebagai artefak yang menunggu commit. Skill ini **pemilik tunggal** mutasi `.gitignore` di seluruh rantai: skrip `plan`, `architect`, dan gerbang dilarang menambahkan barisnya sendiri, karena baris tak berpemilik tiba di hilir sebagai working tree kotor lalu berakhir jadi commit tanpa brief pengklaim.
+- **OUTPUT MODULAR TUNGGAL**: profil HANYA ditulis ke `.claude/profile/backenddev/`; satu-satunya tulisan lain yang sah adalah baris `.backenddev/` pada `.gitignore` akar (Fase 5), dan ia dilaporkan ke gerbang sebagai artefak yang menunggu commit. Skill ini **pemilik tunggal** mutasi `.gitignore` akar di seluruh rantai (penanda `backenddev/docs/.gitignore` milik `docs_git.py` dan tidak pernah di-commit): skrip `plan`, `architect`, dan gerbang dilarang menambahkan baris akar sendiri, karena baris tak berpemilik tiba di hilir sebagai working tree kotor lalu berakhir jadi commit tanpa brief pengklaim.
 - **FIELD STACK WAJIB**: profil tanpa `stack` valid di `index.json` membuat skill hilir gagal memuat adapter; dilarang serah terima dalam keadaan itu.
 - **REWRITE PENUH PADA REFRESH**: tulis ulang 100% dokumen dari pemindaian segar; dilarang merge parsial.
 - **INKONSISTENSI WAJIB DIKLARIFIKASI**: dilarang memilih sepihak saat pola terbelah Gaya A vs Gaya B; keputusan user diambil di Fase 3.
@@ -138,7 +136,7 @@ Artefak `.claude/profile/backenddev/` mengikuti `templates/profile-template.md`.
 - **Profil**  : .claude/profile/backenddev/ (<n> berkas ditulis) · stack <stack-id | tidak terdeteksi>
 - **Baseline**: <perintah yang FAIL | UNVERIFIED_ENV_NOT_READY> — <pesan galat>
 - **Gap**     : inkonsistensi <daftar> · field tak terdeteksi <daftar>
-- **Menunggu commit**: `.claude/profile/backenddev/` (<n> berkas) · `.gitignore` (<baris `.backenddev/` dan/atau `.explore/` ditambahkan | tidak disentuh>)
+- **Menunggu commit**: `.claude/profile/backenddev/` (<n> berkas) · `.gitignore` (<baris `.backenddev/` ditambahkan | tidak disentuh>)
 ```
 
 `Menunggu commit` wajib di kedua bentuk: gerbang meng-stage **persis** path yang disebutnya, dan `.gitignore` yang tertinggal di luar commit profil tiba di `architect` sebagai working tree kotor. Isi profil — arsitektur, konvensi, invariant, blueprint — sengaja tidak disalin ke laporan: skill yang membutuhkannya membaca berkasnya sendiri saat rutenya jalan, supaya yang terbaca selalu versi terakhir.

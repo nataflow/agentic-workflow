@@ -119,22 +119,31 @@ tingkat.
   stack.md · module-structure.md · domain-map.md · surface-map.md
   code-conventions.md · anti-patterns.md · invariants.md · commands.md
 backenddev/
-  docs/
-    .explore/<slug>.md               laci dispatch gerbang (tidak di-commit)
+  docs/                              diabaikan git, tidak pernah di-commit (lihat di bawah)
+    .gitignore                       `*` — ditulis `docs_git.py`, ikut mengabaikan dirinya
+    .explore/<slug>.md               laci dispatch gerbang
     2609231200-order-refund/         <YYMMDDhhmm>-<slug>
       TASK.md  BRD.md  PRD.md  RCA.md
       brief-01-<unit>.md             READY → DONE | BLOCKED | SUPERSEDED
       report-01.md                   laporan brief yang gagal
       HALT.md  REVIEW.md  REPORT.md
-      .explore/                      scratch skill hilir (tidak di-commit)
+      .explore/                      scratch skill hilir
   issues/
     README.md                        indeks temuan audit
     2026-09-23-001-issues.md
 docs/api/<slug>.md
 ```
 
-Skill `profile` Fase 5 menambahkan `.explore/` dan `.backenddev/` ke `.gitignore` bila belum ter-ignore,
-lalu melaporkannya sebagai "Menunggu commit".
+**Dokumen taskdir di luar git.** Isi `backenddev/docs/` hanya hidup di disk dan dicerminkan ke nataflow;
+riwayat git repo hanya memuat kode, profil, laporan audit, dan dokumentasi API. Prasyarat penuh `tech-lead`
+menulis penanda `backenddev/docs/.gitignore` (berisi `*`) sebelum menilai tree. Titik yang dulu dikunci
+commit kini dikunci materai di disk oleh `skills/_common/doc_seal.py`: `base_commit` akar `TASK.md`,
+`approved_seal` BRD/PRD, dan `sidik_kontrak` tiap brief. Repo yang sudah meng-commit dokumen taskdir
+dimigrasikan sekali lewat `skills/_common/docs_git.py migrate` sesudah persetujuan user (gerbang merutekannya
+otomatis; `skills/tech-lead/references/gate-lifecycle.md` bagian 0).
+
+Skill `profile` Fase 5 menambahkan `.backenddev/` ke `.gitignore` bila belum ter-ignore, lalu melaporkannya
+sebagai "Menunggu commit".
 
 **Profil lokasi lama.** Versi sebelumnya menulis profil langsung di `.claude/profile/`. Profil lama milik
 backend memicu lane `PROFILE` mode MIGRATE, yang menjalankan
@@ -150,19 +159,18 @@ dilakukan `tech-lead` di Fase 5. Profil lama milik plugin lain tidak dibaca dan 
 - Staging selalu dengan path eksplisit. `git add .`/`-A` dilarang. Push, merge, rebase, `gh pr create`,
   `branch -d`, dan pindah branch hanya dengan izin user.
 
-| Pemilik | Yang di-commit |
-|---|---|
-| `tech-lead` | profil, laporan audit, `RCA.md`, penghapusan `HALT.md` |
-| `task` | `TASK.md` |
-| `analyst` | eskalasi chain, tutup ledger, approval BRD/PRD |
-| `business-analysis` / `system-analysis` | draft BRD / PRD sesudah reviewer `Approved` |
-| `plan` | batch brief |
-| `code-implementor` | `src/**` + brief, dengan pesan `commit_message` brief (`wip(...) [BLOCKED]` bila terblokir) |
-| `code-reviewer` | `REVIEW.md` + baris indeks `issues/README.md` |
-| `architect` | `HALT.md`, koreksi status `READY → DONE` |
-| `report` | `REPORT.md` |
+| Pemilik | Yang di-commit | Yang dikunci di disk (tanpa commit) |
+|---|---|---|
+| `tech-lead` | profil, laporan audit, `docs/api/` | pencabutan `HALT.md` (`doc_seal.py cabut-halt`) |
+| `task` | — | akar `TASK.md` (`doc_seal.py root`) |
+| `analyst` | — | approval BRD/PRD (`doc_seal.py approve`), tutup ledger (`doc_seal.py tick`), eskalasi chain |
+| `plan` | penanda `OBSOLETE`/`DROPPED` di `finding_source` | batch brief (`doc_seal.py lock-briefs`) |
+| `code-implementor` | `src/**` (+ `finding_source` bertanda `FIXED`), dengan pesan `commit_message` brief (`wip(...) [BLOCKED]` bila terblokir) | status brief |
+| `code-reviewer` | baris indeks `backenddev/issues/README.md` | `REVIEW.md` |
+| `architect` | — | `HALT.md`, koreksi status `READY → DONE` |
+| `report` | — | `REPORT.md` |
 
-`audit` dan `debug` tidak meng-commit sendiri.
+`audit` dan `debug` tidak meng-commit sendiri; `business-analysis` dan `system-analysis` menyerahkan draft di disk.
 
 ## Hook
 
@@ -212,15 +220,17 @@ Tiap skill punya `skills/<skill>/scripts/check_preconditions.py` yang dijalankan
 
 | Skrip | Peran |
 |---|---|
-| `_common/precondition_lib.py` | parser frontmatter, taskdir, chain, status git, profil, dan ikatan approval BRD/PRD ke commit `docs(spec): approve …`; mengimpor `hooks/detect.py` |
+| `_common/precondition_lib.py` | parser frontmatter, taskdir, chain, status git, profil, dan materai approval BRD/PRD (`approved_seal`); mengimpor `hooks/detect.py` |
+| `_common/docs_git.py status\|ensure\|migrate` | penanda ignore `backenddev/docs/` dan migrasi sekali jalan repo lama; salinan identik dengan frontend |
+| `_common/doc_seal.py root\|approve\|lock-briefs\|tick\|cabut-halt\|status` | materai dokumen taskdir di disk, pengganti commit dokumen |
 | `_common/brief_status.py` | status brief dan penulis tunggalnya |
 | `_common/run_verification.py baseline\|closing` | verifikasi baseline dan penutup, log mesin di `.explore/` |
-| `_common/verify_scope.py` | diff commit/worktree terhadap `File scope` brief versi sebelum unit dikerjakan |
+| `_common/verify_scope.py` | diff commit/worktree terhadap `File scope` brief; kontrak brief wajib sama dengan `sidik_kontrak`-nya |
 | `_common/sync_payload.py` | argumen tool MCP nataflow untuk taskdir atau dokumen repo; read-only (lihat Sinkron nataflow) |
 | `_common/nataflow_sync.py` | pustaka sinkron nataflow, salinan identik di keempat plugin |
 | `plan/scripts/scaffold_brief.py` | kunci matriks alokasi, lalu kerangka brief |
 | `plan/scripts/validate_briefs.py` | validasi batch dan per-brief, ronde review brief |
-| `analyst/scripts/chain_counters.py` | plafon eskalasi, re-entry, amandemen akar, dan ronde reviewer; menolak tabel yang diturunkan tangan |
+| `analyst/scripts/chain_counters.py` | plafon eskalasi, re-entry, amandemen akar, dan ronde reviewer; menolak tabel yang diturunkan tangan (log `.explore/counters-log.json`) |
 | `architect/scripts/symbol_map.py` | peta simbol pada sha tertentu untuk ingest brief |
 
 ## Pemulihan
@@ -230,16 +240,17 @@ Tiap skill punya `skills/<skill>/scripts/check_preconditions.py` yang dijalankan
   Taskdir tanpa ledger `## Chain` (lane `DEFECT_RCA`, backfill `EXEC_BRIEF`) dirutekan ke `plan` jalur RCA atau
   `debug`, bukan `PLANNING`. Taskdir baru hanya dibuat bila semua brief DONE/SUPERSEDED **dan** `REPORT.md`
   sudah terbit, atau bila plafon `analyst` tertembus dan user memilih merumuskan ulang permintaannya.
-- **`tech-lead` Fase 5** (re-entry rantai) meng-commit artefak yang menunggu, lalu mengikuti tabel pengirim
+- **`tech-lead` Fase 5** (re-entry rantai) meng-commit artefak tingkat repo yang menunggu, lalu mengikuti tabel pengirim
   balik di `skills/tech-lead/references/gate-lifecycle.md` §6. Temuan P1 `REVIEW.md` dikerjakan di taskdir
   yang sama lewat `PLANNING` + `finding_source`.
 - **`architect`** mulai dari brief READY pertama. Rantai dianggap tuntas hanya bila `REVIEW.md` dan
-  `REPORT.md` sama-sama ada. `REVIEW.md` yang lebih tua dari commit brief/kode terakhir dianggap basi dan
+  `REPORT.md` sama-sama ada. `REVIEW.md` yang ujung `range:`-nya tertinggal dari commit kode terakhir dianggap basi dan
   memicu review ulang. Matriks lengkapnya ada di `skills/architect/references/lifecycle-recovery.md`.
 
 ## Sinkron nataflow (opsional)
 
-Artefak taskdir dan dokumen repo dapat dicerminkan ke nataflow. Disk dan git tetap sumber kebenaran: sinkron
+Artefak taskdir dan dokumen repo dapat dicerminkan ke nataflow. Dokumen taskdir hanya ada di disk (tidak
+di-commit), jadi nataflow satu-satunya salinannya di luar mesin ini; dokumen repo tetap ter-commit. Sinkron
 tidak menulis berkas dan tidak meng-commit, dan kegagalannya tidak menahan rantai.
 
 - **Aktif per repo** lewat `.claude/nataflow.json` (ter-commit, dibaca juga oleh `analyst`, `frontend`, dan
@@ -250,14 +261,16 @@ tidak menulis berkas dan tidak meng-commit, dan kegagalannya tidak menahan ranta
 - **Jangkar**: satu taskdir = satu workdir `backenddev:<repo>:<path taskdir>`, tertaut ke task tiket analyst
   bila `TASK.md` membawa `ticket_source` (taskdir frontend dari tiket yang sama bernaung di task itu juga),
   atau ke task baru dari `TASK.md`.
-- **Yang didorong** (isi blob `HEAD`): `TASK.md`; `BRD.md`/`PRD.md` hanya `APPROVED`; brief semua status;
-  `RCA.md`, `report-NN.md`, `HALT.md`, `REVIEW.md`, `REPORT.md`. Dokumen yang pernah tercermin tetap
-  diperbarui, dan yang dihapus dari git ditandai `removed: true`. `.explore/` dan berkas belum ter-commit
-  tidak pernah ikut. Laporan `audit`, `docs/api/`, dan profil didorong ke workspace.
+- **Yang didorong** (isi disk): `TASK.md` berakar terkunci (`base_commit`); `BRD.md`/`PRD.md` hanya `APPROVED`
+  dengan materai utuh; brief yang sudah dikunci (`sidik_kontrak`), semua status; `RCA.md`, `report-NN.md`,
+  `HALT.md` (termasuk yang dicabut), `REVIEW.md`, `REPORT.md`. Dokumen yang pernah tercermin tetap diperbarui
+  selama berkasnya masih di disk; yang hilang dibiarkan dengan isi terakhirnya di server. `.explore/` tidak
+  pernah ikut. Laporan `audit`, `docs/api/`, dan profil (ter-commit, dari `HEAD`) didorong ke workspace; yang
+  dihapus dari git ditandai `removed: true`.
 - **Kapan** (main loop saja): `analyst` Fase 2 (akar terkunci) dan Fase 4 (BRD/PRD `APPROVED`), serta
-  `tech-lead` Fase 5 sesudah artefak yang menunggu di-commit. Prosedurnya di
+  `tech-lead` Fase 5 sesudah artefak repo yang menunggu di-commit. Prosedurnya di
   `skills/tech-lead/references/nataflow-sync.md`; subagent tidak berubah.
-- **Status**: workdir `done` bila `REPORT.md` ada, `blocked` bila `HALT.md` atau brief `BLOCKED`, selain itu
+- **Status**: workdir `done` bila `REPORT.md` ada, `blocked` bila `HALT.md` belum dicabut atau brief `BLOCKED`, selain itu
   `active`. Task naik ke `in_progress` sejak eksekusi dimulai; task milik taskdir ini menjadi `done` saat
   `REPORT.md` terbit, sedangkan task tiket tidak ditutup plugin ini.
 - **Hemat token**: `sync_payload.py` menerbitkan isi hanya untuk dokumen yang berbeda dari manifest remote.

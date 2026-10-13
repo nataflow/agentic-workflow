@@ -9,7 +9,7 @@ description: Gunakan ketika ada stacktrace, exception, HTTP 5xx, atau test merah
 - Dilarang menyatakan root cause tanpa minimal satu bukti `file:line` konkret dan satu hipotesis alternatif yang terfalsifikasi eksplisit.
 - Hipotesis yang belum diuji adalah dugaan dan dilarang naik menjadi temuan.
 - Terbitkan `RCA.md` meskipun hasilnya `INCONCLUSIVE`, dan dilarang menebak sesudah tiga siklus hipotesis gagal.
-- Dilarang menulis brief, memanggil `architect`, atau menjalankan git commit karena keduanya wewenang gerbang lain.
+- Dilarang menulis brief, memanggil `architect`, atau menjalankan git commit; `RCA.md` hidup di disk karena dokumen taskdir tidak di-commit (Langkah 24).
 
 ## Precondition [REQUIRED]
 
@@ -85,7 +85,7 @@ Jalankan maksimal tiga siklus. Tuntaskan tiap siklus secara penuh sebelum memula
 
 - Dilarang mengedit, membuat, atau menghapus berkas apa pun di `src/` — termasuk berkas test regression yang dispesifikasikan sendiri.
 - Dilarang menulis brief, memanggil `backend:plan`, `backend:architect`, atau subagent selain `code-explorer`.
-- Dilarang menjalankan `git commit`, `git checkout`, `git stash`, atau membuat branch; commit artefak adalah wewenang gerbang `backend:tech-lead`.
+- Dilarang menjalankan `git commit`, `git checkout`, `git stash`, atau membuat branch; `RCA.md` tidak di-commit siapa pun, dan gerbang `backend:tech-lead` mencerminkannya ke nataflow.
 - Dilarang menjalankan perintah yang memutasi state di luar repo: migrasi database, restart service, atau pemanggilan endpoint non-idempoten ke lingkungan nyata.
 - Dilarang menulis ke `backenddev/issues/` — direktori tersebut milik `backend:audit`.
 - Dilarang menaikkan dugaan menjadi root cause demi menutup sesi; status `INCONCLUSIVE` adalah hasil sah.

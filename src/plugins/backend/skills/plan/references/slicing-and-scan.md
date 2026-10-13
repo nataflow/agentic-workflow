@@ -1,6 +1,6 @@
 # Scan Checklist & Slicing Reference — `plan`
 
-12 dimensi scan repositori Fase 2, sapuan dimensi residual lane tanpa PRD, dan strategi pemecahan unit DAG (*slicing*) Fase 3 untuk `backend:plan`. Aturan jalur masuk hidup di `entry-rules.md`; uji mandiri rantai brief dan commit agregat di `review-and-commit.md`; kaidah isi brief di `../templates/brief-template.md` bagian 2 — ketiganya tidak ditulis ulang di sini.
+12 dimensi scan repositori Fase 2, sapuan dimensi residual lane tanpa PRD, dan strategi pemecahan unit DAG (*slicing*) Fase 3 untuk `backend:plan`. Aturan jalur masuk hidup di `entry-rules.md`; uji mandiri rantai brief dan penguncian batch di `review-and-commit.md`; kaidah isi brief di `../templates/brief-template.md` bagian 2 — ketiganya tidak ditulis ulang di sini.
 
 ## 2. 12-Point Work-Unit Scan (Fase 2)
 

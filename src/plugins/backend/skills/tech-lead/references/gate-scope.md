@@ -1,6 +1,6 @@
 # Gate Scope Boundary, Commit Protocols & Dispatch Framing — `tech-lead`
 
-Panduan operasional batasan pemicu gerbang, protokol persetujuan artefak, matriks kepemilikan git commit, dan katalog framing delegasi pada plugin `backend`.
+Panduan operasional batasan pemicu gerbang, protokol persetujuan artefak, matriks penguncian artefak, dan katalog framing delegasi pada plugin `backend`.
 
 ______________________________________________________________________
 
@@ -34,48 +34,47 @@ ______________________________________________________________________
 
 ## 2. Artifact Lifecycle & Approval Writing Protocol
 
-Satu artefak melewati **dua** titik commit yang berbeda pemiliknya: draft dikunci penulisnya, approval dikunci `backend:analyst`.
+Satu artefak melewati **dua** titik kunci yang berbeda pemiliknya: draft diserahkan penulisnya, approval dimateraikan `backend:analyst`. Dokumen taskdir tidak di-commit (bagian 3), jadi "kunci" di sini berarti materai di disk, bukan commit.
 
-- **Draft Milik Penulis**: `business-analysis` / `system-analysis` menyelesaikan dokumen dalam `status: DRAFT`, menjalankan self-review mandiri (via subagent `brd-reviewer` / `prd-reviewer`), lalu — bila self-review `Approved` — meng-commit draft-nya sendiri sebelum mengembalikan rute ke `analyst`.
-- **Approval Milik `analyst`**: Penulis dilarang menulis `status: APPROVED` dalam keadaan apa pun **dan dilarang meminta persetujuan user atas dokumennya sendiri**; gerbang tidak pernah menuliskannya dan tidak pernah memintanya. Satu dokumen karenanya melewati tepat satu gerbang keputusan user, bukan dua. Prosedur lengkapnya — predikat masuk berupa verdict reviewer, penguncian draft yatim, anggaran `## Open questions`, ringkasan eksekutif, `AskUserQuestion`, dan commit approval — adalah rumah kanonik `analyst/references/chain-rules.md` bagian 4.
-- **Brief Bebas Approval**: Dokumen `brief-*.md` lahir langsung dengan `status: READY`, dan dikunci `plan` dalam satu commit agregat setelah self-review batch via subagent `brief-reviewer` lolos. Brief tidak pernah memiliki `status: DRAFT` maupun `status: APPROVED`, sehingga hanya melewati satu titik commit.
+- **Draft Milik Penulis**: `business-analysis` / `system-analysis` menyelesaikan dokumen dalam `status: DRAFT`, menjalankan self-review mandiri (via subagent `brd-reviewer` / `prd-reviewer`), lalu — bila self-review `Approved` — menyerahkan draft-nya ke `analyst` apa adanya di disk. Bukti self-review adalah blok reviewer di `{taskdir}/.explore/review/<brd|prd>.md`.
+- **Approval Milik `analyst`**: Penulis dilarang menulis `status: APPROVED` dalam keadaan apa pun **dan dilarang meminta persetujuan user atas dokumennya sendiri**; gerbang tidak pernah menuliskannya dan tidak pernah memintanya. Satu dokumen karenanya melewati tepat satu gerbang keputusan user, bukan dua. Prosedur lengkapnya — predikat masuk berupa verdict reviewer, anggaran `## Open questions`, ringkasan eksekutif, `AskUserQuestion`, dan materai approval `doc_seal.py approve` — adalah rumah kanonik `analyst/references/chain-rules.md` bagian 4.
+- **Brief Bebas Approval**: Dokumen `brief-*.md` lahir langsung dengan `status: READY`, dan dikunci `plan` lewat `doc_seal.py lock-briefs` (sidik kontrak per brief) setelah self-review batch via subagent `brief-reviewer` lolos. Brief tidak pernah memiliki `status: DRAFT` maupun `status: APPROVED`, sehingga hanya melewati satu titik kunci.
 
 ______________________________________________________________________
 
-## 3. Artifact Commit Ownership Matrix
+## 3. Matriks Penguncian Artefak
 
-Setiap artefak ditutup dengan `git commit` di titik ia menjadi keputusan final:
+Dokumen taskdir (`backenddev/docs/<taskdir>/`) diabaikan git dan tidak pernah di-commit (Langkah 24): penanda ignore-nya `backenddev/docs/.gitignore` ditulis `skills/_common/docs_git.py`, dokumen dikunci lewat materai di disk yang ditulis `skills/_common/doc_seal.py`, lalu dicerminkan ke nataflow (`nataflow-sync.md`). Yang masih ditutup `git commit` hanya kode dan artefak tingkat repo (profil, laporan audit, indeks issues, dokumentasi API). Setiap artefak dikunci di titik ia menjadi keputusan final:
 
-| Artefak | Titik Terjadinya Commit | Pemilik Commit | Format Pesan Commit |
+| Artefak | Titik Terkunci | Pemilik | Cara Mengunci |
 | --- | --- | --- | --- |
-| `.claude/profile/backenddev/` | Selesai ditulis / di-refresh | `tech-lead` | `docs: init/refresh backend profile` |
-| `.claude/profile/backenddev/` + penghapusan `.claude/profile/<berkas>` yang dipindah `migrate_profile.py` | Selesai MIGRATE | `tech-lead` | `docs: migrate backend profile` |
-| `backenddev/docs/<taskdir>/TASK.md` | Uji akar 9/9 lolos | **`task`** | `docs(<slug>): kunci TASK sebagai akar rantai` |
-| `backenddev/docs/<taskdir>/TASK.md` saat amandemen gerbang | Amandemen akar disetujui user (`gate-lifecycle.md` bagian 1a) | `tech-lead` | `docs(<slug>): amandemen akar TASK (<pemicu>)` |
-| `backenddev/docs/<taskdir>/TASK.md` saat eskalasi chain | Transisi chain dieksekusi | **`analyst`** | `docs(<slug>): eskalasi chain <asal> ke <hasil>` |
-| `backenddev/docs/<taskdir>/TASK.md` saat ledger ditutup | Hop `BRIEF` dicentang di Fase 6 langkah 0 | **`analyst`** | `docs(<slug>): tutup ledger chain <enum>` |
-| `backenddev/docs/<taskdir>/BRD.md` draft | Self-review `brd-reviewer` BRD lolos | **`business-analysis`** | `docs(spec): draft BRD <slug>` |
-| `backenddev/docs/<taskdir>/PRD.md` draft | Self-review `prd-reviewer` PRD lolos | **`system-analysis`** | `docs(spec): draft PRD <slug>` |
-| `BRD.md` / `PRD.md` saat `APPROVED` | Saat `status: APPROVED` ditulis `analyst` | **`analyst`** | `docs(spec): approve <BRD\|PRD> <slug>` |
-| `backenddev/docs/<taskdir>/brief-*.md` | Self-review `brief-reviewer` BRIEF batch lolos | **`plan`** | `docs(plan): add <N> briefs for <slug>` |
-| `backenddev/issues/<file>.md` + `README.md` | Laporan audit selesai ditulis | `tech-lead` | `docs(audit): record findings for <target>` |
-| `backenddev/docs/<taskdir>/RCA.md` | Root cause disetujui user / `INCONCLUSIVE` | `tech-lead` | `docs(rca): record root cause for <slug>` |
-| `{taskdir}/REVIEW.md` + baris riwayat review di `backenddev/issues/README.md` | Reviewer selesai menilai seluruh rantai | **`code-reviewer`** | `docs(<slug>): add final review report`, dibentuk dari `commit_convention` profil |
-| `src/**` + berkas briefnya | Tiap brief selesai atau terblokir | **`code-implementor`** | `commit_message` frontmatter brief |
-| `{taskdir}/HALT.md` | Gerbang kompilasi, scope, simbol, atau berkas liar menahan rantai | **`architect`** | `chore(<slug>): tahan rantai di brief-NN (<verdict>)` |
-| `{taskdir}/brief-NN-<unit>.md` koreksi `READY → DONE` | Commit brief mendarat tetapi status tertinggal | **`architect`** | `chore(<slug>): koreksi status brief-NN ke DONE (<sha7>)` |
-| Penghapusan `{taskdir}/HALT.md` ber-`verdict: SCOPE`/`SYMBOL` | User menerima commit di luar scope | `tech-lead` | `docs(<slug>): cabut HALT brief-NN (scope diterima user)` |
-| `BRD.md` / `PRD.md` draft **yatim** | Terdeteksi belum terkunci di Fase 4 `analyst` | **`analyst`** | format pesan penulisnya (`draft <BRD\|PRD>`) |
+| `.claude/profile/backenddev/` | Selesai ditulis / di-refresh | `tech-lead` | commit `docs: init/refresh backend profile` |
+| `.claude/profile/backenddev/` + penghapusan `.claude/profile/<berkas>` yang dipindah `migrate_profile.py` | Selesai MIGRATE | `tech-lead` | commit `docs: migrate backend profile` |
+| `backenddev/docs/<taskdir>/TASK.md` | Uji akar 9/9 lolos | **`task`** | `doc_seal.py root` — `base_commit` = sha `HEAD` |
+| `backenddev/docs/<taskdir>/TASK.md` saat amandemen gerbang | Amandemen akar disetujui user (`gate-lifecycle.md` bagian 1a) | `tech-lead` | suntingan disk lolos `validate_doc.py --kind task`; `base_commit` tetap |
+| `backenddev/docs/<taskdir>/TASK.md` saat eskalasi chain | Transisi chain dieksekusi | **`analyst`** | suntingan disk + `chain_counters.py --bump chain_transition` |
+| `backenddev/docs/<taskdir>/TASK.md` saat ledger ditutup | Hop `BRIEF` dicentang di Fase 6 langkah 0 | **`analyst`** | `doc_seal.py tick --hop BRIEF` |
+| `backenddev/docs/<taskdir>/BRD.md` / `PRD.md` draft | Self-review `brd-reviewer` / `prd-reviewer` lolos | **`business-analysis`** / **`system-analysis`** | tanpa materai — draft final di disk, bukti di `.explore/review/<brd\|prd>.md` |
+| `BRD.md` / `PRD.md` saat `APPROVED` | Persetujuan eksplisit user | **`analyst`** | `doc_seal.py approve --doc <BRD\|PRD>` — `approved_seal` + centang ledger |
+| `backenddev/docs/<taskdir>/brief-*.md` | Self-review `brief-reviewer` BRIEF batch lolos | **`plan`** | `doc_seal.py lock-briefs` — `sidik_kontrak` tiap brief `READY` |
+| `backenddev/issues/<file>.md` + `README.md` | Laporan audit selesai ditulis | `tech-lead` | commit `docs(audit): record findings for <target>` |
+| `backenddev/docs/<taskdir>/RCA.md` | Root cause disetujui user / `INCONCLUSIVE` | `debug` | tanpa materai — final di disk |
+| `{taskdir}/REVIEW.md` + baris riwayat review di `backenddev/issues/README.md` | Reviewer selesai menilai seluruh rantai | **`code-reviewer`** | `REVIEW.md` di disk (`range:` menilai HEAD); commit `backenddev/issues/README.md` saja, `docs(<slug>): add final review report` dibentuk dari `commit_convention` profil |
+| `src/**` | Tiap brief selesai atau terblokir | **`code-implementor`** | commit `commit_message` frontmatter brief; status brief ditulis di disk, tidak di-stage |
+| `{taskdir}/HALT.md` | Gerbang kompilasi, scope, simbol, atau berkas liar menahan rantai | **`architect`** | ditulis di disk; menahan lewat check 7 architect |
+| `{taskdir}/brief-NN-<unit>.md` koreksi `READY → DONE` | Commit unit mendarat tetapi status tertinggal | **`architect`** | suntingan status di disk |
+| Pencabutan `{taskdir}/HALT.md` ber-`verdict: SCOPE`/`SYMBOL` | User menerima commit di luar scope | `tech-lead` | `doc_seal.py cabut-halt --alasan "scope diterima user"` — `status: DICABUT`, berkas tetap |
+| `{taskdir}/REPORT.md` | Laporan rantai selesai ditulis | **`report`** | tanpa materai — final di disk |
 
-*Aturan commit penulis artefak*: `business-analysis`, `system-analysis`, dan `plan` meng-commit artefaknya sendiri **hanya** setelah self-review subagent reviewer masing-masing (`brd-reviewer`, `prd-reviewer`, `brief-reviewer`) berstatus `Approved`. Commit itu mengunci **draft** (atau brief `READY`), tidak pernah menulis `status: APPROVED`.
+*Aturan kunci penulis artefak*: `business-analysis` dan `system-analysis` menyerahkan draft **hanya** setelah self-review subagent reviewer masing-masing (`brd-reviewer`, `prd-reviewer`) berstatus `Approved`; `plan` menjalankan `doc_seal.py lock-briefs` **hanya** setelah `brief-reviewer` `Approved`. Tak satu pun menulis `status: APPROVED`.
 
-*Aturan tanpa-approval*: commit draft (`BRD`, `PRD`) dan commit agregat brief berangkat begitu self-review reviewer terkait berstatus `Approved`, tanpa menunggu persetujuan user, `analyst`, gerbang, maupun main loop. Penolakan user atas sebuah dokumen tidak pernah membatalkan, menahan, atau me-revert commit yang sudah mendarat — ia hanya menahan `status: APPROVED`. Draft yatim dikunci `analyst` lebih dulu (`analyst/references/chain-rules.md` bagian 4 butir 1).
+*Aturan tanpa-approval*: penguncian batch brief berangkat begitu self-review reviewer berstatus `Approved`, tanpa menunggu persetujuan user, `analyst`, gerbang, maupun main loop. Penolakan user atas sebuah dokumen hanya menahan `status: APPROVED`.
 
-*Aturan commit penulis kode*: `code-implementor` dan `code-reviewer` mengunci karyanya sendiri begitu pekerjaannya tuntas. `architect` memverifikasi commit itu mendarat dan diff-nya tidak melewati `## File scope`.
+*Aturan commit penulis kode*: `code-implementor` meng-commit kodenya sendiri dan `code-reviewer` meng-commit baris indeks issues-nya begitu pekerjaannya tuntas. `architect` memverifikasi commit unit itu mendarat, membawa kode, dan diff-nya tidak melewati `## File scope`.
 
-*Di luar matriks*: temuan `code-explorer` dikembalikan ke context pendispatch **dan** ditulis ke laci kerja `.explore/` — `backenddev/docs/.explore/<slug>.md` untuk dispatch gerbang, `<taskdir>/.explore/<slug>.md` untuk skill hilir. Laporan gerbang disalin ke laci taskdir sebagai `gate-<slug>.md` di Fase 3 (`gate-lifecycle.md` bagian 1). Isinya catatan penelusuran, bukan keputusan, sehingga tidak pernah di-stage maupun di-commit siapa pun, dan tidak pernah dihitung sebagai working tree kotor oleh gerbang git mana pun.
+*Di luar matriks*: temuan `code-explorer` dikembalikan ke context pendispatch **dan** ditulis ke laci kerja `.explore/` — `backenddev/docs/.explore/<slug>.md` untuk dispatch gerbang, `<taskdir>/.explore/<slug>.md` untuk skill hilir. Laporan gerbang disalin ke laci taskdir sebagai `gate-<slug>.md` di Fase 3 (`gate-lifecycle.md` bagian 1). Isinya catatan penelusuran, bukan keputusan, dan seperti seluruh `backenddev/docs/` tidak pernah di-stage maupun dicerminkan.
 
-*Larangan*: `audit` dan `debug` dilarang menjalankan git commit — serahkan artefak ke gerbang untuk dikunci. `code-explorer` tidak memegang `Bash`, sehingga tidak dapat menjalankan git. `Write`-nya dibatasi pada satu path laporan `.explore/` yang ditentukan pendispatch: prompt (`agents/code-explorer.md`) mengunci path persisnya, dan hook PreToolUse `hooks/guard_bash.py` menolak mekanis tiap `Write`/`Edit` explorer di luar `backenddev/docs/[<taskdir>/].explore/*.md`. Seluruh pemilik commit dilarang staging wildcard (`git add .` / `-A`), `git push`, `git merge`, `git rebase`, maupun perpindahan branch.
+*Larangan*: `audit` dan `debug` dilarang menjalankan git commit — serahkan artefak ke gerbang untuk dikunci. `code-explorer` tidak memegang `Bash`, sehingga tidak dapat menjalankan git. `Write`-nya dibatasi pada satu path laporan `.explore/` yang ditentukan pendispatch: prompt (`agents/code-explorer.md`) mengunci path persisnya, dan hook PreToolUse `hooks/guard_bash.py` menolak mekanis tiap `Write`/`Edit` explorer di luar `backenddev/docs/[<taskdir>/].explore/*.md`. Seluruh pemilik commit dilarang staging wildcard (`git add .` / `-A`), `git add -f` atas path di bawah `backenddev/docs/`, `git push`, `git merge`, `git rebase`, maupun perpindahan branch.
 
 ______________________________________________________________________
 
@@ -89,23 +88,23 @@ Framing wajib memuat: Path Eksplisit, Batas Scope Sempit, Acceptance Criteria di
 
 ### A. Lane `PLANNING` → `analyst` (kerja terisolasi, kontrak pasti)
 
-> Rancang dan terbitkan brief untuk memperbaiki validasi kuota di `internal/order/service.go` mengikuti pattern `internal/stock/validator.go`. **Taskdir**: `backenddev/docs/2608221000-order-quota-fix/` **Risk Level**: `MINOR`. **Evidence**: `internal/order/service.go:142`, `internal/stock/validator.go:31`. **File Scope**: `internal/order/`. **Acceptance Criteria**: `TASK.md` terkunci beserta ledger `## Chain`, seluruh brief terbit `READY` dan ter-commit, `Fulfills:` menutup 100% `SC-{n}`. **Stop Condition**: Pemicu eskalasi chain aktif dua kali → BERHENTI dan kembalikan klasifikasi ke gerbang.
+> Rancang dan terbitkan brief untuk memperbaiki validasi kuota di `internal/order/service.go` mengikuti pattern `internal/stock/validator.go`. **Taskdir**: `backenddev/docs/2608221000-order-quota-fix/` **Risk Level**: `MINOR`. **Evidence**: `internal/order/service.go:142`, `internal/stock/validator.go:31`. **File Scope**: `internal/order/`. **Acceptance Criteria**: `TASK.md` terkunci beserta ledger `## Chain`, seluruh brief terbit `READY` dan terkunci, `Fulfills:` menutup 100% `SC-{n}`. **Stop Condition**: Pemicu eskalasi chain aktif dua kali → BERHENTI dan kembalikan klasifikasi ke gerbang.
 
 ### B. Lane `PLANNING` → `analyst` (kontrak belum pasti)
 
-> Rancang dan terbitkan brief untuk penambahan endpoint split order. **Taskdir**: `backenddev/docs/2608221000-order-split/` **Risk Level**: `BREAKING`. **Evidence**: `internal/order/handler.go:58`, `internal/order/entity.go:22`. **File Scope**: `internal/order/`, `db/migrations/`. **Acceptance Criteria**: `TASK.md` terkunci, tiap hop ledger `## Chain` tercentang beserta sha-nya — hop `BRIEF` termasuk, tiap artefak rancangan yang tercantum di ledger itu berstatus `APPROVED`, seluruh brief `READY` ter-commit, vonis gerbang `READY_FOR_IMPLEMENTATION` (15/15 predikat). **Stop Condition**: Approval dokumen ditolak user dua kali pada hop yang sama → BERHENTI.
+> Rancang dan terbitkan brief untuk penambahan endpoint split order. **Taskdir**: `backenddev/docs/2608221000-order-split/` **Risk Level**: `BREAKING`. **Evidence**: `internal/order/handler.go:58`, `internal/order/entity.go:22`. **File Scope**: `internal/order/`, `db/migrations/`. **Acceptance Criteria**: `TASK.md` terkunci, tiap hop ledger `## Chain` tercentang beserta sidiknya — hop `BRIEF` termasuk, tiap artefak rancangan yang tercantum di ledger itu berstatus `APPROVED`, seluruh brief `READY` terkunci, vonis gerbang `READY_FOR_IMPLEMENTATION` (15/15 predikat). **Stop Condition**: Approval dokumen ditolak user dua kali pada hop yang sama → BERHENTI.
 
 Gerbang tidak memilih panjang rantai di framing ini: kedua contoh memakai lane yang sama, dan `analyst` menurunkan chain-nya sendiri dari dua sumbu `analyst/references/chain-rules.md` bagian 1.1-1.3 atas `Risk Level` beserta `Evidence` di atas. `Risk Level: BREAKING` tidak dengan sendirinya menuntut BRD — kebutuhan BRD diputuskan sumbu bisnis, bukan oleh pecahnya kontrak teknis.
 
 ### B-1. Lane `PLANNING` → `analyst` (perbaikan temuan terpilih)
 
-> Rancang dan terbitkan brief untuk memperbaiki temuan `P1-1` dan `P2-3` laporan audit `backenddev/issues/2026-09-05-001-issues.md`. **Taskdir**: `backenddev/docs/2609051120-warehouse-stock-fix/` **Risk Level**: `MAJOR`. **Finding Source**: `backenddev/issues/2026-09-05-001-issues.md` — temuan terpilih `P1-1`, `P2-3`. **Evidence**: `internal/warehouse/service.go:88` (`P1-1`), `internal/warehouse/repo.go:215` (`P2-3`). **File Scope**: `internal/warehouse/`. **Acceptance Criteria**: `TASK.md` terkunci dengan satu `SC-{n}` per temuan terpilih yang menyebut ID temuannya, tiap hop ledger `## Chain` tercentang beserta sha-nya, seluruh brief `READY` ter-commit, vonis gerbang `READY_FOR_IMPLEMENTATION`. **Stop Condition**: Temuan ternyata menuntut kontrak baru → `analyst` menaikkan chain, gerbang tidak diminta memutuskannya ulang.
+> Rancang dan terbitkan brief untuk memperbaiki temuan `P1-1` dan `P2-3` laporan audit `backenddev/issues/2026-09-05-001-issues.md`. **Taskdir**: `backenddev/docs/2609051120-warehouse-stock-fix/` **Risk Level**: `MAJOR`. **Finding Source**: `backenddev/issues/2026-09-05-001-issues.md` — temuan terpilih `P1-1`, `P2-3`. **Evidence**: `internal/warehouse/service.go:88` (`P1-1`), `internal/warehouse/repo.go:215` (`P2-3`). **File Scope**: `internal/warehouse/`. **Acceptance Criteria**: `TASK.md` terkunci dengan satu `SC-{n}` per temuan terpilih yang menyebut ID temuannya, tiap hop ledger `## Chain` tercentang beserta sidiknya, seluruh brief `READY` terkunci, vonis gerbang `READY_FOR_IMPLEMENTATION`. **Stop Condition**: Temuan ternyata menuntut kontrak baru → `analyst` menaikkan chain, gerbang tidak diminta memutuskannya ulang.
 
 Slot `Finding Source` hadir hanya pada framing ini, dan `analyst` meneruskannya ke `task` beserta `plan`: ia yang menyalakan re-verification temuan di `plan` Fase 2 dan penandaan baris `> Status:` di berkas asalnya. Framing perbaikan temuan **tidak pernah menyebut `entry_mode`** — jalur masuk `plan` diturunkan `analyst` dari `chain`, persis seperti lane `PLANNING` lainnya. Temuan yang terbukti butuh kontrak baru tidak dikembalikan ke gerbang: ia pemicu eskalasi chain nomor 1 milik `analyst`.
 
 ### B-2. Lane `PLANNING` → `analyst` (dari tiket analyst `READY`)
 
-> Rancang dan terbitkan brief untuk tiket `analyst/tickets/2609231400-cicilan-pembayaran/TICKET.md`. **Taskdir**: `backenddev/docs/2609241000-invoice-installment/` **Risk Level**: `MAJOR`. **Ticket Source**: `analyst/tickets/2609231400-cicilan-pembayaran/TICKET.md` — `TAC-1`…`TAC-7`, `TBR-1`…`TBR-3`. **Evidence**: `internal/invoice/service.go:88`. **File Scope**: `internal/invoice/`. **Acceptance Criteria**: `TASK.md` terkunci dengan tiap `TAC-{n}` dipikul `SC-{n}` atau tercatat di `## Out of Scope` beralasan, tiap hop ledger `## Chain` tercentang beserta sha-nya, seluruh brief `READY` ter-commit. **Stop Condition**: tiket tidak lagi `READY` atau disunting sesudah approve (prasyarat `task` check 7 `FAIL`) → BERHENTI, kembalikan ke `analyst:spec`.
+> Rancang dan terbitkan brief untuk tiket `analyst/tickets/2609231400-cicilan-pembayaran/TICKET.md`. **Taskdir**: `backenddev/docs/2609241000-invoice-installment/` **Risk Level**: `MAJOR`. **Ticket Source**: `analyst/tickets/2609231400-cicilan-pembayaran/TICKET.md` — `TAC-1`…`TAC-7`, `TBR-1`…`TBR-3`. **Evidence**: `internal/invoice/service.go:88`. **File Scope**: `internal/invoice/`. **Acceptance Criteria**: `TASK.md` terkunci dengan tiap `TAC-{n}` dipikul `SC-{n}` atau tercatat di `## Out of Scope` beralasan, tiap hop ledger `## Chain` tercentang beserta sidiknya, seluruh brief `READY` terkunci. **Stop Condition**: tiket tidak lagi `READY` atau disunting sesudah approve (prasyarat `task` check 7 `FAIL`) → BERHENTI, kembalikan ke `analyst:spec`.
 
 Kontrak serah-terima tiket (`ticket_source`):
 
