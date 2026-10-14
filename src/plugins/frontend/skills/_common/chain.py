@@ -69,6 +69,7 @@ from precondition_lib import (  # noqa: E402
     expected_rows,
     find_repo_root,
     history_line,
+    history_section,
     lane_sections_problem,
     lane_tamper,
     last_draft,
@@ -108,6 +109,23 @@ RIWAYAT_BROKEN = ("laporkan ke user lewat `frontend:lead`; Riwayat hanya ditulis
 
 class ChainError(Exception):
     """Prasyarat subperintah tidak terpenuhi; pesannya adalah tindakan remediasi."""
+
+
+_PLACEHOLDER_LINE = re.compile(r"^<[^<>\n]*>$")
+_HISTORY_BLOCK = re.compile(r"^## Riwayat Rantai[ \t]*\n(?:.*\n?)*?(?=^## |\Z)", re.MULTILINE)
+
+
+def strip_placeholder_history(text: str) -> str:
+    """Seksi `## Riwayat Rantai` yang hanya memuat placeholder `<…>` dibuang sebelum akar dikunci (25 R4).
+
+    Akar yang belum terkunci tidak punya kejadian; seksinya ditulis `chain.py root`. Placeholder yang tersalin
+    dari template versi lama tidak boleh membuat `init` memvonis Riwayat rusak. Seksi berisi baris lain tidak
+    disentuh: ia tetap divonis `read_history`.
+    """
+    lines = [line.strip() for line in history_section(text) or [] if line.strip()]
+    if not lines or not all(_PLACEHOLDER_LINE.match(line) for line in lines):
+        return text
+    return _HISTORY_BLOCK.sub("", text, count=1).rstrip("\n") + "\n"
 
 
 def one_line(value: str, flag: str) -> str:
@@ -266,7 +284,7 @@ class Chain:
         problem = lane_sections_problem(self.lane, self.sections)
         if problem:
             raise ChainError(f"frontmatter `TASK.md` tidak sah: {problem}.")
-        text = self.text()
+        text = strip_placeholder_history(self.text())
         if self.history(text):
             raise ChainError("akar sudah terkunci (`## Riwayat Rantai` berisi); ledger hanya diubah "
                              "`approve`/`reopen`/`escalate`.")
