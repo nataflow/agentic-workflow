@@ -1,6 +1,6 @@
 # Alur Plugin `product`
 
-> Plugin `product` (v0.1.0, `src/plugins/product/.claude-plugin/plugin.json`) menginisiasi produk baru, fitur baru,
+> Plugin `product` (v0.1.1, `src/plugins/product/.claude-plugin/plugin.json`) menginisiasi produk baru, fitur baru,
 > atau improvement fitur menjadi `product/<slug>/CHARTER.md` berisi enam pilar — Purpose, Actors, Business Process,
 > Business Rules, Success Criteria, Scope. Tiga skill (`init` sebagai titik masuk, `discover` dan `spec` internal) dan
 > dua subagent (`code-scout`, `charter-reviewer`). Kebenaran dijaga skrip stdlib di `skills/_common/`; prosa skill
