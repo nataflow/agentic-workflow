@@ -184,6 +184,18 @@ def test_plugin_eksplisit_menimpa_default(repo):
     assert out["prefix"] == "frontenddev" and (repo / "frontenddev/docs/.gitignore").is_file()
 
 
+@pytest.mark.regression("25 R2")
+def test_r2_default_plugin_di_layout_cache_terpasang(plugin, repo, tmp_path):
+    """Cache plugin terpasang: `<cache>/<marketplace>/<plugin>/<versi>/` — nama direktori root plugin = versi."""
+    import shutil
+    installed = tmp_path / "cache" / "nataflow" / plugin / "0.14.0"
+    shutil.copytree(PLUGINS / plugin, installed, ignore=shutil.ignore_patterns("__pycache__"))
+    proc = run_script(installed / "skills/_common/docs_git.py", "status", "--json", cwd=repo)
+    out = json.loads(proc.stdout)
+    assert "error" not in out, out
+    assert out["docs"] == f"{PREFIX[plugin]}/docs"
+
+
 def test_base_commit_problem(plugin, repo):
     mod = load_module(COPIES[plugin], f"docs_git_{plugin}_base")
     head = mod.head_sha(repo)
