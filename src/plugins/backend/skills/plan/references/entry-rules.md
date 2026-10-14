@@ -1,6 +1,6 @@
 # Repo Intake & Entry Rules Reference — `plan`
 
-Penyerapan profil repositori, aturan jalur masuk Fase 1, dan kontrak panen artefak hulu untuk `backend:plan`. 12 dimensi scan dan batas slicing hidup di `slicing-and-scan.md`; uji mandiri rantai brief dan commit agregat di `review-and-commit.md`.
+Penyerapan profil repositori, aturan jalur masuk Fase 1, dan kontrak panen artefak hulu untuk `backend:plan`. 12 dimensi scan dan batas slicing hidup di `slicing-and-scan.md`; uji mandiri rantai brief dan penguncian batch di `review-and-commit.md`.
 
 ## 0. Penyerapan Profil Repositori
 

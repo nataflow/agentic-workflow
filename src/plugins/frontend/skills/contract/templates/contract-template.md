@@ -77,7 +77,7 @@ Spesifikasi kontrak data, batas layer 5-tier, dan rencana eksekusi. Path berkas 
 
 ## 2. Aturan Validasi
 
-**Mekanis** — ditagih `validate_doc.py --kind contract`; `FAIL` menahan commit draft, ronde `contract-reviewer`, dan `chain.py approve`:
+**Mekanis** — ditagih `validate_doc.py --kind contract`; `FAIL` menahan ronde `contract-reviewer`, `chain.py draft`, dan `chain.py approve`:
 
 1. **Frontmatter**: `status` hanya `DRAFT` atau `APPROVED` (yang kedua hanya lewat `chain.py approve`); `slug`, `stack` terisi; `order: 30`; `based_on` berpola `<sha 7 digit> (YYYY-MM-DD)`; `sections` identik dengan `sections` `TASK.md`.
 2. **Struktur**: tepat satu H1 berawalan `# Contract — `, lalu `# Architecture` dengan lima `##` dan `# Execution` dengan lima `##`, persis urutan bagian 1.

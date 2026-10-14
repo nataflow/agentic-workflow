@@ -9,6 +9,7 @@ ARCH = "architect/scripts/check_preconditions.py"
 VALIDATE = "plan/scripts/validate_briefs.py"
 SCAFFOLD = "plan/scripts/scaffold_brief.py"
 SCOPE = "_common/verify_scope.py"
+SEAL = "_common/doc_seal.py"
 GUARD = PLUGINS / "backend/hooks/guard_bash.py"
 IMPL = "backend:code-implementor"
 REVIEWER = "backend:code-reviewer"
@@ -25,8 +26,10 @@ def hook(repo, cmd, agent=IMPL):
 
 
 def scoped_brief(repo, extra=""):
+    """Brief READY yang dikunci `plan` lewat `doc_seal.py lock-briefs` (`sidik_kontrak`, Langkah 24)."""
     b = brief(repo, "01", "lock", "READY", body=SCOPE_BODY.format(extra=extra))
-    commit(repo, "docs(plan): add 1 briefs for order-fix")
+    proc = be_run(repo, SEAL, "lock-briefs", "--taskdir", TD)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
     return b
 
 
@@ -122,7 +125,7 @@ def test_h4_rename_dari_luar_scope_ditolak(chain_repo):
     b = scoped_brief(chain_repo, extra="| create | `src/new.go` | — | berkas baru |")
     git(chain_repo, "mv", "src/important.go", "src/new.go")      # rename sungguhan: tujuan belum ada
     b.write_text(b.read_text().replace("status: READY", "status: DONE"))
-    sha = commit(chain_repo, "fix(order): implement lock", str(b.relative_to(chain_repo)))
+    sha = commit(chain_repo, "fix(order): implement lock")                    # brief tidak ikut commit
     r = verify(chain_repo, sha)
     assert r.returncode == 1 and "src/important.go" in r.stdout, r.stdout
 
@@ -158,8 +161,7 @@ def test_h5_koreksi_resmi_diterima_sesi_berikutnya(chain_repo):
     write_files(chain_repo, {"src/order.go": "package order // lock\n"})
     sha = commit(chain_repo, "fix(order): implement lock", "src/order.go")      # status tertinggal
     assert be_checks(chain_repo, ARCH, "--taskdir", TD)[3]["entry"] == f"KOREKSI:01:{sha}"
-    b.write_text(b.read_text().replace("status: READY", "status: DONE"))
-    commit(chain_repo, f"chore(order-fix): koreksi status brief-01 ke DONE ({sha})", str(b.relative_to(chain_repo)))
+    b.write_text(b.read_text().replace("status: READY", "status: DONE"))     # koreksi = suntingan disk
     brief(chain_repo, "02", "endpoint", "READY")
     commit(chain_repo, "docs(plan): add 1 briefs for order-fix")
     c3 = be_checks(chain_repo, ARCH, "--taskdir", TD)[3]
@@ -170,8 +172,7 @@ def test_h5_koreksi_resmi_diterima_sesi_berikutnya(chain_repo):
 def test_h5_done_dokumen_tanpa_commit_unit_tetap_ditolak(chain_repo):
     b = brief(chain_repo, "01", "lock", "READY")
     commit(chain_repo, "docs(plan): add 1 briefs for order-fix")
-    b.write_text(b.read_text().replace("status: READY", "status: DONE"))
-    commit(chain_repo, "chore(order-fix): koreksi status brief-01 ke DONE (abc1234)", str(b.relative_to(chain_repo)))
+    b.write_text(b.read_text().replace("status: READY", "status: DONE"))     # tanpa commit unit
     assert be_checks(chain_repo, ARCH, "--taskdir", TD)[3]["status"] == "FAIL"
 
 
@@ -373,7 +374,6 @@ def test_h13_bump_menolak_tabel_yang_diturunkan_tangan(chain_repo):
     task = chain_repo / TD / "TASK.md"
     for _ in range(2):
         assert be_run(chain_repo, COUNTERS, "--taskdir", TD, "--bump", "reject:PRD").returncode == 0
-    commit(chain_repo, "docs(order-fix): counters", f"{TD}/TASK.md")
     task.write_text(task.read_text().replace("| reject:PRD | 2 |", "| reject:PRD | 0 |"))
     r = be_run(chain_repo, COUNTERS, "--taskdir", TD, "--bump", "reject:PRD")
     assert r.returncode == 1 and "disunting tangan" in r.stdout, r.stdout
@@ -452,13 +452,20 @@ TECH = "tech-lead/scripts/check_preconditions.py"
 TD2 = "backenddev/docs/2601011200-refund"
 
 
+LEDGER = ("## Chain\n\n- [ ] BRD   — backend:business-analysis → BRD.md\n"
+          "- [ ] PRD   — backend:system-analysis  → PRD.md\n- [ ] BRIEF — backend:plan             → brief-*.md\n")
+
+
 @pytest.fixture
 def spec_repo(make_repo):
-    """Taskdir `refund` ber-TASK `chain: BRD_PRD_BRIEF` di branch kerja `feat/refund`."""
-    root = make_repo({f"{TD2}/TASK.md": "---\nchain: BRD_PRD_BRIEF\nrisk: MAJOR\n---\n# T\n", "src/a.go": "package a\n"})
+    """Taskdir `refund` ber-TASK `chain: BRD_PRD_BRIEF` (akar terkunci di disk, Langkah 24) di branch `feat/refund`."""
+    root = make_repo({"src/a.go": "package a\n"})
     git(root, "checkout", "-q", "-b", "main")
     be_profile(root, "go")
     commit(root, "init")
+    base = git(root, "rev-parse", "HEAD").strip()
+    write_files(root, {"backenddev/docs/.gitignore": "*\n",
+                       f"{TD2}/TASK.md": f"---\nchain: BRD_PRD_BRIEF\nrisk: MAJOR\nbase_commit: {base}\n---\n# T\n\n{LEDGER}"})
     git(root, "checkout", "-q", "-b", "feat/refund")
     return root
 
@@ -471,29 +478,31 @@ BRD_OK = "---\ntitle: Refund\nrequester: ops\nstatus: APPROVED\n---\n# BRD\n\n##
 
 
 @pytest.mark.regression("H17")
-def test_h17_brd_approved_tanpa_commit_approve_ditolak(spec_repo):
-    write_files(spec_repo, {f"{TD2}/BRD.md": BRD_OK})
+def test_h17_brd_approved_tanpa_materai_approve_ditolak(spec_repo):
+    write_files(spec_repo, {f"{TD2}/BRD.md": BRD_OK})                        # APPROVED tulisan tangan
     c = sa_c(spec_repo)[1]
-    assert c["status"] == "FAIL" and "belum ter-commit" in c["summary"], c
-    commit(spec_repo, "docs(spec): draft BRD refund", f"{TD2}/BRD.md")      # APPROVED di commit draft
+    assert c["status"] == "FAIL" and "tanpa `approved_seal`" in c["summary"], c
+    write_files(spec_repo, {f"{TD2}/BRD.md": BRD_OK.replace("status: APPROVED", "status: APPROVED\napproved_seal: "
+                                                            + "a" * 64)})
     c = sa_c(spec_repo)[1]
-    assert c["status"] == "FAIL" and "tidak terikat persetujuan user" in c["summary"], c
+    assert c["status"] == "FAIL" and "disunting sesudah approve" in c["summary"], c
 
 
 @pytest.mark.regression("H17")
 def test_h17_brd_disunting_sesudah_approve_ditolak(spec_repo):
-    write_files(spec_repo, {f"{TD2}/BRD.md": BRD_OK})
-    commit(spec_repo, "docs(spec): approve BRD refund", f"{TD2}/BRD.md")
+    write_files(spec_repo, {f"{TD2}/BRD.md": BRD_OK.replace("APPROVED", "DRAFT")})
+    r = be_run(spec_repo, SEAL, "approve", "--taskdir", TD2, "--doc", "BRD", "--answer", "Setujui")
+    assert r.returncode == 0, r.stdout
     assert sa_c(spec_repo)[1]["status"] == "PASS"
-    write_files(spec_repo, {f"{TD2}/BRD.md": BRD_OK.replace("x.", "berubah sesudah approval.")})
+    brd = spec_repo / TD2 / "BRD.md"
+    brd.write_text(brd.read_text().replace("x.", "berubah sesudah approval."))
     c = sa_c(spec_repo)[1]
-    assert c["status"] == "FAIL" and "berubah sesudah commit terakhirnya" in c["summary"], c
+    assert c["status"] == "FAIL" and "disunting sesudah approve" in c["summary"], c
 
 
 @pytest.mark.regression("H17")
-def test_h17_prd_approved_tanpa_commit_approve_ditolak_plan(spec_repo):
+def test_h17_prd_approved_tanpa_materai_approve_ditolak_plan(spec_repo):
     write_files(spec_repo, {f"{TD2}/PRD.md": "---\ntitle: R\nsource_brd: x\nstatus: APPROVED\n---\n# PRD\n"})
-    commit(spec_repo, "docs(spec): draft PRD refund", f"{TD2}/PRD.md")
     c = checks(spec_repo, PLAN_PRE, "--root", str(spec_repo), "--taskdir", TD2, "--entry-mode", "PRD",
                "--chain", "BRD_PRD_BRIEF")[3]
     assert c["status"] == "FAIL" and "tidak terikat" in c["summary"], c
@@ -524,7 +533,7 @@ def test_h19_perubahan_ter_stage_di_luar_taskdir_ditolak(spec_repo):
 
 @pytest.mark.regression("H20")
 @pytest.mark.parametrize("branch", ["main", "feat/other-chain"])
-def test_h20_akar_tidak_di_commit_di_luar_branch_taskdir(spec_repo, branch):
+def test_h20_akar_tidak_dikunci_di_luar_branch_taskdir(spec_repo, branch):
     git(spec_repo, "checkout", "-q", "-B", branch)
     c = checks(spec_repo, TASK_PRE, "--root", str(spec_repo), "--taskdir", TD2, "--lane", "PRD_CONVERSION",
                "--chain", "PRD_BRIEF")[5]
@@ -607,7 +616,6 @@ BE = PLUGINS / "backend"
 def test_h26_taskdir_tanpa_ledger_gagal_check_7(chain_repo):
     task = chain_repo / TD / "TASK.md"
     task.write_text("---\nlane: DEFECT_RCA\nrisk: MINOR\nstatus: ACTIVE\n---\n# Fix\n## Success Criteria\n- SC-1 x\n")
-    commit(chain_repo, "docs(order-fix): akar", f"{TD}/TASK.md")
     c7 = checks(chain_repo, ANALYST, "--taskdir", TD, "--risk", "MINOR", "--chain", "BRIEF")[7]
     assert c7["status"] == "FAIL" and "tanpa ledger" in c7["summary"] and "RCA" in c7["action"], c7
 
@@ -624,10 +632,8 @@ def test_h26_gerbang_merutekan_taskdir_tanpa_ledger_ke_rca():
 def test_h27_penolakan_user_menolkan_ronde_reviewer_hop(chain_repo):
     for key in ("review_round:BRD", "review_round:BRD"):
         assert be_run(chain_repo, COUNTERS, "--taskdir", TD, "--bump", key).returncode == 0
-    commit(chain_repo, "docs(order-fix): ronde", f"{TD}/TASK.md")
     r = be_run(chain_repo, COUNTERS, "--taskdir", TD, "--bump", "reject:BRD")
     assert r.returncode == 0 and "review_round:BRD dinolkan" in r.stdout, r.stdout
-    commit(chain_repo, "docs(order-fix): tolak", f"{TD}/TASK.md")
     assert be_run(chain_repo, COUNTERS, "--taskdir", TD, "--bump", "review_round:BRD").returncode == 0
     assert be_run(chain_repo, COUNTERS, "--taskdir", TD, "--check").returncode == 0      # bukan tamper
 

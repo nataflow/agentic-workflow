@@ -61,6 +61,8 @@ CASES = [
 
     ("backend/hooks/detect.py", ["--plugin", "backend"], "hook", HOOK_STDIN),
     ("backend/hooks/guard_bash.py", ["hook"], "hook", BASH_STDIN),
+    ("backend/skills/_common/docs_git.py", ["status", "--json"], True, None),
+    ("backend/skills/_common/doc_seal.py", ["status", "--taskdir", BE_TD, "--json"], True, None),
     ("backend/skills/_common/validate_doc.py", ["--kind", "task", "--taskdir", BE_TD, "--json"], True, None),
     ("backend/skills/_common/sync_payload.py", ["--taskdir", BE_TD, "--json"], True, None),
     ("backend/skills/_common/sync_payload.py", ["--repo-docs", "audit", "--json"], True, None),
@@ -87,6 +89,7 @@ CASES = [
     ("frontend/hooks/detect.py", ["--plugin", "frontend"], "hook", HOOK_STDIN),
     ("frontend/hooks/guard_bash.py", ["hook"], "hook", BASH_STDIN),
     ("frontend/skills/_common/chain.py", ["status", "--taskdir", FE_TD], False, None),
+    ("frontend/skills/_common/docs_git.py", ["ensure", "--json"], True, None),
     ("frontend/skills/_common/review_round.py", ["status", "--taskdir", FE_TD, "--gate", "plan"], False, None),
     ("frontend/skills/_common/run_verification.py", ["closing", "--taskdir", FE_TD, "--cmd", "test=true"], False, None),
     ("frontend/skills/_common/sync_payload.py", ["--taskdir", FE_TD, "--json"], True, None),

@@ -2,13 +2,16 @@
 
 Satu rumah untuk pertanyaan yang diajukan `architect`, `report`, dan `plan` atas
 disk taskdir: status tiap brief, tautan `supersedes`/`superseded_by`, kesegaran
-`REVIEW.md`, penanda henti `HALT.md`, dan commit brief yang sudah mendarat.
+`REVIEW.md`, penanda henti `HALT.md`, dan commit unit yang sudah mendarat.
+
+Dokumen taskdir tidak di-commit (Langkah 24): brief, `REVIEW.md`, dan `HALT.md` hanya ada di
+disk. Bukti dari git hanya commit **kode**, yang dicari mulai `base_commit` `TASK.md`.
 
 Status brief dan penulis tunggalnya:
 
 * `READY`       — `plan` (`scaffold_brief.py --nn`).
 * `DONE`        — `code-implementor`; koreksi `READY → DONE` oleh `architect`
-                  hanya saat commit brief terbukti mendarat.
+                  hanya saat commit unit terbukti mendarat.
 * `BLOCKED`     — `code-implementor` saat stop condition.
 * `SUPERSEDED`  — hanya `scaffold_brief.py --nn <pengganti>`, atas brief `BLOCKED`
                   atau brief `READY` hilir yang diterbitkan ulang. Terminal.
@@ -21,7 +24,7 @@ import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from precondition_lib import FrontmatterError, doc_status, split_frontmatter
+from precondition_lib import FrontmatterError, doc_status, split_frontmatter, task_base_commit
 
 BRIEF_STATUSES = ("READY", "DONE", "BLOCKED", "SUPERSEDED")
 CLOSED = ("DONE", "SUPERSEDED")               # tidak dieksekusi lagi, tidak menahan rantai
@@ -130,28 +133,46 @@ def validate_links(briefs: List[Dict]) -> List[str]:
 
 # -- git ------------------------------------------------------------------------------------
 
+# Dokumen rantai (`backenddev/`) dan profil (`.claude/`) bukan kode: commit yang hanya menyentuhnya tidak
+# membuktikan unit mendarat dan tidak membuat `REVIEW.md` basi.
+CODE_PATHSPEC = ("--", ".", ":(exclude)backenddev", ":(exclude).claude")
+_RANGE = re.compile(r"^[0-9a-f]{7,40}\.\.(?P<head>[0-9a-f]{7,40})\b")
+
 
 def git(root: Path, *args: str) -> str:
     r = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True)
     return r.stdout.strip() if r.returncode == 0 else ""
 
 
-def review_freshness(root: Path, taskdir_rel: str) -> Tuple[bool, str]:
-    """`REVIEW.md` sah hanya bila tak ada commit brief/kode sesudah commit `REVIEW.md`.
+def base_commit(root: Path, taskdir_rel: str) -> str:
+    """`base_commit` `TASK.md` taskdir bila sah (24 K6), selain itu kosong."""
+    value, problem = task_base_commit(root, Path(root) / taskdir_rel)
+    return "" if problem else value
 
-    Yang dikecualikan (`backenddev/`, `.claude/`) sama dengan yang dikecualikan
-    `code-reviewer` Fase 0 butir 5, sehingga `REPORT.md`, `HALT.md`, `TASK.md`,
-    dan indeks issues tidak membuat REVIEW basi; brief atau kode baru selalu.
+
+def review_freshness(root: Path, taskdir_rel: str) -> Tuple[bool, str]:
+    """`REVIEW.md` sah hanya bila tak ada commit kode sesudah `HEAD` yang dinilainya (24 K9).
+
+    `HEAD` yang dinilai adalah ujung `range: <merge-base>..<HEAD>` frontmatter `REVIEW.md` (kontrak
+    `agents/code-reviewer.md`). Yang dikecualikan (`backenddev/`, `.claude/`) sama dengan yang dikecualikan
+    `code-reviewer` Fase 0 butir 5, sehingga indeks issues dan profil tidak membuat REVIEW basi; kode baru selalu.
+    Brief perbaikan yang terbit sesudah review tanpa kode belum dieksekusi: titik masuk architect berhenti di
+    brief `READY` itu lebih dulu.
     """
-    rv = git(root, "log", "-1", "--format=%H", "--", f"{taskdir_rel}/REVIEW.md")
-    if not rv:
-        return False, "REVIEW.md belum ter-commit"
-    later = set(git(root, "rev-list", f"{rv}..HEAD", "--", f"{taskdir_rel}/brief-*.md").split())
-    later |= set(git(root, "rev-list", f"{rv}..HEAD", "--", ".",
-                     ":(exclude)backenddev", ":(exclude).claude").split())
+    path = Path(root) / taskdir_rel / "REVIEW.md"
+    if not path.exists():
+        return False, "REVIEW.md belum ada"
+    m = _RANGE.match(read_frontmatter(path).get("range", "").strip())
+    if not m:
+        return False, "REVIEW.md tanpa `range: <merge-base>..<HEAD>` yang sah"
+    head = git(root, "rev-parse", "--verify", "-q", m.group("head") + "^{commit}")
+    if not head or subprocess.run(["git", "merge-base", "--is-ancestor", head, "HEAD"], cwd=root,
+                                  capture_output=True).returncode != 0:
+        return False, f"ujung `range` REVIEW.md ({m.group('head')[:7]}) bukan leluhur HEAD"
+    later = git(root, "rev-list", f"{head}..HEAD", *CODE_PATHSPEC).split()
     if later:
-        return False, f"{len(later)} commit brief/kode mendarat sesudah REVIEW.md @ {rv[:7]}"
-    return True, f"REVIEW.md @ {rv[:7]} menutup HEAD"
+        return False, f"{len(later)} commit kode mendarat sesudah REVIEW.md @ {head[:7]}"
+    return True, f"REVIEW.md @ {head[:7]} menutup HEAD"
 
 
 def norm_subject(subject: str) -> str:
@@ -160,64 +181,41 @@ def norm_subject(subject: str) -> str:
 
 
 def landed_sha(root: Path, brief_rel: str, commit_message: str) -> str:
-    """SHA commit ber-subjek `commit_message` brief, sesudah brief itu lahir.
+    """SHA commit ber-subjek `commit_message` brief, sesudah akar rantai dikunci.
 
     Dibandingkan sesudah `norm_subject` (bukan `--grep` regex): satu spasi atau huruf yang meleset
-    tidak lagi membuat unit yang sudah mendarat di-dispatch ulang. Rentangnya dimulai dari commit
-    yang menambahkan berkas brief, supaya unit bernama sama di taskdir lain tidak ikut cocok.
+    tidak lagi membuat unit yang sudah mendarat di-dispatch ulang. Rentangnya dimulai dari `base_commit`
+    `TASK.md` (24 K6), supaya commit di luar rantai ini tidak ikut cocok; `commit_message` unik per
+    taskdir dijaga `validate_briefs.py`. Akar yang belum terkunci → kosong.
     """
     if not commit_message:
         return ""
-    born = git(root, "log", "--diff-filter=A", "--format=%H", "--", brief_rel).splitlines()
-    if not born:
+    base = base_commit(root, str(Path(brief_rel).parent))
+    if not base:
         return ""
     want = norm_subject(commit_message)
-    for line in git(root, "log", "--format=%h%x09%s", f"{born[-1]}..HEAD").splitlines():
+    for line in git(root, "log", "--format=%h%x09%s", f"{base}..HEAD").splitlines():
         sha, _, subj = line.partition("\t")
         if norm_subject(subj) == want:
             return sha
     return ""
 
 
-def _status_at(root: Path, rev: str, brief_rel: str) -> str:
-    r = subprocess.run(["git", "show", f"{rev}:{brief_rel}"], cwd=root, capture_output=True)
-    if r.returncode != 0:
-        return ""
-    try:
-        return str(split_frontmatter(r.stdout.decode("utf-8"))[0].get("status", "")).strip()
-    except (UnicodeDecodeError, FrontmatterError):
-        return ""
-
-
 def _carries_code(root: Path, sha: str) -> bool:
     """Commit menyentuh berkas di luar dokumen rantai (`backenddev/`, `.claude/`)."""
-    return bool(git(root, "show", "--name-only", "--format=", sha, "--", ".", ":(exclude)backenddev",
-                    ":(exclude).claude").strip())
+    return bool(git(root, "show", "--name-only", "--format=", sha, *CODE_PATHSPEC).strip())
 
 
 def done_sha(root: Path, brief_rel: str, commit_message: str = "") -> str:
     """SHA commit bukti brief `DONE` mendarat; kosong bila tak ada.
 
-    Implementor meng-commit `status: DONE` bersama kode unitnya (satu commit), jadi transisi status
-    di riwayat git adalah bukti mendarat yang tidak bergantung pada subjek yang diketik. `DONE` yang
-    hanya ada di working tree, atau ditulis tangan lalu di-commit tanpa lewat transisi, tidak punya
-    bukti ini (09 E18).
-
-    Transisi yang hanya menyentuh dokumen sah bila commit unit ber-`commit_message` brief sudah
-    mendarat lebih dulu dan membawa kode: itulah koreksi `READY → DONE` architect
-    (`lifecycle-recovery.md` bagian 3), yang memang commit brief saja (11 H5).
+    Implementor menulis `status: DONE` di disk lalu meng-commit kode unitnya bersubjek `commit_message`
+    brief. Status brief tidak ikut commit (24 K7), jadi bukti mendarat adalah commit unit itu sendiri,
+    sesudah `base_commit`, yang membawa kode. `DONE` yang ditulis tangan tanpa commit unit tidak punya
+    bukti ini (09 E18); commit bersubjek benar tetapi tanpa kode juga tidak (11 H5).
     """
-    for sha in git(root, "log", "--format=%H", "--", brief_rel).splitlines():
-        if _status_at(root, sha, brief_rel) == "DONE" and _status_at(root, f"{sha}^", brief_rel) != "DONE":
-            if _carries_code(root, sha):
-                return sha[:7]
-            landed = landed_sha(root, brief_rel, commit_message)
-            if landed and _carries_code(root, landed) and \
-                    subprocess.run(["git", "merge-base", "--is-ancestor", landed, sha], cwd=root,
-                                   capture_output=True).returncode == 0:
-                return landed[:7]
-            return ""
-    return ""
+    landed = landed_sha(root, brief_rel, commit_message)
+    return landed[:7] if landed and _carries_code(root, landed) else ""
 
 
 FIXED_MARKER = re.compile(r"^> Status: FIXED\b")
@@ -238,10 +236,20 @@ def finding_diff_ok(root: Path, sha: str, path: str) -> bool:
 # -- penanda henti ----------------------------------------------------------------------------
 
 
+HALT_REVOKED = "DICABUT"
+
+
 def read_halt(taskdir: Path) -> Optional[Dict[str, str]]:
-    """Frontmatter `{taskdir}/HALT.md`, atau None bila rantai tidak ditahan."""
+    """Frontmatter `{taskdir}/HALT.md`, atau None bila rantai tidak ditahan.
+
+    HALT dicabut lewat `doc_seal.py cabut-halt` (`status: DICABUT`, 24 K11), bukan dihapus: berkasnya
+    tetap menjadi jejak, dan tidak lagi menahan rantai.
+    """
     halt = taskdir / HALT_FILE
-    return read_frontmatter(halt) if halt.exists() else None
+    if not halt.exists():
+        return None
+    fm = read_frontmatter(halt)
+    return None if fm.get("status", "").strip().upper() == HALT_REVOKED else fm
 
 
 def halted_nn(taskdir: Path) -> Optional[str]:

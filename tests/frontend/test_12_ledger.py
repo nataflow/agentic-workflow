@@ -1,20 +1,19 @@
-"""Regresi 12 Tahap 4 — ledger & state `frontend` (J42–J53).
+"""Regresi 12 Tahap 4 — ledger & state `frontend` (J42–J53), di atas `## Riwayat Rantai` (Langkah 24).
 
 Plafon ronde hilir tidak dibuka ulang oleh reopen/eskalasi hulu (J42); `draft` ulang me-reset hitungan
-revisi dan reopen BRIEF tak terlihat penghitungnya (J43); sha ledger tidak tahan rebase/clone dan rantai
-TUNTAS yang di-squash divonis DRIFT (J44); `record` menerima laporan reviewer ronde lama (J45); materai
-approve dapat diketik tangan atau disisipkan lewat `--answer` (J46); `reopen` menyapu suntingan
-menggantung (J47); brief `BLOCKED` dihidupkan lewat reopen (J48); slug kembar (J49); status akar asing
-(J50); subperintah atas taskdir yang ditutup (J51); `.bak` pada `save` pertama (J52); path taskdir dan
-verdict REVIEW asing di `taskdir_state` (J53).
+revisi dan reopen BRIEF tak terlihat penghitungnya (J43); ledger tidak tahan rebase dan rantai TUNTAS yang
+di-squash divonis DRIFT (J44); `record` menerima laporan reviewer ronde lama (J45); materai approve dapat
+diketik tangan atau disisipkan lewat `--answer` (J46); `reopen` membawa suntingan akar menggantung (J47); brief
+`BLOCKED` dihidupkan lewat reopen (J48); slug kembar (J49); status akar asing (J50); subperintah atas taskdir
+yang ditutup (J51); `.bak` pada `save` pertama (J52); path taskdir dan verdict REVIEW asing di `taskdir_state`
+(J53). Dokumen taskdir tidak di-commit: jejak yang dulu diuji di riwayat git kini diuji di Riwayat.
 """
 import json
-import subprocess
 
 import pytest
 
-from conftest import FE_FIX, FE_MINOR_TD, FE_SKILLS, FE_TD, GIT_ENV, commit, fe_approved_chain, fe_brief, \
-    fe_commit, fe_round, fe_run, git, write_files
+from conftest import FE_MINOR_TD, FE_TD, commit, fe_approved_chain, fe_brief, fe_draft, fe_round, fe_run, git, \
+    load_module, FE_SKILLS, write_files
 
 TASK = f"{FE_TD}/TASK.md"
 CONTRACT = f"{FE_TD}/CONTRACT.md"
@@ -54,22 +53,26 @@ def ok(proc):
 def contract_approved(repo):
     """CONTRACT disetujui lewat jalur SKILL; brief belum ditulis."""
     fe_round(repo)
-    ok(rr(repo, "commit", "--subject", "docs(orders-lacak): draft CONTRACT.md"))
+    ok(fe_draft(repo))
     ok(approve(repo))
 
 
 def contract_revise(repo, text):
     edit(repo, CONTRACT, "ambil status.", text)
     fe_round(repo)
-    ok(rr(repo, "commit", "--subject", "docs(orders-lacak): revise CONTRACT.md"))
+    ok(fe_draft(repo))
 
 
 def unit_blocked(repo):
-    """brief-01 `BLOCKED` beserta `report-01.md`, satu commit milik architect."""
+    """brief-01 `BLOCKED` beserta `report-01.md`, suntingan disk milik architect (tanpa commit, Langkah 24)."""
     fe_brief(repo, "01", status="BLOCKED")
     write_files(repo, {f"{FE_TD}/report-01.md":
                        '---\nartifact: UNIT_REPORT\nunit: "01"\nstatus: BLOCKED\n---\n\n# Unit 01\n\n## Triase\n- galat\n'})
-    fe_commit(repo, "unit 01 BLOCKED - galat kompilasi baru", B1, f"{FE_TD}/report-01.md")
+
+
+def riwayat(repo):
+    return [l for l in (repo / TASK).read_text(encoding="utf-8").split("## Riwayat Rantai", 1)[1].splitlines()
+            if l.startswith("- ")]
 
 
 # ------------------------------------------------------------------ J42
@@ -109,18 +112,17 @@ def test_j42_eskalasi_membuka_putaran_contract(fe_chain_repo):
 def test_j43_draft_ulang_tidak_mereset_revisi(fe_chain_repo):
     repo = fe_chain_repo
     fe_round(repo)
-    ok(rr(repo, "commit", "--subject", "docs(orders-lacak): draft CONTRACT.md"))
+    ok(fe_draft(repo))
     for text in ("ambil status v1.", "ambil status v2."):
         edit(repo, CONTRACT, "ambil status", text[:-1] + " —")
         fe_round(repo)
-        ok(rr(repo, "commit", "--subject", "docs(orders-lacak): revise CONTRACT.md"))
-    assert chain(repo, "revisions", "--row", "CONTRACT").returncode == 1
+        ok(fe_draft(repo))
+    r = chain(repo, "revisions", "--row", "CONTRACT")
+    assert r.returncode == 1 and "2/2" in r.out and "AskUserQuestion" in r.out and "abandon" in r.out, r.out
     edit(repo, CONTRACT, "ambil status", "ambil status v3 —")
     fe_round(repo)
-    ok(rr(repo, "commit", "--subject", "docs(orders-lacak): draft CONTRACT.md"))   # draft ulang
-    r = chain(repo, "revisions", "--row", "CONTRACT")
-    assert r.returncode == 1 and "3/2" in r.out, r.out
-    assert "AskUserQuestion" in r.out and "abandon" in r.out
+    r = fe_draft(repo)                                                    # draft ulang = revisi ketiga
+    assert r.returncode == 1 and "plafon revisi" in r.out and "abandon" in r.out, r.out
 
 
 @pytest.mark.regression("J43")
@@ -129,18 +131,19 @@ def test_j43_reopen_brief_menghentikan_hitungan(fe_chain_repo):
     contract_approved(repo)
     b1 = fe_brief(repo, "01")
     fe_round(repo, gate="plan")
-    ok(rr(repo, "commit", "--subject", "docs(orders-lacak): draft breakdown (1 briefs)", gate="plan"))
+    ok(fe_draft(repo, "BRIEF"))
     for step in ("Tambah tombol Lacak v1.", "Tambah tombol Lacak v2."):
         fe_brief(repo, "01", step=step)
         fe_round(repo, gate="plan")
-        ok(rr(repo, "commit", "--subject", "docs(orders-lacak): revise breakdown", gate="plan"))
+        ok(fe_draft(repo, "BRIEF"))
+    assert "2/2" in chain(repo, "revisions", "--row", "BRIEF").out
     ok(approve(repo, "BRIEF"))
     ok(chain(repo, "reopen", "--row", "BRIEF", "--reason", "SC berubah"))
     fe_brief(repo, "01", step="Tambah tombol Lacak v3.")
     fe_round(repo, gate="plan")
-    ok(rr(repo, "commit", "--subject", "docs(orders-lacak): revise breakdown", gate="plan"))
+    ok(fe_draft(repo, "BRIEF"))                                           # draft pertama putaran sesudah reopen
     r = chain(repo, "revisions", "--row", "BRIEF")
-    assert r.returncode == 0 and "1/2" in r.out, r.out
+    assert r.returncode == 0 and "0/2" in r.out, r.out
     assert b1
 
 
@@ -162,7 +165,7 @@ def squash_to_root(repo, msg):
 
 
 @pytest.mark.regression("J44")
-def test_j44_rebase_lalu_clone_ledger_tetap_sah(fe_chain_repo, tmp_path):
+def test_j44_rebase_ledger_tetap_sah(fe_chain_repo):
     repo = fe_chain_repo
     git(repo, "checkout", "-q", "-b", "feat/orders-lacak")
     fe_approved_chain(repo)
@@ -171,18 +174,15 @@ def test_j44_rebase_lalu_clone_ledger_tetap_sah(fe_chain_repo, tmp_path):
     commit(repo, "chore: readme", "README.md")
     git(repo, "checkout", "-q", "feat/orders-lacak")
     git(repo, "rebase", "-q", "main")
-    clone = tmp_path / "clone"
-    subprocess.run(["git", "clone", "-q", "--branch", "feat/orders-lacak", f"file://{repo}", str(clone)],
-                   check=True, capture_output=True, env={**GIT_ENV, "PATH": "/usr/bin:/bin"})
-    r = chain(clone, "verify")
+    r = chain(repo, "verify")
     assert r.returncode == 0, r.out
-    assert "EKSEKUSI" in state(clone).out
+    assert "EKSEKUSI" in state(repo).out
 
 
 @pytest.mark.regression("J44")
 def test_j44_squash_rantai_tuntas_bukan_drift(fe_minor_chain):
     repo = fe_minor_chain
-    commit(repo, "docs(order-checkout): laporkan hasil rantai order-checkout", f"{FE_MINOR_TD}/REPORT.md")
+    assert "nol taskdir terbuka" in state(repo).out
     squash_to_root(repo, "feat: order checkout label (#12)")
     r = state(repo)
     assert "nol taskdir terbuka" in r.out, r.out
@@ -193,16 +193,25 @@ def test_j44_squash_rantai_tuntas_bukan_drift(fe_minor_chain):
 def test_j44_approve_menulis_sidik(fe_chain_repo):
     repo = fe_chain_repo
     contract_approved(repo)
-    body = git(repo, "log", "-1", "--format=%b")
-    assert "Sidik: " in body and "Review-Round: contract r1 t1 PASS" in body, body
+    last = riwayat(repo)[-1]
+    assert last.startswith("- 3 · approve CONTRACT · sidik ") and "review contract r1 t1 PASS" in last, last
+    assert last.endswith("persetujuan: Setujui") and " sc " in last, last
+    assert git(repo, "status", "--porcelain") == "", "approve tidak menyentuh git"
 
 
-def test_j44_squash_rantai_berjalan_fail_closed(fe_chain_repo):
+@pytest.mark.regression("J44")
+def test_j44_base_commit_bukan_leluhur_fail_closed(fe_chain_repo):
     repo = fe_chain_repo
     fe_approved_chain(repo)
-    squash_to_root(repo, "wip")
-    r = chain(repo, "verify")
-    assert r.returncode == 1 and "reopen" in r.out, r.out
+    git(repo, "checkout", "-q", "--orphan", "lain")
+    commit(repo, "lain")
+    side = git(repo, "rev-parse", "HEAD").strip()
+    git(repo, "checkout", "-q", "main")
+    task = (repo / TASK).read_text(encoding="utf-8")
+    base = task.split("base_commit: ", 1)[1].split("\n", 1)[0]
+    (repo / TASK).write_text(task.replace(base, side), encoding="utf-8")
+    r = state(repo)
+    assert "RUSAK" in r.out and "leluhur" in r.out, r.out
 
 
 # ------------------------------------------------------------------ J45
@@ -212,7 +221,7 @@ def test_j44_squash_rantai_berjalan_fail_closed(fe_chain_repo):
 def test_j45_evidence_ronde_lama_ditolak(fe_chain_repo):
     repo = fe_chain_repo
     fe_round(repo)
-    ok(rr(repo, "commit", "--subject", "docs(orders-lacak): draft CONTRACT.md"))
+    ok(fe_draft(repo))
     edit(repo, CONTRACT, "ambil status.", "ambil status + hapus pesanan (DELETE).")
     opened = ok(rr(repo, "open"))
     assert "sidik " in opened.out
@@ -226,7 +235,7 @@ def test_j45_review_plan_basi_ditolak(fe_chain_repo):
     contract_approved(repo)
     fe_brief(repo, "01")
     fe_round(repo, gate="plan")
-    ok(rr(repo, "commit", "--subject", "docs(orders-lacak): draft breakdown (1 briefs)", gate="plan"))
+    ok(fe_draft(repo, "BRIEF"))
     fe_brief(repo, "01", step="Tambah tombol Lacak + hapus cache global.")
     ok(rr(repo, "open", gate="plan"))
     r = rr(repo, "record", "--verdict", "PASS", gate="plan")                # REVIEW-PLAN.md ronde lalu
@@ -236,23 +245,24 @@ def test_j45_review_plan_basi_ditolak(fe_chain_repo):
 # ------------------------------------------------------------------ J46
 
 
-def hand_stamp(repo, row_line_old, row_line_new, sha, row="CONTRACT", subject="docs(orders-lacak): approve CONTRACT.md"):
-    edit(repo, TASK, row_line_old, row_line_new)
-    git(repo, "add", "-A")
-    git(repo, "commit", "-qm", subject, "-m", f"Persetujuan user: ya\nKonten disetujui: {sha}\nHop: {row}")
+LIB = load_module(FE_SKILLS / "_common/precondition_lib.py", "fe_lib_12_ledger")
 
 
 @pytest.mark.regression("J46")
 def test_j46_materai_tangan_ditolak(fe_chain_repo):
     repo = fe_chain_repo
     edit(repo, CONTRACT, "## 5. Decisions Not Taken", "## 5. TBD")
-    sha = fe_commit(repo, "draft CONTRACT.md")
     assert approve(repo).returncode == 1                                 # jalur resmi menolak
     edit(repo, CONTRACT, "status: DRAFT", "status: APPROVED")
-    hand_stamp(repo, "- [ ] CONTRACT — frontend:contract     → CONTRACT.md",
-               f"- [x] CONTRACT — frontend:contract     → CONTRACT.md @ APPROVED {sha}", sha)
+    sidik = LIB.content_snapshot(repo, [CONTRACT])                       # materai tangan bersidik benar
+    edit(repo, TASK, "- [ ] CONTRACT — frontend:contract     → CONTRACT.md",
+         f"- [x] CONTRACT — frontend:contract     → CONTRACT.md @ APPROVED {sidik[:12]}")
+    text = (repo / TASK).read_text(encoding="utf-8")
+    sc = LIB.sc_sidik(text)
+    (repo / TASK).write_text(text.rstrip("\n") + f"\n- 2 · approve CONTRACT · sidik {sidik} · sc {sc} · "
+                             "waktu 2026-10-13T00:00:00Z · persetujuan: ya\n", encoding="utf-8")
     r = chain(repo, "verify", "--rows", "CONTRACT")
-    assert r.returncode == 1 and "Sidik" in r.out, r.out
+    assert r.returncode == 1 and "review contract" in r.out, r.out
     r = fe_run(repo, "plan/scripts/check_preconditions.py", "--taskdir", FE_TD, "--mode", "CONTRACT", "--json")
     assert {c["id"]: c["status"] for c in json.loads(r.stdout)["checks"]}[4] == "FAIL"
 
@@ -261,27 +271,26 @@ def test_j46_materai_tangan_ditolak(fe_chain_repo):
 def test_j46_answer_bernewline_ditolak(fe_chain_repo):
     repo = fe_chain_repo
     fe_round(repo)
-    ok(rr(repo, "commit", "--subject", "docs(orders-lacak): draft CONTRACT.md"))
-    head = git(repo, "rev-parse", "HEAD")
-    r = approve(repo, answer="ya\nKonten disetujui: 0000000\nHop: BRIEF")
+    ok(fe_draft(repo))
+    before = (repo / TASK).read_text(encoding="utf-8")
+    r = approve(repo, answer="ya\n- 9 · approve BRIEF · sidik 0000000")
     assert r.returncode == 1 and "baris" in r.out, r.out
-    assert git(repo, "rev-parse", "HEAD") == head
+    assert (repo / TASK).read_text(encoding="utf-8") == before
 
 
 # ------------------------------------------------------------------ J47
 
 
 @pytest.mark.regression("J47")
-def test_j47_reopen_tree_kotor_ditolak(fe_chain_repo):
+def test_j47_reopen_akar_menggantung_ditolak(fe_chain_repo):
     repo = fe_chain_repo
     fe_approved_chain(repo)
     edit(repo, TASK, "## Out of Scope", "- [ ] **SC-2**: TBD lingkup liar\n\n## Out of Scope")
-    edit(repo, CONTRACT, "ambil status.", "ambil status + endpoint baru tanpa review.")
-    head = git(repo, "rev-parse", "HEAD")
+    before = (repo / TASK).read_text(encoding="utf-8")
     r = chain(repo, "reopen", "--row", "CONTRACT", "--reason", "uji")
-    assert r.returncode == 1 and "stash" in r.out, r.out
-    assert git(repo, "rev-parse", "HEAD") == head
-    assert "- [x] CONTRACT" in (repo / TASK).read_text(encoding="utf-8")
+    assert r.returncode == 1 and "chain.py amend" in r.out, r.out
+    assert (repo / TASK).read_text(encoding="utf-8") == before
+    assert "- [x] CONTRACT" in before
 
 
 # ------------------------------------------------------------------ J48
@@ -295,8 +304,7 @@ def test_j48_brief_blocked_tidak_dapat_dihidupkan(fe_chain_repo):
     ok(chain(repo, "reopen", "--row", "BRIEF", "--reason", "unit 01 BLOCKED"))
     fe_brief(repo, "01", status="READY")                                 # dihidupkan, bukan remedi
     fe_round(repo, gate="plan")
-    ok(rr(repo, "commit", "--subject", "docs(orders-lacak): draft breakdown append (unit 01..01, total 1)",
-          gate="plan"))
+    ok(fe_draft(repo, "BRIEF"))
     r = approve(repo, "BRIEF")
     assert r.returncode == 1 and "brief-01" in r.out and "BLOCKED" in r.out, r.out
 
@@ -307,7 +315,6 @@ def test_j48_brief_blocked_tidak_dapat_dihidupkan(fe_chain_repo):
 @pytest.mark.regression("J49")
 def test_j49_slug_kembar_ditolak(fe_chain_repo):
     repo = fe_chain_repo
-    fe_commit(repo, "draft CONTRACT.md")
     td2 = "frontenddev/docs/2609251000-orders-lacak"
     (repo / td2).mkdir(parents=True)
     r = fe_run(repo, "task/scripts/check_preconditions.py", "--taskdir", td2, "--lane", "FAST_FORWARD",
@@ -324,7 +331,6 @@ def test_j49_slug_kembar_ditolak(fe_chain_repo):
 def test_j50_status_akar_asing_rusak(fe_chain_repo):
     repo = fe_chain_repo
     edit(repo, TASK, "status: ACTIVE", "status: DONE")
-    commit(repo, "docs(orders-lacak): tandai selesai", TASK)
     r = state(repo)
     assert "RUSAK" in r.out and "`DONE`" in r.out, r.out
 
@@ -334,10 +340,10 @@ def test_j51_reopen_sesudah_abandon_ditolak(fe_chain_repo):
     repo = fe_chain_repo
     fe_approved_chain(repo)
     ok(chain(repo, "abandon", "--reason", "user berhenti"))
-    head = git(repo, "rev-parse", "HEAD")
+    before = (repo / TASK).read_text(encoding="utf-8")
     r = chain(repo, "reopen", "--row", "BRIEF", "--reason", "x")
     assert r.returncode == 1 and "ABANDONED" in r.out, r.out
-    assert git(repo, "rev-parse", "HEAD") == head
+    assert (repo / TASK).read_text(encoding="utf-8") == before
 
 
 @pytest.mark.regression("J51")
@@ -370,6 +376,5 @@ def test_j53_verdict_review_asing_penutup(fe_minor_chain):
     repo = fe_minor_chain
     (repo / FE_MINOR_TD / "REPORT.md").unlink()
     edit(repo, f"{FE_MINOR_TD}/REVIEW.md", "verdict: PASS", "verdict: LULUS")
-    commit(repo, "docs(order-checkout): closing review LULUS", f"{FE_MINOR_TD}/REVIEW.md")
     r = state(repo, "--taskdir", FE_MINOR_TD)
     assert "PENUTUP" in r.out and "LULUS" in r.out, r.out

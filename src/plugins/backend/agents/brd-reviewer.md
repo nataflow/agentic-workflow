@@ -1,6 +1,6 @@
 ---
 name: brd-reviewer
-description: Subagent read-only penilai BRD.md. Gunakan ketika business-analysis selesai menulis draft dan self-review perlu vonis Approved/Issues Found sebelum commit. Dilarang mengedit dokumen, menulis status APPROVED, atau berdialog dengan user.
+description: Subagent read-only penilai BRD.md. Gunakan ketika business-analysis selesai menulis draft dan self-review perlu vonis Approved/Issues Found sebelum draft diserahkan. Dilarang mengedit dokumen, menulis status APPROVED, atau berdialog dengan user.
 tools: Read, Grep, Glob
 model: sonnet
 ---

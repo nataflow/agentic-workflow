@@ -339,7 +339,7 @@ class PreconditionChecker:
                 "id": check_id,
                 "name": name,
                 "status": "PASS",
-                "summary": "Working tree bersih di luar taskdir (siap untuk commit isolasi)",
+                "summary": "Working tree bersih di luar taskdir",
                 "action": "",
             })
         except GitError as e:
@@ -394,13 +394,13 @@ class PreconditionChecker:
             counters = _counters.parse(text)
             summary += f" · Counters: {_counters.summary(counters)}"
             # Plafon yang diturunkan tangan membuat Failure path tidak pernah terpicu (11 H13).
-            drops = _counters.tampered(_counters.history(self.td.path) + [counters])
+            drops = _counters.tampered(_counters.history(self.td.path), counters)
             bad = _counters.unknown_keys(counters)
             if drops or bad:
                 status = "FAIL"
                 summary += " · " + "; ".join(drops + [f"kunci tak dikenal `{k}`" for k in bad])
-                action = action or ("Tabel `## Counters` hanya ditulis `chain_counters.py`; pulihkan nilainya dari riwayat git "
-                          "`TASK.md`, dilarang melanjutkan rantai di atas plafon yang dikosongkan.")
+                action = action or ("Tabel `## Counters` hanya ditulis `chain_counters.py`; pulihkan nilainya dari entri "
+                          f"terakhir `{_counters.LOG}`, dilarang melanjutkan rantai di atas plafon yang dikosongkan.")
         self.results.append({
             "id": check_id,
             "name": name,

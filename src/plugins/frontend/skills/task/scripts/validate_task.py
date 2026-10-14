@@ -44,6 +44,8 @@ from precondition_lib import (  # noqa: E402
 from precondition_lib import cli  # noqa: E402
 
 HEADINGS = ("## Description", "## Success Criteria", "## Out of Scope", "## Chain")
+# `## Riwayat Rantai` ditulis `chain.py` sesudah akar dikunci (Langkah 24); sah hanya di ujung, sesudah `## Chain`.
+HISTORY_HEADING = "## Riwayat Rantai"
 SC_LINE = re.compile(r"^- \[[ xX]\] \*\*SC-(\d+)\*\*:(.*)$")
 # Alat ukur beserta objeknya (12 J38): `— verifikasi: test` saja tidak menunjuk apa pun yang dapat dijalankan.
 MEASURE = re.compile(r"— verifikasi:\s*(?:(?:tests?|diff|typecheck|lint|build)\b\s*\S|qa\s+manual\s*:\s*\S)",
@@ -132,8 +134,8 @@ class TaskValidator:
         if len(h1) != 1:
             errors.append(f"{len(h1)} H1, wajib tepat satu")
         h2 = [l.strip() for l in code if l.startswith("## ")]
-        if tuple(h2) != HEADINGS:
-            errors.append(f"heading {h2} bukan {list(HEADINGS)}")
+        if tuple(h2) not in (HEADINGS, HEADINGS + (HISTORY_HEADING,)):
+            errors.append(f"heading {h2} bukan {list(HEADINGS)} (+ `{HISTORY_HEADING}` tulisan `chain.py`)")
         self._add(1, "Struktur & frontmatter", not errors, "; ".join(errors) or "lolos",
                   "Ikuti bagian 1 template persis.")
 

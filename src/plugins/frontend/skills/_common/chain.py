@@ -1,39 +1,42 @@
 #!/usr/bin/env python3
-"""Ledger `## Chain` `TASK.md` — satu-satunya penulis approval, re-entry, dan eskalasi.
+"""Ledger `## Chain` dan `## Riwayat Rantai` `TASK.md` — satu-satunya penulis akar, draft, approval, re-entry,
+dan eskalasi.
 
-Transisi status dokumen planning dan pencentangan ledger **tidak** ditulis model
-dengan tangan. Model mengumpulkan jawaban eksplisit user lewat `AskUserQuestion`,
-lalu memanggil subperintah di bawah; skrip ini memeriksa prasyaratnya, menulis
-frontmatter dan baris ledger, dan meng-commit keduanya sebagai satu langkah.
+Dokumen taskdir diabaikan git dan dicerminkan ke nataflow (Langkah 24): skrip ini tidak pernah men-stage atau
+meng-commit. Jejak yang dulu hidup di subjek dan badan commit dokumen kini ditulis sebagai kejadian bernomor di
+seksi `## Riwayat Rantai` (ujung `TASK.md`). Transisi status dokumen planning, pencentangan ledger, dan kejadian
+Riwayat **tidak** ditulis model dengan tangan. Model mengumpulkan jawaban eksplisit user lewat `AskUserQuestion`,
+lalu memanggil subperintah di bawah; skrip memeriksa prasyaratnya dan menulis frontmatter, ledger, dan Riwayat.
 
 Subperintah:
 
-- `init`       — tulis `## Chain` dari `sections` frontmatter `TASK.md` (dipakai `task`, tanpa commit).
+- `init`       — tulis `## Chain` dari `sections` frontmatter `TASK.md` (dipakai `task` sebelum self-test akar).
+- `root`       — kunci akar: `validate_task.py` `PASS`, `base_commit` = `HEAD`, dan kejadian `akar` (lane, sections,
+                 sidik akar). Pengganti commit `kunci TASK sebagai akar rantai`.
+- `amend`      — amandemen akar sesudah `validate_task.py --amend` `PASS`: kejadian `amandemen` bersidik akar baru.
+- `draft`      — catat draft atau revisi hop sesudah validator gate-nya `PASS` (CONTRACT, dan BRIEF lane non-MINOR
+                 ber-brief `READY`: ronde reviewer terakhir juga `PASS` atas konten itu). Plafon 2 revisi.
 - `status`     — cetak ledger beserta vonis keutuhan tiap baris.
 - `verify`     — `FAIL` bila baris yang diminta (default: semua) belum `[x]` sah dan utuh.
-- `approve`    — `FLOW`/`UI`/`CONTRACT`: `DRAFT` → `APPROVED` + centang, satu commit.
-                 `BRIEF`: centang batch brief `READY` + `REVIEW-PLAN.md` `PASS`, satu commit.
+- `approve`    — `FLOW`/`UI`/`CONTRACT`: `DRAFT` → `APPROVED` + centang + kejadian `approve`.
+                 `BRIEF`: centang batch brief `READY` + `REVIEW-PLAN.md` `PASS`, `sidik_kontrak` tiap brief `READY`.
 - `reopen`     — buka ulang hop tercentang (`[~]`) beserta **seluruh hop tercentang di bawahnya**
                  (kaskade: yang disetujui atas hulu lama tidak lagi sah); dokumen hop turun ke
                  `DRAFT`. Plafon 3 per hop dan 6 per taskdir.
 - `abandon`    — tutup taskdir yang tidak dilanjutkan (`status: ABANDONED`) atas keputusan user.
-- `files`      — cetak berkas rantai (commit berscope `(<slug>)` sejak akar) — rentang review penutup.
+- `files`      — cetak berkas rantai (commit kode berscope `(<slug>)` sejak `base_commit`) — rentang review penutup.
 - `escalate`   — geser `lane`/`sections` ke atas dan tambah baris ledger. Plafon 2/taskdir.
 - `revisions`  — hitung revisi berturut sebuah hop; exit 1 bila plafon 2 sudah habis.
 
-Sha yang dicentang adalah commit **konten** yang disetujui user (commit terakhir
-yang menyentuh dokumennya sebelum approval), bukan commit approval itu sendiri.
-Karena itu approval dan centang muat dalam satu commit. Badan commit approve
-memateraikan `Konten disetujui: <sha>`, `Sidik: <hash konten tanpa status:>`,
-`Review-Round:` (hop yang direview), dan `Hop: <ROW>`; hilir menjangkarkan
-keutuhan pada commit approve itu (12 J44) — tahan rebase dan clone — dan isi
-dokumen sekarang wajib identik dengan isinya di sana, kecuali baris `status:`.
-Suntingan sesudah approval tanpa `reopen` tertangkap sebagai drift.
+Ledger mencentang **sidik** konten yang disetujui (`@ APPROVED <sidik12>`), bukan sha commit. Kejadian `approve`
+memateraikan `sidik` (sha1 isi tanpa baris `status:`), `review` (ronde reviewer hop yang direview), `sc` (sidik
+butir `SC-{n}`), dan jawaban user (12 J44/J46, 24 K8). Isi dokumen sekarang wajib identik dengan sidik itu, kecuali
+baris `status:`; suntingan sesudah approval tanpa `reopen` tertangkap sebagai drift.
 
-Batas yang dinyatakan apa adanya: skrip tidak dapat membuktikan `AskUserQuestion`
-benar-benar terjadi. Yang dijaminnya adalah jejak — jawaban user dimateraikan di
-badan commit approval, dan approval tanpa jawaban, atau dengan jawaban bernewline
-yang dapat menyisipkan baris materai, ditolak.
+Batas yang dinyatakan apa adanya: skrip tidak dapat membuktikan `AskUserQuestion` benar-benar terjadi, dan tidak
+dapat membuktikan Riwayat itu sendiri tidak ditulis ulang — model di runtime yang sama dapat menulisnya. Yang
+dijamin adalah jejak: suntingan dokumen yang tidak lewat skrip terdeteksi sebagai drift, approval tanpa jawaban
+ditolak, dan jawaban/alasan bernewline (yang dapat menyisipkan kejadian palsu) ditolak.
 
 Zero external dependencies (Python Standard Library only).
 """
@@ -43,9 +46,11 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import docs_git  # noqa: E402
+from verify_scope import SIDIK_FIELD, contract_sidik  # noqa: E402
 from precondition_lib import (  # noqa: E402
     TASKDIR_PATTERN,
     BRIEF_GLOB,
@@ -54,27 +59,32 @@ from precondition_lib import (  # noqa: E402
     FrontmatterError,
     ROOTED_LANES,
     MINOR_LANE,
+    append_history,
     approval_targets,
+    berkas_value,
     chain_files,
     chain_line,
-    count_subjects,
+    content_snapshot,
+    drafts_since_open,
     expected_rows,
     find_repo_root,
-    git,
-    git_ok,
-    is_committed,
+    history_line,
     lane_sections_problem,
-    last_commit,
+    lane_tamper,
+    last_draft,
+    last_root_seal,
     locked_brief_problems,
     normalize_taskdir,
     parse_sections,
     read_chain,
+    read_history,
     read_status,
     replace_chain_row,
     revisions_since_open,
+    root_sidik,
+    sc_sidik,
+    sections_value,
     set_frontmatter_field,
-    snapshot_at,
-    split_frontmatter,
     task_lane_sections,
     taskdir_slug,
     verify_chain_row,
@@ -92,6 +102,8 @@ LANE_RANK = {"HOTFIX_MINOR": 0, "FAST_FORWARD": 1, "REFACTOR_ARCH": 1, "FULL_PIP
 # Rute plafon habis (12 J43, padanan 11 H28): tidak ada jalan pintas yang me-reset plafon.
 CAP_ROUTE = ("hentikan gate; `frontend:lead` bertanya lewat `AskUserQuestion`: rumuskan ulang di taskdir baru "
              "(`chain.py abandon` taskdir ini) atau hentikan")
+RIWAYAT_BROKEN = ("laporkan ke user lewat `frontend:lead`; Riwayat hanya ditulis `chain.py`, dilarang menambalnya "
+                  "dengan tangan")
 
 
 class ChainError(Exception):
@@ -99,15 +111,20 @@ class ChainError(Exception):
 
 
 def one_line(value: str, flag: str) -> str:
-    """Teks bebas yang masuk subjek/badan commit wajib satu baris (12 J46).
+    """Teks bebas yang masuk kejadian Riwayat wajib satu baris (12 J46).
 
-    Baris baru di `--answer` dapat menyisipkan `Konten disetujui:`/`Hop:` palsu ke materai; di
-    `--reason` ia memecah subjek commit.
+    Baris baru di `--answer`/`--reason` dapat menyisipkan kejadian palsu ke `## Riwayat Rantai`.
     """
     if "\n" in value or "\r" in value:
         raise ChainError(f"`{flag}` memuat baris baru — tulis satu baris; jawaban/alasan bernewline dapat "
-                         "menyisipkan baris materai palsu ke badan commit.")
+                         "menyisipkan kejadian palsu ke `## Riwayat Rantai`.")
     return value.strip()
+
+
+def run_script(*args: str) -> Tuple[bool, str]:
+    proc = subprocess.run([sys.executable, *args], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                          universal_newlines=True)
+    return proc.returncode == 0, proc.stdout
 
 
 class Chain:
@@ -121,7 +138,7 @@ class Chain:
         self.task = self.root / self.task_rel
         self.slug = taskdir_slug(self.taskdir_rel)
         if not self.task.is_file():
-            raise ChainError(f"`{self.task_rel}` tidak ada — kunci akar lewat `frontend:task`.")
+            raise ChainError(f"`{self.task_rel}` tidak ada — tulis akar lewat `frontend:task`.")
         self.lane, self.sections = task_lane_sections(self.task)
 
     # ------------------------------------------------------------ helpers
@@ -139,12 +156,39 @@ class Chain:
         raise ChainError(f"baris `{row}` tidak ada di ledger — hop ini tidak dijadwalkan "
                          f"sections `{','.join(self.sections) or '-'}`.")
 
+    def history(self, text: Optional[str] = None) -> List[Dict]:
+        events, problem = read_history(self.text() if text is None else text)
+        if problem:
+            raise ChainError(f"`## Riwayat Rantai` rusak: {problem} — {RIWAYAT_BROKEN}.")
+        return events
+
+    def record(self, text: str, kind: str, rows: List[str], fields: List[Tuple[str, str]],
+               free: Optional[Tuple[str, str]] = None) -> Tuple[str, int]:
+        """`text` ditambah satu kejadian Riwayat bernomor berikutnya."""
+        n = len(self.history(text)) + 1
+        return append_history(text, history_line(n, kind, rows, fields, free)), n
+
+    def require_rooted(self, intact: bool = True) -> List[Dict]:
+        """Akar terkunci (`chain.py root`): kejadian pertama `akar`. Mengembalikan kejadian Riwayat.
+
+        `intact`: sidik akar wajib sama dengan kejadian akar/eskalasi/amandemen terakhir (12 J47, 24) — suntingan
+        akar yang menggantung diselesaikan lewat amandemen lebih dulu, tidak dibawa diam-diam ke kejadian lain.
+        """
+        events = self.history()
+        if not events or events[0]["kind"] != "akar":
+            raise ChainError("akar belum terkunci — jalankan `chain.py root` (`frontend:task` Phase 4) lebih dulu.")
+        if intact and root_sidik(self.text())[:12] != last_root_seal(events):
+            raise ChainError(f"`{self.task_rel}` disunting di luar `chain.py amend`/`escalate` — selesaikan dulu "
+                             "lewat `frontend:lead`: amandemen akar (`validate_task.py --amend` lalu `chain.py "
+                             "amend`) atau kembalikan suntingannya. Tidak ada berkas yang diubah.")
+        return events
+
     def require_ledger_shape(self) -> None:
         present = [e["row"] for e in self.entries()]
         expected = expected_rows(self.sections)
         if present != expected:
             raise ChainError(f"ledger {present} ≠ jadwal sections {expected}; ledger rusak — "
-                             "tulis ulang lewat `chain.py init` hanya bila belum ada centang.")
+                             "tulis ulang lewat `chain.py init` hanya bila akar belum dikunci.")
 
     def require_above(self, row: str) -> None:
         for e in self.entries():
@@ -154,14 +198,8 @@ class Chain:
             if problem:
                 raise ChainError(f"hop hulu belum sah: {problem}.")
 
-    def require_clean(self, *rels: str) -> None:
-        for rel in rels:
-            if not is_committed(self.root, rel):
-                raise ChainError(f"`{rel}` belum ter-commit atau punya perubahan menggantung — "
-                                 "commit draft/revisinya lebih dulu.")
-
     def require_active(self) -> None:
-        """`approve`/`reopen`/`escalate` hanya atas akar `ACTIVE` (12 J51)."""
+        """`approve`/`reopen`/`escalate`/`draft`/`amend` hanya atas akar `ACTIVE` (12 J51)."""
         status = read_status(self.task)
         if status != "ACTIVE":
             raise ChainError(f"`{self.task_rel}` berstatus `{status or '(kosong)'}`, bukan `ACTIVE` — "
@@ -170,45 +208,62 @@ class Chain:
                                 "akar rusak; laporkan ke user lewat `frontend:lead` (dilarang menambal akar "
                                 "dengan tangan)."))
 
-    def stamp_body(self, answer: str, sha: str, row: str, targets_row: str, review: str = "") -> str:
-        """Badan materai approve (12 J44/J46): sidik dihitung dari tree `HEAD` — commit approve hanya
-        menambah baris `status:`/ledger, jadi isinya sama dengan tree commit approve itu sendiri."""
-        sidik = snapshot_at(self.root, "HEAD", approval_targets(self.root, self.taskdir_rel, targets_row, "HEAD"))
-        return "\n".join([f"Persetujuan user: {answer}", f"Konten disetujui: {sha}", f"Sidik: {sidik}"]
-                         + ([f"Review-Round: {review}"] if review else []) + [f"Hop: {row}"])
-
-    def commit(self, paths: List[str], subject: str, body: str = "",
-               originals: Optional[Dict[str, bytes]] = None) -> str:
-        """Commit **hanya** `paths` — index user yang lain tidak ikut; gagal → isi dipulihkan."""
-        ok, out = git_ok(self.root, "add", "--", *paths)
-        if ok:
-            args = ["commit", "-q", "-m", subject] + (["-m", body] if body else []) + ["--", *paths]
-            ok, out = git_ok(self.root, *args)
-        if not ok:
-            git_ok(self.root, "reset", "-q", "--", *paths)
-            for rel, data in (originals or {}).items():
-                (self.root / rel).write_bytes(data)
-            raise ChainError(f"`git commit` gagal (hook/lock?) — berkas dipulihkan ke keadaan "
-                             f"semula: {out.strip()[-400:]}")
-        return git(self.root, "rev-parse", "--short", "HEAD").strip()
-
     def snapshot(self, *rels: str) -> Dict[str, bytes]:
-        """Isi byte persis — pemulihan sesudah commit gagal tidak boleh mengubah line ending."""
+        """Isi byte persis — pemulihan sesudah tulis gagal tidak boleh mengubah line ending."""
         return {r: (self.root / r).read_bytes() for r in rels if (self.root / r).is_file()}
 
-    def write_task(self, text: str) -> None:
-        write_keep_newline(self.task, text)
+    def write_all(self, writes: Dict[str, str]) -> None:
+        """Tulis seluruh berkas; gagal di tengah → pulihkan isi semula semuanya."""
+        originals = self.snapshot(*writes)
+        try:
+            for rel, text in writes.items():
+                write_keep_newline(self.root / rel, text)
+        except OSError as exc:
+            stuck = []
+            for rel, old in originals.items():
+                try:
+                    if (self.root / rel).read_bytes() != old:
+                        (self.root / rel).write_bytes(old)
+                except OSError:
+                    stuck.append(rel)
+            if stuck:
+                raise ChainError(f"gagal menulis ({exc}); {', '.join(stuck)} tidak dapat dipulihkan — laporkan ke "
+                                 "user, lalu ulangi.")
+            raise ChainError(f"gagal menulis ({exc}) — berkas dipulihkan ke keadaan semula.")
 
     def briefs(self) -> List[Path]:
         return sorted(self.taskdir.glob(BRIEF_GLOB))
 
-    # ------------------------------------------------------------ init / status / verify
+    def brief_rels(self) -> List[str]:
+        return [f"{self.taskdir_rel}/{b.name}" for b in self.briefs()]
+
+    def validate_doc(self, row: str) -> None:
+        kind = {"FLOW": "flow", "UI": "ui", "CONTRACT": "contract"}[row]
+        ok, out = run_script(str(PLUGIN_SKILLS / "_common" / "validate_doc.py"), "--kind", kind,
+                             "--taskdir", self.taskdir_rel, "--root", str(self.root))
+        if not ok:
+            raise ChainError(f"`validate_doc.py --kind {kind}` FAIL — perbaiki draft dulu:\n{out}")
+
+    def validate_briefs(self) -> None:
+        args = [str(PLUGIN_SKILLS / "plan" / "scripts" / "validate_briefs.py"), "--taskdir", self.taskdir_rel,
+                "--root", str(self.root)] + (["--contract"] if self.sections else [])
+        ok, out = run_script(*args)
+        if not ok:
+            raise ChainError(f"`validate_briefs.py` FAIL — perbaiki brief dulu:\n{out}")
+
+    def doc_rel(self, row: str) -> str:
+        return f"{self.taskdir_rel}/{CHAIN_BY_ROW[row][2]}"
+
+    # ------------------------------------------------------------ init / root / amend / status / verify
 
     def init(self) -> str:
         problem = lane_sections_problem(self.lane, self.sections)
         if problem:
             raise ChainError(f"frontmatter `TASK.md` tidak sah: {problem}.")
         text = self.text()
+        if self.history(text):
+            raise ChainError("akar sudah terkunci (`## Riwayat Rantai` berisi); ledger hanya diubah "
+                             "`approve`/`reopen`/`escalate`.")
         if any(e["mark"] != " " for e in read_chain(text)):
             raise ChainError("ledger sudah punya centang; `init` hanya untuk akar yang baru ditulis.")
         block = "## Chain\n\n" + "\n".join(chain_line(r) for r in expected_rows(self.sections)) + "\n"
@@ -217,8 +272,62 @@ class Chain:
                           count=1, flags=re.MULTILINE)
         else:
             text = text.rstrip("\n") + "\n\n" + block
-        self.write_task(text)
-        return f"CHAIN INIT: {', '.join(expected_rows(self.sections))} ditulis ke {self.task_rel} (belum di-commit)"
+        write_keep_newline(self.task, text)
+        return (f"CHAIN INIT: {', '.join(expected_rows(self.sections))} ditulis ke {self.task_rel} "
+                "(akar belum terkunci — `chain.py root` sesudah self-test)")
+
+    def lock_root(self) -> str:
+        """Kunci akar (24 K6): `base_commit` = `HEAD` dan kejadian `akar` — pengganti commit akar."""
+        self.require_active()
+        problem = lane_sections_problem(self.lane, self.sections)
+        if problem:
+            raise ChainError(f"frontmatter `TASK.md` tidak sah: {problem}.")
+        if self.history():
+            raise ChainError("akar sudah terkunci (`## Riwayat Rantai` berisi); suntingan akar hanya lewat "
+                             "`chain.py amend`.")
+        prefix = docs_git.PREFIXES["frontend"]
+        tracked = docs_git.tracked_docs(self.root, prefix)
+        if tracked:
+            raise ChainError(f"MIGRASI: {len(tracked)} berkas `{prefix}/docs/` masih ter-track git — jalankan "
+                             "prosedur migrasi `frontend:lead` (`docs_git.py migrate`) lebih dulu.")
+        _, problem = docs_git.ensure_ignored(self.root, prefix)
+        if problem:
+            raise ChainError(f"{problem} — perbaiki `.gitignore` di bawah `{prefix}/docs/`, lalu ulangi.")
+        head = docs_git.head_sha(self.root)
+        if not head:
+            raise ChainError("repo belum punya commit — akar dikunci atas `HEAD`; commit awal repo lebih dulu.")
+        ok, out = run_script(str(PLUGIN_SKILLS / "task" / "scripts" / "validate_task.py"),
+                             "--taskdir", self.taskdir_rel, "--root", str(self.root))
+        if not ok:
+            raise ChainError(f"`validate_task.py` FAIL — akar belum sah, perbaiki dulu:\n{out}")
+        text = set_frontmatter_field(self.text(), "base_commit", head)
+        text, n = self.record(text, "akar", [], [("base", head[:7]), ("lane", self.lane),
+                                                  ("sections", sections_value(self.sections)),
+                                                  ("akar", root_sidik(text)[:12])])
+        self.write_all({self.task_rel: text})
+        return f"CHAIN ROOT: {self.task_rel} terkunci @ base {head[:7]} (Riwayat #{n})"
+
+    def amend(self, reason: str) -> str:
+        """Amandemen akar: `validate_task.py --amend` `PASS`, lalu sidik akar baru dicatat."""
+        if not reason.strip():
+            raise ChainError("`--reason` kosong — sebut keputusan user yang mengamandemen akar.")
+        reason = one_line(reason, "--reason")
+        self.require_active()
+        events = self.require_rooted(intact=False)
+        problem = lane_tamper(self.root, self.taskdir_rel)
+        if problem:
+            raise ChainError(f"{problem} — pergeseran lane/sections hanya lewat `chain.py escalate`.")
+        ok, out = run_script(str(PLUGIN_SKILLS / "task" / "scripts" / "validate_task.py"), "--amend",
+                             "--taskdir", self.taskdir_rel, "--root", str(self.root))
+        if not ok:
+            raise ChainError(f"`validate_task.py --amend` FAIL — amandemen belum sah:\n{out}")
+        text = self.text()
+        sidik = root_sidik(text)[:12]
+        if sidik == last_root_seal(events):
+            raise ChainError("akar tidak berubah sejak kejadian akar terakhir — tidak ada amandemen untuk dicatat.")
+        text, n = self.record(text, "amandemen", [], [("akar", sidik)], ("alasan", reason))
+        self.write_all({self.task_rel: text})
+        return f"CHAIN AMEND: akar {self.task_rel} @ {sidik} (Riwayat #{n})"
 
     def status_lines(self, rows: Optional[List[str]] = None) -> List[str]:
         out = []
@@ -243,6 +352,55 @@ class Chain:
                 problems.append(problem)
         return problems
 
+    # ------------------------------------------------------------ draft
+
+    def draft(self, row: str) -> str:
+        """Catat draft/revisi hop (pengganti commit `draft`/`revise` dan `review_round.py commit`)."""
+        self.require_active()
+        events = self.require_rooted()
+        self.require_ledger_shape()
+        entry = self.entry(row)
+        if entry["mark"] == "x":
+            raise ChainError(f"hop `{row}` sudah tercentang @ {entry['sha']}; revisi hanya lewat `reopen`.")
+        self.require_above(row)
+        review = ""
+        if row in DOC_ROWS:
+            rel = self.doc_rel(row)
+            if not (self.root / rel).is_file():
+                raise ChainError(f"`{rel}` tidak ada — tulis draft-nya lebih dulu.")
+            status = read_status(self.root / rel)
+            if status != "DRAFT":
+                raise ChainError(f"`{rel}` berstatus `{status or '(kosong)'}`; hanya `DRAFT` yang dicatat sebagai draft.")
+            self.validate_doc(row)
+            if row == "CONTRACT":
+                review = self._require_review_pass("contract")
+            sidik = content_snapshot(self.root, [rel])
+        else:
+            briefs = self.briefs()
+            if not any(read_status(b) == "READY" for b in briefs):
+                raise ChainError("nol brief `READY` — tidak ada breakdown baru untuk dicatat.")
+            bad = [f"{b.name} ({read_status(b) or 'kosong'})" for b in briefs
+                   if read_status(b) not in ("READY", "DONE", "BLOCKED")]
+            if bad:
+                raise ChainError("status brief di luar READY/DONE/BLOCKED: " + ", ".join(bad))
+            self.validate_briefs()
+            if self.lane != MINOR_LANE:
+                review = self._require_review_pass("plan")
+            sidik = content_snapshot(self.root, self.brief_rels())
+        prev = last_draft(events, row)
+        if prev and prev["fields"].get("sidik") == sidik[:12]:
+            raise ChainError(f"konten ini sudah tercatat sebagai draft (Riwayat #{prev['n']}) — tidak ada perubahan "
+                             "untuk dicatat.")
+        revisions = drafts_since_open(events, row)        # draft ini menjadi revisi ke-n putaran berjalan
+        if revisions > MAX_REVISIONS:
+            raise ChainError(f"plafon revisi hop `{row}` ({MAX_REVISIONS}) habis — {CAP_ROUTE} (`frontend:lead` "
+                             "Phase 8).")
+        text, n = self.record(self.text(), "draft", [row], [("sidik", sidik[:12])]
+                              + ([("review", review)] if review else []))
+        self.write_all({self.task_rel: text})
+        label = f"revisi {revisions}/{MAX_REVISIONS}" if revisions else "draft pertama putaran ini"
+        return f"CHAIN DRAFT: {row} @ {sidik[:12]} — {label} (Riwayat #{n})"
+
     # ------------------------------------------------------------ approve
 
     def approve(self, row: str, answer: str) -> str:
@@ -251,95 +409,103 @@ class Chain:
                              "user dari `AskUserQuestion`. Diam atau jawaban ambigu bukan persetujuan.")
         answer = one_line(answer, "--answer")
         self.require_active()
+        events = self.require_rooted()
         self.require_ledger_shape()
         entry = self.entry(row)
         if entry["mark"] == "x":
             raise ChainError(f"hop `{row}` sudah tercentang @ {entry['sha']}; revisi hanya lewat `reopen`.")
         self.require_above(row)
         if row in DOC_ROWS:
-            return self._approve_doc(row, entry, answer)
-        return self._approve_brief(entry, answer)
+            return self._approve_doc(row, entry, answer, events)
+        return self._approve_brief(entry, answer, events)
 
-    def _approve_doc(self, row: str, entry: Dict, answer: str) -> str:
-        doc = CHAIN_BY_ROW[row][2]
-        rel = f"{self.taskdir_rel}/{doc}"
+    @staticmethod
+    def _tail(state: str, sidik: str, entry: Dict) -> str:
+        return f"{state} {sidik[:12]}" + (f" (re-entry {entry['n']}, was {entry['sha']})" if entry["mark"] == "~" else "")
+
+    def _require_presented(self, events: List[Dict], row: str, sidik: str) -> None:
+        """Konten yang disetujui wajib konten yang tercatat diajukan (pengganti `require_clean`)."""
+        draft = last_draft(events, row)
+        if not draft or draft["fields"].get("sidik") != sidik[:12]:
+            raise ChainError(f"konten hop `{row}` di disk belum tercatat sebagai draft yang diajukan "
+                             f"(`chain.py draft --row {row}`"
+                             + (f"; draft terakhir #{draft['n']} @ {draft['fields'].get('sidik')}" if draft else "")
+                             + ") — yang disetujui wajib persis konten yang diajukan ke user.")
+
+    def _approve_doc(self, row: str, entry: Dict, answer: str, events: List[Dict]) -> str:
+        rel = self.doc_rel(row)
         path = self.root / rel
         if not path.is_file():
-            raise ChainError(f"`{rel}` tidak ada — tulis dan commit draft-nya lebih dulu.")
-        self.require_clean(rel, self.task_rel)
+            raise ChainError(f"`{rel}` tidak ada — tulis dan catat draft-nya lebih dulu.")
         status = read_status(path)
         if status != "DRAFT":
-            raise ChainError(f"`{doc}` berstatus `{status or '(kosong)'}`; hanya `DRAFT` yang dapat disetujui.")
-        kind = {"FLOW": "flow", "UI": "ui", "CONTRACT": "contract"}[row]
-        validator = PLUGIN_SKILLS / "_common" / "validate_doc.py"
-        proc = subprocess.run([sys.executable, str(validator), "--kind", kind,
-                               "--taskdir", self.taskdir_rel, "--root", str(self.root)],
-                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
-        if proc.returncode != 0:
-            raise ChainError(f"`validate_doc.py --kind {kind}` FAIL — perbaiki draft dulu:\n{proc.stdout}")
+            raise ChainError(f"`{CHAIN_BY_ROW[row][2]}` berstatus `{status or '(kosong)'}`; hanya `DRAFT` yang dapat "
+                             "disetujui.")
+        self.validate_doc(row)
         review = self._require_review_pass("contract") if row == "CONTRACT" else ""
-        sha = last_commit(self.root, rel)
-        body = self.stamp_body(answer, sha, row, row, review)
-        originals = self.snapshot(rel, self.task_rel)
-        write_keep_newline(path, set_frontmatter_field(path.read_text(encoding="utf-8"), "status", "APPROVED"))
-        tail = f"APPROVED {sha}" + (f" (re-entry {entry['n']}, was {entry['sha']})" if entry["mark"] == "~" else "")
-        self.write_task(replace_chain_row(self.text(), row, chain_line(row, "x", tail)))
-        new = self.commit([rel, self.task_rel], f"docs({self.slug}): approve {doc}", body, originals)
-        return f"CHAIN APPROVE: {row} @ APPROVED {sha} — commit {new}"
+        sidik = content_snapshot(self.root, [rel])
+        self._require_presented(events, row, sidik)
+        doc_text = set_frontmatter_field(path.read_text(encoding="utf-8"), "status", "APPROVED")
+        text = replace_chain_row(self.text(), row, chain_line(row, "x", self._tail("APPROVED", sidik, entry)))
+        text, n = self.record(text, "approve", [row], [("sidik", sidik)] + ([("review", review)] if review else [])
+                              + [("sc", sc_sidik(text))], ("persetujuan", answer))
+        self.write_all({rel: doc_text, self.task_rel: text})
+        return f"CHAIN APPROVE: {row} @ APPROVED {sidik[:12]} (Riwayat #{n})"
 
-    def _approve_brief(self, entry: Dict, answer: str) -> str:
+    def _approve_brief(self, entry: Dict, answer: str, events: List[Dict]) -> str:
         briefs = self.briefs()
         if not briefs:
             raise ChainError("nol `brief-*.md` di taskdir — jalankan `frontend:plan` lebih dulu.")
-        rels = [f"{self.taskdir_rel}/{b.name}" for b in briefs]
-        self.require_clean(*rels, self.task_rel)
         bad = [f"{b.name} ({read_status(b) or 'kosong'})" for b in briefs
                if read_status(b) not in ("READY", "DONE", "BLOCKED")]
         if bad:
             raise ChainError("status brief di luar READY/DONE/BLOCKED: " + ", ".join(bad))
-        if not any(read_status(b) == "READY" for b in briefs) and entry["mark"] != "~":
+        ready = [b for b in briefs if read_status(b) == "READY"]
+        if not ready and entry["mark"] != "~":
             raise ChainError("nol brief `READY` — tidak ada breakdown baru untuk disetujui.")
         if entry["mark"] == "~":
             locked = locked_brief_problems(self.root, self.taskdir_rel)
             if locked:
                 raise ChainError("brief terkunci saat hop BRIEF dibuka ulang berubah: " + ", ".join(locked)
                                  + " — brief `DONE`/`BLOCKED` tidak pernah disunting atau dinaikkan lagi; "
-                                   "pulihkan isinya (`git checkout <reopen> -- <brief>`) dan tulis brief remedi "
-                                   "(`remedies: \"NN\"`) untuk sisa pekerjaan unit `BLOCKED`.")
-        validator = PLUGIN_SKILLS / "plan" / "scripts" / "validate_briefs.py"
-        args = [sys.executable, str(validator), "--taskdir", self.taskdir_rel, "--root", str(self.root)]
-        if self.sections:
-            args.append("--contract")
-        proc = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
-        if proc.returncode != 0:
-            raise ChainError(f"`validate_briefs.py` FAIL — perbaiki brief dulu:\n{proc.stdout}")
-        paths = list(rels)
-        new_work = any(read_status(b) == "READY" for b in briefs)
-        review_line = ""
-        if self.lane != MINOR_LANE and new_work:
-            review_rel = f"{self.taskdir_rel}/REVIEW-PLAN.md"
-            review = self.root / review_rel
-            if not review.is_file():
+                                   "pulihkan isinya dan tulis brief remedi (`remedies: \"NN\"`) untuk sisa "
+                                   "pekerjaan unit `BLOCKED`.")
+        self.validate_briefs()
+        review = ""
+        if self.lane != MINOR_LANE and ready:
+            plan_review = self.taskdir / "REVIEW-PLAN.md"
+            if not plan_review.is_file():
                 raise ChainError("`REVIEW-PLAN.md` tidak ada — Gate Plan Review belum jalan.")
-            self.require_clean(review_rel)
-            verdict = read_status(review, "verdict")
+            verdict = read_status(plan_review, "verdict")
             if verdict != "PASS":
                 raise ChainError(f"`REVIEW-PLAN.md` ber-verdict `{verdict or '(kosong)'}`, bukan `PASS`.")
-            review_line = self._require_review_pass("plan")
-            paths.append(review_rel)
-        sha = last_commit(self.root, *paths)
-        body = self.stamp_body(answer, sha, "BRIEF", "BRIEF", review_line)
-        originals = self.snapshot(self.task_rel)
-        tail = f"READY {sha}" + (f" (re-entry {entry['n']}, was {entry['sha']})" if entry["mark"] == "~" else "")
-        self.write_task(replace_chain_row(self.text(), "BRIEF", chain_line("BRIEF", "x", tail)))
-        n = sum(1 for b in briefs if read_status(b) == "READY")
-        new = self.commit([self.task_rel], f"docs({self.slug}): approve breakdown ({n} briefs)", body, originals)
-        return f"CHAIN APPROVE: BRIEF @ READY {sha} — commit {new}"
+            review = self._require_review_pass("plan")
+        brief_sidik = content_snapshot(self.root, self.brief_rels())
+        if ready:
+            self._require_presented(events, "BRIEF", brief_sidik)
+        # 24 K10: kontrak tiap brief READY dikunci di frontmatternya sendiri (`verify_scope.py`). Baris
+        # `sidik_kontrak:` di luar sidik konten, jadi sidik ronde dan draft tidak bergeser.
+        writes = {}
+        for b in ready:
+            text = b.read_text(encoding="utf-8")
+            writes[f"{self.taskdir_rel}/{b.name}"] = set_frontmatter_field(text, SIDIK_FIELD, contract_sidik(text))
+        self.write_all(writes)
+        targets = approval_targets(self.root, self.taskdir_rel, "BRIEF")
+        sidik = content_snapshot(self.root, targets)
+        names = [Path(t).name for t in targets]
+        text = replace_chain_row(self.text(), "BRIEF", chain_line("BRIEF", "x", self._tail("READY", sidik, entry)))
+        text, n = self.record(text, "approve", ["BRIEF"],
+                              [("sidik", sidik), ("brief", brief_sidik[:12]),
+                               ("berkas", berkas_value(self.root, self.taskdir_rel, names))]
+                              + ([("review", review)] if review else []) + [("sc", sc_sidik(text))],
+                              ("persetujuan", answer))
+        self.write_all({self.task_rel: text})
+        return f"CHAIN APPROVE: BRIEF @ READY {sidik[:12]} — {len(ready)} brief READY (Riwayat #{n})"
 
     def _require_review_pass(self, gate: str) -> str:
         """Ronde reviewer terakhir wajib `PASS` atas konten yang persis sama dan epoch reopen sekarang.
 
-        Mengembalikan nilai baris `Review-Round:` materai approve (12 J46): `<gate> r<n> t<total> PASS <sidik12>`.
+        Mengembalikan nilai field `review` kejadian (12 J46): `<gate> r<n> t<total> PASS <sidik12>`.
         """
         try:
             rounds = Rounds(self.taskdir_rel, gate, self.root)
@@ -359,73 +525,52 @@ class Chain:
             raise ChainError("`--reason` kosong — sebut pemicu re-entry (mis. berkas yatim, BLOCKED berulang).")
         reason = one_line(reason, "--reason")
         self.require_active()
+        events = self.require_rooted()
         self.require_ledger_shape()
         entry = self.entry(row)
         if entry["mark"] != "x":
             raise ChainError(f"hop `{row}` tidak tercentang; tidak ada yang dibuka ulang.")
-        pattern = rf"^docs\({re.escape(self.slug)}\): reopen "
-        used = count_subjects(self.root, pattern, self.task_rel)
-        if used >= MAX_REOPEN:
+        reopens = [e for e in events if e["kind"] == "reopen"]
+        if len(reopens) >= MAX_REOPEN:
             raise ChainError(f"plafon re-entry taskdir ({MAX_REOPEN}) habis — cacatnya satu lapis di atas "
                              f"hop ini; {CAP_ROUTE}.")
-        # kuota per hop: hanya reopen yang menargetkan hop ini (token pertama subjek);
-        # kaskade tidak memakan kuota hop di bawahnya — plafon taskdir tetap membatasi total
-        n = count_subjects(self.root, rf"{pattern}{row}\b", self.task_rel) + 1
+        # kuota per hop: hanya reopen yang menargetkan hop ini; kaskade tidak memakan kuota hop di bawahnya —
+        # plafon taskdir tetap membatasi total
+        n = sum(1 for e in reopens if e["fields"].get("target") == row) + 1
         if n > MAX_REOPEN_ROW:
             raise ChainError(f"plafon re-entry hop `{row}` ({MAX_REOPEN_ROW}) habis — {CAP_ROUTE}.")
         entries = self.entries()
         idx = [e["row"] for e in entries].index(row)
         cascade = [e for e in entries[idx:] if e["mark"] == "x"]
-        docs = {f"{self.taskdir_rel}/{CHAIN_BY_ROW[e['row']][2]}": e["sha"] for e in cascade if e["row"] in DOC_ROWS}
-        # 12 J47: commit reopen hanya membawa ledger + baris `status:`; suntingan menggantung tidak ikut tersapu
-        dirty = [rel for rel in (self.task_rel, *docs) if (self.root / rel).is_file()
-                 and not is_committed(self.root, rel)]
-        if dirty:
-            raise ChainError(f"{', '.join(f'`{d}`' for d in dirty)} punya perubahan menggantung — reopen hanya "
-                             "meng-commit ledger dan baris `status:`. Suntingan akar → amandemen akar lebih dulu "
-                             "(`validate_task.py --amend`, commit `amandemen akar TASK`); suntingan dokumen → "
-                             f"`git stash push -- {' '.join(dirty)}`, ulangi reopen, lalu `git stash pop` dan "
-                             "lanjutkan di gate pemiliknya. Tidak ada berkas yang diubah.")
-        originals = self.snapshot(self.task_rel, *docs)
-        staged: Dict[str, str] = {}
-        for rel, sha in docs.items():                 # 1) validasi seluruh kaskade — belum ada yang ditulis
-            if rel not in originals:
-                raise ChainError(f"`{rel}` hilang dari disk padahal hop-nya tercentang @ {sha} — "
-                                 f"pulihkan dengan `git checkout {sha} -- {rel}`, lalu ulangi reopen. "
-                                 "Tidak ada berkas yang diubah.")
+        writes: Dict[str, str] = {}
+        for e in cascade:                             # 1) validasi seluruh kaskade — belum ada yang ditulis
+            if e["row"] not in DOC_ROWS:
+                continue
+            rel = self.doc_rel(e["row"])
+            if not (self.root / rel).is_file():
+                raise ChainError(f"`{rel}` hilang dari disk padahal hop-nya tercentang @ {e['sha']} — pulihkan "
+                                 "berkasnya (cermin nataflow, atau salinan user), lalu ulangi reopen. Tidak ada "
+                                 "berkas yang diubah.")
             try:
-                staged[rel] = set_frontmatter_field((self.root / rel).read_text(encoding="utf-8"),
-                                                    "status", "DRAFT")
+                writes[rel] = set_frontmatter_field((self.root / rel).read_text(encoding="utf-8"), "status", "DRAFT")
             except FrontmatterError as exc:
-                raise ChainError(f"`{rel}`: {exc} — pulihkan frontmatter dari commit tercentang "
-                                 f"(`git show {sha}:{rel}`), lalu ulangi reopen. Tidak ada berkas yang diubah.")
+                raise ChainError(f"`{rel}`: {exc} — pulihkan frontmatter-nya, lalu ulangi reopen. Tidak ada berkas "
+                                 "yang diubah.")
         text = self.text()
         for e in cascade:
             r = e["row"]
             # label informasional: target = hitungan target, kaskade = total pembukaan hop itu
-            k = n if r == row else count_subjects(self.root, rf"{pattern}[A-Z ]*\b{r}\b", self.task_rel) + 1
+            k = n if r == row else sum(1 for x in reopens if r in x["rows"]) + 1
             text = replace_chain_row(text, r, chain_line(r, "~", f"re-entry {k} (was {e['sha']})"))
-        try:                                          # 2) tulis semuanya; gagal di tengah → pulihkan
-            for rel, new_text in staged.items():
-                write_keep_newline(self.root / rel, new_text)
-            self.write_task(text)
-        except OSError as exc:
-            stuck = []
-            for rel, old in originals.items():
-                try:
-                    if (self.root / rel).read_bytes() != old:
-                        (self.root / rel).write_bytes(old)
-                except OSError:
-                    stuck.append(rel)
-            if stuck:
-                raise ChainError(f"gagal menulis kaskade ({exc}); {', '.join(stuck)} tidak dapat dipulihkan — "
-                                 f"`git checkout -- {' '.join(stuck)}` lalu ulangi reopen.")
-            raise ChainError(f"gagal menulis kaskade ({exc}) — berkas dipulihkan ke keadaan semula.")
-        paths = [self.task_rel, *staged]
-        rows = " ".join(e["row"] for e in cascade)
-        new = self.commit(paths, f"docs({self.slug}): reopen {rows} — {reason[:72]}",
-                          "", originals)
-        return f"CHAIN REOPEN: {rows} (kaskade dari {row}, re-entry {n}) — commit {new}"
+        rows = [e["row"] for e in cascade]
+        # 12 J48: keadaan brief saat hop dibuka dicatat — brief DONE/BLOCKED tidak boleh berubah sesudahnya
+        names = [b.name for b in self.briefs()]
+        text, num = self.record(text, "reopen", rows, [("target", row)]
+                                + ([("berkas", berkas_value(self.root, self.taskdir_rel, names))] if names else []),
+                                ("alasan", reason))
+        writes[self.task_rel] = text
+        self.write_all(writes)
+        return f"CHAIN REOPEN: {' '.join(rows)} (kaskade dari {row}, re-entry {n}) — Riwayat #{num}"
 
     def abandon(self, reason: str) -> str:
         if not reason.strip():
@@ -433,16 +578,20 @@ class Chain:
         reason = one_line(reason, "--reason")
         if read_status(self.task) == "ABANDONED":
             raise ChainError(f"`{self.task_rel}` sudah `ABANDONED` — taskdir sudah ditutup; tidak ada yang diubah.")
-        self.require_clean(self.task_rel)
-        originals = self.snapshot(self.task_rel)
-        self.write_task(set_frontmatter_field(self.text(), "status", "ABANDONED"))
-        new = self.commit([self.task_rel], f"docs({self.slug}): tutup taskdir — {reason[:72]}",
-                          "", originals)
-        return f"CHAIN ABANDON: {self.taskdir_rel} ABANDONED — commit {new}"
+        text = set_frontmatter_field(self.text(), "status", "ABANDONED")
+        _, problem = read_history(text)
+        if problem:                                  # jalan keluar RUSAK: Riwayat rusak tidak menahan penutupan
+            note = f" (Riwayat rusak, kejadian tidak dicatat: {problem})"
+        else:
+            text, n = self.record(text, "abandon", [], [], ("alasan", reason))
+            note = f" (Riwayat #{n})"
+        self.write_all({self.task_rel: text})
+        return f"CHAIN ABANDON: {self.taskdir_rel} ABANDONED{note}"
 
     def escalate(self, lane: str, sections_raw: str, reason: str) -> str:
         reason = one_line(reason, "--reason")
         self.require_active()
+        events = self.require_rooted()
         sections = parse_sections(sections_raw)
         problem = lane_sections_problem(lane, sections)
         if problem:
@@ -455,10 +604,11 @@ class Chain:
             raise ChainError(f"sections hanya bertambah: `{','.join(self.sections)}` → `{','.join(sections)}`.")
         if new_rows == old_rows and lane == self.lane:
             raise ChainError("tidak ada yang berubah.")
-        used = count_subjects(self.root, rf"^docs\({re.escape(self.slug)}\): eskalasi lane", self.task_rel)
-        if used >= MAX_ESCALATE:
+        if sum(1 for e in events if e["kind"] == "eskalasi") >= MAX_ESCALATE:
             raise ChainError(f"plafon eskalasi taskdir ({MAX_ESCALATE}) habis — {CAP_ROUTE}.")
-        self.require_clean(self.task_rel)
+        problem = lane_tamper(self.root, self.taskdir_rel)
+        if problem:
+            raise ChainError(f"{problem} — kembalikan frontmatter ke pasangan terakhir di Riwayat, lalu ulangi.")
         entries = {e["row"]: e for e in self.entries()}
         added = [r for r in new_rows if r not in entries]
         first_added = min(new_rows.index(r) for r in added) if added else len(new_rows)
@@ -472,35 +622,32 @@ class Chain:
         text = set_frontmatter_field(text, "sections", ", ".join(sections) if sections else "[]")
         block = "## Chain\n\n" + "\n".join(lines) + "\n"
         text = re.sub(r"^## Chain\s*\n(?:.*\n?)*?(?=^## |\Z)", block, text, count=1, flags=re.MULTILINE)
-        originals = self.snapshot(self.task_rel)
-        self.write_task(text)
-        new = self.commit([self.task_rel], f"docs({self.slug}): eskalasi lane {self.lane} → {lane}",
-                          f"Alasan: {reason}\nSections: {','.join(self.sections) or '-'} → {','.join(sections)}",
-                          originals)
-        return f"CHAIN ESCALATE: {self.lane} → {lane}, hop baru {added or '-'} — commit {new}"
+        text, n = self.record(text, "eskalasi", [], [("lane", f"{self.lane} → {lane}"),
+                                                     ("sections", f"{sections_value(self.sections)} → "
+                                                                  f"{sections_value(sections)}"),
+                                                     ("akar", root_sidik(text)[:12])], ("alasan", reason))
+        self.write_all({self.task_rel: text})
+        return f"CHAIN ESCALATE: {self.lane} → {lane}, hop baru {added or '-'} (Riwayat #{n})"
 
     def revisions(self, row: str) -> int:
-        if row in DOC_ROWS:
-            doc = CHAIN_BY_ROW[row][2]
-            return revisions_since_open(self.root, [f"{self.taskdir_rel}/{doc}"], self.slug, doc)
-        return revisions_since_open(self.root, [f"{self.taskdir_rel}/{BRIEF_GLOB}"], self.slug, "breakdown")
+        return revisions_since_open(self.root, self.taskdir_rel, row)
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Ledger ## Chain frontend")
+    parser = argparse.ArgumentParser(description="Ledger ## Chain dan ## Riwayat Rantai frontend")
     sub = parser.add_subparsers(dest="cmd", required=True)
-    for name in ("init", "status", "verify", "approve", "reopen", "escalate", "revisions",
-                 "abandon", "files"):
+    for name in ("init", "root", "amend", "draft", "status", "verify", "approve", "reopen", "escalate",
+                 "revisions", "abandon", "files"):
         p = sub.add_parser(name)
         p.add_argument("--taskdir", required=True)
         p.add_argument("--root", default=None)
-        if name in ("approve", "reopen", "revisions"):
+        if name in ("approve", "reopen", "revisions", "draft"):
             p.add_argument("--row", required=True, choices=list(CHAIN_BY_ROW))
         if name == "verify":
             p.add_argument("--rows", default="", help="dipisah koma; kosong = semua")
         if name == "approve":
             p.add_argument("--answer", required=True, help="jawaban user apa adanya dari AskUserQuestion")
-        if name in ("reopen", "escalate", "abandon"):
+        if name in ("reopen", "escalate", "abandon", "amend"):
             p.add_argument("--reason", required=True)
         if name == "escalate":
             p.add_argument("--lane", required=True, choices=list(ROOTED_LANES))
@@ -510,6 +657,12 @@ def main() -> None:
         chain = Chain(args.taskdir, Path(args.root) if args.root else None)
         if args.cmd == "init":
             print(chain.init())
+        elif args.cmd == "root":
+            print(chain.lock_root())
+        elif args.cmd == "amend":
+            print(chain.amend(args.reason))
+        elif args.cmd == "draft":
+            print(chain.draft(args.row))
         elif args.cmd == "status":
             print("\n".join(chain.status_lines()) or "(ledger kosong)")
         elif args.cmd == "verify":

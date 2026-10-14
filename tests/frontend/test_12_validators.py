@@ -12,8 +12,8 @@ import json
 
 import pytest
 
-from conftest import FE_FIX, FE_MINOR_TD, FE_SKILLS, FE_TD, commit, fe_brief, fe_profile, fe_review_md, fe_run, \
-    git, load_module, write_files
+from conftest import FE_FIX, FE_MINOR_TD, FE_SKILLS, FE_TD, commit, fe_brief, fe_lib, fe_profile, fe_review_md, \
+    fe_run, load_module, write_files
 
 LIB = load_module(FE_SKILLS / "_common/precondition_lib.py", "fe_lib_12d")
 VB = "plan/scripts/validate_briefs.py"
@@ -198,13 +198,28 @@ def test_j17_tree_review_tak_terbaca_fail(fe_minor_chain):
 
 # --- J27: plafon remedi -----------------------------------------------------------------------------
 
+def reopen_event(repo, rows):
+    """Kejadian `reopen <rows>` di `## Riwayat Rantai` beserta keadaan brief saat itu (field `berkas`), persis
+    tulisan `chain.py reopen` — jejak urutan BLOCKED/re-entry yang dibaca Check M (Langkah 24)."""
+    lib = fe_lib()
+    p = repo / FE_TD / "TASK.md"
+    events, problem = lib.read_history(p.read_text(encoding="utf-8"))
+    assert not problem, problem
+    names = sorted(x.name for x in (repo / FE_TD).glob("brief-*.md"))
+    line = lib.history_line(len(events) + 1, "reopen", rows.split(),
+                            [("target", rows.split()[0]), ("berkas", lib.berkas_value(repo, FE_TD, names))],
+                            ("alasan", "uji"))
+    p.write_text(lib.append_history(p.read_text(encoding="utf-8"), line), encoding="utf-8")
+
+
 def blocked_commit(repo, *rels, nn="01"):
-    commit(repo, f"docs(orders-lacak): unit {nn} BLOCKED - galat", *rels)
+    """Unit BLOCKED tercatat Riwayat lewat reopen BRIEF berikutnya (dulu: commit `unit NN BLOCKED`)."""
+    reopen_event(repo, "BRIEF")
 
 
 def task_subject(repo, subject):
-    edit(repo, f"{FE_TD}/TASK.md", "## Chain", "## Chain\n", 1)
-    commit(repo, f"docs(orders-lacak): {subject}", f"{FE_TD}/TASK.md")
+    """Re-entry kontrak (`reopen CONTRACT`) sebagai kejadian Riwayat."""
+    reopen_event(repo, "CONTRACT BRIEF" if "CONTRACT" in subject else "BRIEF")
 
 
 @pytest.mark.regression("J27")
@@ -218,8 +233,7 @@ def test_j27_remedi_tanpa_field_fail(lacak):
 
 @pytest.mark.regression("J27")
 def test_j27_brief_asli_sebelum_blocked_tidak_ditagih(lacak):
-    rel2 = second(lacak, depends='["01"]')
-    commit(lacak, "docs(orders-lacak): draft breakdown (2 briefs)", B1, rel2)
+    second(lacak, depends='["01"]')
     fe_brief(lacak, "01", status="BLOCKED")
     edit(lacak, B1, 'total_units: "1"', 'total_units: "2"')
     blocked_commit(lacak, B1)

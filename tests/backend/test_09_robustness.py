@@ -111,23 +111,21 @@ def test_e20_baris_tak_dikenal_fail_rapi(chain_repo):
 
 @pytest.mark.regression("E20")
 def test_e20_kunci_global_diturunkan_tangan_terdeteksi(chain_repo):
+    """Riwayat tabel dari log tulisan skrip `.explore/counters-log.json`, bukan git (Langkah 24)."""
     assert counters(chain_repo, "--bump", "reentry").returncode == 0
-    commit(chain_repo, "docs(order-fix): re-entry", f"{TD}/TASK.md")
     task = chain_repo / TD / "TASK.md"
     task.write_text(task.read_text(encoding="utf-8").replace("| reentry | 1 |", "| reentry | 0 |"), encoding="utf-8")
     r = counters(chain_repo, "--check")
     assert r.returncode == 1 and "reentry turun 1 → 0" in r.stdout, r.stdout
-    commit(chain_repo, "chore: rapikan", f"{TD}/TASK.md")                # ter-commit pun tetap terdeteksi
-    assert counters(chain_repo, "--check").returncode == 1
+    r = counters(chain_repo, "--bump", "chain_transition")                # menulis di atasnya pun ditolak
+    assert r.returncode == 1 and "disunting tangan" in r.stdout, r.stdout
 
 
 @pytest.mark.regression("E20")
 def test_e20_reset_hop_sesudah_reentry_sah(chain_repo):
     assert counters(chain_repo, "--bump", "review_round:PRD").returncode == 0
-    commit(chain_repo, "docs(order-fix): ronde PRD", f"{TD}/TASK.md")
     assert counters(chain_repo, "--bump", "reentry").returncode == 0
     assert counters(chain_repo, "--reset-hop", "PRD").returncode == 0
-    commit(chain_repo, "docs(order-fix): re-entry hop PRD", f"{TD}/TASK.md")
     r = counters(chain_repo, "--check")
     assert r.returncode == 0, r.stdout
 
@@ -135,7 +133,6 @@ def test_e20_reset_hop_sesudah_reentry_sah(chain_repo):
 @pytest.mark.regression("E20")
 def test_e20_kunci_hop_turun_tanpa_reentry_terdeteksi(chain_repo):
     assert counters(chain_repo, "--bump", "review_round:PRD").returncode == 0
-    commit(chain_repo, "docs(order-fix): ronde PRD", f"{TD}/TASK.md")
     assert counters(chain_repo, "--reset-hop", "PRD").returncode == 0      # tanpa --bump reentry
     r = counters(chain_repo, "--check")
     assert r.returncode == 1 and "review_round:PRD turun" in r.stdout, r.stdout

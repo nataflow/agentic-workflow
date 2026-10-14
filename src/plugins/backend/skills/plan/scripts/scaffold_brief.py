@@ -48,7 +48,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from brief_status import (  # noqa: E402
-    HALT_FILE, LOCKED, SUPERSEDABLE, halted_nn, read_frontmatter, scan_briefs, set_frontmatter,
+    HALT_FILE, HALT_REVOKED, LOCKED, SUPERSEDABLE, halted_nn, read_frontmatter, scan_briefs, set_frontmatter,
 )
 from precondition_lib import (  # noqa: E402
     VALID_RISKS, find_repo_root, frontmatter_field, load_profile_index, parse_enum, read_text, resolve_taskdir,
@@ -626,23 +626,24 @@ class MatrixTool:
             lines.append("")
 
         path.write_text("\n".join(lines), encoding="utf-8")
-        staged = [path.name]
+        touched = [path.name]
         disk = {b["nn"]: b for b in scan_briefs(self.taskdir)}
         for s in sup:
             old = disk[s]
             set_frontmatter(old["path"], status="SUPERSEDED", superseded_by=f"brief-{nn}")
-            staged.append(old["name"])
+            touched.append(old["name"])
         if _repairs(row) and halted_nn(self.taskdir) == _repairs(row):
-            (self.taskdir / HALT_FILE).unlink()
-            staged.append(f"{HALT_FILE} (dihapus — stage dengan `git rm -q {HALT_FILE}`)")
+            # HALT dicabut, bukan dihapus (24 K11): berkasnya jejak penahanan, dan cermin nataflow ikut mencabutnya.
+            set_frontmatter(self.taskdir / HALT_FILE, status=HALT_REVOKED, dicabut=f"brief-{nn} (repairs)")
+            touched.append(f"{HALT_FILE} (status: {HALT_REVOKED})")
         explore = row.get("explore")
         note = (
             f"Panen `{LACI}/{explore}.md` lebih dulu sebelum mengisi `## File scope` "
             f"dan `## Steps`." if explore else
             f"Unit ini tidak punya laporan `{LACI}/`; anchor diturunkan dari sapuan mandiri."
         )
-        if len(staged) > 1:
-            note += f"\n    Stage bersama di commit agregat: {', '.join(staged)}"
+        if len(touched) > 1:
+            note += f"\n    Ikut disunting di disk: {', '.join(touched[1:])}"
         return f"{path}\n{note}"
 
 

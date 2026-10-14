@@ -1,22 +1,22 @@
 ---
 name: report
-description: Dipanggil frontend:architect Phase 5 sesudah REVIEW.md penutup lolos validate_review.py, ter-commit dengan verdict PASS atau WARNING, dan seluruh brief tertutup - perumusan REPORT.md dari berkas rantai sejak commit akar dan vonis Success Criteria REVIEW.md, dikunci satu commit sebagai penanda tuntas taskdir
+description: Dipanggil frontend:architect Phase 5 sesudah REVIEW.md penutup lolos validate_review.py dengan verdict PASS atau WARNING dan seluruh brief tertutup - perumusan REPORT.md dari berkas rantai sejak akar dan vonis Success Criteria REVIEW.md, lolos validate_report.py sebagai penanda tuntas taskdir tanpa commit
 user-invocable: false
 ---
 
 ## THE IRON LAW
 
-- Tulis `REPORT.md` hanya sesudah `REVIEW.md` penutup lolos `validate_review.py`, ter-commit dengan verdict `PASS` atau `WARNING`, dan seluruh brief tertutup.
+- Tulis `REPORT.md` hanya sesudah `REVIEW.md` penutup lolos `validate_review.py` dan masih segar (`head:` tanpa commit kode sesudahnya), dengan verdict `PASS` atau `WARNING`, dan seluruh brief tertutup.
 - Setiap butir `## Perubahan` wajib berakar pada berkas rantai; klaim tanpa berkas dibuang, bukan diloloskan.
 - Skill ini melaporkan, bukan menilai — dilarang menerbitkan severity, verdict, atau temuan baru.
 - Vonis tiap `SC-{n}` disalin dari `## Cakupan Success Criteria` `REVIEW.md`, bukan diklasifikasi ulang; `PERLU VERIFIKASI MANUAL` tetap begitu sampai user sendiri memverifikasinya.
 - Dilarang menyentuh `src/`, mengedit `TASK.md`, `REVIEW.md`, atau brief mana pun.
-- Kunci berkas dalam satu commit path-eksplisit sebelum mengembalikan kendali ke `frontend:architect`.
+- `REPORT.md` terbit saat lolos `validate_report.py`, tanpa commit: dokumen taskdir diabaikan git dan dicerminkan ke nataflow (Langkah 24).
 
 ## Precondition [REQUIRED]
 
 1. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/report/scripts/check_preconditions.py --taskdir <taskdir>`.
-2. `PASS` (8/8 checks) → lanjut ke Workflow; pakai baris `Terselesaikan:` (`akar`, `slug`, `berkas_rantai`) apa adanya di Phase 2. `FAIL` → hentikan dan remediasi butir gagal: taskdir atau akar tidak sah → kembali ke lead; `REVIEW.md` absen, belum ter-commit, basi (ada commit yang menyentuh `brief-*.md` sesudahnya), atau gagal `validate_review.py` → kembali ke `frontend:architect` Phase 4; verdict `BLOCKED` → REPORT ditahan, temuan dirutekan lead untuk diperbaiki di taskdir yang sama; brief belum tertutup → `frontend:architect`; ledger tidak tercentang penuh atau berubah → lead; `REPORT.md` sudah ada → serahkan keputusan penulisan ulang ke user; nol berkas rantai → laporkan ke user; working tree kotor → laporkan ke user, jangan di-stash sendiri.
+2. `PASS` (8/8 checks) → lanjut ke Workflow; pakai baris `Terselesaikan:` (`akar`, `slug`, `berkas_rantai`) apa adanya di Phase 2. `FAIL` → hentikan dan remediasi butir gagal: taskdir atau akar tidak sah → kembali ke lead; `REVIEW.md` absen, basi (`head:` tidak sah atau ada commit kode sesudahnya), atau gagal `validate_review.py` → kembali ke `frontend:architect` Phase 4; verdict `BLOCKED` → REPORT ditahan, temuan dirutekan lead untuk diperbaiki di taskdir yang sama; brief belum tertutup → `frontend:architect`; ledger tidak tercentang penuh atau berubah → lead; `REPORT.md` sudah terbit → serahkan keputusan penulisan ulang ke user; `REPORT.md` tertunda (tidak lolos validator) → kembali ke `frontend:architect` Phase 5 butir 4; nol berkas rantai → laporkan ke user; working tree kotor → laporkan ke user, jangan di-stash sendiri.
 3. Skrip: `chain.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py`; `validate_review.py` = `${CLAUDE_PLUGIN_ROOT}/skills/architect/scripts/validate_review.py`.
 
 ## Parameter [REQUIRED]
@@ -48,10 +48,10 @@ user-invocable: false
 ### Phase 4 — Penulisan, Validasi & Penguncian
 
 1. Tulis `{taskdir}/REPORT.md` mengikuti `templates/report-template.md` bagian 1.
-2. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/report/scripts/validate_report.py --taskdir <taskdir>`; `FAIL` → perbaiki berkasnya lalu ulangi, maksimal 2 putaran perbaikan; masih `FAIL` → hentikan tanpa commit, sajikan butir gagal di Output, dan serahkan ke user.
-3. Stage path eksplisit `{taskdir}/REPORT.md`, lalu commit `docs(<slug>): laporkan hasil rantai <slug>`. Dilarang `git add .` maupun `git add -A`.
-4. Commit mendarat → jalankan prosedur `lead/references/nataflow-sync.md` (`--taskdir <taskdir>`) di main loop; segmennya masuk baris penutup, dan `nataflow GAGAL` tidak membatalkan laporan.
-5. Catat SHA commit dan kembalikan kendali ke `frontend:architect`.
+2. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/report/scripts/validate_report.py --taskdir <taskdir>`; `FAIL` → perbaiki berkasnya lalu ulangi, maksimal 2 putaran perbaikan; masih `FAIL` → hentikan, sajikan butir gagal di Output, dan serahkan ke user.
+3. Validator `PASS` = laporan terbit. Dilarang men-stage atau meng-commit `{taskdir}/REPORT.md`.
+4. Laporan terbit → jalankan prosedur `lead/references/nataflow-sync.md` (`--taskdir <taskdir>`) di main loop; segmennya masuk baris penutup, dan `nataflow GAGAL` tidak membatalkan laporan.
+5. Kembalikan kendali ke `frontend:architect`.
 
 ## Guardrails
 
@@ -60,27 +60,27 @@ user-invocable: false
 - **ARTEFAK HULU TAK TERSENTUH**: dilarang mengedit `TASK.md` (termasuk mencentang `SC-{n}`), `REVIEW.md`, brief, dan `REPORT.md` yang sudah ada.
 - **GIT TERBATAS**: dilarang `git push`, `git merge`, `git rebase`, `gh pr create`, dan staging wildcard.
 - **KEPUTUSAN MILIK USER**: penetapan bahwa rantai layak di-push, di-PR, atau di-merge, serta hasil QA manual, tetap milik user; skill ini berhenti pada laporan terkunci.
-- **RATIONALIZATION PREVENTION**: dilarang menulis report sebelum `REVIEW.md` ter-commit ("kodenya sudah jelas selesai"), menyatakan butir `QA manual:` terpenuhi karena test lain hijau, mengisi `## Catatan` dengan basa-basi, atau mengarang butir `## Perubahan` dari brief alih-alih dari berkas rantai.
+- **RATIONALIZATION PREVENTION**: dilarang menulis report sebelum `REVIEW.md` lolos validator ("kodenya sudah jelas selesai"), menyatakan butir `QA manual:` terpenuhi karena test lain hijau, mengisi `## Catatan` dengan basa-basi, atau mengarang butir `## Perubahan` dari brief alih-alih dari berkas rantai.
 
 ## Output [REQUIRED]
 
-Validasi `PASS` dan commit mendarat → tutup satu baris: `### REPORT LOCKED — <taskdir>/REPORT.md @ <sha> · <n> butir dari <n> berkas · SC <n> terbukti / <n> manual / <n> belum · nataflow <segmen>`. Commit gagal → sajikan:
+Validasi `PASS` → tutup satu baris: `### REPORT LOCKED — <taskdir>/REPORT.md · terbit · <n> butir dari <n> berkas · SC <n> terbukti / <n> manual / <n> belum · nataflow <segmen>`. Validasi tetap `FAIL` → sajikan:
 
 ```markdown
 ### REPORT LOCKED — GAGAL
-- **Path**  : frontenddev/docs/<YYMMDDhhmm>-<slug>/REPORT.md · tertulis, belum terkunci
-- **Commit**: GAGAL — <pesan git>
+- **Path**  : frontenddev/docs/<YYMMDDhhmm>-<slug>/REPORT.md · tertulis, belum terbit
+- **Validasi**: GAGAL — <butir validate_report.py yang jatuh>
 ```
 
-Tutup satu baris: `kembali ke frontend:architect | Taskdir: <path> | Laporan: REPORT.md @ <sha | belum terkunci>`.
+Tutup satu baris: `kembali ke frontend:architect | Taskdir: <path> | Laporan: REPORT.md <terbit | belum terbit>`.
 
 ## Failure path
 
-1. **REPORT.md sudah ada**: hentikan tanpa menimpa. Ter-commit → laporkan path-nya dan serahkan keputusan penulisan ulang ke user; belum ter-commit → tertunda, penguncian milik `architect` Phase 5 butir 4.
+1. **REPORT.md sudah ada**: hentikan tanpa menimpa. Lolos `validate_report.py` → sudah terbit: laporkan path-nya dan serahkan keputusan penulisan ulang ke user; tidak lolos → tertunda, pemulihannya milik `architect` Phase 5 butir 4.
 2. **Taskdir tanpa TASK.md**: hentikan; tidak ada kriteria untuk dipasangkan — sejak v0.4.0 tidak ada taskdir sah tanpa akar.
 3. **Verdict BLOCKED**: hentikan sebelum menulis berkas; lead merutekan temuannya ke brief perbaikan di taskdir yang sama (`chain.py reopen --row BRIEF` → `plan` APPEND).
 4. **Nol berkas rantai**: hentikan dan laporkan `akar` serta slug terbaca. Dilarang mengarang butir dari isi brief.
-5. **Commit gagal**: pertahankan berkas di working tree, laporkan `Commit: GAGAL` beserta pesan git, serahkan penguncian ke `architect` (fase `LAPORAN TERTUNDA`, Phase 5 butir 4).
+5. **Validasi gagal sesudah 2 putaran**: pertahankan berkas di disk, laporkan `Validasi: GAGAL` beserta butirnya, serahkan ke `architect` (fase `LAPORAN TERTUNDA`, Phase 5 butir 4).
 
 ## STYLE
 

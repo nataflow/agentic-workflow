@@ -45,8 +45,10 @@ from precondition_lib import (  # noqa: E402
     section_lines,
     split_frontmatter,
     table_cells,
+    parse_berkas,
     sc_ids,
     success_criteria,
+    task_history,
     find_placeholders,
     PLACEHOLDER_ACTION,
 )
@@ -166,6 +168,7 @@ class BriefValidator:
         self.stacks_dir = Path(__file__).resolve().parents[2] / "profile" / "stacks"
         self.briefs: List[Dict[str, Any]] = []
         self.results: List[Dict[str, Any]] = []
+        self._events: Optional[List[Dict[str, Any]]] = None
         self.fatal: Optional[str] = None
 
     @staticmethod
@@ -991,54 +994,48 @@ class BriefValidator:
         else:
             self._add(cid, name, "PASS", f"{len(sc)} SC seluruhnya dipikul brief")
 
-    def _git(self, *args: str) -> str:
-        try:
-            return subprocess.check_output(["git", "-C", str(self.root), *args], stderr=subprocess.DEVNULL,
-                                           universal_newlines=True)
-        except Exception:
-            return ""
+    def _history(self) -> List[Dict[str, Any]]:
+        """Kejadian `## Riwayat Rantai` `TASK.md` (Langkah 24); Riwayat rusak dibaca sebagai nol kejadian."""
+        if self._events is None:
+            self._events = task_history(self.root, self.taskdir_rel)[0]
+        return self._events
 
-    def _first_blocked(self, brief: Dict[str, Any]) -> str:
-        """Sha commit tertua yang menulis brief ini berstatus `BLOCKED`, atau kosong bila belum ter-commit.
+    def _first_blocked(self, brief: Dict[str, Any]) -> int:
+        """Nomor kejadian `reopen` tertua yang mencatat brief ini `BLOCKED` (field `berkas`), atau 0.
 
-        Dibaca dari isi riwayat, bukan dari subjek `unit <NN> BLOCKED` yang dapat diketik (12 J27).
+        Dibaca dari Riwayat, bukan dari subjek `unit <NN> BLOCKED` yang dapat diketik (12 J27, 24 K5). Brief
+        `BLOCKED` belum tercatat selama hop BRIEF belum dibuka ulang sesudahnya.
         """
-        rel = f"{self.taskdir_rel}/{brief['name']}"
-        for sha in self._git("log", "--reverse", "--format=%H", "--", rel).split():
-            status = split_frontmatter(self._git("show", f"{sha}:{rel}"))[0].get("status", "")
-            if isinstance(status, str) and status.strip() == "BLOCKED":
-                return sha
-        return ""
+        for e in self._history():
+            recorded = parse_berkas(e["fields"].get("berkas", "")) if e["kind"] == "reopen" else {}
+            if recorded.get(brief["name"], ("", ""))[0] == "BLOCKED":
+                return e["n"]
+        return 0
 
-    def _born_after(self, brief: Dict[str, Any], sha: str) -> bool:
-        """Brief lahir sesudah commit `sha`: belum ter-commit, atau commit penambahannya bukan leluhur `sha`."""
-        added = self._git("log", "--diff-filter=A", "--format=%H", "--",
-                          f"{self.taskdir_rel}/{brief['name']}").split()
-        if not added:
-            return True
-        return subprocess.run(["git", "-C", str(self.root), "merge-base", "--is-ancestor", added[-1], sha],
-                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0
+    def _born_after(self, brief: Dict[str, Any], n: int) -> bool:
+        """Brief lahir sesudah kejadian ke-`n`: namanya tidak tercatat di field `berkas` kejadian itu."""
+        event = next((e for e in self._history() if e["n"] == n), None)
+        return event is None or brief["name"] not in parse_berkas(event["fields"].get("berkas", ""))
 
-    def _contract_reentries(self, since: str) -> int:
-        """Re-entry kontrak sesudah `since`: reopen yang membuka CONTRACT, atau eskalasi dari HOTFIX_MINOR yang
-        menambah hop CONTRACT (rute resmi remedi ketiga lane MINOR). Tanpa `since` → nol."""
+    def _contract_reentries(self, since: int) -> int:
+        """Re-entry kontrak sejak kejadian ke-`since`: reopen yang membuka CONTRACT, atau eskalasi dari HOTFIX_MINOR
+        yang menambah hop CONTRACT (rute resmi remedi ketiga lane MINOR). Tanpa `since` → nol."""
         if not since:
             return 0
-        slug = re.escape(self.taskdir_rel.rsplit("/", 1)[-1].split("-", 1)[-1])
-        log = self._git("log", f"{since}..HEAD", "--format=%s", "--", f"{self.taskdir_rel}/TASK.md")
-        return sum(1 for l in log.splitlines()
-                   if re.match(rf"^docs\({slug}\): reopen [A-Z ]*\bCONTRACT\b", l)
-                   or re.match(rf"^docs\({slug}\): eskalasi lane HOTFIX_MINOR → ", l))
+        return sum(1 for e in self._history() if e["n"] >= since and (
+            (e["kind"] == "reopen" and "CONTRACT" in e["rows"])
+            or (e["kind"] == "eskalasi" and e["fields"].get("lane", "").startswith("HOTFIX_MINOR →"))))
 
     def _check_m_remedies(self) -> None:
         """`remedies: "NN"` menunjuk brief `BLOCKED` bernomor lebih kecil; plafon 2 remedi per unit asal.
 
         Remedi atas remedi dihitung ke unit asal paling hulu: unit yang gagal
         tiga kali membuktikan cacatnya ada di kontrak, bukan di brief, dan brief
-        keempat hanya menambah satu commit `BLOCKED` lagi. Plafon bertambah satu per
+        keempat hanya menambah satu unit `BLOCKED` lagi. Plafon bertambah satu per
         re-entry kontrak: `reopen … CONTRACT`, atau eskalasi dari `HOTFIX_MINOR`
-        (satu-satunya eskalasi yang menambah hop CONTRACT) — hanya yang terjadi sesudah
-        commit `BLOCKED` pertama rantai remedi itu (12 J27): reopen dini tidak menambah plafon.
+        (satu-satunya eskalasi yang menambah hop CONTRACT) — hanya yang terjadi sejak
+        kejadian `reopen` pertama yang mencatat unit asal itu `BLOCKED` (12 J27, Riwayat 24 K5):
+        reopen dini tidak menambah plafon.
 
         Brief `READY` yang lahir sesudah sebuah brief `BLOCKED` dan menyentuh berkasnya, selagi
         brief itu belum ter-remedi, wajib mendeklarasikan `remedies` — remedi yang tak dideklarasikan
@@ -1082,7 +1079,7 @@ class BriefValidator:
             counts[origin] = counts.get(origin, 0) + 1
         for origin, n in sorted(counts.items()):
             members = [origin] + [nn for nn, o in origin_of.items() if o == origin]
-            reentries = max([self._contract_reentries(blocked_at.get(m, "")) for m in members] or [0])
+            reentries = max([self._contract_reentries(blocked_at.get(m, 0)) for m in members] or [0])
             # Remedi ketiga dan seterusnya sah hanya sesudah kontrak dibuka ulang (satu per re-entry).
             if n > 2 + reentries:
                 problems.append(f"unit asal `{origin}` punya {n} brief remedi — plafon {2 + reentries} "

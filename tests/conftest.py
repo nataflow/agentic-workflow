@@ -151,21 +151,41 @@ def brief(repo: Path, nn: str, unit: str, status: str, body: str = "# Brief\n", 
 
 
 def land(repo: Path, brief_path: Path, code: str = "src/order.go", line: str = "// unit\n") -> str:
-    """Unit mendarat sesuai protokol implementor: `status: DONE` + kode dalam SATU commit bersubjek
-    `commit_message` brief. Brief `DONE` tanpa commit semacam ini ditolak architect (09 E18)."""
+    """Unit mendarat sesuai protokol implementor: `status: DONE` di disk + commit kode bersubjek `commit_message`
+    brief; brief tidak di-commit (Langkah 24). Brief `DONE` tanpa commit semacam ini ditolak architect (09 E18)."""
     text = brief_path.read_text(encoding="utf-8")
     brief_path.write_text(re.sub(r"^status: \w+$", "status: DONE", text, count=1, flags=re.M), encoding="utf-8")
     target = repo / code
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text((target.read_text(encoding="utf-8") if target.exists() else "") + line, encoding="utf-8")
     msg = re.search(r'^commit_message: "?(.*?)"?$', text, re.M).group(1)
-    return commit(repo, msg, code, str(brief_path.relative_to(repo)))
+    return commit(repo, msg, code)
 
 
 def commit(repo: Path, msg: str, *paths: str) -> str:
+    """Commit `paths` (default: semua perubahan) dan kembalikan sha7 `HEAD`.
+
+    Tanpa `paths` dan tanpa perubahan ter-stage tidak ada commit yang dibuat: dokumen taskdir backend diabaikan
+    git (Langkah 24), jadi "commit sesudah menulis dokumen" tidak lagi menghasilkan apa pun. Path eksplisit yang
+    diabaikan git tetap gagal di `git add`.
+    """
     git(repo, "add", *(paths or ("-A",)))
+    if not paths and subprocess.run(["git", "-C", str(repo), "diff", "--cached", "--quiet"],
+                                    env={**os.environ, **GIT_ENV}).returncode == 0:
+        return git(repo, "rev-parse", "--short=7", "HEAD").strip()
     git(repo, "commit", "-qm", msg)
     return git(repo, "rev-parse", "--short=7", "HEAD").strip()
+
+
+_BE_PL = []
+
+
+def be_sealed(text: str) -> str:
+    """BRD/PRD `APPROVED` bermaterai utuh seperti tulisan `doc_seal.py approve` (Langkah 24)."""
+    if not _BE_PL:
+        _BE_PL.append(load_module(BE_SKILLS / "_common" / "precondition_lib.py", "be_precondition_lib_sealed"))
+    nl = "\r\n" if "\r\n" in text else "\n"
+    return text.replace(f"status: APPROVED{nl}", f"status: APPROVED{nl}approved_seal: {_BE_PL[0].doc_seal(text)}{nl}", 1)
 
 
 def be_run(repo: Path, skill_script: str, *args: str) -> subprocess.CompletedProcess:
@@ -180,13 +200,22 @@ def be_checks(repo: Path, skill_script: str, *args: str) -> Dict[int, dict]:
     return {c["id"]: c for c in json.loads(proc.stdout)["checks"]}
 
 
+BE_DOCS_IGNORE = "*\n"   # `backenddev/docs/.gitignore` tulisan `docs_git.py ensure` (Langkah 24)
+
+
+def be_task(root: Path, base: str, extra: str = "") -> None:
+    """`{TD}/TASK.md` akar terkunci di disk (`base_commit`), tidak di-commit; `backenddev/docs/` diabaikan git."""
+    write_files(root, {"backenddev/docs/.gitignore": BE_DOCS_IGNORE,
+                       f"{TD}/TASK.md": (f"---\nchain: BRIEF\nrisk: MINOR\nstatus: ACTIVE\nbase_commit: {base}\n{extra}"
+                                         "---\n# Order fix\n## Success Criteria\n- SC-1 lock\n- SC-2 endpoint\n")})
+
+
 @pytest.fixture
 def chain_repo(make_repo):
-    """Repo ber-profil backend (stack go), `{TD}/TASK.md` ter-commit di `main`; HEAD di branch kerja `fix/order-fix`."""
+    """Repo ber-profil backend (stack go); HEAD di branch kerja `fix/order-fix`. `{TD}/TASK.md` hanya di disk dengan
+    `base_commit` = commit awal `main` (Langkah 24: dokumen taskdir diabaikan git dan tidak pernah di-commit)."""
     root = make_repo({
         ".gitignore": ".explore/\n",
-        f"{TD}/TASK.md": ("---\nchain: BRIEF\nrisk: MINOR\nstatus: ACTIVE\n---\n# Order fix\n"
-                          "## Success Criteria\n- SC-1 lock\n- SC-2 endpoint\n"),
         "src/order.go": "package order\n",
     })
     git(root, "checkout", "-q", "-b", "main")
@@ -194,6 +223,7 @@ def chain_repo(make_repo):
     write_files(root, {".claude/profile/backenddev/commands.md":
                        "## Commands\n- build: go build ./...\n- test: go test ./...\n"})
     commit(root, "init")
+    be_task(root, git(root, "rev-parse", "HEAD").strip())
     git(root, "checkout", "-q", "-b", "fix/order-fix")   # rantai berjalan di branch kerja, bukan base
     return root
 
@@ -230,20 +260,54 @@ def fe_brief(repo: Path, nn: str, status: str = "READY", step: str = "Tambah tom
     return rel
 
 
+_FE_PL = []
+
+
+def fe_lib():
+    """`frontend/skills/_common/precondition_lib.py` termuat sekali (nama unik, `load_module`)."""
+    if not _FE_PL:
+        _FE_PL.append(load_module(FE_SKILLS / "_common" / "precondition_lib.py", "fe_precondition_lib_conftest"))
+    return _FE_PL[0]
+
+
+def fe_seal_root(root: Path, td: str = FE_TD) -> str:
+    """Kunci akar `TASK.md` uji minimal persis tulisan `chain.py root`, tanpa `validate_task.py`: `base_commit` =
+    `HEAD`, kejadian `akar` di `## Riwayat Rantai`, dan penanda ignore `frontenddev/docs/` (Langkah 24)."""
+    lib = fe_lib()
+    write_files(root, {"frontenddev/docs/.gitignore": "*\n"})
+    path = root / td / "TASK.md"
+    head = git(root, "rev-parse", "HEAD").strip()
+    text = lib.set_frontmatter_field(path.read_text(encoding="utf-8"), "base_commit", head)
+    fm = lib.parse_frontmatter(text)
+    lane, sections = str(fm.get("lane", "")).strip(), lib.parse_sections(fm.get("sections", ""))
+    line = lib.history_line(1, "akar", [], [("base", head[:7]), ("lane", lane), ("sections", lib.sections_value(sections)),
+                                            ("akar", lib.root_sidik(text)[:12])])
+    lib.write_keep_newline(path, lib.append_history(text, line))
+    return head
+
+
+def fe_lock_root(root: Path, td: str = FE_TD) -> None:
+    """Akar terkunci lewat jalur `frontend:task` Phase 4: `chain.py init` lalu `chain.py root` (Langkah 24)."""
+    for cmd in ("init", "root"):
+        r = fe_run(root, "_common/chain.py", cmd, "--taskdir", td)
+        assert r.returncode == 0, r.out
+
+
 @pytest.fixture
 def fe_chain_repo(make_repo):
-    """Repo FAST_FORWARD frontend: akar `TASK.md` terkunci di `main`, `CONTRACT.md` DRAFT tertulis (belum di-commit)."""
+    """Repo FAST_FORWARD frontend: akar `TASK.md` terkunci di disk (`base_commit` = commit awal `main`, Riwayat
+    `akar`), `CONTRACT.md` DRAFT tertulis. Dokumen taskdir diabaikan git dan tidak pernah di-commit (Langkah 24)."""
     root = make_repo({
         ".gitignore": ".explore/\n",
-        f"{FE_TD}/TASK.md": (FE_FIX / "task_fast_forward.md").read_text(encoding="utf-8"),
         "src/features/orders/OrderDetail.tsx": "export function OrderDetail() { return null }\n",
     })
     git(root, "checkout", "-q", "-b", "main")
     fe_profile(root, "react-vite")
     write_files(root, {".claude/profile/frontenddev/commands.md":
                        "| Perintah | Status |\n|---|---|\n| `pnpm typecheck` | OK |\n| `pnpm test` | OK |\n"})
-    assert fe_run(root, "_common/chain.py", "init", "--taskdir", FE_TD).returncode == 0
-    sha = commit(root, "docs(orders-lacak): kunci TASK sebagai akar rantai")
+    sha = commit(root, "init")
+    write_files(root, {f"{FE_TD}/TASK.md": (FE_FIX / "task_fast_forward.md").read_text(encoding="utf-8")})
+    fe_lock_root(root)
     write_files(root, {f"{FE_TD}/CONTRACT.md":
                        (FE_FIX / "contract_valid.md").read_text(encoding="utf-8").replace("{sha}", sha)})
     return root
@@ -289,19 +353,28 @@ def fe_round(repo: Path, verdict: str = "PASS", gate: str = "contract", mechanic
     assert r.returncode == 0, r.out
 
 
+def fe_base_commit(repo: Path, td: str = FE_TD) -> str:
+    """`base_commit` penuh di frontmatter `TASK.md` taskdir (akar terkunci, Langkah 24)."""
+    task = (repo / td / "TASK.md").read_text(encoding="utf-8")
+    return re.search(r"^base_commit: ([0-9a-f]{40})$", task, re.M).group(1)
+
+
+def fe_draft(repo: Path, row: str = "CONTRACT", td: str = FE_TD) -> subprocess.CompletedProcess:
+    """`chain.py draft --row <row>` — catat draft yang diajukan (pengganti commit draft, Langkah 24)."""
+    return fe_run(repo, "_common/chain.py", "draft", "--taskdir", td, "--row", row)
+
+
 def fe_approved_chain(repo: Path) -> None:
-    """CONTRACT dan BRIEF (brief 01) disetujui lewat jalur SKILL: ronde PASS → commit skrip → approve."""
+    """CONTRACT dan BRIEF (brief 01) disetujui lewat jalur SKILL: ronde PASS → `chain.py draft` → approve."""
     def run(*args):
         r = fe_run(repo, *args)
         assert r.returncode == 0, r.out
     fe_round(repo)
-    run("_common/review_round.py", "commit", "--taskdir", FE_TD, "--gate", "contract",
-        "--subject", "docs(orders-lacak): draft CONTRACT.md")
+    run("_common/chain.py", "draft", "--taskdir", FE_TD, "--row", "CONTRACT")
     run("_common/chain.py", "approve", "--taskdir", FE_TD, "--row", "CONTRACT", "--answer", "Setujui")
     fe_brief(repo, "01")
     fe_round(repo, gate="plan")
-    run("_common/review_round.py", "commit", "--taskdir", FE_TD, "--gate", "plan",
-        "--subject", "docs(orders-lacak): draft breakdown (1 briefs)")
+    run("_common/chain.py", "draft", "--taskdir", FE_TD, "--row", "BRIEF")
     run("_common/chain.py", "approve", "--taskdir", FE_TD, "--row", "BRIEF", "--answer", "Setujui")
 
 
@@ -310,7 +383,8 @@ FE_MINOR_TD = "frontenddev/docs/2609231200-order-checkout"
 
 @pytest.fixture
 def fe_minor_chain(tmp_path):
-    """Rantai HOTFIX_MINOR frontend: `closing review PASS` ter-commit, `REPORT.md` tertulis belum di-commit."""
+    """Rantai HOTFIX_MINOR frontend yang tuntas: unit 01 mendarat, `REVIEW.md` PASS ber-`head`, `REPORT.md` tertulis.
+    Dokumen taskdir hanya di disk (Langkah 24)."""
     root = tmp_path / "repo"
     proc = subprocess.run(["bash", str(FE_FIX / "minor_chain_reviewed.sh"), str(root), str(FE_SKILLS)],
                           capture_output=True, text=True, env={**os.environ, **GIT_ENV})
@@ -331,13 +405,15 @@ FE_P2_FINDING = ("### [P2-1] Label tidak memakai i18n\n\n> Status: PLANNED\n\n"
 def fe_review_md(repo: Path, **over: str) -> str:
     """REVIEW.md rantai `fe_minor_chain` — default: WARNING sah ber-`[P2-1]` PLANNED (fixture positif L4.2).
 
-    `over` menimpa field: taskdir, stack, verdict, p2, reviewed_at, h1, summary_status, total,
+    `over` menimpa field: taskdir, stack, verdict, p2, head, reviewed_at, h1, summary_status, total,
     verification, sc_evidence, findings, done, dims (daftar 9 status), dim_names (daftar 9 nama).
     """
-    base = git(repo, "log", "--diff-filter=A", "--format=%h", "--", f"{FE_MINOR_TD}/TASK.md").split()[-1]
-    # Tanggal commit akar, bukan literal: `reviewed_at` < tanggal akar = FAIL, dan akar lahir saat test jalan.
+    task = (repo / FE_MINOR_TD / "TASK.md").read_text(encoding="utf-8")
+    base = re.search(r"^base_commit: ([0-9a-f]{7})", task, re.M).group(1)
+    head = git(repo, "rev-parse", "--short=7", "HEAD").strip()
+    # Tanggal `base_commit`, bukan literal: `reviewed_at` < tanggal akar = FAIL, dan akar lahir saat test jalan.
     born = git(repo, "log", "-1", "--format=%cs", base).strip()
-    f = {"taskdir": FE_MINOR_TD, "stack": "react-vite", "verdict": "WARNING", "p2": "1",
+    f = {"taskdir": FE_MINOR_TD, "stack": "react-vite", "verdict": "WARNING", "p2": "1", "head": head,
          "reviewed_at": born, "h1": "# Review Findings — order-checkout",
          "summary_status": "WARNING", "total": "- Total Findings: 1 (0 P1, 1 P2, 0 P3)",
          "verification": "| `test` | HIJAU | 0 |", "sc_evidence": "`src/features/order/OrderButton.test.tsx:1`",
@@ -353,6 +429,7 @@ p1: 0
 p2: {f['p2']}
 p3: 0
 base: {base}
+head: {f['head']}
 reviewed_at: {f['reviewed_at']}
 ---
 

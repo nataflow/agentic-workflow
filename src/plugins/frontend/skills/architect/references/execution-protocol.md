@@ -50,35 +50,35 @@ Enam butir batas ditegakkan di tingkat prompt:
 | `report-<NN>.md` | Disk vs `files_touched` | Tindakan |
 |---|---|---|
 | `status: DONE` | hanya `files_touched` (+ `report-<NN>.md`) berubah | Pemeriksaan anchor (bawah), lalu **commit unit** |
-| `status: DONE` | ada berkas berubah di luar `files_touched` | Pelanggaran scope: pulihkan berkas liar dan `files_touched`, tulis `## Triase` ke `report-<NN>.md`, turunkan brief ke `BLOCKED`, **commit BLOCKED** |
+| `status: DONE` | ada berkas berubah di luar `files_touched` | Pelanggaran scope: pulihkan berkas liar dan `files_touched`, tulis `## Triase` ke `report-<NN>.md`, turunkan brief ke `BLOCKED` — **tandai BLOCKED** |
 | `status: DONE` | `## Changes` menyebut berkas yang tidak berubah | Laporan tidak jujur: perlakukan sebagai baris "kosong/rusak" di bawah |
 | `status: DONE` | hunk `git diff -U0` berkas `MODIFY` menyebut simbol di luar `Anchor` | Pelanggaran scope tingkat simbol: perlakuan sama dengan berkas liar |
-| `status: FAILED` | bersih | **Commit BLOCKED** |
-| `status: FAILED` | kotor di dalam `files_touched` | Rollback milik `architect` (implementor tidak punya terminal): `git restore -- <path>` berkas `MODIFY` dan `rm -- <path>` berkas `CREATE` yang disebut `## Rollback` laporan atau terbaca kotor, catat di `## Triase`, lalu **commit BLOCKED** |
-| absen / rusak | bersih (selain `report-<NN>.md` yang belum ter-commit) | Kegagalan dispatch: hapus `report-<NN>.md` rusak itu bila ada (Check 12 menuntut ia absen), lalu ulangi maksimal sekali dengan slot yang sama; brief tetap `READY` |
+| `status: FAILED` | bersih | **Tandai BLOCKED** |
+| `status: FAILED` | kotor di dalam `files_touched` | Rollback milik `architect` (implementor tidak punya terminal): `git restore -- <path>` berkas `MODIFY` dan `rm -- <path>` berkas `CREATE` yang disebut `## Rollback` laporan atau terbaca kotor, catat di `## Triase`, lalu **tandai BLOCKED** |
+| absen / rusak | bersih | Kegagalan dispatch: hapus `report-<NN>.md` rusak itu bila ada (Check 12 menuntut ia absen), lalu ulangi maksimal sekali dengan slot yang sama; brief tetap `READY` |
 | absen / rusak | kotor | **HENTIKAN.** Tampilkan berkas kotor ke user dan eskalasi; dilarang retry, rollback otomatis, dan commit |
+
+Dokumen taskdir (brief, `report-<NN>.md`) diabaikan git, jadi tidak pernah tampak di `git status`; `verify_scope.py` tetap memvonis kontrak brief terhadap `sidik_kontrak`-nya. Brief `DONE` di disk tanpa commit unit (sesi terputus di antara penulisan status dan commit kode) dijalankan lewat matriks yang sama: baris pertama berakhir di **commit unit**, baris lain menurunkan status ke `BLOCKED`.
 
 Kotoran di **luar** `files_touched` pada baris mana pun bukan wewenang `architect` untuk dipulihkan bila ia sudah ada sebelum dispatch — Check 8 menjamin tree bersih sebelum berangkat, jadi yang muncul sesudahnya adalah kerja subagent.
 
 **Pemeriksaan anchor.** Untuk tiap berkas `MODIFY`: `git diff -U0 -- <path>`; hunk header `@@ … @@ <konteks>` yang tidak menyebut anchor adalah pelanggaran. Funcname bawaan git untuk TypeScript/Svelte hanya menangkap deklarasi top-level tanpa indentasi — repo tanpa diff driver (`*.ts diff=typescript` di `.gitattributes`) menghasilkan hunk header kosong; pada kasus itu vonis turun ke `WARN`, isi hunk diperiksa manual, dan temuan dicatat sebagai rekomendasi profil.
 
-**Commit unit** — kenaikan status dan commit satu langkah:
+**Commit unit** — kenaikan status di disk lalu commit kode, satu langkah:
 
 ```bash
-# frontmatter brief: status: READY → DONE
-git add <files_touched> <brief_path> <taskdir>/report-<NN>.md
+# frontmatter brief: status: READY → DONE (disk; brief dan report-<NN>.md tidak di-stage)
+git add <files_touched>
 git commit -m "feat(<slug>): implement unit <NN> - <nama unit>"
 ```
 
-**Commit BLOCKED** — satu commit, bukti ikut:
+**Tandai BLOCKED** — suntingan disk, tanpa commit:
 
 ```bash
 # frontmatter brief: status: READY → BLOCKED; report-<NN>.md memuat ## Triase
-git add <brief_path> <taskdir>/report-<NN>.md
-git commit -m "docs(<slug>): unit <NN> BLOCKED - <penghalang ringkas>"
 ```
 
-Brief `DONE` yang tidak ter-commit membuat `depends_on` unit berikutnya tak pernah terpenuhi; brief `BLOCKED` yang tidak ter-commit membuat `taskdir_state.py` tidak menemukan titik berhentinya. Karena itu tidak ada kenaikan status tanpa commit, dan tidak ada commit tanpa kenaikan status.
+Bukti `DONE` dibaca skrip dari dua hal: status `DONE` di disk dan commit `<type>(<slug>): implement unit <NN>` pembawa kode sejak `base_commit`. Brief `DONE` tanpa commit itu ditolak Check 4 dan membuat `depends_on` unit berikutnya tak pernah terpenuhi. Karena itu status `DONE` ditulis tepat sebelum commit kode, tidak pernah tanpa commit itu, dan subjek commit wajib persis bentuk di atas. `BLOCKED` cukup ditulis di disk: `taskdir_state.py` membaca titik berhentinya dari brief, dan Riwayat mencatatnya saat lead membuka ulang hop BRIEF.
 
 ---
 
@@ -129,18 +129,18 @@ Pakai `typecheck_per_brief` dari baris `Terselesaikan:` prasyarat rantai (nilai 
 | `tidak` | Lewati; pembuktian menunggu Phase 4 |
 | `ya` | `python3 «run_verification.py» closing --taskdir <taskdir> --cmd typecheck='<typecheck commands.md>' --out {taskdir}/.explore/gate-<NN>.md` — dibandingkan dengan baseline Phase 0 (diukur sebelum unit pertama mendarat); exit 1 = galat baru atau `TIMEOUT` |
 
-Vonis **relatif baseline**: nol galat *baru*, bukan hijau absolut. Galat baru → unit `BLOCKED` retroaktif: tambahkan `## Triase` berisi galat mentahnya ke `report-<NN>.md`, turunkan brief `DONE` → `BLOCKED`, dan commit keduanya (`docs(<slug>): unit <NN> BLOCKED - galat kompilasi baru`). Kode unit **tetap** di tree — `git revert` hanya atas persetujuan eksplisit user, karena ia ikut membalik `report-<NN>.md` dan status brief. Brief remedi (`remedies: "<NN>"`) memperbaikinya dengan aksi `MODIFY`. Dilarang melanjutkan ke `NN+1` di atas galat yang unit ini terbitkan. Lint, test, dan build tidak pernah ikut gerbang ini.
+Vonis **relatif baseline**: nol galat *baru*, bukan hijau absolut. Galat baru → unit `BLOCKED` retroaktif: tambahkan `## Triase` berisi galat mentahnya ke `report-<NN>.md`, dan turunkan brief `DONE` → `BLOCKED` di disk (tanpa commit). Kode unit **tetap** di tree — `git revert` hanya atas persetujuan eksplisit user, karena ia membalik kode yang dinilai `report-<NN>.md`. Brief remedi (`remedies: "<NN>"`) memperbaikinya dengan aksi `MODIFY`. Dilarang melanjutkan ke `NN+1` di atas galat yang unit ini terbitkan. Lint, test, dan build tidak pernah ikut gerbang ini.
 
 ---
 
 ## 6. Siklus `status` Brief
 
-| Dari | Pemicu | Ke | Penulis | Ikut di-commit |
+| Dari | Pemicu | Ke | Penulis | Ikut di-commit (kode saja) |
 |---|---|---|---|---|
-| — | Batch brief ditulis `plan`, disetujui user lewat `chain.py approve --row BRIEF` | `READY` | `frontend:plan` | seluruh `brief-*.md` + `REVIEW-PLAN.md` |
-| `READY` | `report-<NN>.md` `DONE` + matriks bagian 3 bersih | `DONE` | `architect` | `files_touched` + brief + `report-<NN>.md` |
-| `READY` | `report-<NN>.md` `FAILED` atau pelanggaran scope | `BLOCKED` | `architect` | brief + `report-<NN>.md` |
-| `DONE` | Galat kompilasi baru di gerbang bagian 5 | `BLOCKED` | `architect` | brief + `report-<NN>.md` (ber-`## Triase`) |
+| — | Batch brief ditulis `plan`, disetujui user lewat `chain.py approve --row BRIEF` | `READY` | `frontend:plan` | — (`chain.py approve` menulis `sidik_kontrak` dan kejadian `approve BRIEF`) |
+| `READY` | `report-<NN>.md` `DONE` + matriks bagian 3 bersih | `DONE` | `architect` | `files_touched` |
+| `READY` | `report-<NN>.md` `FAILED` atau pelanggaran scope | `BLOCKED` | `architect` | — (suntingan disk) |
+| `DONE` | Galat kompilasi baru di gerbang bagian 5 | `BLOCKED` | `architect` | — (suntingan disk; `report-<NN>.md` ber-`## Triase`) |
 
 Brief `BLOCKED` tidak pernah dinaikkan lagi, dan brief `DONE`/`BLOCKED` tidak pernah disunting lagi. Pekerjaan unit `BLOCKED` diambil alih brief remedi (`remedies: "<NN>"`) pada taskdir yang sama — `chain.py reopen --row BRIEF` (kaskade: hop tercentang di bawahnya ikut terbuka) lalu `frontend:plan` mode APPEND. Cacat pada unit `DONE` (temuan `REVIEW.md` `BLOCKED`, verifikasi penutup merah) diambil brief perbaikan tanpa `remedies` lewat jalur yang sama. Plafon 2 remedi per unit asal (`validate_briefs.py` Check M); remedi ketiga dilarang, cacatnya ada di kontrak: `chain.py reopen --row CONTRACT` — pada `HOTFIX_MINOR` yang tak punya hop CONTRACT: `chain.py reopen --row BRIEF` lalu `chain.py escalate --lane FAST_FORWARD --sections architecture`.
 
@@ -177,7 +177,7 @@ Log penuh: `<taskdir>/.explore/verification-logs/closing/<nama>.log`
 
 **Hijau** (exit 0) → jalankan ulang `«check_preconditions.py» --taskdir <taskdir>` sebelum reviewer berangkat. Check 8 `FAIL` = perintah verifikasi meninggalkan jejak di tree (snapshot baru, coverage, `*.tsbuildinfo`, `lint --fix` atas berkas ter-track). Hentikan, sajikan path-nya ke user, dan ikuti keputusannya: buang/pulihkan, pola ignore lewat `frontend:profile` REFRESH, atau brief perbaikan bila berkas itu memang bagian rantai. Pembersihan otomatis dilarang karena berkas ter-track yang termutasi hanya dapat dinilai user. Tanpa langkah ini, check `TREE` `validate_review.py --log` memvonis jejak itu sebagai mutasi reviewer, dan penutup berulang tanpa akhir.
 
-Rute yang sama berlaku bagi `REVIEW.md` ber-verdict `BLOCKED` (P1, SC belum terbukti → cacat eksekusi; berkas yatim → cacat perencanaan). Review ulang sesudah brief perbaikan `DONE` menimpa `REVIEW.md` utuh; `REVIEW.md` yang lebih tua daripada `implement unit` terakhir dianggap basi (fase `PENUTUP`).
+Rute yang sama berlaku bagi `REVIEW.md` ber-verdict `BLOCKED` (P1, SC belum terbukti → cacat eksekusi; berkas yatim → cacat perencanaan). Review ulang sesudah brief perbaikan `DONE` menimpa `REVIEW.md` utuh; `REVIEW.md` yang `head:`-nya mendahului commit kode terakhir dianggap basi (fase `PENUTUP`).
 
 ---
 

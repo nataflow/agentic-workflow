@@ -19,7 +19,7 @@ Alur siklus hidup status brief diatur secara deterministik untuk menjamin keterl
 Baris `status` frontmatter ditulis **`code-implementor`** (`DONE`/`BLOCKED`) dan skrip
 `scaffold_brief.py` milik `plan` (`SUPERSEDED`), bukan `architect`. Skill orkestrator membacanya
 untuk traversal dan memverifikasi commit-nya mendarat. Satu-satunya tulisan `architect` adalah koreksi
-`READY → DONE` saat commit brief terbukti mendarat tetapi statusnya tertinggal (bagian 3).
+`READY → DONE` di disk saat commit unit terbukti mendarat tetapi statusnya tertinggal (bagian 3).
 
 | Status Awal | Kondisi Transisi                            | Status Akhir | Ditulis oleh       | Aksi Lanjutan `architect`                    |
 | ----------- | ------------------------------------------- | ------------ | ------------------ | -------------------------------------------- |
@@ -45,20 +45,20 @@ untuk traversal dan memverifikasi commit-nya mendarat. Satu-satunya tulisan `arc
 2. **Kondisi Terminal — dua artefak penutup, bukan satu**:
 
    Rantai dinyatakan tuntas hanya ketika `{taskdir}/REVIEW.md` **dan** `{taskdir}/REPORT.md` sama-sama
-   ada. Memvonis tuntas atas `REVIEW.md` saja membuat `report` yang gagal commit — atau tak pernah
+   ada. Memvonis tuntas atas `REVIEW.md` saja membuat `report` yang gagal — atau tak pernah
    berangkat karena sesi sebelumnya putus di antara Fase 4 dan Fase 5 — tidak pernah dijemput siapa pun.
 
    | Seluruh brief tertutup (`DONE`/`SUPERSEDED`) | `REVIEW.md` | Segar (check 3)? | `REPORT.md` | Titik masuk sesi ini |
    | --- | --- | --- | --- | --- |
    | ya | tidak ada | — | — | Fase 4 — jalankan gerbang verifikasi lalu review penutup |
-   | ya | ada | **tidak** (commit brief/kode sesudahnya) | — | Fase 4 — verifikasi lalu **satu review baru**; `REVIEW.md` lama ditimpa reviewer |
+   | ya | ada | **tidak** (commit kode sesudahnya) | — | Fase 4 — verifikasi lalu **satu review baru**; `REVIEW.md` lama ditimpa reviewer |
    | ya | ada | ya | tidak ada | Fase 5 — panen laporan rantai lewat `backend:report`; commit trail direkonstruksi dari `git log`, severity dibaca dari `REVIEW.md`, dan tidak ada satu pun subagent didispatch ulang |
    | ya | ada | ya | ada | Rantai tuntas — laporkan apa adanya, jangan menulis ulang artefak yang sudah terbit |
 
-   Kesegaran dibaca dari riwayat git, bukan dari teks `range:` yang ditulis reviewer: `REVIEW.md` basi
-   bila ada commit yang menyentuh `{taskdir}/brief-*.md` atau kode di luar `backenddev/` dan `.claude/`
-   sesudah commit terakhir `REVIEW.md`. Commit `REPORT.md`, `HALT.md`, `TASK.md`, profil, dan indeks
-   issues tidak membuatnya basi. Tanpa aturan ini `REVIEW.md` ber-`P1` yang basi memutar rantai tanpa
+   Kesegaran dibaca skrip dari ujung `range: <merge-base>..<HEAD>` frontmatter `REVIEW.md` dan riwayat
+   commit kode: `REVIEW.md` basi bila ujung itu bukan leluhur `HEAD`, atau ada commit yang menyentuh kode
+   di luar `backenddev/` dan `.claude/` sesudahnya (24 K9). Dokumen taskdir tidak di-commit, dan commit
+   profil maupun indeks issues tidak membuatnya basi. Tanpa aturan ini `REVIEW.md` ber-`P1` yang basi memutar rantai tanpa
    ujung: architect lompat ke Fase 5, `report` menolak `P1`, gerbang merutekan `P1` ke `PLANNING` lagi.
 
 ______________________________________________________________________
@@ -66,21 +66,21 @@ ______________________________________________________________________
 ## 2. Kepemilikan Commit & Staging Eksplisit
 
 Commit dikerjakan **penulis karyanya**, bukan orkestrator. `architect` memverifikasi bahwa commit
-itu mendarat dan diff-nya tidak melewati `## File scope`.
+itu mendarat, membawa kode, dan diff-nya tidak melewati `## File scope`. Dokumen taskdir — brief,
+`report-NN.md`, `HALT.md`, `REVIEW.md`, `REPORT.md` — tidak pernah di-commit siapa pun (Langkah 24):
+`backenddev/docs/` diabaikan git, dan penanda henti serta koreksi status milik `architect` ditulis di disk.
 
 | Commit | Pemilik | Pesan |
 | --- | --- | --- |
-| `src/**` + brief, brief sukses | `code-implementor` | `commit_message` frontmatter brief |
-| `src/**` + brief + report, brief terblokir | `code-implementor` | `wip(<domain>): brief-<NN>-<unit> [BLOCKED]` |
-| `{taskdir}/REVIEW.md` + baris riwayat review di `backenddev/issues/README.md` | `code-reviewer` | `docs(<slug>): add final review report`, dibentuk dari `commit_convention` profil |
-| `{taskdir}/HALT.md`, rantai ditahan gerbang kompilasi/scope/simbol/berkas liar | `architect` | `chore(<slug>): tahan rantai di brief-NN (<verdict>)` |
-| `{taskdir}/brief-NN-<unit>.md` saja, koreksi `READY → DONE` (commit ada, status tertinggal) | `architect` | `chore(<slug>): koreksi status brief-NN ke DONE (<sha7>)` |
+| `src/**` (+ `finding_source` bertanda `FIXED`), brief sukses | `code-implementor` | `commit_message` frontmatter brief — bukti unit mendarat |
+| `src/**` yang sudah tersentuh, brief terblokir | `code-implementor` | `wip(<domain>): brief-<NN>-<unit> [BLOCKED]`; nol berkas kode tersentuh → tanpa commit |
+| `{taskdir}/REVIEW.md` + baris riwayat review di `backenddev/issues/README.md` | `code-reviewer` | `REVIEW.md` di disk; commit `backenddev/issues/README.md` saja, `docs(<slug>): add final review report` dibentuk dari `commit_convention` profil |
 | Penguncian susulan saat commit hilir terbukti gagal | `architect` | ulangi pesan milik penulisnya, catat penyimpangan |
 
-Seluruh staging wajib menyebut path satu per satu:
+Seluruh staging wajib menyebut path satu per satu, dan tidak pernah memuat path di bawah `backenddev/docs/`:
 
 ```bash
-git add <file-1> <file-2> <file-n> {taskdir}/brief-<NN>-<unit>.md
+git add <file-1> <file-2> <file-n>
 git commit -m "<commit_message frontmatter brief>"
 ```
 
@@ -88,7 +88,7 @@ git commit -m "<commit_message frontmatter brief>"
 
 ### Larangan Keras Operasi Git
 
-- dilarang `git add .` atau `git add -A`: wildcard staging berisiko menarik file scratch, temporary log, atau uncommitted work milik user.
+- dilarang `git add .` atau `git add -A`: wildcard staging berisiko menarik file scratch, temporary log, atau uncommitted work milik user. Dilarang pula `git add -f` atas `backenddev/docs/`.
 - dilarang `git push` atau `gh pr create`: mengirim perubahan ke remote adalah hak prerogatif user.
 - dilarang `git checkout` atau `git merge`: berpindah branch atau merge otomatis dapat merusak konteks kerja direktori user.
 
@@ -99,7 +99,7 @@ ______________________________________________________________________
 Ketika subagent `code-implementor` mengalami kegagalan atau terantuk stop condition:
 
 ```
-[ Implementor Gagal ] ──► report-<NN>.md ──► status: BLOCKED ──► Commit WIP ──► Fase 5 (BLOCKED) ──► tech-lead
+[ Implementor Gagal ] ──► report-<NN>.md ──► status: BLOCKED ──► Commit WIP (bila kode tersentuh) ──► Fase 5 (BLOCKED) ──► tech-lead
 ```
 
 **Rantai terhenti tidak pernah direview.** Tidak ada jalur "review parsial": Fase 4 dilewati utuh —
@@ -125,16 +125,16 @@ bukan pula dipindahkan ke taskdir baru.
 ### 3a. Penanda Henti `{taskdir}/HALT.md`
 
 Vonis gerbang kompilasi per-brief (Fase 3 butir 3b), scope, dan simbol (butir 4) jatuh **sesudah**
-implementor meng-commit brief sebagai `DONE`. Vonis yang hanya hidup di laporan percakapan hilang saat
-sesi putus: sesi berikutnya melihat brief itu `DONE`, memilih `NN+1`, dan melanjutkan di atas kode yang
-diketahui rusak. `HALT.md` mencatat vonis itu di disk dan ter-commit; check 7 skrip prasyarat menolak
-setiap sesi selama berkas itu ada.
+implementor meng-commit kode unit dan menulis brief `DONE`. Vonis yang hanya hidup di laporan percakapan
+hilang saat sesi putus: sesi berikutnya melihat brief itu `DONE`, memilih `NN+1`, dan melanjutkan di atas
+kode yang diketahui rusak. `HALT.md` mencatat vonis itu di disk (tanpa commit); check 7 skrip prasyarat
+menolak setiap sesi selama berkas itu ada dan belum dicabut (`status: DICABUT`, 24 K11).
 
 ```markdown
 ---
 brief: brief-02-endpoint.md
 verdict: COMPILE | SCOPE | SYMBOL | STRAY
-sha: <sha7 commit brief yang divonis>
+sha: <sha7 commit unit yang divonis>
 baseline: <sha7 merge-base> · <hijau | merah (n galat) | TERDEGRADASI (alasan)>
 ---
 # HALT — brief-02-endpoint
@@ -147,16 +147,16 @@ COMPILE/STRAY → tech-lead → PLANNING taskdir sama (reentry_reason = berkas i
 SCOPE/SYMBOL → tech-lead tanyakan ke user: terima (cabut HALT) atau reset.
 ```
 
-Kunci dengan `git add {taskdir}/HALT.md && git commit -m "chore(<slug>): tahan rantai di brief-NN (<verdict>)"`.
+Tulis di disk, tanpa commit. Pencabutan tidak menghapus berkasnya: ia menambah `status: DICABUT` dan `dicabut: <alasan>`, sehingga jejak penahanan tetap ada dan ikut tercermin ke nataflow.
 
 | Pencabut | Kapan | Mekanisme |
 | --- | --- | --- |
-| `plan` | Brief perbaikan ber-`repairs: brief-NN` ditulis `scaffold_brief.py --nn` | Skrip menghapus `HALT.md`; `git rm -q {taskdir}/HALT.md` ikut commit agregat `plan` |
-| `tech-lead` | `SCOPE`/`SYMBOL` diterima user | `git rm -q {taskdir}/HALT.md` + `docs(<slug>): cabut HALT brief-NN (scope diterima user)` |
+| `plan` | Brief perbaikan ber-`repairs: brief-NN` ditulis `scaffold_brief.py --nn` | Skrip menulis `status: DICABUT` + `dicabut: brief-NN (repairs)` |
+| `tech-lead` | `SCOPE`/`SYMBOL` diterima user, atau commit unit di-reset user | `doc_seal.py cabut-halt --alasan "<scope diterima user \| commit di-reset user>"` |
 | `architect` | tidak pernah | — |
 
-`HALT.md` berada di bawah `backenddev/`, sehingga commit-nya tidak membuat `REVIEW.md` basi dan termasuk
-zona artefak `tech-lead --re-entry`.
+`HALT.md` bukan kode, sehingga tidak membuat `REVIEW.md` basi, dan seperti seluruh `backenddev/docs/`
+diabaikan git.
 
 ### Matriks Bukti Disk untuk Amplop `BLOCKED`
 
@@ -164,19 +164,19 @@ zona artefak `tech-lead --re-entry`.
 dispatch tidak pernah berangkat (**tidak ada vonis**). Kata statusnya tidak membedakan keduanya, jadi
 `architect` memutuskan dari bukti di disk — bukan dari amplop.
 
-| `report-<NN>.md`? | Commit brief di `git log`? | `status` brief di disk | `git status` | Tindakan `architect` |
+| `report-<NN>.md`? | Commit unit di `git log`? | `status` brief di disk | `git status` | Tindakan `architect` |
 | --- | --- | --- | --- | --- |
-| ya | ya | `BLOCKED` | bersih | **HENTIKAN**, Fase 5 `BLOCKED (di brief-NN)`; brief ditutup `plan` lewat pengganti ber-`supersedes` |
-| ya | tidak | apa pun | apa pun | Vonis ada, commit gagal — kunci sendiri `wip(<domain>): brief-NN-<unit> [BLOCKED]`, catat penyimpangan, **HENTIKAN**, Fase 5 `BLOCKED (di brief-NN)` |
+| ya | apa pun | `BLOCKED` | bersih | **HENTIKAN**, Fase 5 `BLOCKED (di brief-NN)`; brief ditutup `plan` lewat pengganti ber-`supersedes` |
+| ya | tidak | apa pun | kotor | Vonis ada, commit `wip` gagal — commit sendiri berkas kode tersentuh `wip(<domain>): brief-NN-<unit> [BLOCKED]`, catat penyimpangan, **HENTIKAN**, Fase 5 `BLOCKED (di brief-NN)` |
 | tidak | ya | `DONE` | bersih | Normal — ambil SHA dari `git log`, lanjut `NN+1` |
-| tidak | ya | `READY` | bersih | **Koreksi status** (commit ada, status tertinggal): tulis `status: DONE` di brief, `git add {taskdir}/brief-NN-<unit>.md`, `git commit -m "chore(<slug>): koreksi status brief-NN ke DONE (<sha7>)"`; **dilarang retry**; lanjut `NN+1`. Skrip prasyarat menandainya `entry` `KOREKSI:<NN>:<sha7>` |
-| tidak | ya | apa pun | kotor | **HENTIKAN**, tulis `HALT.md` `verdict: STRAY` berisi `git status --porcelain` (bagian 3a); eskalasi ke user; dilarang meng-commit berkas selain `HALT.md` |
+| tidak | ya | `READY` | bersih | **Koreksi status** (commit ada, status tertinggal): tulis `status: DONE` di brief, di disk tanpa commit; **dilarang retry**; lanjut `NN+1`. Skrip prasyarat menandainya `entry` `KOREKSI:<NN>:<sha7>` |
+| tidak | ya | apa pun | kotor | **HENTIKAN**, tulis `HALT.md` `verdict: STRAY` berisi `git status --porcelain` (bagian 3a); eskalasi ke user; dilarang meng-commit apa pun |
 | tidak | tidak | `READY` | bersih | Dispatch tak pernah berangkat — ulangi dispatch sebanyak `max_retries_per_brief`; masih gagal ⇒ eskalasi ke user |
 | tidak | tidak | apa pun | kotor | Perubahan parsial tanpa vonis — **HENTIKAN**, eskalasi ke user; dilarang meng-commit apa pun |
 
-Pembeda commit brief di `git log` adalah subjek yang **persis sama** dengan `commit_message` pada
-frontmatter brief (atau varian `wip(<domain>)`-nya), dibandingkan persis — bukan `--grep` regex dan
-bukan tebakan dari isi diff. Berkas di luar `.explore/` yang tertinggal sesudah commit implementor
+Pembeda commit unit di `git log` adalah subjek yang **sama** dengan `commit_message` pada frontmatter
+brief (atau varian `wip(<domain>)`-nya) sesudah spasi dirapatkan dan huruf disamakan, sejak `base_commit`
+`TASK.md` — bukan `--grep` regex dan bukan tebakan dari isi diff. Berkas di luar `.explore/` yang tertinggal sesudah commit implementor
 tidak pernah dibersihkan `architect` (`git restore`, `git clean`, `git stash` dilarang): keputusan atas
 pekerjaan yang tidak diklaim siapa pun milik user.
 
@@ -202,7 +202,7 @@ Hasil review branch penutup diklasifikasikan ke dalam 4 tingkatan tindakan. Defi
 
 | Severity    | Tindakan Architect                                     | Aksi Handoff Lanjutan                                  |
 | ----------- | ------------------------------------------------------ | ------------------------------------------------------ |
-| **`P1`**    | Laporkan di summary akhir; `REVIEW.md` sudah di-commit reviewer | Eskalasi ke `tech-lead`; ia merutekannya ke lane `PLANNING` **pada taskdir yang sama** dengan `finding_source` `{taskdir}/REVIEW.md` dan `reentry_reason` |
+| **`P1`**    | Laporkan di summary akhir; `REVIEW.md` sudah ditulis reviewer | Eskalasi ke `tech-lead`; ia merutekannya ke lane `PLANNING` **pada taskdir yang sama** dengan `finding_source` `{taskdir}/REVIEW.md` dan `reentry_reason` |
 | **`P2`**    | Laporkan di summary akhir (baris indeks sudah ditulis dan di-commit `code-reviewer`) | Ditangani pada siklus perbaikan rilis berikutnya       |
 | **`P3`**    | Laporkan di summary akhir (baris indeks sudah ditulis dan di-commit `code-reviewer`) | Non-blocking backlog                                   |
 | **`CLEAN`** | Nyatakan review bersih penuh (0 pelanggaran terhadap union brief) | Siap untuk user membuat PR / merge                     |

@@ -58,13 +58,15 @@ Brief implementasi atomik untuk subagent `code-implementor`; satu-satunya acuan 
 - [ ] (verifikasi penutup) <perintah dari commands.md profil> — <ambang relatif baseline>
 ````
 
+Field `sidik_kontrak:` tidak ditulis `plan`: `chain.py approve --row BRIEF` menambahkannya ke tiap brief `READY` sebagai kunci kontrak (`verify_scope.py` menolak brief yang kontraknya disunting sesudah itu). Barisnya di luar sidik konten, jadi tidak membatalkan ronde Plan Review.
+
 Field opsional `remedies: "<NN>"` disisipkan sesudah `depends_on` **hanya** pada brief remedi yang mengambil alih unit `BLOCKED` `<NN>` (Check M). Brief perbaikan atas unit `DONE` (temuan `REVIEW.md`, verifikasi penutup merah) tidak membawanya. Brief baru yang menyentuh berkas unit `BLOCKED` yang belum ter-remedi **wajib** membawanya — remedi yang tak dideklarasikan tetap remedi.
 
 ---
 
 ## 2. Aturan Validasi
 
-**Mekanis** — ditagih `validate_briefs.py` (per brief dengan `--brief NN`, per batch tanpa); `FAIL` menahan batch commit, ronde `doc-reviewer`, dan `chain.py approve --row BRIEF`. Brief `DONE`/`BLOCKED` terkunci dan tidak disunting saat APPEND: dilewati predikat rencana, tetap ditagih predikat struktur dan cakupan (S, N, D, O, E, C, G).
+**Mekanis** — ditagih `validate_briefs.py` (per brief dengan `--brief NN`, per batch tanpa); `FAIL` menahan ronde `doc-reviewer`, `chain.py draft --row BRIEF`, dan `chain.py approve --row BRIEF`. Brief `DONE`/`BLOCKED` terkunci dan tidak disunting saat APPEND: dilewati predikat rencana, tetap ditagih predikat struktur dan cakupan (S, N, D, O, E, C, G).
 
 | Check | Predikat |
 |---|---|

@@ -110,6 +110,21 @@ def test_j4_implementor_git_dir_dan_ignored_ditolak(repo, tool, path, code):
     assert hook(repo, tool=tool, file_path=path, agent=IMPL).returncode == code, (tool, path)
 
 
+@pytest.mark.regression("24 K13")
+@pytest.mark.parametrize("tool, path, code", [
+    ("Write", f"{TDIR}/report-01.md", 0),                # laporan unit: satu-satunya keluaran implementor di taskdir
+    ("Edit", f"{TDIR}/report-12.md", 0),
+    ("Edit", f"{TDIR}/brief-01-x.md", 2),                # status brief milik architect
+    ("Write", f"{TDIR}/FLOW.md", 2),
+    ("Write", f"{TDIR}/report-01.md.bak", 2),
+    ("Write", f"{TDIR}/sub/report-01.md", 2),
+    ("Write", ".env.local", 2),
+])
+def test_24_k13_implementor_di_taskdir_ter_ignore(repo, tool, path, code):
+    write_files(repo, {"frontenddev/docs/.gitignore": "*\n"})
+    assert hook(repo, tool=tool, file_path=path, agent=IMPL).returncode == code, (tool, path)
+
+
 @pytest.mark.regression("J4")
 @pytest.mark.parametrize("path, code", [
     (f"{TDIR}/.explore/gate-cart.md", 0),
@@ -236,7 +251,7 @@ def test_j6_tree_finding_source_taskdir_ini_lolos(fe_minor_chain):
     task.write_text(task.read_text(encoding="utf-8").replace(
         "status: ACTIVE\n", f"status: ACTIVE\nfinding_source: {AUDIT}\n", 1), encoding="utf-8")
     write_files(fe_minor_chain, {AUDIT: "### [P2-1] x\n\n> Status: PLANNED\n"})
-    commit(fe_minor_chain, "docs(order-checkout): finding_source", f"{TD}/TASK.md", AUDIT)
+    commit(fe_minor_chain, "docs(order-checkout): finding_source", AUDIT)
     write_files(fe_minor_chain, {REVIEW: fe_review_md(fe_minor_chain),
                                  AUDIT: "### [P2-1] x\n\n> Status: FIXED\n"})
     c = _validate_tree(fe_minor_chain)

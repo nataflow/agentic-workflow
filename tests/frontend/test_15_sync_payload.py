@@ -1,4 +1,5 @@
-"""15 F2, F9, F11–F13, F15 — `sync_payload.py` frontend: argumen tool MCP nataflow untuk taskdir dan dokumen repo."""
+"""15 F2, F9, F11–F13, F15 — `sync_payload.py` frontend: argumen tool MCP nataflow untuk taskdir dan dokumen repo.
+Dokumen taskdir dibaca dari disk (24 K14), bukan dari blob `HEAD`."""
 import json
 import re
 
@@ -79,7 +80,7 @@ def test_akar_saja_dan_draft_tidak_ikut(repo):
     assert (wd["key"], wd["status"]) == (key, "active") and out["task"]["status"] is None
     meta = json.loads(wd["metadata"])
     assert meta["lane"] == "FAST_FORWARD" and meta["state"] == "GATE"
-    assert keys(push(repo)) == ["TASK.md"], "CONTRACT DRAFT (belum di-commit) tidak ikut"
+    assert keys(push(repo)) == ["TASK.md"], "CONTRACT DRAFT tidak ikut"
 
 
 @pytest.mark.regression("15 F2")
@@ -105,7 +106,6 @@ def test_drift_tidak_didorong_ulang(repo):
     contract = next(d for d in first["documents"] if d["key"] == "CONTRACT.md")
     path = repo / FE_TD / "CONTRACT.md"
     path.write_text(path.read_text(encoding="utf-8") + "\nsuntingan tanpa approve\n", encoding="utf-8")
-    commit(repo, "docs(orders-lacak): sunting CONTRACT", f"{FE_TD}/CONTRACT.md")
     out = push(repo, json.dumps([view(contract)]))
     assert "CONTRACT.md" not in keys(out), "hop DRIFT: cermin tetap isi yang disetujui"
 
@@ -130,10 +130,13 @@ def test_abandon_menjadi_abandoned_dan_cancelled(repo):
 @pytest.mark.regression("15 F12")
 def test_rantai_tuntas_done(fe_minor_chain):
     repo = enable(fe_minor_chain)
+    report = repo / FE_MINOR_TD / "REPORT.md"
+    text = report.read_text(encoding="utf-8")
+    report.unlink()
     out = sp(repo, "--taskdir", FE_MINOR_TD)[1]
     assert out["task"]["status"]["status"] == "in_progress", "unit DONE + REVIEW → eksekusi dimulai"
-    assert "REPORT.md" not in keys(push(repo, target=("--taskdir", FE_MINOR_TD))), "REPORT belum ter-commit"
-    commit(repo, "docs(order-checkout): laporkan hasil rantai order-checkout", f"{FE_MINOR_TD}/REPORT.md")
+    assert "REPORT.md" not in keys(push(repo, target=("--taskdir", FE_MINOR_TD))), "REPORT belum ditulis"
+    report.write_text(text, encoding="utf-8")
     out = sp(repo, "--taskdir", FE_MINOR_TD)[1]
     assert out["workdir"]["status"] == "done" and json.loads(out["workdir"]["metadata"])["state"] == "TUNTAS"
     assert out["task"]["status"]["status"] == "done"
@@ -147,7 +150,6 @@ def test_taskdir_bertiket(repo):
     path = repo / FE_TD / "TASK.md"
     path.write_text(path.read_text(encoding="utf-8").replace(
         "status: ACTIVE\n", f"status: ACTIVE\nticket_source: {TICKET}/TICKET.md\n"), encoding="utf-8")
-    commit(repo, "docs(orders-lacak): amandemen akar TASK", f"{FE_TD}/TASK.md")
     out = sp(repo, "--taskdir", FE_TD)[1]
     assert out["task"]["lookup"]["metadata"] == json.dumps({"source": "analyst", "ticket_key": TICKET},
                                                            separators=(",", ":"))
@@ -169,3 +171,38 @@ def test_byte_stabil_dan_read_only(repo):
     before = git(repo, "status", "--porcelain")
     runs = {run_script(SP, "--taskdir", FE_TD, "--json", cwd=repo).stdout for _ in range(2)}
     assert len(runs) == 1 and git(repo, "status", "--porcelain") == before
+
+
+@pytest.mark.regression("24 K14")
+def test_dokumen_taskdir_dari_disk(repo):
+    fe_approved_chain(repo)
+    out = push(repo)
+    contract = next(d for d in out["documents"] if d["key"] == "CONTRACT.md")
+    assert contract["content"] == (repo / FE_TD / "CONTRACT.md").read_text(encoding="utf-8"), "isi disk apa adanya"
+    meta = json.loads(contract["metadata"])
+    assert meta["commit"] == "" and meta["head"] == git(repo, "rev-parse", "HEAD").strip()
+    brief = next(d for d in out["documents"] if d["key"].startswith("brief-"))
+    assert "sidik_kontrak: " in brief["content"], "brief yang dicerminkan sudah dikunci approve BRIEF"
+
+
+@pytest.mark.regression("24 K14")
+def test_akar_belum_terkunci_fail(repo):
+    task = repo / FE_TD / "TASK.md"
+    task.write_text(re_sub_base(task.read_text(encoding="utf-8")), encoding="utf-8")
+    code, out = sp(repo, "--taskdir", FE_TD)
+    assert code == 1 and "akar belum terkunci" in out["problems"][0]
+
+
+def re_sub_base(text):
+    return re.sub(r"^base_commit: .*\n", "", text, count=1, flags=re.M)
+
+
+@pytest.mark.regression("24 G5")
+def test_berkas_terhapus_tidak_didorong(repo):
+    fe_approved_chain(repo)
+    first = push(repo)
+    plan = [d for d in first["documents"] if d["key"] == "REVIEW-PLAN.md"]
+    assert plan, keys(first)
+    (repo / FE_TD / "REVIEW-PLAN.md").unlink()
+    out = push(repo, json.dumps([view(plan[0])]))
+    assert "REVIEW-PLAN.md" not in keys(out), "berkas yang dihapus dibiarkan dengan isi terakhirnya di server"

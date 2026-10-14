@@ -12,6 +12,7 @@ Review seluruh diff rantai untuk satu taskdir frontend.
 - Taskdir: `{taskdir}`
 - Rentang: berkas keluaran `python3 {chain_py} files --taskdir {taskdir}` (perintah lengkap di definisi agent-mu) —
   commit rantai (subjek `<type>(<slug>):`) sejak akar `{base}`; hunk lewat `git diff {base}..HEAD -- <berkas>`.
+  `HEAD` yang dinilai: `{head}` — tulis apa adanya ke frontmatter `head:` `REVIEW.md`.
   Commit di luar rantai tidak dinilai dan berkasnya bukan berkas yatim.
 - Review ulang: `REVIEW.md` yang sudah ada ditimpa utuh, bukan disambung.
 - Kontrak Penilai: union `files_touched` seluruh brief, `CONTRACT.md` bila ada, dan `## Success Criteria`
@@ -23,7 +24,7 @@ Review seluruh diff rantai untuk satu taskdir frontend.
 - Temuan Asal: `{finding_source}` — bila bukan `-`, tutup baris `> Status:` tiap temuan yang benar-benar
   diperbaiki diff ini menjadi `FIXED <YYYY-MM-DD> — lihat {taskdir}`.
 - Larangan: dilarang mengedit `src/`, menjalankan typecheck/lint/test/build, dan menjalankan
-  `git add`/`git commit` — commit milik pendispatch.
+  `git add`/`git commit` — `REVIEW.md` tidak di-commit, dan commit `finding_source` milik pendispatch.
 - Stop Condition: gerbang masuk lengkap ada di definisi agent-mu — BERHENTI dan lapor sesuai jalur gagal
   di sana, jangan menebak.
 - Balikan: amplop `## Reviewer Report` maksimal 10 baris sesuai definisi agent-mu. Jangan kutip isi
@@ -35,7 +36,8 @@ Review seluruh diff rantai untuk satu taskdir frontend.
 | Slot | Sumber Pengisian | Keterangan & Batasan Kritis |
 | --- | --- | --- |
 | `{taskdir}` | Parameter `taskdir` architect | **[REQUIRED]** |
-| `{base}` | `git log --diff-filter=A --format=%h -- {taskdir}/TASK.md \| tail -1` | **[REQUIRED]** Commit yang melahirkan akar; `validate_review.py` menolak `base` selain commit itu. Dilarang menebak `main`/`HEAD~N`: rentang yang salah menilai pekerjaan orang lain |
+| `{base}` | 7 digit pertama `base_commit` frontmatter `{taskdir}/TASK.md` | **[REQUIRED]** HEAD saat akar dikunci (`chain.py root`); `validate_review.py` menolak `base` selain itu. Dilarang menebak `main`/`HEAD~N`: rentang yang salah menilai pekerjaan orang lain |
+| `{head}` | `git rev-parse --short HEAD` sesudah verifikasi penutup, saat dispatch | **[REQUIRED]** `validate_review.py` menuntut `head` leluhur `HEAD`; commit kode sesudahnya membuat review basi |
 | `{verification_log}` | Phase 4 butir 1 | **[REQUIRED]** `{taskdir}/.explore/closing-verification.md` |
 | `{template}` | Entri `review-template.md` peta **Skrip:** SKILL.md | **[REQUIRED]** Path absolut hasil substitusi, bukan literal |
 | `{adapter_path}` | Entri `adapter` peta **Skrip:** SKILL.md, `<stack>` dari `index.json` | **[REQUIRED]** Path absolut hasil substitusi |
@@ -64,6 +66,6 @@ python3 «validate_review.py» --taskdir {taskdir} \
 | Validator `FAIL` | Laporan tidak sah. Ulangi dispatch maksimal sekali dengan slot yang sama; tetap `FAIL` → review tidak tuntas: bersihkan tree dulu (lihat di bawah), lalu laporkan ke user. Dilarang menyunting `REVIEW.md` sendiri agar lolos |
 | `REVIEW.md` tidak ada | Cacat kerja subagent: ulangi maksimal sekali; tetap gagal → review tidak tuntas: bersihkan tree dulu (lihat di bawah). Dilarang menulis `REVIEW.md` sendiri atau mengarang verdict |
 
-**Review tidak tuntas — bersihkan tree sebelum berhenti.** Buang `REVIEW.md` yang tidak sah: `git restore -- {taskdir}/REVIEW.md` bila ter-track, hapus bila baru. Pulihkan suntingan `{finding_source}` yang belum ter-commit: `git restore -- {finding_source}`. Rantai berikutnya berangkat dari tree bersih dan fase `PENUTUP`.
+**Review tidak tuntas — bersihkan sebelum berhenti.** Hapus `REVIEW.md` yang tidak sah. Pulihkan suntingan `{finding_source}` yang belum ter-commit: `git restore -- {finding_source}`. Rantai berikutnya berangkat dari tree bersih dan fase `PENUTUP`.
 
 **Subagent mengembalikan:** amplop `## Reviewer Report` ≤10 baris; verdict yang berlaku adalah turunan `validate_review.py`, bukan bunyi amplop.

@@ -245,9 +245,9 @@ class PreconditionChecker:
                     "id": check_id,
                     "name": name,
                     "status": "FAIL",
-                    "summary": f"PRD.md APPROVED tidak terikat commit approval: {why}",
-                    "action": "Kembalikan ke `backend:analyst`: `APPROVED` sah hanya lewat commit "
-                              "`docs(spec): approve PRD <slug>` sesudah persetujuan user; PRD yang berubah "
+                    "summary": f"PRD.md APPROVED tidak terikat materai approval: {why}",
+                    "action": "Kembalikan ke `backend:analyst`: `APPROVED` sah hanya lewat "
+                              "`doc_seal.py approve --doc PRD` sesudah persetujuan user; PRD yang berubah "
                               "sesudahnya wajib melewati gerbang dokumen lagi."
                 })
                 return
@@ -414,7 +414,7 @@ class PreconditionChecker:
                 "id": check_id,
                 "name": name,
                 "status": "PASS",
-                "summary": "Repositori git valid untuk commit agregat brief",
+                "summary": "Repositori git valid untuk penguncian batch brief",
                 "action": ""
             })
         except Exception as e:

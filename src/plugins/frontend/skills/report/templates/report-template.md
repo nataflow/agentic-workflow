@@ -26,7 +26,7 @@ ______________________________________________________________________
 
 ## 2. Aturan Validasi
 
-Ditagih `validate_report.py`; `FAIL` menahan commit:
+Ditagih `validate_report.py`; `FAIL` menahan terbitnya laporan (`LAPORAN TERTUNDA`):
 
 - **H1** — salin H1 `TASK.md` apa adanya, lalu tambahkan ` — Report`. Dilarang diturunkan dari slug.
 - **Ringkasan** — tepat satu kalimat hasil aktual, minimal 5 kata (kode inline dihitung satu kata); `Selesai.`/`Done.`/`Beres.` ditolak.

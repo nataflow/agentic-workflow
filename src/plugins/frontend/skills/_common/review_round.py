@@ -4,52 +4,53 @@
 Plafon yang hanya ditulis di prosa dilanggar persis saat ia paling dibutuhkan:
 ketika ronde kedua masih menyisakan temuan dan "satu ronde lagi" terasa murah.
 Skrip ini menyimpan state ronde di laci `<taskdir>/.explore/<gate>-review-state.json`
-(zona kerja, tidak di-commit) dan menolak ronde yang melampaui plafon.
+(zona kerja, tidak dicerminkan) dan menolak ronde yang melampaui plafon.
 
 Subperintah:
 
 - `open`   — dipanggil **sebelum** dispatch reviewer. Mencatat ronde baru beserta
-             sidik konten berkas yang akan direview, epoch reopen, dan `HEAD`, lalu
-             mencetak `sidik <12 hex>` untuk slot `{sidik}` prompt reviewer. `FAIL`
-             (exit 1) bila plafon putaran (2) atau plafon taskdir (8) habis —
-             dispatch dilarang berangkat.
+             sidik konten berkas yang akan direview, epoch reopen, dan jumlah kejadian
+             `## Riwayat Rantai` saat itu, lalu mencetak `sidik <12 hex>` untuk slot
+             `{sidik}` prompt reviewer. `FAIL` (exit 1) bila plafon putaran (2) atau
+             plafon taskdir (8) habis — dispatch dilarang berangkat.
 - `record` — dipanggil sesudah balikan reviewer. Mencatat verdict ronde terakhir
              beserta hitungan `BLOCKER [MEKANIS]`/`[SEMANTIK]`. Gate contract menuntut
              `--evidence` (balikan `contract-reviewer` apa adanya); gate plan menuntut
              `REVIEW-PLAN.md` ber-`verdict` sama. Laporan wajib menggemakan sidik ronde
              yang terbuka (`- Sidik:` / frontmatter `sidik:`, 12 J45) — laporan ronde
              lama atas konten lain ditolak.
-- `commit` — satu-satunya jalur commit draft `CONTRACT.md` / batch brief pada lane
-             non-MINOR: ditolak kecuali ronde terakhir `PASS` atas konten disk dan epoch
-             sekarang. Commit-nya membawa trailer `Review-Round: <gate> r<n> t<total>
-             PASS <sidik>` — jejak ronde yang ikut ter-commit.
-- `status` — cetak ronde, sisa plafon, dan `siap commit`. `--ready`: exit 1 bila belum siap
+- `status` — cetak ronde, sisa plafon, dan `siap diajukan`. `--ready`: exit 1 bila belum siap
              (ronde terakhir bukan `PASS` atas konten disk dan epoch sekarang).
-- `rebuild` — state hilang padahal trailer mencatat ronde: tulis ulang hitungan taskdir
-             dari trailer (ronde sesudah commit terakhir tidak terpulihkan).
+- `rebuild` — state hilang padahal Riwayat mencatat ronde: tulis ulang hitungan taskdir
+             dari field `review` kejadian `draft`/`approve` (ronde sesudah draft terakhir tidak
+             terpulihkan).
+
+Draft `CONTRACT.md` dan batch brief lane non-MINOR dicatat `chain.py draft` (Langkah 24, pengganti
+`review_round.py commit`): skrip itu menolak kecuali `ready()` di sini kosong, lalu mencatat field
+`review <gate> r<n> t<total> PASS <sidik>` di kejadian `draft` — jejak ronde yang ikut tercermin ke
+nataflow bersama `TASK.md`.
 
 **Putaran** adalah ronde ber-epoch sama yang dibuka sesudah ronde `PASS` terakhir
-yang **sudah diajukan** — kontennya pernah di-commit sesudah ronde itu dibuka
-(`git log <head>..HEAD` + sidik isi berkas di tiap commit). Tiap putaran berhak
-dua ronde. Commit draft yang belum pernah `PASS` tidak membuka putaran baru,
-apa pun subjeknya.
+yang **sudah diajukan** — ada kejadian `draft` hop gate ini sesudah ronde itu dibuka
+dengan sidik yang sama. Tiap putaran berhak dua ronde. Draft yang belum pernah `PASS`
+tidak membuka putaran baru.
 
-**Epoch** adalah jumlah commit `reopen` yang membuka hop gate ini **atau hop di
+**Epoch** adalah jumlah kejadian `reopen` yang membuka hop gate ini **atau hop di
 atasnya** (`FLOW`/`UI`/`CONTRACT` untuk gate contract, semua hop untuk gate plan),
-ditambah commit `eskalasi lane` (12 J42). Dokumen hulu yang berubah membuka putaran
+ditambah kejadian `eskalasi` (12 J42). Dokumen hulu yang berubah membuka putaran
 baru dan membatalkan vonis ronde sebelumnya, walau hop gate ini masih `[ ]`.
 
 `chain.py approve` membaca state ini lewat `Rounds.ready()`: approval `CONTRACT`
 dan `BRIEF` hanya sah bila ronde terakhir ber-verdict `PASS`, sidik kontennya
 sama dengan konten yang disetujui, dan epoch-nya sama dengan epoch sekarang —
-suntingan atau `reopen` sesudah reviewer lolos membatalkan vonisnya. Commit
-`draft`/`revise`/`append` sesudah ronde tidak berpengaruh.
+suntingan atau `reopen` sesudah reviewer lolos membatalkan vonisnya. Kejadian
+`draft` sesudah ronde tidak berpengaruh.
 
-**Batas yang dinyatakan apa adanya**: state di `.explore/` tidak di-commit.
+**Batas yang dinyatakan apa adanya**: state di `.explore/` tidak dicerminkan.
 Berkas rusak atau berbentuk salah → `FAIL` (pulihkan dari `.bak`, salinan sebelum
-tulis terakhir; tulis pertama menyalin state barunya, 12 J52). Berkas hilang → hitungan dari nol, **kecuali** trailer
-`Review-Round` di git mencatat ronde: maka `FAIL` sampai `rebuild`. Ronde yang
-belum pernah ikut commit tidak dapat dibuktikan sesudah lacinya dihapus.
+tulis terakhir; tulis pertama menyalin state barunya, 12 J52). Berkas hilang → hitungan dari nol, **kecuali**
+Riwayat mencatat ronde: maka `FAIL` sampai `rebuild`. Ronde yang belum pernah ikut kejadian `draft`
+tidak dapat dibuktikan sesudah lacinya dihapus.
 
 Zero external dependencies (Python Standard Library only).
 """
@@ -66,9 +67,8 @@ from typing import Any, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from precondition_lib import (  # noqa: E402
-    TASKDIR_PATTERN,
-    BRIEF_GLOB, content_snapshot, find_repo_root, gate_targets_at, git, git_ok, normalize_taskdir,
-    read_status, reopen_epoch, snapshot_at, taskdir_slug,
+    GATE_ROW, TASKDIR_PATTERN,
+    BRIEF_GLOB, content_snapshot, find_repo_root, normalize_taskdir, read_status, reopen_epoch, task_history,
 )
 from precondition_lib import cli  # noqa: E402
 
@@ -76,10 +76,6 @@ MAX_PER_CYCLE = 2
 MAX_PER_TASKDIR = 8
 MAX_DISPATCH_FAILED = 2
 GATES = ("contract", "plan")
-TRAILER = "Review-Round"
-SUBJECTS = {"contract": ("draft CONTRACT.md", "revise CONTRACT.md"),
-            "plan": ("draft breakdown (", "revise breakdown", "draft breakdown append (",
-                     "plan review ronde ")}
 REVIEW_LINE = re.compile(r"^-\s*Verdict:\s*(PASS|BLOCKED)\s*$", re.MULTILINE)
 SIDIK_LINE = re.compile(r"^-\s*Sidik:\s*`?([0-9a-f]{12,40})`?\s*$", re.MULTILINE)
 SIDIK_LEN = 12
@@ -104,19 +100,27 @@ class Rounds:
             return [f"{self.taskdir_rel}/CONTRACT.md"]
         return sorted(f"{self.taskdir_rel}/{p.name}" for p in self.taskdir.glob(BRIEF_GLOB))
 
+    def history(self) -> List[Dict[str, Any]]:
+        """Kejadian `## Riwayat Rantai` `TASK.md`; Riwayat rusak → `FAIL` (fail-closed)."""
+        events, problem = task_history(self.root, self.taskdir_rel)
+        if problem:
+            raise SystemExit(f"REVIEW ROUND: [FAIL] `## Riwayat Rantai` rusak: {problem} — laporkan ke user lewat "
+                             "`frontend:lead`; dilarang menambal Riwayat dengan tangan.")
+        return events
+
     def committed_rounds(self) -> int:
-        """Total ronde taskdir terbesar yang dicatat trailer `Review-Round` gate ini di git."""
-        out = git(self.root, "log", f"--format=%(trailers:key={TRAILER},valueonly)", "--", self.taskdir_rel)
+        """Total ronde taskdir terbesar yang dicatat field `review` gate ini di kejadian Riwayat."""
         rx = re.compile(rf"^{self.gate} r\d+ t(\d+)\b")
-        return max([int(m.group(1)) for m in map(rx.match, out.splitlines()) if m] or [0])
+        found = [rx.match(e["fields"].get("review", "")) for e in self.history()]
+        return max([int(m.group(1)) for m in found if m] or [0])
 
     def load(self) -> Dict[str, Any]:
         name = self.path.name
         if not self.path.exists():
             committed = self.committed_rounds()
             if committed:
-                raise SystemExit(f"REVIEW ROUND: [FAIL] `{name}` hilang padahal git mencatat {committed} ronde "
-                                 f"(trailer `{TRAILER}`) — pulihkan dari `{name}.bak`, atau jalankan "
+                raise SystemExit(f"REVIEW ROUND: [FAIL] `{name}` hilang padahal `## Riwayat Rantai` mencatat "
+                                 f"{committed} ronde — pulihkan dari `{name}.bak`, atau jalankan "
                                  "`review_round.py rebuild`; dilarang memulai hitungan dari nol.")
             return {"gate": self.gate, "rounds": []}
         try:
@@ -130,7 +134,7 @@ class Rounds:
                              f"pulihkan dari `{name}.bak`.")
         if len(rounds) < self.committed_rounds():
             raise SystemExit(f"REVIEW ROUND: [FAIL] `{name}` memuat {len(rounds)} ronde, lebih pendek dari "
-                             f"jejak ronde ter-commit ({self.committed_rounds()}) — pulihkan dari `{name}.bak`.")
+                             f"jejak ronde di Riwayat ({self.committed_rounds()}) — pulihkan dari `{name}.bak`.")
         return state
 
     def save(self, state: Dict[str, Any]) -> None:
@@ -148,25 +152,24 @@ class Rounds:
     def epoch(self) -> int:
         return reopen_epoch(self.root, self.taskdir_rel, self.gate)
 
-    def presented(self, r: Dict[str, Any]) -> bool:
-        """Ronde PASS yang kontennya sudah di-commit sesudah ronde itu dibuka — sudah diajukan ke user."""
-        if r.get("verdict") != "PASS" or not r.get("head"):
+    def presented(self, r: Dict[str, Any], events: List[Dict[str, Any]]) -> bool:
+        """Ronde PASS yang kontennya tercatat `chain.py draft` sesudah ronde itu dibuka — sudah diajukan ke user.
+
+        Ronde format lama (tanpa `riwayat`, dulu ber-`head` commit) dianggap belum diajukan (konservatif).
+        """
+        if r.get("verdict") != "PASS" or not isinstance(r.get("riwayat"), int):
             return False
-        pathspec = (f"{self.taskdir_rel}/CONTRACT.md" if self.gate == "contract"
-                    else f"{self.taskdir_rel}/{BRIEF_GLOB}")
-        # head yang hilang (rebase/amend) → git log gagal → dianggap belum diajukan (konservatif)
-        for sha in git(self.root, "log", "--format=%H", f"{r['head']}..HEAD", "--", pathspec).split():
-            targets = gate_targets_at(self.root, self.taskdir_rel, self.gate, sha)
-            if snapshot_at(self.root, sha, targets) == r.get("snapshot"):
-                return True
-        return False
+        row, sidik = GATE_ROW[self.gate], str(r.get("snapshot", ""))[:12]
+        return any(e["n"] > r["riwayat"] and e["kind"] == "draft" and e["rows"] == [row]
+                   and e["fields"].get("sidik") == sidik for e in events)
 
     def cycle(self, rounds: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Ronde putaran berjalan: epoch sama, sesudah ronde PASS terakhir yang sudah diajukan."""
         epoch = self.epoch()
+        events = self.history()
         cur = [r for r in rounds if r.get("epoch", epoch) == epoch]   # ronde format lama ikut dihitung
         for i in range(len(cur) - 1, -1, -1):
-            if self.presented(cur[i]):
+            if self.presented(cur[i], events):
                 return cur[i + 1:]
         return cur
 
@@ -216,16 +219,14 @@ class Rounds:
                              "bila dispatch gagal (tidak dihitung plafon).")
         if c["cycle"] >= MAX_PER_CYCLE:
             raise SystemExit(f"REVIEW ROUND OPEN: [FAIL] plafon {MAX_PER_CYCLE} ronde per putaran habis "
-                             "(putaran sejak draft terakhir yang lolos `PASS` dan di-commit, epoch "
-                             f"reopen {self.epoch()}). Dilarang mendispatch ronde ketiga: sajikan BLOCKER "
+                             "(putaran sejak draft terakhir yang lolos `PASS` dan dicatat `chain.py draft`, "
+                             f"epoch reopen {self.epoch()}). Dilarang mendispatch ronde ketiga: sajikan BLOCKER "
                              f"yang tersisa ke user, lalu {CAP_ROUTE}. Putaran baru hanya dibuka reopen hop "
-                             "ini atau hop di atasnya, atau eskalasi lane. (Commit ronde `PASS` yang hilang "
-                             "karena rebase/amend tidak lagi dihitung sebagai sudah diajukan.)")
+                             "ini atau hop di atasnya, atau eskalasi lane.")
         if c["taskdir"] >= MAX_PER_TASKDIR:
             raise SystemExit(f"REVIEW ROUND OPEN: [FAIL] plafon {MAX_PER_TASKDIR} ronde per taskdir habis — "
                              f"{CAP_ROUTE}.")
-        entry = {"round": c["cycle"] + 1, "epoch": self.epoch(),
-                 "head": git(self.root, "rev-parse", "HEAD").strip(),
+        entry = {"round": c["cycle"] + 1, "epoch": self.epoch(), "riwayat": len(self.history()),
                  "snapshot": content_snapshot(self.root, targets), "opened": _now(),
                  "verdict": None}
         rounds.append(entry)
@@ -325,55 +326,20 @@ class Rounds:
                              f"semantik {b.group(2)}) — catat vonis reviewer apa adanya.")
         return rel
 
-    def paths(self) -> List[str]:
-        """Path yang di-commit `commit`: target + laporan (plan), termasuk brief ter-track yang dihapus."""
-        paths = self.targets()
-        if self.gate == "plan":
-            tracked = git(self.root, "ls-files", "--", f"{self.taskdir_rel}/{BRIEF_GLOB}").split()
-            paths = sorted(set(paths) | set(tracked)) + [self.report_rel()]
-        return paths
-
-    def commit(self, subject: str) -> str:
-        slug = taskdir_slug(self.taskdir_rel)
-        prefix = f"docs({slug}): "
-        kinds = SUBJECTS[self.gate]
-        if not subject.startswith(prefix) or not subject[len(prefix):].startswith(kinds):
-            raise SystemExit(f"REVIEW ROUND COMMIT: [FAIL] subjek wajib `{prefix}<{' | '.join(k.strip() for k in kinds)}…>`.")
-        state = self.load()
-        problem = self.ready(state)
-        if problem:
-            raise SystemExit(f"REVIEW ROUND COMMIT: [FAIL] {problem} — jangan commit; lanjutkan dari "
-                             "validator + ronde reviewer gate ini.")
-        paths = self.paths()
-        last = state["rounds"][-1]
-        trailer = (f"{TRAILER}: {self.gate} r{last['round']} t{len(state['rounds'])} PASS "
-                   f"{last['snapshot'][:12]}")
-        ok, out = git_ok(self.root, "add", "-A", "--", *paths)
-        if ok:
-            if not git(self.root, "diff", "--cached", "--name-only", "--", *paths).strip():
-                raise SystemExit("REVIEW ROUND COMMIT: [FAIL] tidak ada perubahan untuk di-commit — "
-                                 "draft/batch ini sudah ter-commit.")
-            ok, out = git_ok(self.root, "commit", "-q", "-m", subject, "-m", trailer, "--", *paths)
-        if not ok:
-            git_ok(self.root, "reset", "-q", "--", *paths)
-            raise SystemExit(f"REVIEW ROUND COMMIT: [FAIL] `git commit` gagal (hook/lock?) — perbaiki "
-                             f"penyebabnya lalu ulangi: {out.strip()[-400:]}")
-        sha = git(self.root, "rev-parse", "--short", "HEAD").strip()
-        return f"REVIEW ROUND COMMIT: {self.gate} ronde {last['round']} PASS — commit {sha} ({trailer})"
-
     def rebuild(self) -> str:
         if self.path.exists():
             raise SystemExit(f"REVIEW ROUND REBUILD: [FAIL] `{self.path.name}` masih ada — `rebuild` hanya "
                              "untuk state yang hilang; berkas rusak dipulihkan dari `.bak`.")
         committed = self.committed_rounds()
         if not committed:
-            raise SystemExit("REVIEW ROUND REBUILD: [FAIL] tidak ada trailer ronde di git — tidak ada yang dipulihkan.")
+            raise SystemExit("REVIEW ROUND REBUILD: [FAIL] `## Riwayat Rantai` tidak mencatat ronde gate ini — tidak "
+                             "ada yang dipulihkan.")
         # Ronde rekonstruksi mengisi plafon taskdir tetapi tidak pernah sah untuk approve
         # (tanpa epoch/sidik) dan tidak dihitung di putaran berjalan (epoch -1).
-        rounds = [{"round": 0, "epoch": -1, "head": "", "snapshot": "", "verdict": "REKONSTRUKSI",
+        rounds = [{"round": 0, "epoch": -1, "riwayat": -1, "snapshot": "", "verdict": "REKONSTRUKSI",
                    "mechanical": 0, "semantic": 0, "opened": _now()} for _ in range(committed)]
         self.save({"gate": self.gate, "rounds": rounds, "rebuilt": _now()})
-        return (f"REVIEW ROUND REBUILD: {self.gate} — {committed} ronde dipulihkan dari trailer "
+        return (f"REVIEW ROUND REBUILD: {self.gate} — {committed} ronde dipulihkan dari Riwayat "
                 f"(taskdir {committed}/{MAX_PER_TASKDIR}); approval menuntut satu ronde baru atas konten sekarang.")
 
     def status(self) -> str:
@@ -383,11 +349,12 @@ class Rounds:
         lines = [f"REVIEW ROUND STATUS: {self.gate} — putaran {c['cycle']}/{MAX_PER_CYCLE}, "
                  f"taskdir {c['taskdir']}/{MAX_PER_TASKDIR}"]
         for r in state.get("rounds", []):
-            where = (f"epoch {r['epoch']}, head {str(r.get('head', ''))[:7] or '-'}" if "epoch" in r
+            where = (f"epoch {r['epoch']}, riwayat #{r['riwayat']}" if isinstance(r.get("riwayat"), int)
+                     else f"epoch {r['epoch']}, format lama" if "epoch" in r
                      else f"format lama {r.get('generation', '-')}")
             lines.append(f"- ronde {r.get('round')} [{where}] → {r.get('verdict') or 'terbuka'}"
                          + (f" (mekanis {r.get('mechanical')}, semantik {r.get('semantic')})" if r.get("verdict") else ""))
-        lines.append("siap commit: ya" if not problem else f"siap commit: tidak — {problem}")
+        lines.append("siap diajukan: ya" if not problem else f"siap diajukan: tidak — {problem}")
         return "\n".join(lines)
 
 
@@ -404,7 +371,7 @@ def nonneg(value: str) -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Plafon ronde reviewer dokumen frontend")
-    parser.add_argument("cmd", choices=("open", "record", "commit", "status", "rebuild"))
+    parser.add_argument("cmd", choices=("open", "record", "status", "rebuild"))
     parser.add_argument("--taskdir", required=True)
     parser.add_argument("--gate", required=True, choices=GATES)
     parser.add_argument("--root", default=None)
@@ -412,8 +379,7 @@ def main() -> None:
     parser.add_argument("--mechanical", type=nonneg, default=0)
     parser.add_argument("--semantic", type=nonneg, default=0)
     parser.add_argument("--evidence", default="", help="gate contract: balikan reviewer di .explore/")
-    parser.add_argument("--subject", default="", help="commit: subjek Phase 6 contract / Phase 4 plan")
-    parser.add_argument("--ready", action="store_true", help="status: exit 1 bila belum siap commit")
+    parser.add_argument("--ready", action="store_true", help="status: exit 1 bila belum siap diajukan")
     args = parser.parse_args()
     rounds = Rounds(args.taskdir, args.gate, Path(args.root) if args.root else None)
     if args.cmd == "open":
@@ -422,14 +388,12 @@ def main() -> None:
         if not args.verdict:
             raise SystemExit("REVIEW ROUND RECORD: [FAIL] `--verdict` wajib.")
         print(rounds.record(args.verdict, args.mechanical, args.semantic, args.evidence))
-    elif args.cmd == "commit":
-        print(rounds.commit(args.subject))
     elif args.cmd == "rebuild":
         print(rounds.rebuild())
     else:
         out = rounds.status()
         print(out)
-        if args.ready and not out.endswith("siap commit: ya"):
+        if args.ready and not out.endswith("siap diajukan: ya"):
             sys.exit(1)
 
 

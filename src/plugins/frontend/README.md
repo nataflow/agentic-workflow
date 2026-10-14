@@ -17,13 +17,13 @@ spesifik-stack hidup di satu adapter `skills/profile/stacks/<stack-id>.md` yang 
 |---|---|---|---|
 | `frontend:lead` | gerbang tiap permintaan: lane, sections, taskdir, pemulihan, eskalasi | — | — |
 | `frontend:profile` | prasyarat sekali per repo | `.claude/profile/frontenddev/` | — |
-| `frontend:task` | akar tiap taskdir | `TASK.md` + ledger `## Chain` | commit akar |
+| `frontend:task` | akar tiap taskdir | `TASK.md` + ledger `## Chain` | `chain.py root` |
 | `frontend:ux-design` | Gate Flow | `FLOW.md` | `chain.py approve --row FLOW` |
 | `frontend:ui-design` | Gate Design | `UI.md` | `chain.py approve --row UI` |
 | `frontend:contract` | Gate Contract (+ `contract-reviewer`) | `CONTRACT.md` | `chain.py approve --row CONTRACT` |
 | `frontend:plan` | Gate Breakdown (+ `doc-reviewer`) | `brief-<NN>-<unit>.md`, `REVIEW-PLAN.md` | `chain.py approve --row BRIEF` |
-| `frontend:architect` | eksekusi sekuensial, verifikasi penutup, review tunggal | status brief, `REVIEW.md` (ditulis `code-reviewer`) | commit unit; `validate_review.py` |
-| `frontend:report` | laporan penutup | `REPORT.md` | commit — penanda tuntas |
+| `frontend:architect` | eksekusi sekuensial, verifikasi penutup, review tunggal | status brief, `REVIEW.md` (ditulis `code-reviewer`) | commit kode unit; `validate_review.py` |
+| `frontend:report` | laporan penutup | `REPORT.md` | `validate_report.py` — penanda tuntas |
 | `frontend:review` | review ad-hoc di luar rantai aktif | chat, atau `frontenddev/reviews/<berkas>.md` | commit bila `--write` |
 
 Hanya `lead`, `profile`, dan `review` yang muncul di menu `/`. Tujuh lainnya ber-`user-invocable: false`:
@@ -73,18 +73,18 @@ permintaan ──► lead ──┬─► profile ──────────
                       ├─► explore ─────────────► jawaban, berhenti
                       ├─► review (ad-hoc) ─────► laporan / frontenddev/reviews/, berhenti
                       │
-                      └─► task ──► TASK.md + ## Chain ──► commit akar
+                      └─► task ──► TASK.md + ## Chain ──► chain.py root
                             │
-                            ├─► ux-design  → FLOW.md DRAFT → commit → AskUserQuestion → chain.py approve FLOW
-                            ├─► ui-design  → UI.md DRAFT   → commit → AskUserQuestion → chain.py approve UI
+                            ├─► ux-design  → FLOW.md DRAFT → chain.py draft → AskUserQuestion → chain.py approve FLOW
+                            ├─► ui-design  → UI.md DRAFT   → chain.py draft → AskUserQuestion → chain.py approve UI
                             ├─► contract   → CONTRACT.md DRAFT → validate_doc → contract-reviewer (≤2 ronde)
-                            │                → commit → AskUserQuestion → chain.py approve CONTRACT
+                            │                → chain.py draft → AskUserQuestion → chain.py approve CONTRACT
                             ├─► plan       → brief READY × N → validate_briefs → doc-reviewer (≤2 ronde)
-                            │                → commit → AskUserQuestion → chain.py approve BRIEF
+                            │                → chain.py draft → AskUserQuestion → chain.py approve BRIEF
                             └─► architect  → per unit: ingest → code-implementor → report-NN.md
                                              → matriks bukti disk → commit unit (+ gerbang kompilasi)
                                            → verifikasi penutup sekali → code-reviewer → validate_review
-                                           → commit REVIEW.md → report → REPORT.md (tuntas)
+                                           → REVIEW.md (validate_review) → report → REPORT.md (tuntas)
 ```
 
 Gate bersifat **kondisional** menurut `sections` `TASK.md`: `flow` menjadwalkan Gate Flow, `ui` Gate
@@ -105,33 +105,41 @@ pun tidak.
 ```markdown
 ## Chain
 
-- [x] FLOW     — frontend:ux-design → FLOW.md @ APPROVED 3f9c2ab
-- [x] UI       — frontend:ui-design → UI.md @ APPROVED 8e01d7a
-- [~] CONTRACT — frontend:contract  → CONTRACT.md @ re-entry 1 (was 7d1e0c4)
+- [x] FLOW     — frontend:ux-design → FLOW.md @ APPROVED 3f9c2ab1d0e4
+- [x] UI       — frontend:ui-design → UI.md @ APPROVED 8e01d7a5c3f9
+- [~] CONTRACT — frontend:contract  → CONTRACT.md @ re-entry 1 (was 7d1e0c4a92b1)
 - [ ] BRIEF    — frontend:plan      → brief-*.md
 ```
 
-`skills/_common/chain.py` adalah **satu-satunya penulis** ledger, status `APPROVED`, `lane`, dan
-`sections`:
+`skills/_common/chain.py` adalah **satu-satunya penulis** ledger, `## Riwayat Rantai`, `base_commit`, status
+`APPROVED`, `lane`, dan `sections`. Riwayat adalah seksi terakhir `TASK.md`: satu baris bernomor per kejadian
+(`akar`, `draft`, `approve`, `reopen`, `eskalasi`, `amandemen`, `abandon`), pengganti subjek dan badan commit
+dokumen sejak dokumen taskdir lepas dari git (Langkah 24). Plafon, epoch ronde, dan materai approve dibaca
+darinya; Riwayat yang tak terurai atau bernomor loncat membuat semua gerbang `FAIL`.
 
 | Subperintah | Dipakai | Yang ditegakkan |
 |---|---|---|
 | `init` | `task` | baris ledger persis jadwal `sections` |
-| `approve --row R --answer "<jawaban>"` | gate pemilik hop | akar `ACTIVE`; `--answer` satu baris; hop hulu sah; dokumen `DRAFT` ter-commit; validator `PASS`; untuk CONTRACT/BRIEF ronde reviewer terakhir `PASS` atas konten final **tanpa `reopen` hop itu atau hop di atasnya, maupun `escalate`, sesudah ronde itu** (BRIEF di hop `[~]` tanpa brief `READY` baru sah tanpa ronde baru; brief `DONE`/`BLOCKED` tidak boleh berubah sejak reopen). Menulis `APPROVED` + centang dalam satu commit yang memateraikan jawaban user, `Konten disetujui: <sha>`, `Sidik: <hash konten tanpa status:>`, `Review-Round:` (hop yang direview), dan `Hop: <R>` |
-| `reopen --row R --reason` | `lead` | akar `ACTIVE`, tree `TASK.md` + dokumen bersih; kaskade: R dan seluruh hop tercentang di bawahnya jadi `[~]`, dokumen FLOW/UI/CONTRACT-nya kembali `DRAFT`; seluruh kaskade divalidasi sebelum ada yang ditulis; plafon 3 per hop (dihitung saat hop itu target), 6 per taskdir |
+| `root` | `task` | akar sah (`validate_task.py`), `frontenddev/docs/` tidak ter-track; menulis `base_commit` = `HEAD` dan kejadian `akar` beserta sidik akar |
+| `amend --reason` | `lead` | amandemen akar sah (`validate_task.py --amend`); kejadian `amandemen` bersidik akar baru. Suntingan akar di luar `amend`/`escalate` → `FAIL` di check akar tiap gate |
+| `draft --row R` | gate pemilik hop | validator `PASS`; CONTRACT dan BRIEF non-MINOR: ronde reviewer terakhir `PASS` atas konten itu; konten berbeda dari draft terakhir; plafon 2 revisi. Kejadian `draft` membawa sidik konten dan field `review` |
+| `approve --row R --answer "<jawaban>"` | gate pemilik hop | akar `ACTIVE` dan utuh; `--answer` satu baris; hop hulu sah; dokumen `DRAFT` yang kontennya sama dengan draft terakhir yang dicatat; validator `PASS`; untuk CONTRACT/BRIEF ronde reviewer terakhir `PASS` atas konten final **tanpa `reopen` hop itu atau hop di atasnya, maupun `escalate`, sesudah ronde itu** (BRIEF di hop `[~]` tanpa brief `READY` baru sah tanpa ronde baru; brief `DONE`/`BLOCKED` tidak boleh berubah sejak reopen). Menulis `APPROVED` + centang `@ <sidik12>` dan kejadian `approve <R>` yang memateraikan sidik konten (tanpa `status:`), ronde reviewer, sidik `SC-{n}`, dan jawaban user; BRIEF juga menulis `sidik_kontrak` ke tiap brief `READY` |
+| `reopen --row R --reason` | `lead` | akar `ACTIVE` dan utuh; kaskade: R dan seluruh hop tercentang di bawahnya jadi `[~]`, dokumen FLOW/UI/CONTRACT-nya kembali `DRAFT`; seluruh kaskade divalidasi sebelum ada yang ditulis; kejadian `reopen` mencatat status dan sidik tiap brief saat itu; plafon 3 per hop (dihitung saat hop itu target), 6 per taskdir |
 | `escalate --lane L --sections S` | `lead` | akar `ACTIVE`; lane hanya naik, sections hanya bertambah, hop tercentang di bawah hop baru wajib di-`reopen` dulu; plafon 2 |
 | `abandon --reason` | `lead` | `TASK.md` `status: ABANDONED` atas keputusan user; taskdir keluar dari pemindaian (`DITUTUP`) |
-| `files` | `code-reviewer`, `report` | berkas rantai: commit bersubjek `<type>(<slug>):` sejak akar |
-| `revisions --row R` | gate pemilik hop | plafon 2 revisi berturut sejak `draft` **pertama** sesudah akar/reopen — `draft` berikutnya dihitung revisi, amandemen akar tidak me-reset |
-| `verify` / `status` | siapa pun | tiap `[x]` berjangkar pada **commit approve** hop itu (subjek persis + `Hop: <R>`, terbaru sesudah reopen terakhirnya), bukan pada sha ledger — tahan rebase dan clone: `Konten disetujui:`-nya = sha ledger; `Sidik:`-nya = isi berkas pada commit approve itu; `Review-Round:` PASS atas konten yang sama untuk hop yang direview; dokumen `APPROVED`; **konten identik dengan saat disetujui kecuali baris `status:`**; `SC-{n}` akar tidak berubah sejak approval. Materai tanpa `Sidik:` (diketik tangan atau dari versi lama) → FAIL dengan remedi reopen + approve ulang; validator tidak dijalankan ulang atas approval lama |
+| `files` | `code-reviewer`, `report` | berkas rantai: commit kode bersubjek `<type>(<slug>):` sejak `base_commit` |
+| `revisions --row R` | gate pemilik hop | plafon 2 revisi berturut sejak kejadian `draft` **pertama** sesudah reopen/approve — `draft` berikutnya dihitung revisi, amandemen akar tidak me-reset |
+| `verify` / `status` | siapa pun | tiap `[x]` berjangkar pada **kejadian `approve`** hop itu di Riwayat (terbaru sesudah reopen terakhirnya): sidik ledger = `sidik` kejadian; `review` PASS atas konten yang sama untuk hop yang direview; dokumen `APPROVED`; **konten identik dengan sidik itu kecuali baris `status:`**; brief per berkas dengan transisi status yang sah; `SC-{n}` akar tidak berubah sejak approval. Centang tanpa kejadian `approve` → FAIL dengan remedi reopen + approve ulang; validator tidak dijalankan ulang atas approval lama |
 
-Sha yang dicentang adalah commit **konten** yang disetujui user. Karena itu setiap skrip prasyarat hilir
+Sidik yang dicentang adalah sidik **konten** yang disetujui user. Karena itu setiap skrip prasyarat hilir
 dapat membuktikan bahwa yang dikerjakan adalah yang disetujui: suntingan `CONTRACT.md` sesudah approval
 tanpa `reopen` gagal di `plan`, `architect`, dan `report` sebagai drift. Batasnya dinyatakan apa adanya:
 skrip tidak dapat membuktikan `AskUserQuestion` benar-benar terjadi — yang dijaminnya jejak, karena
-approval tanpa jawaban (atau dengan jawaban bernewline yang dapat menyisipkan baris materai) ditolak dan
-jawabannya dimateraikan di badan commit. Rantai yang sudah `TUNTAS` dinilai sebelum ledger, jadi
-squash-merge sesudah laporan tidak mengubahnya menjadi `DRIFT`.
+approval tanpa jawaban (atau dengan jawaban bernewline yang dapat menyisipkan kejadian palsu) ditolak dan
+jawabannya dimateraikan di kejadian `approve`. Batas kedua: model di runtime yang sama dapat menulis ulang
+Riwayat itu sendiri — yang dijamin, suntingan dokumen yang tidak lewat skrip terdeteksi sebagai drift.
+Rantai yang sudah `TUNTAS` dinilai sebelum ledger, jadi squash-merge sesudah laporan tidak mengubahnya
+menjadi `PENUTUP`.
 
 ## Mechanical Enforcement
 
@@ -144,33 +152,35 @@ Di atasnya tujuh penjaga — enam validator dan satu hook:
 | `_common/validate_doc.py --kind flow\|ui\|contract` | frontmatter, heading persis template, ID `DD`/`ST`/`AC` berurutan, nol placeholder; untuk CONTRACT **keterlacakan dua arah** — tiap token `Sumber` AC nyata, dan tiap `SC` akar, `DD` FLOW, `ST` UI dipikul minimal satu AC |
 | `plan/scripts/validate_briefs.py` | 16 check S N D L T F B R V K O E C P G M — termasuk **G** (tiap `SC` dipikul brief `READY`/`DONE` lewat `fulfills`; brief `BLOCKED` tidak memikul apa pun, begitu pula di C dan E), **D** (DAG satu arah; remedi yang bergantung pada unit asalnya — rantai buntu — ditolak), **V** (operator shell hanya bila perintah sama persis dengan perintah profil), dan **M** (remedi menunjuk brief `BLOCKED`; brief `READY` yang beririsan dengan brief `BLOCKED` belum ter-remedi wajib `remedies`; plafon 2 per unit asal, +1 per re-entry kontrak sesudah `BLOCKED` pertama: `reopen … CONTRACT`, atau eskalasi dari `HOTFIX_MINOR`); `CREATE` ganda antar brief, `unit` ≠ NN nama berkas, dan path `../`/absolut FAIL |
 | `task/scripts/validate_task.py` | struktur akar, pasangan lane/sections, `SC` ber-alat-ukur, bukti `file:baris` nyata, ledger `[ ]` (`--amend`: amandemen akar oleh `lead`, ledger boleh bercentang) |
-| `architect/scripts/validate_review.py` | `taskdir`/`stack`/`reviewed_at` sah, H1 ber-slug; tiap `SC` dan `AC` `terbukti` wajib berbukti (`path:baris` berkas rantai atau perintah HIJAU; AC `test otomatis` hanya `path:baris` berkas test rantai, sehingga test yang tak pernah dibuat tidak dapat divonis `terbukti`); status 9 dimensi = severity terburuk temuan; `## Summary` dan Done Criteria DITUNDA ikut menurunkan verdict; `--log` mencocokkan verifikasi penutup dengan log mesin dan menagih `baseline_head` leluhur commit `implement unit` pertama (baseline diukur sebelum unit mana pun mendarat); hitungan temuan; `base` = commit akar `TASK.md`; **verdict diturunkan**: `BLOCKED` ⇔ P1 / SC belum terbukti / verifikasi merah (`TIMEOUT` atau galat baru > 0; `MERAH` bergalat baru 0 adalah warisan baseline) |
-| `hooks/guard_bash.py` (PreToolUse) | `code-reviewer` read-only atas repo: Bash hanya git baca (`status`, `diff`, `log`, `show`, `rev-parse`, `ls-files`, `merge-base`, `blame`, `symbolic-ref` bentuk baca — pencarian lewat tool Grep), opsi global hanya `--no-pager`, tanpa ekspansi shell, glob sebelum `--`, pipe, atau pengalihan; `ls`; dan `chain.py files` plugin ini; Write hanya `REVIEW.md`; Edit hanya `REVIEW.md` dan berkas temuan `frontenddev/reviews/`. Penulis lain hanya Edit/Write: `code-explorer` hanya laci `.explore/`/`.frontenddev/explore/`, `doc-reviewer` hanya `REVIEW-PLAN.md`, `code-implementor` ditolak di luar repo, di `.git/`, atau pada path ter-ignore (scope `files_touched`-nya divonis `verify_scope.py` sesudah unit). Fail-closed; main loop tidak dipagar. `validate_review.py --log` menagih tree bersih sesudah reviewer — hanya `REVIEW.md` dan `finding_source` taskdir itu (check `TREE`) |
+| `architect/scripts/validate_review.py` | `taskdir`/`stack`/`reviewed_at` sah, H1 ber-slug; tiap `SC` dan `AC` `terbukti` wajib berbukti (`path:baris` berkas rantai atau perintah HIJAU; AC `test otomatis` hanya `path:baris` berkas test rantai, sehingga test yang tak pernah dibuat tidak dapat divonis `terbukti`); status 9 dimensi = severity terburuk temuan; `## Summary` dan Done Criteria DITUNDA ikut menurunkan verdict; `--log` mencocokkan verifikasi penutup dengan log mesin dan menagih `baseline_head` leluhur commit `implement unit` pertama (baseline diukur sebelum unit mana pun mendarat); hitungan temuan; `base` = `base_commit` akar `TASK.md`, `head` = `HEAD` yang dinilai (leluhur `HEAD`); **verdict diturunkan**: `BLOCKED` ⇔ P1 / SC belum terbukti / verifikasi merah (`TIMEOUT` atau galat baru > 0; `MERAH` bergalat baru 0 adalah warisan baseline) |
+| `hooks/guard_bash.py` (PreToolUse) | `code-reviewer` read-only atas repo: Bash hanya git baca (`status`, `diff`, `log`, `show`, `rev-parse`, `ls-files`, `merge-base`, `blame`, `symbolic-ref` bentuk baca — pencarian lewat tool Grep), opsi global hanya `--no-pager`, tanpa ekspansi shell, glob sebelum `--`, pipe, atau pengalihan; `ls`; dan `chain.py files` plugin ini; Write hanya `REVIEW.md`; Edit hanya `REVIEW.md` dan berkas temuan `frontenddev/reviews/`. Penulis lain hanya Edit/Write: `code-explorer` hanya laci `.explore/`/`.frontenddev/explore/`, `doc-reviewer` hanya `REVIEW-PLAN.md`, `code-implementor` ditolak di luar repo, di `.git/`, atau pada path ter-ignore kecuali `report-NN.md` taskdir-nya (scope `files_touched`-nya divonis `verify_scope.py` sesudah unit). Fail-closed; main loop tidak dipagar. `validate_review.py --log` menagih tree bersih sesudah reviewer — hanya `REVIEW.md` dan `finding_source` taskdir itu (check `TREE`) |
 | `report/scripts/validate_report.py` | Ringkasan ≥ 5 kata, butir ≥ 3 kata; perubahan berakar berkas rantai; temuan REVIEW `PLANNED`/`DEFERRED` disebut di Catatan; tiap SC `PERLU VERIFIKASI MANUAL` tercatat |
 | `review/scripts/validate_audit.py` | berkas audit `frontenddev/reviews/`: ID `P{n}-{m}` berurutan, hitungan `p1/p2/p3`, `verdict` turunan, `> Status:` ber-enum, jangkar `file:baris`; `--only-status-changed` menolak diff `finding_source` yang menyentuh baris selain `> Status:` |
 
 Dan dua penjaga keadaan:
 
 - `_common/review_round.py` — plafon ronde reviewer dokumen (2 per putaran, 8 per taskdir; putaran baru
-  dimulai sesudah dokumen yang lolos ronde `PASS` di-commit, atau sesudah `reopen` hop gate itu atau hop di
-  atasnya, atau sesudah `escalate`) disimpan di `.explore/<gate>-review-state.json` beserta sidik konten,
-  epoch, dan `HEAD` tiap ronde. `open` mencetak sidik konten; reviewer menggemakannya (`- Sidik:` di balikan
+  dimulai sesudah dokumen yang lolos ronde `PASS` dicatat `chain.py draft`, atau sesudah `reopen` hop gate itu
+  atau hop di atasnya, atau sesudah `escalate`) disimpan di `.explore/<gate>-review-state.json` beserta sidik
+  konten, epoch, dan jumlah kejadian Riwayat tiap ronde. `open` mencetak sidik konten; reviewer menggemakannya (`- Sidik:` di balikan
   `contract-reviewer`, `sidik:` di `REVIEW-PLAN.md`) dan `record` menolak laporan ronde lain. State rusak →
-  FAIL (pulihkan dari `.bak`, yang ditulis sejak `save` pertama); `commit` meng-commit draft/batch hanya
-  sesudah ronde `PASS` dengan trailer `Review-Round`, sehingga state yang hilang terdeteksi (`rebuild`
-  memulihkan hitungannya).
+  FAIL (pulihkan dari `.bak`, yang ditulis sejak `save` pertama); kejadian `draft` di Riwayat membawa field
+  `review <gate> r<n> t<total> PASS`, sehingga state yang hilang terdeteksi (`rebuild` memulihkan hitungannya).
 - `lead/scripts/taskdir_state.py` — memvonis keadaan tiap taskdir (`AKAR`, `GATE`, `DRIFT`,
   `EKSEKUSI`, `TERHENTI`, `PENUTUP`, `TEMUAN`, `LAPORAN`, `LAPORAN TERTUNDA`, `TUNTAS`, `DITUTUP`, `RUSAK`) beserta satu
-  rute berikutnya, dari disk dan ledger — bukan dari ingatan sesi. `TUNTAS` dinilai sebelum ledger;
+  rute berikutnya, dari disk, ledger, dan Riwayat — bukan dari ingatan sesi. `TUNTAS` dinilai sebelum ledger dan
+  berarti `REPORT.md` lolos `validate_report.py` (`LAPORAN TERTUNDA`: tertulis tetapi gagal validator);
+  taskdir era git tanpa `base_commit` divonis `TUNTAS` bila ber-`REPORT.md`, selain itu `RUSAK`; repo yang
+  masih men-track `frontenddev/docs/` keluar `FAIL` dengan rute `MIGRASI`;
   `TERHENTI` juga mencakup rantai buntu (`DAG`: brief `READY` ada, tak satu pun dapat berangkat); `RUSAK`
   membawa jalan keluarnya (`abandon` lalu taskdir baru, atau direktori dipindah bila tak berakar); status akar
   selain `ACTIVE`/`ABANDONED` juga `RUSAK`.
 
 Pasangan `(lane, sections)` ditegakkan di setiap gate: `HOTFIX_MINOR` ⇔ sections kosong;
 `FAST_FORWARD`/`REFACTOR_ARCH` ⇔ tepat `architecture`; `FULL_PIPELINE` memuat `flow` atau `ui`.
-`lane`/`sections` yang berubah di luar commit akar (`kunci TASK`) atau `chain.py escalate` divonis `RUSAK`
-oleh `taskdir_state.py` dan `FAIL` di check akar setiap gate — riwayat `TASK.md` di-replay sejak commit
-penambahannya, jadi subjek commit yang ditiru tidak cukup. Slug unik per repo: prasyarat `task` menolak
+`lane`/`sections` yang berubah di luar akar terkunci atau `chain.py escalate` divonis `RUSAK` oleh
+`taskdir_state.py` dan `FAIL` di check akar setiap gate — Riwayat di-replay sejak kejadian `akar`, dan sidik
+akar menangkap suntingan `TASK.md` lain di luar `chain.py amend`. Slug unik per repo: prasyarat `task` menolak
 slug yang sudah dipakai taskdir lain (`lead` menambah sufiks `-2`), karena commit rantai dikenali dari `(<slug>)`.
 
 ## Success Criteria, End to End
@@ -193,15 +203,15 @@ Rantai yang janji akarnya tidak mendarat tidak pernah sampai ke `report`, sebers
 `architect` menjalankan brief satu per satu. Tiap unit:
 
 1. **Ingest** — `check_preconditions.py --brief NN`: brief `READY` ber-`stack` sama dengan profil,
-   `depends_on` tertutup lewat commit `implement unit` yang membawa kode (status `DONE` yang diketik di
-   commit dokumen saja tidak sah), `report-NN.md` belum ada, kesegaran `based_on`.
+   `depends_on` tertutup lewat commit `implement unit` yang membawa kode sejak `base_commit` (status `DONE`
+   yang diketik tanpa commit itu tidak sah), `report-NN.md` belum ada, kesegaran `based_on`.
 2. **Dispatch** — `code-implementor` menerapkan brief tanpa satu perintah terminal pun (tool `Bash` tidak
    tersedia) dan menulis `report-<NN>.md` — laporan yang bertahan melewati sesi. Berkas yang perlu
    dipulihkan dicatatnya di `## Rollback`; rollback-nya (`git restore --` berkas `MODIFY`, `rm --` berkas
    `CREATE`) milik `architect` di matriks bukti disk.
 3. **Matriks bukti disk** — `git status` dan hunk anchor disandingkan dengan `files_touched`; laporan
-   adalah klaim, disk adalah bukti. Hasilnya commit unit (brief `DONE` + kode + laporan, satu commit)
-   atau commit `BLOCKED`.
+   adalah klaim, disk adalah bukti. Hasilnya commit unit (status `DONE` di disk lalu commit kode saja)
+   atau brief `BLOCKED` di disk.
 4. **Gerbang kompilasi per-brief** — typecheck sesudah commit, hanya bila adapter `typecheck-per-brief: ya`,
    divonis relatif baseline.
 
@@ -214,7 +224,7 @@ taskdir yang sama: `reopen BRIEF` → `plan` APPEND brief perbaikan → eksekusi
 menimpa `REVIEW.md`. Rantai yang ditinggalkan user ditutup `chain.py abandon`.
 
 Baseline seluruh perintah diukur sekali sebelum unit pertama mendarat (`run_verification.py baseline`, mencatat
-`head`; bila hilang sesudah unit mendarat, diukur di worktree pada akar `TASK.md`). Sesudah seluruh unit tertutup:
+`head`; bila hilang sesudah unit mendarat, diukur di worktree pada `base_commit` akar). Sesudah seluruh unit tertutup:
 lint, test, build, dan typecheck **sekali** lewat `bash -o pipefail`, ditulis ke `.explore/closing-verification.md`.
 Galat baru = tanda galat yang tidak ada di baseline, dihitung per kemunculan. Merah tidak pernah dibiarkan
 tanpa rute:
@@ -228,15 +238,16 @@ tanpa rute:
 Hijau → prasyarat dijalankan ulang, sehingga jejak perintah verifikasi di tree (snapshot, coverage,
 `lint --fix`) disajikan ke user sebelum reviewer berangkat. Tree bersih → `code-reviewer` menilai berkas
 rantai (`chain.py files`) terhadap union `files_touched`, sembilan dimensi, CONTRACT, dan SC; `REVIEW.md`
-di-commit hanya sesudah `validate_review.py` `PASS`.
+sah hanya sesudah `validate_review.py` `PASS`, dan basi begitu commit kode mendarat sesudah `head`-nya.
 
 ## Artifacts
 
 ```
 ./frontenddev/
-  docs/
+  docs/                  diabaikan git, tidak pernah di-commit (lihat di bawah)
+    .gitignore           `*` — ditulis `docs_git.py`, ikut mengabaikan dirinya
     2609231200-order-checkout/
-      TASK.md            akar + ledger     → task; chain.py
+      TASK.md            akar + ledger + Riwayat → task; chain.py
       FLOW.md            perjalanan        → ux-design        (DRAFT → APPROVED)
       UI.md              bentuk layar      → ui-design        (DRAFT → APPROVED)
       CONTRACT.md        kontrak           → contract         (DRAFT → APPROVED)
@@ -252,9 +263,9 @@ di-commit hanya sesudah `validate_review.py` `PASS`.
 Status frontmatter:
 
 - **`ACTIVE`** — khusus `TASK.md`; tidak pernah berubah. `lane`/`sections` hanya bergeser lewat `chain.py escalate`.
-- **`DRAFT`** — FLOW/UI/CONTRACT yang ditulis penulisnya dan di-commit, menunggu keputusan user; juga keadaan dokumen yang dibuka ulang.
+- **`DRAFT`** — FLOW/UI/CONTRACT yang ditulis penulisnya dan dicatat `chain.py draft`, menunggu keputusan user; juga keadaan dokumen yang dibuka ulang.
 - **`APPROVED`** — ditulis hanya oleh `chain.py approve`.
-- **`READY`** → **`DONE`** | **`BLOCKED`** — khusus brief; transisi ditulis `architect` bersama commit-nya.
+- **`READY`** → **`DONE`** | **`BLOCKED`** — khusus brief; transisi ditulis `architect` di disk (`DONE` tepat sebelum commit kode unit).
 
 Tiap dokumen membawa `based_on: <sha> (<tanggal>)` dan `stack: <stack-id>` — brief yang lahir untuk
 `react-vite` tidak dieksekusi di profil `sveltekit`, dan brief yang berkasnya bergerak sesudah ditulis
@@ -262,43 +273,48 @@ diberi `WARN` di ingest.
 
 ## Commits
 
-Plugin meng-commit apa yang ia tulis **di titik ia selesai ditulis**, selalu dengan path eksplisit —
-tidak pernah `git add .`/`-A`, tidak pernah `commit -a`, tidak pernah `--no-verify`, tidak pernah push
-atau pindah branch. Subjek tiap commit rantai memuat `(<slug>)`; `report` dan ingest mengenali commit
-rantai dari situ.
+Dokumen taskdir `frontenddev/docs/**` tidak pernah di-commit: diabaikan git (penanda
+`frontenddev/docs/.gitignore` tulisan prasyarat `task`) dan dicerminkan ke nataflow. Jejak yang dulu hidup di
+subjek dan badan commit dokumen kini kejadian `## Riwayat Rantai` tulisan `chain.py`. Repo yang sudah
+meng-commit dokumen taskdir dimigrasikan sekali lewat `skills/_common/docs_git.py migrate` sesudah persetujuan
+user (`lead` Failure path 7).
+
+Yang tetap di-commit hanya kode dan dokumen tingkat repo, selalu dengan path eksplisit — tidak pernah
+`git add .`/`-A`, tidak pernah `commit -a`, tidak pernah `--no-verify`, tidak pernah push atau pindah branch.
+Subjek commit kode rantai memuat `(<slug>)`; `chain.py files`, bukti `DONE`, dan ingest mengenali commit rantai
+dari situ.
 
 | Titik | Subjek | Pemilik |
 |---|---|---|
-| Akar | `docs(<slug>): kunci TASK sebagai akar rantai` | `task` |
-| Draft / revisi dokumen gate | `docs(<slug>): draft FLOW.md` · `revise FLOW.md` | gate pemilik |
-| Approval | `docs(<slug>): approve FLOW.md` · `approve breakdown (<N> briefs)` | `chain.py` |
-| Re-entry / eskalasi / penutupan | `docs(<slug>): reopen <ROW ROW ...> — <alasan>` · `eskalasi lane <A> → <B>` · `tutup taskdir — <alasan>` | `chain.py` |
-| Amandemen akar | `docs(<slug>): amandemen akar TASK` | `lead` |
-| Batch brief | `docs(<slug>): draft breakdown (<N> briefs)` · `revise breakdown` · `draft breakdown append (...)` | `plan` |
-| Unit | `feat(<slug>): implement unit <NN> - <nama>` · `docs(<slug>): unit <NN> BLOCKED - <sebab>` | `architect` |
-| Review penutup | `docs(<slug>): closing review <verdict>` | `architect` |
-| Laporan | `docs(<slug>): laporkan hasil rantai <slug>` | `report` |
+| Unit | `feat(<slug>): implement unit <NN> - <nama>` (kode `files_touched` saja) | `architect` |
+| Review penutup | `docs(<slug>): closing review <verdict>` (hanya bila `finding_source` berubah) | `architect` |
+| Temuan asal `OBSOLETE` | `docs(review): tandai temuan OBSOLETE` | `task` |
+| Audit ad-hoc | `docs(review): audit <slug>` | `review` |
+| Profil | `docs: init/refresh/migrate frontend profile` · `docs: patch frontend profile (drift +<n>)` | `profile` |
+| Migrasi sekali jalan | `chore: lepas frontenddev/docs dari git` | `docs_git.py migrate` |
 
 ## Sinkron nataflow (opsional)
 
-Artefak taskdir dan dokumen repo dapat dicerminkan ke nataflow. Disk dan git tetap sumber kebenaran: sinkron
+Artefak taskdir dan dokumen repo dapat dicerminkan ke nataflow. Disk (dokumen taskdir) dan git (dokumen repo)
+tetap sumber kebenaran; untuk dokumen taskdir, nataflow satu-satunya salinan di luar mesin ini. Sinkron
 tidak menulis berkas, tidak meng-commit, dan tidak menjalankan `chain.py`, sehingga ledger dan materai approve
 tidak tersentuh. Kegagalannya tidak menahan gate maupun eksekusi.
 
 - **Aktif per repo** lewat `.claude/nataflow.json` (ter-commit, dibaca juga oleh `analyst`, `backend`, dan
   `quickdev`): `mcp_server` (default `nataflow-api`), `workspaces` (objek alias → UUID workspace;
   kosong → workspace milik key, satu entri → otomatis, lebih dari satu → user memilih saat task baru atau
-  dokumen repo disinkron), `pic_id`, dan `repo` (default: remote `origin` ternormalisasi). Berkas absen → dilewati; ada tetapi
-  rusak → `GAGAL`. Server MCP didaftarkan user di Claude Code; plugin tidak menyimpan key.
+  dokumen repo disinkron), `pic_id`, dan `repo` (default: remote `origin` ternormalisasi). Berkas absen → dilewati, dan check 10 prasyarat `task` memberi `WARN` karena dokumen taskdir lalu
+  hanya ada di disk; ada tetapi rusak → `GAGAL`. Server MCP didaftarkan user di Claude Code; plugin tidak menyimpan key.
 - **Jangkar**: satu taskdir = satu workdir `frontenddev:<repo>:<path taskdir>`, tertaut ke task tiket analyst
   bila `TASK.md` membawa `ticket_source` (taskdir backend dari tiket yang sama bernaung di task itu juga), atau
   ke task baru dari `TASK.md`.
-- **Yang didorong** (isi blob `HEAD`, dipilih `skills/_common/sync_payload.py`): `TASK.md`; `FLOW.md`/`UI.md`/
+- **Yang didorong** (isi disk, dipilih `skills/_common/sync_payload.py`; metadata `commit` kosong dan `head` =
+  `HEAD` saat sinkron): `TASK.md` berakar terkunci; `FLOW.md`/`UI.md`/
   `CONTRACT.md` hanya bila baris ledger-nya `[x]` dan tidak DRIFT; brief dan `REVIEW-PLAN.md` sesudah hop BRIEF
   disetujui (atau brief `DONE`/`BLOCKED`); `report-NN.md`, `REVIEW.md`, `REPORT.md`. Hop yang dibuka ulang
-  tercermin dengan status terbarunya. `frontenddev/reviews/` dan profil didorong ke workspace.
-- **Kapan** (main loop saja): `task` sesudah commit akar, tiap gate sesudah `chain.py approve`, `architect` sekali
-  per putaran, `report` sesudah commit, `lead` sesudah `reopen`/`escalate`/`abandon`/amandemen akar, serta
+  tercermin dengan status terbarunya; berkas taskdir yang dihapus dari disk tidak didorong ulang. `frontenddev/reviews/` dan profil didorong ke workspace.
+- **Kapan** (main loop saja): `task` sesudah `chain.py root`, tiap gate sesudah `chain.py approve`, `architect` sekali
+  per putaran, `report` sesudah laporan terbit, `lead` sesudah `reopen`/`escalate`/`abandon`/`amend`, serta
   `review`/`profile` sesudah commit. Prosedurnya di `skills/lead/references/nataflow-sync.md`.
 - **Status**: workdir dari `taskdir_state.py` (`TUNTAS` → `done`, `DITUTUP` → `abandoned`, `TERHENTI`/`TEMUAN` →
   `blocked`). Task naik ke `in_progress` sejak eksekusi dimulai; task milik taskdir ini menjadi `done`/`cancelled`,
@@ -334,7 +350,7 @@ taskdir.
 
 ## Why There Is No Plan Mode
 
-Rencana eksekusi hidup di `brief-*.md` sebagai file — dibaca ulang, di-diff, di-commit, bertahan lintas
+Rencana eksekusi hidup di `brief-*.md` sebagai file — dibaca ulang, dibandingkan, dicerminkan ke nataflow, bertahan lintas
 sesi, dan disetujui satu kali lewat ledger. Plan mode di atas brief berarti menyetujui isi yang sama dua
 kali.
 

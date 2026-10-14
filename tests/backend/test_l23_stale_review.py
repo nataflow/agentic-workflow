@@ -1,24 +1,23 @@
-"""L2.3 — REVIEW.md basi (brief/kode mendarat sesudahnya) memaksa review ulang, bukan Fase 5."""
-from conftest import TD, be_checks, be_run, brief, commit, git, write_files
+"""L2.3 — REVIEW.md basi (kode mendarat sesudahnya) memaksa review ulang, bukan Fase 5."""
+from conftest import TD, be_checks, be_run, brief, commit, git, land, write_files
 
 ARCH = "architect/scripts/check_preconditions.py"
 REPORT = "report/scripts/check_preconditions.py"
 
 
 def _reviewed(repo, highest="P1"):
+    """Dua unit mendarat (commit kode bersubjek `commit_message`), lalu REVIEW.md menilai HEAD itu (`range:`)."""
     git(repo, "checkout", "-qb", "fix/order")
-    brief(repo, "01", "lock", "DONE")
-    brief(repo, "02", "endpoint", "DONE")
-    write_files(repo, {"src/order.go": "package order\n// v1\n"})
-    commit(repo, "fix(order): implement lock+endpoint")
-    write_files(repo, {f"{TD}/REVIEW.md": f"---\nrange: aaa..bbb (1 commit)\nhighest: {highest}\n---\n# Review\n"})
-    commit(repo, "docs(order-fix): add final review report")
+    base = git(repo, "rev-parse", "HEAD").strip()
+    land(repo, brief(repo, "01", "lock", "READY"), line="// v1\n")
+    land(repo, brief(repo, "02", "endpoint", "READY"), line="// v2\n")
+    head = git(repo, "rev-parse", "HEAD").strip()
+    write_files(repo, {f"{TD}/REVIEW.md": f"---\nrange: {base[:7]}..{head[:7]} (2 commit)\nhighest: {highest}\n---\n"
+                                          "# Review\n"})
 
 
 def _land_fix(repo):
-    brief(repo, "03", "endpoint-fix", "DONE")
-    write_files(repo, {"src/order.go": "package order\n// v1\n// fix P1\n"})
-    commit(repo, "fix(order): implement endpoint-fix")
+    land(repo, brief(repo, "03", "endpoint-fix", "READY"), line="// fix P1\n")
 
 
 def test_stale_review_routes_to_phase4(chain_repo):

@@ -11,7 +11,7 @@ user-invocable: false
 - Penuhi titik hijau mandiri dan sapuan scan 12 dimensi di tiap unit kerja.
 - Alirkan ketergantungan antar-brief satu arah tanpa siklus.
 - Berhenti di brief terakhir yang menutup kontrak; unit yang tak meng-`Covers` maupun `Fulfills` apa pun tidak ditulis.
-- Luluskan self-review lewat subagent `brief-reviewer`, lalu kunci seluruh brief dalam satu commit agregat sebelum handoff ke pemanggilnya — `backend:analyst` pada lane planning, `backend:tech-lead` pada jalur `RCA`.
+- Luluskan self-review lewat subagent `brief-reviewer`, lalu kunci seluruh brief lewat satu `doc_seal.py lock-briefs` sebelum handoff ke pemanggilnya — `backend:analyst` pada lane planning, `backend:tech-lead` pada jalur `RCA`.
 
 ## Precondition [REQUIRED]
 
@@ -77,10 +77,10 @@ Teruskan `--file-scope` apa adanya dari parameter skill. Tanpa itu Check E turun
 
 ### Fase 5 — Laporan Penutupan & Serah Terima Determinik
 
-Jalankan self-review kolektif lebih dulu, commit menyusul, dan tutup dengan laporan:
+Jalankan self-review kolektif lebih dulu, penguncian menyusul, dan tutup dengan laporan:
 
-1. **Self-Review Kolektif Dokumen**: baca state ronde lewat `python3 ${CLAUDE_PLUGIN_ROOT}/skills/plan/scripts/validate_briefs.py --taskdir <taskdir> --review-state`, buka ronde dengan `--open-round` tepat sebelum dispatch berangkat, lalu panggil subagent `brief-reviewer` lewat template `dispatcher/reviewer.md` mengikuti protokol dispatch di `references/review-and-commit.md` bagian 5 — hidrasi slot `taskdir`, `chain`, `ronde`, dan `target`; materaikan tiap ronde yang selesai dengan `--record-round`; plafon **2 ronde per generasi batch dan 4 per taskdir**; ronde 2 menyempit ke brief yang berubah; dan penanganan dispatch gagal ada di sana. Hanya temuan `BLOCKER` yang menahan commit — `ADVISORY` tercatat di `{taskdir}/.explore/review/brief.md` tanpa memicu ronde baru.
-2. **Commit Agregat**: eksekusi commit satu batch mengikuti `references/review-and-commit.md` bagian 6 — urutan wajib, staging path eksplisit, format `docs(plan): add <N> briefs for <slug>`, batas kewenangan git, dan mitigasi tiap mode kegagalan ada di sana. Status self-review bukan `Approved` → lewati commit dan laporkan brief `READY` belum terkunci di git.
+1. **Self-Review Kolektif Dokumen**: baca state ronde lewat `python3 ${CLAUDE_PLUGIN_ROOT}/skills/plan/scripts/validate_briefs.py --taskdir <taskdir> --review-state`, buka ronde dengan `--open-round` tepat sebelum dispatch berangkat, lalu panggil subagent `brief-reviewer` lewat template `dispatcher/reviewer.md` mengikuti protokol dispatch di `references/review-and-commit.md` bagian 5 — hidrasi slot `taskdir`, `chain`, `ronde`, dan `target`; materaikan tiap ronde yang selesai dengan `--record-round`; plafon **2 ronde per generasi batch dan 4 per taskdir**; ronde 2 menyempit ke brief yang berubah; dan penanganan dispatch gagal ada di sana. Hanya temuan `BLOCKER` yang menahan penguncian — `ADVISORY` tercatat di `{taskdir}/.explore/review/brief.md` tanpa memicu ronde baru.
+2. **Penguncian Batch**: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/doc_seal.py lock-briefs --taskdir <taskdir>` mengikuti `references/review-and-commit.md` bagian 6 — urutan wajib, commit tunggal berkas `finding_source`, batas kewenangan git, dan mitigasi tiap mode kegagalan ada di sana. Status self-review bukan `Approved` → lewati penguncian dan laporkan brief `READY` belum terkunci.
 3. Tutup dengan `## Output [REQUIRED]`, lalu tegaskan: *"Tidak ada kode di `src/` yang dimodifikasi."* Tabel per brief tidak dicetak: `backend:architect` Fase 2 menyajikannya tepat sebelum implementor pertama berangkat.
 
 ## Guardrails
@@ -93,24 +93,24 @@ Jalankan self-review kolektif lebih dulu, commit menyusul, dan tutup dengan lapo
 - **DAG LINEAR SATU ARAH**: dilarang dependensi melingkar atau `Consumes` yang menunjuk `NN` lebih besar.
 - **SUBAGENT DISPATCH**: panggil `brief-reviewer` langsung via template `dispatcher/reviewer.md` di Fase 5, dan `code-explorer` langsung via template `dispatcher/explorer.md` di Fase 2. Dilarang menyusun prompt dispatch di luar template resminya atau melanggar plafon ronde di `references/review-and-commit.md` bagian 5.
 - **VERDICT DITERUSKAN UTUH**: blok `## Brief Review` dari `brief-reviewer` ditulis apa adanya ke `{taskdir}/.explore/review/brief.md` tiap ronde, bukan dicetak di chat, tanpa parafrase maupun penyaringan.
-- **COMMIT TERBATAS PADA BRIEF**: commit skill ini hanya memuat `brief-*.md` taskdir aktif — brief baru **dan** brief yang baru ditandai `SUPERSEDED` — ditambah `git rm -q {taskdir}/HALT.md` bila baris `repairs` mencabutnya dan berkas `finding_source` di bawah `backenddev/issues/` bila Fase 2 menandainya `OBSOLETE`/`DROPPED`, dengan staging path eksplisit, satu-satunya mutasi git milik `plan`. Dilarang `git add .`/`-A`, `push`, `merge`, `rebase`, `branch`, maupun `checkout`.
+- **GIT TERBATAS PADA `finding_source`**: brief, transisi `SUPERSEDED`, dan pencabutan `HALT.md` hanya ditulis di disk (dokumen taskdir diabaikan git, Langkah 24). Satu-satunya mutasi git milik `plan` adalah commit berkas `finding_source` di bawah `backenddev/issues/` bila Fase 2 menandainya `OBSOLETE`/`DROPPED`, dengan staging path eksplisit. Dilarang `git add .`/`-A`, `git add -f`, `push`, `merge`, `rebase`, `branch`, maupun `checkout`.
 - **CUKUP ITU BERHENTI**: brief mengeksekusi kontrak yang sudah dikunci hulu, bukan kontrak yang seharusnya. Dilarang menambah langkah, berkas, abstraksi, interface, atau flag konfigurasi yang tak satu pun `AC-{n}`/`SC-{n}` tuntut ("nanti ada yang kedua" bukan akar); memecah satu permukaan jadi banyak brief demi terlihat atomik — itu kebalikan *God Brief* dengan ongkos gerbang yang sama; dan membawa perbaikan temuan Fase 2 ke dalam batch ini, karena rumahnya `backenddev/issues/`, bukan brief tambahan.
 - **KEPUTUSAN DEFINITIF SAAT INI**: seluruh isi dokumen berprinsip "Yang ditulis = Keputusan saat ini" tanpa memori temporal atau komparasi masa lalu.
-- **RATIONALIZATION PREVENTION**: dilarang menggabungkan seluruh perubahan ke 1 brief raksasa (*God Brief*); meninggalkan placeholder berharap dilengkapi implementor; menugaskan test suite penuh pada brief awal; mengabaikan file migrasi saat ada mutasi model persistensi; memberi brief status `DRAFT`; memperluas perubahan ke modul tetangga di luar batch aktif; meneruskan sapuan sesudah kuota Fase 2 habis; atau menyatakan brief ter-commit saat `git commit` mengembalikan kode keluar bukan nol.
+- **RATIONALIZATION PREVENTION**: dilarang menggabungkan seluruh perubahan ke 1 brief raksasa (*God Brief*); meninggalkan placeholder berharap dilengkapi implementor; menugaskan test suite penuh pada brief awal; mengabaikan file migrasi saat ada mutasi model persistensi; memberi brief status `DRAFT`; memperluas perubahan ke modul tetangga di luar batch aktif; meneruskan sapuan sesudah kuota Fase 2 habis; atau menyatakan brief terkunci saat `doc_seal.py lock-briefs` mengembalikan kode keluar bukan nol.
 
 ## Output [REQUIRED]
 
-Brief mengikuti `templates/brief-template.md`. Self-review `Approved` dan batch ter-commit → tutup satu baris tanpa blok: `### BACKEND PLAN GENERATION REPORT — <n> BRIEF READY @ <sha> · <taskdir> · Entry <PRD | RCA | LANGSUNG> · Check 15/15 · ronde <n>/2 · ADVISORY <n> · review <taskdir>/.explore/review/brief.md`. Selain itu, sajikan:
+Brief mengikuti `templates/brief-template.md`. Self-review `Approved` dan batch terkunci → tutup satu baris tanpa blok: `### BACKEND PLAN GENERATION REPORT — <n> BRIEF READY @ <batch_sidik 12 hex> · <taskdir> · Entry <PRD | RCA | LANGSUNG> · Check 15/15 · ronde <n>/2 · ADVISORY <n> · review <taskdir>/.explore/review/brief.md`. Selain itu, sajikan:
 
 ```markdown
 ### BACKEND PLAN GENERATION REPORT — BELUM TERKUNCI
 - **Rantai**: <taskdir> · Entry <PRD | RCA | LANGSUNG> · <n> brief ditulis
-- **Commit**: tidak dijalankan (<alasan>) — brief `READY` belum terkunci di git
+- **Kunci** : tidak dijalankan (<alasan>) — brief `READY` belum terkunci
 - **Self-Review**: tidak tuntas (<alasan>) · BLOCKER <n> tersisa — <daftar> · backenddev/docs/<taskdir>/.explore/review/brief.md
 - **Check** : <n>/15 PASS · TERDEGRADASI <daftar id | nihil> · LOCKED <n brief DONE/BLOCKED | nihil> · Coverage AC <n>/<n> · SC <n>/<n>
 ```
 
-Verdict `brief-reviewer` dirujuk lewat path berkasnya, bukan dilampirkan: blok utuh hidup di `{taskdir}/.explore/review/brief.md`, dan predikat E `analyst` membacanya dari sana — dilarang mencetaknya di chat maupun memparafrasenya. Status commit dibaca gerbang di Fase 5-nya: batch yang belum terkunci menahan keberangkatan `architect`. Alokasi `Covers:`/`Fulfills:`, risk per unit, dan `## File scope` tiap brief hidup di berkas brief yang baru saja di-commit — dilarang menyalinnya jadi tabel di laporan.
+Verdict `brief-reviewer` dirujuk lewat path berkasnya, bukan dilampirkan: blok utuh hidup di `{taskdir}/.explore/review/brief.md`, dan predikat E `analyst` membacanya dari sana — dilarang mencetaknya di chat maupun memparafrasenya. Status kunci dibaca gerbang di Fase 5-nya: batch yang belum terkunci menahan keberangkatan `architect`. Alokasi `Covers:`/`Fulfills:`, risk per unit, dan `## File scope` tiap brief hidup di berkas brief yang baru saja dikunci — dilarang menyalinnya jadi tabel di laporan.
 
 **Serah-terima.** `Kembali ke backend:analyst` — Fase 6 skill itu satu-satunya titik yang memverifikasi ledger `## Chain` tercentang penuh. Dilarang mendispatch implementor sendiri; orkestrasi eksekusi milik `backend:architect` lewat gerbang. Hanya jalur `RCA` yang pulang ke `backend:tech-lead`.
 
@@ -123,8 +123,8 @@ Verdict `brief-reviewer` dirujuk lewat path berkasnya, bukan dilampirkan: blok u
 5. **Migrasi PRD Tidak Mendarat**: urutan deploy atau rollback plan `## Migration requirements` PRD tak ditemukan di `## Migration`/`## Risk & rollback` brief mana pun → lengkapi brief pemilik migrasinya sebelum menutup Fase 4; dilarang menyerahkan urutan deploy ke gerbang sebagai catatan lisan.
 6. **Risk Brief Melampaui Plafon Akar**: predikat derivasi menuntut nilai `risk:` lebih tinggi daripada `risk:` `TASK.md` → hentikan penulisan batch dan kembalikan ke `backend:analyst` menyebut pemicu eskalasi chain nomor 2 beserta nilai yang dituntut predikat (jalur `RCA`: ke `backend:tech-lead`, `references/entry-rules.md` bagian 1C). Dilarang melunakkan predikat agar muat di bawah plafon maupun menaikkan risk sendiri.
 7. **Taskdir Tidak Terbaca**: minta re-inisialisasi direktori kerja ke `tech-lead`.
-8. **Self-Review Gagal atau Plafon Ronde Habis**: dispatch gagal → ulangi maksimal satu kali tanpa memateraikannya sebagai ronde. `--open-round` menolak berangkat, atau temuan `BLOCKER` masih terbuka sesudah ronde kedua generasi ini → serahkan brief tanpa commit dan tandai self-review tidak tuntas beserta daftar `BLOCKER` yang tersisa. Dilarang mengarang verdict `Approved`, membuka ronde ketiga pada generasi batch yang sama, maupun mengulang siklus ronde dari awal dengan memanggil ulang skill ini — hitungan dimateraikan per generasi batch dan per taskdir, bukan per invokasi. Brief yang **ditambahkan** sesudah plafon generasi habis, atau hop `BRIEF` yang dibuka re-entry `analyst`, membuka generasi berikutnya beserta jatah ronde barunya; itu jalur yang sah, dan menambah brief semata demi membuka jatah bukan.
-9. **Commit Gagal Dieksekusi**: pertahankan `status: READY`, sertakan galat mentah di laporan, serahkan penguncian ke gerbang. Mitigasi per mode kegagalan ada di `references/review-and-commit.md` bagian 6.
+8. **Self-Review Gagal atau Plafon Ronde Habis**: dispatch gagal → ulangi maksimal satu kali tanpa memateraikannya sebagai ronde. `--open-round` menolak berangkat, atau temuan `BLOCKER` masih terbuka sesudah ronde kedua generasi ini → serahkan brief tanpa dikunci dan tandai self-review tidak tuntas beserta daftar `BLOCKER` yang tersisa. Dilarang mengarang verdict `Approved`, membuka ronde ketiga pada generasi batch yang sama, maupun mengulang siklus ronde dari awal dengan memanggil ulang skill ini — hitungan dimateraikan per generasi batch dan per taskdir, bukan per invokasi. Brief yang **ditambahkan** sesudah plafon generasi habis, atau hop `BRIEF` yang dibuka re-entry `analyst`, membuka generasi berikutnya beserta jatah ronde barunya; itu jalur yang sah, dan menambah brief semata demi membuka jatah bukan.
+9. **Penguncian Gagal Dieksekusi**: pertahankan `status: READY`, sertakan keluaran skrip atau galat git mentah di laporan, serahkan ke gerbang. Mitigasi per mode kegagalan ada di `references/review-and-commit.md` bagian 6.
 
 ## STYLE
 

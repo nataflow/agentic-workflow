@@ -18,8 +18,10 @@ memblokir.
 
 Penulis lain (12 J4) tidak memegang `Bash`, jadi yang dipagar hanya Edit/Write:
 - `frontend:code-implementor`: ditolak di luar repo, di `.git/`, atau pada path ter-ignore git — tempat yang
-  tidak terlihat `verify_scope.py --worktree`. Scope `files_touched`-nya tetap divonis `verify_scope.py`
-  sesudah unit (L3.4 Opsi B; lease ala backend sengaja tidak dibawa).
+  tidak terlihat `verify_scope.py --worktree`. Satu pengecualian (24 K13): `frontenddev/docs/<taskdir>/report-NN.md`,
+  laporan unitnya sendiri — dokumen taskdir diabaikan git sejak Langkah 24. Brief tetap tertolak: statusnya ditulis
+  `architect`. Scope `files_touched`-nya tetap divonis `verify_scope.py` sesudah unit (L3.4 Opsi B; lease ala
+  backend sengaja tidak dibawa).
 - `frontend:code-explorer`: hanya laci `frontenddev/docs/<taskdir>/.explore/*.md` atau
   `.frontenddev/explore/*.md`.
 - `frontend:doc-reviewer`: hanya `frontenddev/docs/<taskdir>/REVIEW-PLAN.md`.
@@ -58,6 +60,7 @@ WRITE_OK = re.compile(rf"^{TASKDIR}/REVIEW\.md$")
 EDIT_OK = re.compile(rf"^({TASKDIR}/REVIEW\.md|frontenddev/reviews/[^/]+\.md)$")
 EXPLORE_OK = re.compile(rf"^({TASKDIR}/\.explore/[^/]+\.md|\.frontenddev/explore/[^/]+\.md)$")
 PLAN_REVIEW_OK = re.compile(rf"^{TASKDIR}/REVIEW-PLAN\.md$")
+UNIT_REPORT_OK = re.compile(rf"^{TASKDIR}/report-\d{{2}}\.md$")
 
 
 def repo_root(cwd: Path) -> Path:
@@ -192,6 +195,8 @@ def decide_writer(agent: str, file_path: str, root: Path, cwd: Path) -> str:
         return "" if PLAN_REVIEW_OK.match(p) else f"{DOC_REVIEWER} hanya menulis `<taskdir>/REVIEW-PLAN.md`; `{p}` ditolak"
     if ".git" in p.lower().split("/"):
         return f"`{p}` di dalam `.git/` — di luar pantauan `git status`"
+    if UNIT_REPORT_OK.match(p):                    # 24 K13: laporan unit di taskdir yang diabaikan git
+        return ""
     if ignored(root, p):
         return f"`{p}` diabaikan git — tulisan di sana tidak terlihat `verify_scope.py`; laporkan di report-NN.md"
     return ""

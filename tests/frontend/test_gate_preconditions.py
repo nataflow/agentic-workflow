@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from conftest import FE_TD, commit, fe_profile, fe_round, fe_run, git, write_files
+from conftest import FE_TD, commit, fe_draft, fe_profile, fe_round, fe_run, git, write_files
 
 NEW_TD = "frontenddev/docs/2609250000-orders-baru"
 
@@ -14,13 +14,12 @@ def checks(r) -> dict:
 
 
 def contract_approved(repo) -> None:
-    """Hop CONTRACT tercentang lewat jalur SKILL: ronde PASS → commit skrip → approve."""
+    """Hop CONTRACT tercentang lewat jalur SKILL: ronde PASS → `chain.py draft` → approve."""
     fe_round(repo)
-    for args in (("_common/review_round.py", "commit", "--taskdir", FE_TD, "--gate", "contract",
-                  "--subject", "docs(orders-lacak): draft CONTRACT.md"),
-                 ("_common/chain.py", "approve", "--taskdir", FE_TD, "--row", "CONTRACT", "--answer", "Setujui")):
-        r = fe_run(repo, *args)
-        assert r.returncode == 0, r.out
+    r = fe_draft(repo)
+    assert r.returncode == 0, r.out
+    r = fe_run(repo, "_common/chain.py", "approve", "--taskdir", FE_TD, "--row", "CONTRACT", "--answer", "Setujui")
+    assert r.returncode == 0, r.out
 
 
 # --- plan ----------------------------------------------------------------------------------------
@@ -39,7 +38,7 @@ def test_plan_contract_sesudah_contract_disetujui_pass(fe_chain_repo):
 def test_plan_contract_sebelum_hop_contract_fail(fe_chain_repo):
     c = checks(plan(fe_chain_repo, "CONTRACT"))
     assert c[4] == "FAIL"                 # ledger: hop CONTRACT belum berangkat
-    assert c[9] == "FAIL"                 # CONTRACT.md draft belum di-commit
+    assert c[9] == "PASS"                 # draft CONTRACT.md diabaikan git (Langkah 24), tree bersih
 
 
 def test_plan_mode_minor_ditolak_di_lane_fast_forward(fe_chain_repo):
@@ -57,7 +56,6 @@ def test_plan_dari_subdirektori(fe_chain_repo):
 # --- ui-design -----------------------------------------------------------------------------------
 
 def test_ui_design_sections_tanpa_ui_fail(fe_chain_repo):
-    commit(fe_chain_repo, "docs(orders-lacak): draft CONTRACT.md", f"{FE_TD}/CONTRACT.md")
     c = checks(fe_run(fe_chain_repo, "ui-design/scripts/check_preconditions.py", "--taskdir", FE_TD, "--json"))
     assert c[3] == "FAIL" and c[9] == "PASS"
 
@@ -88,7 +86,8 @@ def test_review_objek_tidak_tersedia_fail(fe_chain_repo, args):
 
 
 def test_review_diff_valid_pass(fe_chain_repo):
-    commit(fe_chain_repo, "docs(orders-lacak): draft CONTRACT.md", f"{FE_TD}/CONTRACT.md")
+    write_files(fe_chain_repo, {"src/features/orders/OrderDetail.tsx": "export const x = 1\n"})
+    commit(fe_chain_repo, "feat(orders-lacak): implement unit 01", "src/features/orders/OrderDetail.tsx")
     assert checks(review(fe_chain_repo, "--target", "diff", "--range", "HEAD~1..HEAD"))[1] == "PASS"
 
 
@@ -103,10 +102,11 @@ def test_review_path_berspasi(make_repo):
 
 @pytest.fixture
 def fresh_repo(make_repo):
-    root = make_repo({"src/a.ts": "x\n", f"{NEW_TD}/.keep": ""})
+    root = make_repo({"src/a.ts": "x\n"})
     git(root, "checkout", "-q", "-b", "main")
     fe_profile(root, "react-vite")
     commit(root, "chore: init")
+    (root / NEW_TD).mkdir(parents=True)               # taskdir dibuat lead Phase 5, tidak pernah di-commit
     return root
 
 
@@ -143,3 +143,26 @@ def test_task_bukan_repo_git_fail(make_repo):
 def test_task_working_tree_kotor_fail(fresh_repo):
     write_files(fresh_repo, {"src/a.ts": "y\n"})
     assert checks(task(fresh_repo, "FAST_FORWARD", "architecture"))[7] == "FAIL"
+
+
+@pytest.mark.regression("24 G2")
+def test_task_menulis_penanda_ignore(fresh_repo):
+    r = task(fresh_repo, "FAST_FORWARD", "architecture")
+    assert r.returncode == 0 and checks(r)[10] == "WARN", r.out            # 24 K2: tanpa `.claude/nataflow.json`
+    assert "hanya tersimpan di disk" in r.stdout
+    assert (fresh_repo / "frontenddev/docs/.gitignore").read_text(encoding="utf-8").rstrip().endswith("*")
+    write_files(fresh_repo, {f"{NEW_TD}/TASK.md": "x\n"})
+    assert git(fresh_repo, "status", "--porcelain") == ""
+    write_files(fresh_repo, {".claude/nataflow.json": "{}\n"})
+    commit(fresh_repo, "chore: aktifkan sinkron nataflow", ".claude/nataflow.json")
+    assert checks(task(fresh_repo, "FAST_FORWARD", "architecture"))[10] == "PASS"
+
+
+@pytest.mark.regression("24 G2")
+def test_task_dokumen_ter_track_rute_migrasi(fresh_repo):
+    write_files(fresh_repo, {"frontenddev/docs/2609010000-lama/TASK.md": "---\nstatus: ACTIVE\n---\n# Lama\n"})
+    commit(fresh_repo, "docs: era git")
+    r = task(fresh_repo, "FAST_FORWARD", "architecture")
+    c = {x["id"]: x for x in json.loads(r.stdout)["checks"]}
+    assert r.returncode == 1 and c[10]["status"] == "FAIL" and "MIGRASI" in c[10]["summary"], c[10]
+    assert "docs_git.py migrate" in c[10]["action"]

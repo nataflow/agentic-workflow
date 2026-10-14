@@ -48,7 +48,7 @@ reviewed_at: <YYYY-MM-DD>
 
 ## 2. Aturan
 
-1. Tiap temuan ber-ID `P{severity}-{n}` berurutan per severity dan membawa `> Status:` — `PLANNED` saat lahir; `FIXED <tanggal> — lihat <taskdir>` ditulis `code-reviewer` penutup taskdir perbaikan; `DEFERRED <tanggal> — <alasan>`/`DROPPED <tanggal> — <alasan>` ditulis `frontend:lead` atas keputusan user; `OBSOLETE <tanggal>` ditulis `task` saat re-verifikasi sebelum akar dikunci menemukan kodenya sudah berubah, dan ikut commit akar.
+1. Tiap temuan ber-ID `P{severity}-{n}` berurutan per severity dan membawa `> Status:` — `PLANNED` saat lahir; `FIXED <tanggal> — lihat <taskdir>` ditulis `code-reviewer` penutup taskdir perbaikan; `DEFERRED <tanggal> — <alasan>`/`DROPPED <tanggal> — <alasan>` ditulis `frontend:lead` atas keputusan user; `OBSOLETE <tanggal>` ditulis `task` saat re-verifikasi sebelum akar dikunci menemukan kodenya sudah berubah, lalu di-commit tersendiri (`docs(review): tandai temuan OBSOLETE`).
 2. `verdict` diturunkan: `BLOCKED` ⇔ `p1 > 0`; `WARNING` ⇔ `p2 > 0`; selain itu `PASS`.
 3. Tiap temuan berjangkar `file:baris` yang dibuka reviewer; tanpa jangkar → dibuang.
 4. Berkas di-commit `docs(review): audit <slug>` — tanpa commit, ia tidak sah sebagai `finding_source` (`task` memeriksanya).

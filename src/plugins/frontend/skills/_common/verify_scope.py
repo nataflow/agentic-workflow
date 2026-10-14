@@ -9,10 +9,12 @@ Scope sah = path `files_touched` frontmatter (frontend) atau baris `modify|creat
 direktori yang sama. Berkas `finding_source` frontmatter sah hanya bila diff-nya semata menambah
 baris `> Status: FIXED`. Laci `.explore/` diabaikan, hanya di `<plugin>/docs/[<taskdir>/].explore/`.
 
-Scope dibaca dari brief **sebelum** unit dikerjakan (11 H3): `--commit` dari `<sha>^:<brief>`,
-`--worktree` dari `HEAD:<brief>`; brief yang belum ter-commit dibaca dari disk. Pelaksana karena itu
-tidak dapat memperluas scope dengan menyunting brief-nya sendiri. Pada `--commit`, diff brief di commit
-unit hanya boleh menyentuh baris `status:` frontmatter dan isi `## Work status`.
+Pelaksana tidak dapat memperluas scope dengan menyunting brief-nya sendiri (11 H3). Brief yang dikunci
+membawa `sidik_kontrak:` (sidik isi tanpa baris `status:` dan isi `## Work status`, ditulis saat brief
+dikunci; Langkah 24): kontrak brief di disk wajib sama dengan sidik itu, di kedua mode. Brief tanpa
+sidik memakai jalur lama: scope dibaca dari `<sha>^:<brief>` (`--commit`) atau `HEAD:<brief>`
+(`--worktree`), brief yang belum ter-commit dari disk, dan pada `--commit` diff brief di commit unit
+hanya boleh menyentuh baris `status:` frontmatter dan isi `## Work status`.
 
 Baris tabel `## File scope` sah hanya bila kolomnya lengkap (11 H2), aturan yang sama dengan
 `validate_briefs.py`: 4 kolom backend (`Aksi | Path | Anchor | Apa yang berubah`), 3 kolom frontend
@@ -24,6 +26,7 @@ simbol (Anchor) tetap milik `symbol_map.py`.
 Salinan identik di skills/_common/ backend dan frontend. Hanya pustaka standar.
 """
 import argparse
+import hashlib
 import re
 import subprocess
 import sys
@@ -144,13 +147,33 @@ def brief_before(root: Path, brief: Path, commit: Optional[str]) -> str:
 
 _STATUS_LINE = re.compile(r"^status[ \t]*:.*$", re.M)
 _WORK_STATUS = re.compile(r"^## Work status[ \t]*$.*?(?=^## |\Z)", re.M | re.S | re.I)
+SIDIK_FIELD = "sidik_kontrak"
+_SIDIK_LINE = re.compile(rf"^{SIDIK_FIELD}[ \t]*:")
 
 
 def brief_contract(text: str) -> str:
-    """Isi brief tanpa bagian yang sah disunting pelaksana: baris `status:` dan isi `## Work status`."""
+    """Isi brief tanpa bagian yang sah disunting pelaksana: baris `status:` dan isi `## Work status`.
+
+    Baris `sidik_kontrak:` ikut dibuang: ia materai kontrak itu sendiri, bukan bagian kontraknya.
+    """
     text = text.replace("\r\n", "\n")
     head, sep, rest = text.partition("\n---")
-    return _STATUS_LINE.sub("status:", head) + sep + _WORK_STATUS.sub("## Work status\n", rest)
+    head = "\n".join(l for l in _STATUS_LINE.sub("status:", head).split("\n") if not _SIDIK_LINE.match(l))
+    return head + sep + _WORK_STATUS.sub("## Work status\n", rest)
+
+
+def contract_sidik(text: str) -> str:
+    """Sidik sha256 kontrak brief (`brief_contract`) — nilai `sidik_kontrak:` saat brief dikunci."""
+    return hashlib.sha256(brief_contract(text).encode("utf-8")).hexdigest()
+
+
+def sealed_tamper(brief: Path) -> Optional[bool]:
+    """Brief ber-`sidik_kontrak` → apakah kontraknya di disk berbeda dari sidik itu; tanpa sidik → None."""
+    text = brief.read_text(encoding="utf-8")
+    sidik = frontmatter(text).get(SIDIK_FIELD)
+    if not isinstance(sidik, str) or not sidik.strip():
+        return None
+    return contract_sidik(text) != sidik.strip()
 
 
 def allowed_paths(root: Path, brief: Path, commit: Optional[str] = None) -> Tuple[set, Optional[str]]:
@@ -198,11 +221,13 @@ def main() -> int:
         touched = changed(root, a.commit)
         if a.commit and not touched:
             raise RuntimeError(f"{a.commit[:7]} tidak mengubah satu berkas pun")
-        tampered = False
-        if a.commit:
-            b_rel = rel(root, str(brief))
-            before, after = show_text(root, f"{a.commit}^", b_rel), show_text(root, a.commit, b_rel)
-            tampered = None not in (before, after) and brief_contract(before) != brief_contract(after)
+        tampered = sealed_tamper(brief)
+        if tampered is None:
+            tampered = False
+            if a.commit:
+                b_rel = rel(root, str(brief))
+                before, after = show_text(root, f"{a.commit}^", b_rel), show_text(root, a.commit, b_rel)
+                tampered = None not in (before, after) and brief_contract(before) != brief_contract(after)
         stray = []
         for p in touched:
             if p in allowed or is_scratch(p):

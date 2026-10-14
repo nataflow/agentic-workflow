@@ -306,29 +306,61 @@ def check_base_branch(root: Path, base: Optional[str], require_diff: bool = Fals
     return True, f"branch '{head}' · merge-base {mb[:7]} terhadap '{base}'"
 
 
-def approval_verdict(root: Path, doc: Path, kind: str) -> Tuple[bool, str]:
-    """`status: APPROVED` BRD/PRD sah hanya bila terikat commit approve `analyst` (11 H17).
+# ============================================================ materai dokumen (Langkah 24)
 
-    Syaratnya: berkas ter-track, bersih (index dan worktree), dan commit terakhir yang menyentuhnya
-    bersubjek `docs(spec): approve <BRD|PRD> <slug>` (`analyst/references/chain-rules.md` bagian 4
-    butir 5) — satu-satunya jalur tulis `APPROVED`. APPROVED tulisan tangan, atau isi yang disunting
-    sesudah approval, tidak lagi lolos hanya karena frontmatter-nya berbunyi benar.
+# Dokumen taskdir tidak di-commit (24 K1): `APPROVED` dan akar rantai dijangkarkan pada materai di disk,
+# bukan pada riwayat git. `docs_git.py` (salinan identik backend/frontend) memegang `base_commit_problem`.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import docs_git as _docs_git  # noqa: E402
+
+SEAL_FIELDS = ("status", "approved_seal", "approved_at", "approval")
+_SEAL_LINE = re.compile(rf"^(?:{'|'.join(SEAL_FIELDS)})[ \t]*:.*$")
+
+
+def doc_seal(text: str) -> str:
+    """Sidik sha256 isi dokumen tanpa baris frontmatter `status`/`approved_*`/`approval` (24 K8).
+
+    BOM dan CRLF dinormalkan; badan dokumen ikut utuh. Menyunting isi sesudah approve mengubah sidik,
+    sedangkan penulisan materai itu sendiri tidak.
     """
+    lines = normalize_text(text).split("\n")
+    if lines and lines[0].strip() == "---":
+        end = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None)
+        if end is not None:
+            lines = [lines[0]] + [l for l in lines[1:end] if not _SEAL_LINE.match(l)] + lines[end:]
+    return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
+
+
+def task_base_commit(root: Path, taskdir: Path) -> Tuple[str, str]:
+    """`(base_commit, masalah)` frontmatter `TASK.md` taskdir; masalah kosong bila sah (24 K6)."""
+    value = frontmatter_field(Path(taskdir) / "TASK.md", "base_commit") or ""
+    return value, _docs_git.base_commit_problem(root, value)
+
+
+def approval_verdict(root: Path, doc: Path, kind: str) -> Tuple[bool, str]:
+    """`status: APPROVED` BRD/PRD sah hanya bila materai approve `analyst` utuh (11 H17, 24 K8).
+
+    `doc_seal.py approve` satu-satunya jalur tulis `APPROVED`: ia menulis `approved_seal` = sidik isi
+    yang disetujui user (`analyst/references/chain-rules.md` bagian 4 butir 5). APPROVED tulisan tangan
+    (tanpa materai), atau isi yang disunting sesudah approval, tidak lolos hanya karena frontmatter-nya
+    berbunyi benar.
+    """
+    name = Path(doc).name
     try:
-        rel = Path(doc).resolve().relative_to(Path(root).resolve()).as_posix()
-    except ValueError:
-        return False, f"{Path(doc).name} di luar repo"
-    if _git_out(root, "ls-files", "--error-unmatch", "--", rel)[0] != 0:
-        return False, f"{rel} berstatus APPROVED tetapi belum ter-commit"
-    if _git_out(root, "status", "--porcelain", "--", rel)[1].strip():
-        return False, f"{rel} berubah sesudah commit terakhirnya (belum ter-commit)"
-    rc, out = _git_out(root, "log", "-1", "--format=%h%x09%s", "--", rel)
-    sha, _, subject = out.strip().partition("\t")
-    subject = " ".join(subject.split())
-    if rc != 0 or not subject.startswith(f"docs(spec): approve {kind} "):
-        return False, (f"commit terakhir {rel} bersubjek \"{subject or '—'}\", bukan "
-                       f"`docs(spec): approve {kind} <slug>` — APPROVED tidak terikat persetujuan user")
-    return True, f"{kind} APPROVED @ {sha}"
+        text = Path(doc).read_bytes().decode("utf-8")
+        fields, _ = split_frontmatter(text)
+    except OSError as exc:
+        return False, f"{name} tidak terbaca: {exc}"
+    except UnicodeDecodeError:
+        return False, f"{name} bukan UTF-8"
+    except FrontmatterError as exc:
+        return False, f"{name}: {exc}"
+    seal = (fields.get("approved_seal") or "").strip()
+    if not seal:
+        return False, f"{name} berstatus APPROVED tanpa `approved_seal` — APPROVED tidak lewat `doc_seal.py approve`"
+    if seal != doc_seal(text):
+        return False, f"{name} disunting sesudah approve (isi ≠ `approved_seal` {seal[:12]})"
+    return True, f"{kind} APPROVED @ {seal[:12]}"
 
 
 def is_under(path: str, prefix: str) -> bool:

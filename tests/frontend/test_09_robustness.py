@@ -3,13 +3,14 @@ import json
 
 import pytest
 
-from conftest import FE_MINOR_TD as TD, FE_SKILLS, PLUGINS, commit, fe_run, git, load_module, run_script, \
-    write_files
+from conftest import FE_MINOR_TD as TD, FE_SKILLS, PLUGINS, commit, fe_run, load_module, run_script, write_files
 
 LIB = load_module(FE_SKILLS / "_common" / "precondition_lib.py", "fe_lib_09")
 GUARD = PLUGINS / "frontend" / "hooks" / "guard_bash.py"
 REVIEWER = "frontend:code-reviewer"
 TASK = ("---\nstatus: ACTIVE\nlane: HOTFIX_MINOR\nsections: \n---\n# x\n\n## Chain\n\n- [ ] BRIEF\n")
+AKAR = ("\n## Riwayat Rantai\n\n- 1 · akar · base 0000000 · lane HOTFIX_MINOR · sections - · akar 000000000000 · "
+        "waktu 2026-10-13T00:00:00Z\n")
 OTHER_TD = "frontenddev/docs/2609260000-akar"
 
 
@@ -17,18 +18,16 @@ OTHER_TD = "frontenddev/docs/2609260000-akar"
 
 @pytest.mark.regression("E12")
 def test_e12_akar_tanpa_subjek_kunci_tetap_dibandingkan(make_repo):
-    repo = make_repo({f"{OTHER_TD}/TASK.md": TASK})
-    commit(repo, "docs(akar): tulis akar rantai")          # subjek akar diketik model, bukan `kunci TASK`
+    repo = make_repo({f"{OTHER_TD}/TASK.md": TASK + AKAR})   # pembanding = kejadian `akar`, bukan subjek apa pun
     assert LIB.lane_tamper(repo, OTHER_TD) == ""
     p = repo / OTHER_TD / "TASK.md"
-    p.write_text(TASK.replace("lane: HOTFIX_MINOR\nsections: ", "lane: FULL_PIPELINE\nsections: flow"),
+    p.write_text((TASK + AKAR).replace("lane: HOTFIX_MINOR\nsections: ", "lane: FULL_PIPELINE\nsections: flow"),
                  encoding="utf-8")
-    commit(repo, "chore: rapikan TASK")
-    assert "berubah di luar commit akar" in LIB.lane_tamper(repo, OTHER_TD)
+    assert "berubah di luar akar" in LIB.lane_tamper(repo, OTHER_TD)
 
 
 @pytest.mark.regression("E12")
-def test_e12_task_belum_ter_commit_tanpa_vonis(make_repo):
+def test_e12_akar_belum_terkunci_tanpa_vonis(make_repo):
     repo = make_repo({f"{OTHER_TD}/TASK.md": TASK})
     assert LIB.lane_tamper(repo, OTHER_TD) == ""
 
@@ -36,30 +35,40 @@ def test_e12_task_belum_ter_commit_tanpa_vonis(make_repo):
 # --- E13 ---------------------------------------------------------------------------------------
 
 @pytest.mark.regression("E13")
-def test_e13_brief_disentuh_sesudah_review_basi_apa_pun_subjeknya(fe_minor_chain):
+def test_e13_kode_sesudah_review_basi_apa_pun_subjeknya(fe_minor_chain):
     assert LIB.review_is_fresh(fe_minor_chain, TD) is True
-    brief = next((fe_minor_chain / TD).glob("brief-*.md"))
-    brief.write_text(brief.read_text(encoding="utf-8") + "\n", encoding="utf-8")
-    commit(fe_minor_chain, "chore: rapikan", str(brief.relative_to(fe_minor_chain)))
+    write_files(fe_minor_chain, {"src/features/order/OrderButton.tsx": "export const OrderButton = () => 1;\n"})
+    commit(fe_minor_chain, "chore: rapikan", "src/features/order/OrderButton.tsx")
     assert LIB.review_is_fresh(fe_minor_chain, TD) is False
 
 
 @pytest.mark.regression("E13")
-def test_e13_commit_non_brief_sesudah_review_tetap_segar(fe_minor_chain):
-    commit(fe_minor_chain, "docs(order-checkout): laporan", f"{TD}/REPORT.md")
+def test_e13_commit_non_kode_sesudah_review_tetap_segar(fe_minor_chain):
+    write_files(fe_minor_chain, {"frontenddev/reviews/audit.md": "# Audit\n"})
+    commit(fe_minor_chain, "docs(review): tandai temuan", "frontenddev/reviews/audit.md")
     assert LIB.review_is_fresh(fe_minor_chain, TD) is True
+
+
+@pytest.mark.regression("24 K9")
+def test_review_tanpa_head_tidak_segar(fe_minor_chain):
+    review = fe_minor_chain / TD / "REVIEW.md"
+    review.write_text(review.read_text(encoding="utf-8").replace("head: ", "head_lama: "), encoding="utf-8")
+    assert LIB.review_is_fresh(fe_minor_chain, TD) is False
 
 
 # --- E14 ---------------------------------------------------------------------------------------
 
 @pytest.mark.regression("E14")
 def test_e14_revisi_bersubjek_meleset_tetap_terhitung(make_repo):
-    repo = make_repo({f"{OTHER_TD}/FLOW.md": "a\n"})
-    commit(repo, "docs(akar): draft FLOW.md")
-    for i, subject in enumerate(("docs(akar):  revise FLOW.md", "Docs(akar): Revise FLOW.md")):
-        write_files(repo, {f"{OTHER_TD}/FLOW.md": f"{i}\n"})
-        commit(repo, subject)
-    assert LIB.revisions_since_open(repo, [f"{OTHER_TD}/FLOW.md"], "akar", "FLOW.md") == 2
+    """Subjek commit yang diketik model tidak lagi ada (Langkah 24): tiap kejadian `draft` sesudah yang pertama
+    adalah revisi, apa pun yang diketik di sekitarnya; reopen hop lain tetap batas putaran."""
+    drafts = "".join(f"- {n} · draft FLOW · sidik {n:012d} · waktu 2026-10-13T00:00:00Z\n" for n in (2, 3, 4))
+    repo = make_repo({f"{OTHER_TD}/TASK.md": TASK + AKAR + drafts})
+    assert LIB.revisions_since_open(repo, OTHER_TD, "FLOW") == 2
+    write_files(repo, {f"{OTHER_TD}/TASK.md": TASK + AKAR + drafts
+                       + "- 5 · reopen BRIEF · target BRIEF · waktu 2026-10-13T00:00:00Z · alasan: x\n"
+                       + "- 6 · draft FLOW · sidik 000000000006 · waktu 2026-10-13T00:00:00Z\n"})
+    assert LIB.revisions_since_open(repo, OTHER_TD, "FLOW") == 0
 
 
 # --- E16 ---------------------------------------------------------------------------------------

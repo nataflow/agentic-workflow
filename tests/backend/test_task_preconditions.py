@@ -1,7 +1,9 @@
-"""Prasyarat `task` backend: taskdir (L5.2), chain (L5.4), dirty -z (L5.5)."""
+"""Prasyarat `task` backend: taskdir (L5.2), chain (L5.4), dirty -z (L5.5), dokumen taskdir di luar git (24)."""
+import json
+
 import pytest
 
-from conftest import be_checks, be_profile, commit, git, write_files
+from conftest import be_checks, be_profile, be_run, commit, git, write_files
 
 TD = "backenddev/docs/2601011200-refund"
 TK = "task/scripts/check_preconditions.py"
@@ -9,10 +11,12 @@ TK = "task/scripts/check_preconditions.py"
 
 @pytest.fixture
 def repo(make_repo):
-    root = make_repo({f"{TD}/.keep": "", "src/a.go": "package a\n"})
+    root = make_repo({"src/a.go": "package a\n"})
     git(root, "checkout", "-q", "-b", "main")
     be_profile(root, "go")
     commit(root, "init")
+    # Penanda ignore ditulis prasyarat penuh `tech-lead` (Langkah 24); taskdir hanya di disk.
+    write_files(root, {"backenddev/docs/.gitignore": "*\n", f"{TD}/.keep": ""})
     git(root, "checkout", "-q", "-b", "feat/refund")    # 11 H20: akar ditulis di branch kerja taskdir
     return root
 
@@ -41,3 +45,28 @@ def test_chain_huruf_kecil_dan_asing(repo):
 @pytest.mark.parametrize("td", ["src", ".", "backenddev/docs/2601011200-belum-ada"])
 def test_taskdir_non_kanonik_ditolak(repo, td):
     assert tk(repo, "--lane", "DIRECT_BRIEF", "--chain", "BRIEF", td=td)[1]["status"] == "FAIL"
+
+
+@pytest.mark.regression("24 G2")
+def test_dokumen_taskdir_wajib_di_luar_git(repo):
+    (repo / "backenddev/docs/.gitignore").unlink()
+    c = tk(repo, "--lane", "DIRECT_BRIEF", "--chain", "BRIEF")[5]
+    assert c["status"] == "FAIL" and "belum diabaikan git" in c["summary"], c
+    git(repo, "add", f"{TD}/.keep")
+    git(repo, "commit", "-qm", "docs: era git")
+    write_files(repo, {"backenddev/docs/.gitignore": "*\n"})
+    c = tk(repo, "--lane", "DIRECT_BRIEF", "--chain", "BRIEF")[5]
+    assert c["status"] == "FAIL" and "masih ter-track" in c["summary"] and "tech-lead" in c["action"], c
+
+
+@pytest.mark.regression("24 K2")
+def test_tanpa_config_nataflow_peringatan_tanpa_menggagalkan(repo):
+    proc = be_run(repo, TK, "--root", str(repo), "--taskdir", TD, "--lane", "DIRECT_BRIEF", "--chain", "BRIEF")
+    assert proc.returncode == 0 and proc.stdout.startswith("[PERINGATAN] `.claude/nataflow.json` tidak ada"), proc.out
+    data = json.loads(be_run(repo, TK, "--json", "--root", str(repo), "--taskdir", TD, "--lane", "DIRECT_BRIEF",
+                             "--chain", "BRIEF").stdout)
+    assert data["status"] == "PASS" and len(data["peringatan"]) == 1, data
+    write_files(repo, {".claude/nataflow.json": "{}"})
+    commit(repo, "chore: aktifkan sinkron nataflow", ".claude/nataflow.json")
+    proc = be_run(repo, TK, "--root", str(repo), "--taskdir", TD, "--lane", "DIRECT_BRIEF", "--chain", "BRIEF")
+    assert proc.returncode == 0 and "PERINGATAN" not in proc.stdout, proc.out

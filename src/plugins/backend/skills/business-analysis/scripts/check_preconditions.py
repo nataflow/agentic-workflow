@@ -214,8 +214,8 @@ class PreconditionChecker:
                 })
                 return
 
-            # Commit draft menyapu apa pun yang sudah di-stage (11 H19): perubahan di luar taskdir
-            # ikut mendarat di bawah subjek `docs(spec): draft BRD`.
+            # Hop planning tidak menyentuh kode (11 H19): perubahan di luar taskdir adalah kerja lain yang
+            # belum tuntas, dan akan tercampur ke commit kode unit sesudah rantai berangkat.
             dirty_outside = [q for q in dirty_paths(self.root)
                              if not (self.td.ok and self.td.rel and is_under(q, self.td.rel))]
             if dirty_outside:
@@ -226,8 +226,7 @@ class PreconditionChecker:
                     "name": name,
                     "status": "FAIL",
                     "summary": f"Working tree kotor di luar taskdir ({sample})",
-                    "action": "Commit, stash, atau bersihkan perubahan di luar taskdir sebelum draft BRD ditulis; "
-                              "commit draft menyapu seluruh index.",
+                    "action": "Commit, stash, atau bersihkan perubahan di luar taskdir sebelum draft BRD ditulis.",
                 })
                 return
 
@@ -235,7 +234,7 @@ class PreconditionChecker:
                 "id": check_id,
                 "name": name,
                 "status": "PASS",
-                "summary": "Repositori git valid dan bersih di luar taskdir untuk commit draft BRD",
+                "summary": "Repositori git valid dan bersih di luar taskdir untuk draft BRD",
                 "action": ""
             })
         except Exception as e:

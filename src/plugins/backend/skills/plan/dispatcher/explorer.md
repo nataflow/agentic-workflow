@@ -108,7 +108,7 @@ Tulis laporan ke `Berkas laporan` lebih dulu, lalu kembalikan badan laporan yang
 
 **Batas serap.** Explorer memetakan berkas yang **ada**; `plan` memutuskan berkas yang **disentuh**. `### File Map` adalah bukti, bukan `## File scope` siap salin — tiap baris tetap harus lolos batas slicing bagian 3 dan plafon `## Out of Scope` `TASK.md`. Vonis `terdampak` pada dimensi 3 atau 4 sapuan residual menghentikan penulisan batch dan memicu lima pemicu eskalasi `references/entry-rules.md` bagian 1A.
 
-**Status berkas laporan.** `{taskdir}/.explore/` adalah zona kerja, bukan artefak rantai: tidak di-stage, tidak di-commit — commit skill ini tetap terbatas pada `brief-*.md` dengan staging path eksplisit — dan tidak dihitung sebagai working tree kotor oleh gerbang git mana pun. Brief mengutip `file:baris` kode, bukan path laporan explorer.
+**Status berkas laporan.** `{taskdir}/.explore/` adalah zona kerja, bukan artefak rantai: tidak di-stage, tidak di-commit, tidak dicerminkan ke nataflow — dan tidak dihitung sebagai working tree kotor oleh gerbang git mana pun. Brief mengutip `file:baris` kode, bukan path laporan explorer.
 
 **Laci dipakai bersama.** Selain laporan `code-explorer`, `plan` menaruh dua berkas kerjanya sendiri di laci yang sama: `brief-matrix.md`/`brief-matrix.json` (matriks alokasi Fase 3 langkah 1) dan `brief-review-state.json` (materai ronde self-review Fase 5). Keduanya berstatus laci kerja yang sama persis — tidak di-stage, tidak di-commit, tidak dihitung working tree kotor — dan diletakkan di sini justru karena laci ini sudah dikecualikan tiap gerbang git di rantai. Nama berkasnya berawalan `brief-`, sehingga tidak pernah bertabrakan dengan `{slug}` dispatch explorer mana pun.
 

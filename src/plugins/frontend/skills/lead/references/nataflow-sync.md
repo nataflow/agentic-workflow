@@ -2,7 +2,7 @@
 
 Dimuat di main loop oleh skill pemilik titik status frontend. Subagent tidak pernah menjalankannya. Hasilnya tepat satu segmen `nataflow <…>` untuk baris penutup skill pemanggil: `nataflow workdir <nama> · <n> dokumen (<c> baru, <u> diperbarui, <s> sama)`, `nataflow repo · <n> dokumen (…)`, `nataflow dilewati`, atau `nataflow GAGAL: <sebab>`.
 
-Disk dan git tetap satu-satunya sumber kebenaran; nataflow hanya cermin. Prosedur ini tidak menulis berkas dan tidak meng-commit, sehingga ledger `## Chain`, materai approve (`Konten disetujui:`, `Sidik:`), dan tree bersih tidak tersentuh. `GAGAL` tidak menahan gate maupun eksekusi, dan sinkron diulang lewat rute "sinkron ulang taskdir" `frontend:lead`.
+Disk (dokumen taskdir) dan git (dokumen tingkat repo) tetap sumber kebenaran; nataflow hanya cermin. Prosedur ini tidak menulis berkas dan tidak meng-commit, sehingga ledger `## Chain`, `## Riwayat Rantai` (materai approve), dan tree bersih tidak tersentuh. Dokumen taskdir tidak di-commit (Langkah 24), jadi isinya dibaca dari disk; nataflow satu-satunya salinannya di luar mesin ini. `GAGAL` tidak menahan gate maupun eksekusi, dan sinkron diulang lewat rute "sinkron ulang taskdir" `frontend:lead`.
 
 `<sync_payload.py>` di bawah adalah `python3 <root plugin frontend>/skills/_common/sync_payload.py`, root yang sama dengan `chain.py` skill pemanggil.
 
@@ -10,11 +10,11 @@ Disk dan git tetap satu-satunya sumber kebenaran; nataflow hanya cermin. Prosedu
 
 | Skill | Titik | Target |
 |---|---|---|
-| `task` | Phase 4 sesudah commit akar | `--taskdir <taskdir>` |
-| `lead` | Keadaan `AKAR` sesudah commit akar tertinggal; Phase 8 sesudah `chain.py reopen`/`escalate`/`abandon` atau commit amandemen akar; rute "sinkron ulang taskdir" | `--taskdir <taskdir>` |
+| `task` | Phase 4 sesudah `chain.py root` | `--taskdir <taskdir>` |
+| `lead` | Keadaan `AKAR` sesudah `chain.py root` tertinggal; Phase 8 sesudah `chain.py reopen`/`escalate`/`abandon`/`amend`; rute "sinkron ulang taskdir" | `--taskdir <taskdir>` |
 | `ux-design`, `ui-design`, `contract`, `plan` | Butir **Setuju**, sesudah `chain.py approve` PASS | `--taskdir <taskdir>` |
 | `architect` | Sekali per putaran, sebelum baris `ARCHITECT — …` atau blok `### ARCHITECT — BLOCKED`/`TERTAHAN` | `--taskdir <taskdir>` |
-| `report` | Phase 4 sesudah commit `REPORT.md` | `--taskdir <taskdir>` |
+| `report` | Phase 4 sesudah `REPORT.md` lolos `validate_report.py` | `--taskdir <taskdir>` |
 | `review` | Sesudah commit laporan `frontenddev/reviews/` | `--repo-docs review` |
 | `profile` | Sesudah commit profil (termasuk PATCH) | `--repo-docs profile` |
 
@@ -56,7 +56,7 @@ Dipakai `review` dan `profile`. Urutannya sama dengan langkah taskdir, dengan pe
 ## Larangan
 
 - Dilarang menyusun, menyunting, meringkas, atau menerjemahkan nilai argumen di luar keluaran `sync_payload.py`. Satu-satunya nilai dari balikan tool adalah `task_id`, `workspace_id` task untuk `upsert_workdir`, dan `reference_id`. `metadata` dikirim sebagai teks JSON persis seperti tercetak.
-- Dilarang memilih berkas sendiri: dokumen gate `DRAFT`, hop yang DRIFT, `.explore/`, dan berkas yang belum ter-commit sengaja tidak ada di payload.
+- Dilarang memilih berkas sendiri: dokumen gate `DRAFT`, hop yang DRIFT, `.explore/`, dan akar yang belum terkunci sengaja tidak ada di payload. Berkas taskdir yang dihapus dari disk tidak didorong ulang; baris remote-nya dibiarkan dengan isi terakhir.
 - Dilarang memanggil `upsert_documents` (batch) atau `delete_document`. Berkas yang dihapus dari git sudah diterbitkan skrip dengan metadata `removed: true`.
 - Dilarang memilih workspace sendiri: `workspace_choices` selalu ditanyakan ke user, dan `--workspace` hanya menerima alias yang dipilih user.
 - Dilarang mengulang `create_task` sesudah tool galat tanpa `list_task` ulang. Tulisan yang ternyata sampai di server membuat task kembar.

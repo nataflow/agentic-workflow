@@ -1,7 +1,10 @@
-"""08c C3 — chain.py mempertahankan gaya line ending dokumen dan TASK.md."""
+"""08c C3 — chain.py mempertahankan gaya line ending dokumen dan TASK.md, dan hanya menyentuh baris miliknya."""
+import difflib
+import sys
+
 import pytest
 
-from conftest import FE_SKILLS, git, run_script
+from conftest import FE_SKILLS, fe_seal_root, git, run_script
 
 TD = "frontenddev/docs/2609240900-label"
 CHAIN = FE_SKILLS / "_common" / "chain.py"
@@ -80,15 +83,16 @@ def put(root, rel, text, crlf):
 
 
 def setup_ui(make_repo, crlf):
+    """Akar terkunci di disk dan draft `UI.md` tercatat (`chain.py draft`), seperti jalur `ui-design`."""
     root = make_repo()
     git(root, "checkout", "-q", "-b", "main")
     git(root, "config", "core.autocrlf", "false")
+    git(root, "commit", "-q", "--allow-empty", "-m", "init")
     put(root, f"{TD}/TASK.md", TASK, crlf)
-    git(root, "add", "-A")
-    git(root, "commit", "-qm", "docs(label): kunci TASK sebagai akar rantai")
+    fe_seal_root(root, TD)
     put(root, f"{TD}/UI.md", UI, crlf)
-    git(root, "add", "-A")
-    git(root, "commit", "-qm", "docs(label): draft UI.md")
+    proc = run_script(CHAIN, "draft", "--taskdir", TD, "--row", "UI", "--root", str(root))
+    assert proc.returncode == 0, proc.stdout + proc.stderr
     return root
 
 
@@ -97,36 +101,59 @@ def approve(root):
                       "--root", str(root))
 
 
+def snapshot(root):
+    return {d: (root / TD / d).read_bytes() for d in ("UI.md", "TASK.md")}
+
+
+def changed(before, after, doc):
+    """(baris diganti/dihapus, baris ditambah) antara dua isi berkas."""
+    a, b = before[doc].decode("utf-8").splitlines(), after[doc].decode("utf-8").splitlines()
+    diff = [l for l in difflib.unified_diff(a, b, lineterm="", n=0) if l[:1] in "+-" and l[:3] not in ("+++", "---")]
+    return sum(1 for l in diff if l.startswith("-")), sum(1 for l in diff if l.startswith("+"))
+
+
 @pytest.mark.parametrize("crlf", [True, False])
 def test_c3_approve_hanya_mengubah_satu_baris(make_repo, crlf):
     root = setup_ui(make_repo, crlf)
+    before = snapshot(root)
     proc = approve(root)
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    stat = git(root, "show", "--numstat", "--format=", "HEAD").split()
-    assert stat == ["1", "1", f"{TD}/TASK.md", "1", "1", f"{TD}/UI.md"]
+    after = snapshot(root)
+    assert changed(before, after, "UI.md") == (1, 1)                  # baris `status:`
+    assert changed(before, after, "TASK.md") == (1, 2)                # baris ledger + satu kejadian Riwayat
     for doc in ("UI.md", "TASK.md"):
-        data = (root / TD / doc).read_bytes()
-        assert (b"\r\n" in data) is crlf
+        assert (b"\r\n" in after[doc]) is crlf
     verify = run_script(CHAIN, "verify", "--taskdir", TD, "--rows", "UI", "--root", str(root))
     assert verify.returncode == 0, verify.stdout
+    assert git(root, "status", "--porcelain") == "", "approve tidak menyentuh git (Langkah 24)"
 
 
 def test_c3_reopen_mempertahankan_crlf(make_repo):
     root = setup_ui(make_repo, crlf=True)
     assert approve(root).returncode == 0
+    before = snapshot(root)
     proc = run_script(CHAIN, "reopen", "--taskdir", TD, "--row", "UI", "--reason", "revisi desain",
                       "--root", str(root))
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    stat = git(root, "show", "--numstat", "--format=", "HEAD").split()
-    assert stat == ["1", "1", f"{TD}/TASK.md", "1", "1", f"{TD}/UI.md"]
+    after = snapshot(root)
+    assert changed(before, after, "UI.md") == (1, 1) and changed(before, after, "TASK.md") == (1, 2)
+    assert all(b"\r\n" in data for data in after.values())
 
 
-def test_c3_commit_gagal_memulihkan_byte_persis(make_repo):
+def test_c3_tulis_gagal_memulihkan_byte_persis(make_repo, monkeypatch):
     root = setup_ui(make_repo, crlf=True)
-    before = {d: (root / TD / d).read_bytes() for d in ("UI.md", "TASK.md")}
-    hook = root / ".git" / "hooks" / "pre-commit"
-    hook.write_text("#!/bin/sh\nexit 1\n")
-    hook.chmod(0o755)
-    proc = approve(root)
-    assert proc.returncode == 1 and "gagal" in proc.stdout + proc.stderr
-    assert {d: (root / TD / d).read_bytes() for d in before} == before
+    before = snapshot(root)
+    sys.path.insert(0, str(FE_SKILLS / "_common"))
+    import chain as chain_mod
+    real = chain_mod.write_keep_newline
+
+    def flaky(path, text):
+        if path.name == "TASK.md":
+            raise OSError("disk penuh")
+        return real(path, text)
+
+    monkeypatch.setattr(chain_mod, "write_keep_newline", flaky)
+    with pytest.raises(chain_mod.ChainError, match="dipulihkan"):
+        chain_mod.Chain(TD, root).approve("UI", "Setujui desain")
+    monkeypatch.undo()
+    assert snapshot(root) == before

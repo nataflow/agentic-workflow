@@ -82,7 +82,7 @@ Tulis Bentuk B lebih dulu ke laci kerja — `{laci}<slug>.md` bila baris Laci te
 - **Read-only mutlak**: dilarang menyuruh subagent mengubah kode, menetapkan lane, atau mengambil keputusan rute arsitektur.
 - **Ambiguitas monorepo diselesaikan di hulu**: bila target app (`apps/web` vs `apps/mobile`) belum pasti, tetapkan lebih dulu di `{batas_cakupan}`. Subagent dilarang bertanya balik.
 - **Periksa `.frontenddev/` terabaikan git**: sebelum dispatch pertama di sebuah repo, periksa baris berjangkar `/.frontenddev/` dan `frontenddev/docs/**/.explore/` berlaku — exit code `git check-ignore -q .frontenddev` dan `git check-ignore -q frontenddev/docs/x/.explore/y` keduanya 0, bukan `grep` atas `.gitignore`. **WHEN** belum ada: hentikan dispatch dan rutekan ke `frontend:profile` mode REFRESH — gate itu pemilik tunggal baris tersebut dan meng-commitnya bersama profil. Dilarang menuliskannya sendiri: `.gitignore` yang berubah tanpa pemilik commit menggantung sepanjang taskdir dan merusak gerbang "tree bersih" milik `code-implementor`.
-- **Artefak scratch, bukan keputusan**: `.frontenddev/` adalah workdir gitignored — berbeda dari taskdir `./frontenddev/docs/` yang di-commit per gate. Dilarang men-stage atau meng-commit laporan explore.
+- **Artefak scratch, bukan keputusan**: `.frontenddev/` adalah workdir gitignored — berbeda dari taskdir `./frontenddev/docs/` yang dikunci skrip per gate dan dicerminkan ke nataflow (keduanya tidak di-commit). Dilarang men-stage atau meng-commit laporan explore.
 - **Audit hidrasi sebelum berangkat**: batalkan dispatch bila prompt masih memuat slot kurung kurawal `{...}` mentah atau placeholder `TBD`/`TODO`. Penanda `<...>` di dalam blok `Format laporan` bukan slot — ia diisi subagent.
 
 ### Penanganan Balikan

@@ -2,7 +2,7 @@
 
 Gunakan template ini saat `architect` mendispatch subagent eksekutor brief (`code-implementor`) secara langsung.
 
-**Tujuan:** Mengubah satu brief `READY` menjadi perubahan `src/**` dalam batas `files_touched` tanpa satu pun perintah terminal, lalu menulis `{taskdir}/report-<NN>.md` sebagai balikan persisten yang dikunci `architect` dengan commit atomik.
+**Tujuan:** Mengubah satu brief `READY` menjadi perubahan `src/**` dalam batas `files_touched` tanpa satu pun perintah terminal, lalu menulis `{taskdir}/report-<NN>.md` sebagai balikan persisten; `architect` mengunci unit dengan status `DONE` di disk dan commit kode atomik (laporan tidak di-commit, Langkah 24).
 
 **Dispatch setelah:** Ingest (`references/execution-protocol.md` bagian 1) `PASS` untuk unit ini.
 
@@ -85,7 +85,7 @@ Balikan chat hanya penunjuk; keputusan diambil dari **disk** lewat matriks `refe
 | Balikan | Penanganan `architect` |
 | --- | --- |
 | `REPORT <unit>: DONE` | Matriks bagian 3; bersih → commit unit |
-| `REPORT <unit>: FAILED` | Matriks bagian 3 → commit BLOCKED, rantai berhenti |
+| `REPORT <unit>: FAILED` | Matriks bagian 3 → tandai BLOCKED, rantai berhenti |
 | Payload lain, kosong, atau error | Kegagalan dispatch: cek `report-<NN>.md` dan tree lebih dulu — laporan mungkin sudah tertulis; lalu baris matriks yang berlaku |
 
 **Subagent mengembalikan:** satu baris penunjuk `report-<NN>.md`; isinya dibaca dari disk.

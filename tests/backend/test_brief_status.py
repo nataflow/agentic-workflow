@@ -1,6 +1,6 @@
 """Pustaka `_common/brief_status.py` (L2.2, L2.3, L2.4, L2.10)."""
 
-from conftest import BE_SKILLS, TD, brief, commit, write_files, load_module
+from conftest import BE_SKILLS, TD, brief, commit, git, land, write_files, load_module
 
 bs = load_module(BE_SKILLS / "_common" / "brief_status.py", "be_brief_status")
 
@@ -40,22 +40,26 @@ def test_validate_links_requires_bidirectional():
 
 
 def test_review_freshness_matrix(chain_repo):
+    """Kesegaran dari ujung `range:` REVIEW.md (24 K9): REVIEW.md tidak di-commit, kode baru selalu membasikannya."""
     root = chain_repo
-    brief(root, "01", "lock", "DONE")
-    commit(root, "fix(order): implement lock")
-    write_files(root, {f"{TD}/REVIEW.md": "r\n"})
-    assert bs.review_freshness(root, TD) == (False, "REVIEW.md belum ter-commit")
-    commit(root, "docs(order-fix): add final review report")
+    land(root, brief(root, "01", "lock", "READY"))
+    assert bs.review_freshness(root, TD) == (False, "REVIEW.md belum ada")
+    write_files(root, {f"{TD}/REVIEW.md": "---\nhighest: CLEAN\n---\nr\n"})
+    fresh, why = bs.review_freshness(root, TD)
+    assert not fresh and "tanpa `range" in why
+    write_files(root, {f"{TD}/REVIEW.md": "---\nrange: aaaaaaa..deadbee (1 commit)\n---\nr\n"})
+    fresh, why = bs.review_freshness(root, TD)
+    assert not fresh and "bukan leluhur HEAD" in why
+    head = git(root, "rev-parse", "HEAD").strip()
+    write_files(root, {f"{TD}/REVIEW.md": f"---\nrange: aaaaaaa..{head[:7]} (1 commit)\n---\nr\n"})
     assert bs.review_freshness(root, TD)[0]
     write_files(root, {".claude/profile/backenddev/commands.md": "# c2\n", "backenddev/issues/README.md": "x\n",
                        f"{TD}/REPORT.md": "r\n"})
-    commit(root, "docs: profile + index + report")
-    assert bs.review_freshness(root, TD)[0]
-    brief(root, "02", "fix", "DONE")
-    write_files(root, {"src/order.go": "package order\n// fix\n"})
-    commit(root, "fix(order): implement fix")
+    commit(root, "docs: profile + index")
+    assert bs.review_freshness(root, TD)[0], "profil dan indeks issues bukan kode"
+    land(root, brief(root, "02", "fix", "READY"))
     fresh, why = bs.review_freshness(root, TD)
-    assert not fresh and "1 commit brief/kode" in why
+    assert not fresh and "1 commit kode" in why
 
 
 def test_landed_sha_exact_subject(chain_repo):

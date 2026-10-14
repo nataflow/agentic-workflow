@@ -15,21 +15,23 @@ Isinya lima kelompok:
    ditolak skrip prasyarat tanpa satu pun pesan yang menyebut sebabnya.
 2. **Git & frontmatter** — akar repo, pemanggil git, satu parser frontmatter
    (`split_frontmatter`) untuk **semua** skrip termasuk validator, penyaring
-   laci `.explore/`, dan uji ter-commit. Satu parser berarti status artefak yang
-   sama tidak pernah divonis berbeda oleh dua gerbang.
+   laci `.explore/`, dan bukti `DONE` dari commit kode. Satu parser berarti status
+   artefak yang sama tidak pernah divonis berbeda oleh dua gerbang.
 3. **Lane & sections** — enum lane berakar, nilai `sections`, dan invarian
    pasangan keduanya. Ketiganya dibaca dari frontmatter `TASK.md`, bukan
    disimpulkan dari berkas yang kebetulan ada.
-4. **Ledger `## Chain`** — pembaca/penulis baris ledger, uji keutuhan konten
-   yang disetujui (drift), dan penghitung plafon (revisi, re-entry, eskalasi).
-   CLI-nya `chain.py`; hilir memakai `check_chain_rows`.
+4. **Ledger `## Chain` dan `## Riwayat Rantai`** — pembaca/penulis baris ledger
+   dan kejadian Riwayat (Langkah 24: dokumen taskdir tidak di-commit, jadi materai
+   approve, plafon, dan epoch dibaca dari Riwayat di `TASK.md`), uji keutuhan
+   konten yang disetujui (drift), dan penghitung plafon (revisi, re-entry,
+   eskalasi). CLI-nya `chain.py`; hilir memakai `check_chain_rows`.
 5. **Blok check & laporan** — check yang pesannya sama persis di banyak
    gerbang, plus format laporan teks/JSON baku.
 
 Zero external dependencies (Python Standard Library only).
 """
 
-import fnmatch
+import datetime
 import hashlib
 import json
 import os
@@ -38,6 +40,10 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import docs_git as _docs_git  # noqa: E402
+from verify_scope import SIDIK_FIELD  # noqa: E402
 
 KNOWN_STACKS = ("react-vite", "react-native", "sveltekit", "svelte-vite")
 TASKDIR_PATTERN = re.compile(r"^frontenddev/docs/\d{10}-[a-z0-9-]+$")
@@ -301,7 +307,8 @@ def as_list(value: Any) -> List[str]:
 def is_committed(root: Path, rel: str) -> bool:
     """Benar bila `rel` pernah di-commit **dan** tidak punya perubahan menggantung.
 
-    Status yang tak terbaca bukan "tanpa perubahan" (12 J17): hasilnya False.
+    Hanya untuk dokumen tingkat repo (mis. `finding_source` di `frontenddev/reviews/`): dokumen taskdir tidak
+    pernah di-commit (Langkah 24). Status yang tak terbaca bukan "tanpa perubahan" (12 J17): hasilnya False.
     """
     if not git(root, "log", "-1", "--format=%h", "--", rel).strip():
         return False
@@ -311,23 +318,6 @@ def is_committed(root: Path, rel: str) -> bool:
         return False
 
 
-def last_commit(root: Path, *paths: str) -> str:
-    """Sha pendek commit terakhir yang menyentuh salah satu `paths`, atau kosong."""
-    return git(root, "log", "-1", "--format=%h", "--", *paths).strip()
-
-
-def _status_at(root: Path, rev: str, rel: str) -> str:
-    try:
-        proc = subprocess.run(["git", "-C", str(root), "show", f"{rev}:{rel}"], stdout=subprocess.PIPE,
-                              stderr=subprocess.DEVNULL)
-    except OSError:
-        return ""
-    if proc.returncode != 0:
-        return ""
-    value = parse_frontmatter(proc.stdout.decode("utf-8", errors="replace")).get("status", "")
-    return value.strip() if isinstance(value, str) else ""
-
-
 def carries_code(root: Path, sha: str) -> bool:
     """Commit menyentuh berkas di luar dokumen rantai (`frontenddev/`, `.claude/`)."""
     return bool(git(root, "show", "--name-only", "--format=", sha, "--", ".", ":(exclude)frontenddev",
@@ -335,15 +325,26 @@ def carries_code(root: Path, sha: str) -> bool:
 
 
 def done_landed(root: Path, brief_rel: str) -> str:
-    """Sha pendek commit transisi `→ DONE` brief yang membawa kode, atau kosong (12 J15, padanan 09 E18).
+    """Sha pendek commit unit brief `DONE` yang membawa kode, atau kosong (24 K7, padanan 09 E18 dan 12 J15).
 
-    architect meng-commit `status: DONE` bersama kode unit dan `report-<NN>.md` dalam satu commit; subjek
-    `implement unit NN` dapat diketik di commit yang hanya membawa dokumen. fe tidak punya koreksi
-    brief-saja (11 H5), jadi transisi tanpa kode tidak pernah sah.
+    Dokumen taskdir tidak di-commit (Langkah 24), jadi transisi `→ DONE` tidak lagi ada di riwayat git. Buktinya
+    kini dua: status `DONE` di disk, dan commit `<type>(<slug>): implement unit <NN>` di `base_commit..HEAD` yang
+    membawa kode. `DONE` yang diketik tangan tanpa commit kode tetap tertangkap. Subjek yang diketik di commit
+    tanpa kode juga tidak dihitung.
     """
-    for sha in git(root, "log", "--format=%H", "--", brief_rel).splitlines():
-        if _status_at(root, sha, brief_rel) == "DONE" and _status_at(root, f"{sha}^", brief_rel) != "DONE":
-            return sha[:7] if carries_code(root, sha) else ""
+    path = root / brief_rel
+    m = re.match(r"^brief-(\d{2})-", path.name)
+    if not m or read_status(path) != "DONE":
+        return ""
+    taskdir_rel = Path(brief_rel).parent.as_posix()
+    base = task_root_sha(root, taskdir_rel)
+    if not base:
+        return ""
+    rx = re.compile(rf"^[a-z]+!?\({re.escape(taskdir_slug(taskdir_rel))}\)!?: implement unit {m.group(1)}\b")
+    for line in git(root, "log", "--format=%H %s", f"{base}..HEAD").splitlines():
+        sha, _, subject = line.partition(" ")
+        if rx.match(subject) and carries_code(root, sha):
+            return sha[:7]
     return ""
 
 
@@ -1014,10 +1015,11 @@ def replace_chain_row(task_text: str, row: str, new_line: str) -> str:
 
 
 def strip_status_line(text: str) -> str:
-    """Isi dokumen tanpa baris `status:` frontmatter **pertama** — basis uji keutuhan konten.
+    """Isi dokumen tanpa baris `status:` dan `sidik_kontrak:` frontmatter **pertama** — basis uji keutuhan konten.
 
-    Hanya yang pertama (12 J31): baris `status:` kedua yang disisipkan sesudah approval adalah
-    perubahan konten, bukan transisi status.
+    Hanya yang pertama (12 J31): baris `status:` kedua yang disisipkan sesudah approval adalah perubahan konten,
+    bukan transisi status. `sidik_kontrak:` ditulis `chain.py approve --row BRIEF` sesudah ronde reviewer (24 K10),
+    jadi ia tidak boleh mengubah sidik konten yang sudah direview.
     """
     if not text.startswith("---"):
         return text
@@ -1025,100 +1027,201 @@ def strip_status_line(text: str) -> str:
     if end == -1:
         return text
     head = re.sub(r"^status:.*\n?", "", text[3:end], count=1, flags=re.MULTILINE)
+    # Baris beserta newline di depannya: `set_frontmatter_field` menambahkan field baru di ujung frontmatter, dan
+    # isi tanpa baris itu wajib persis isi sebelum ia ditulis.
+    head = re.sub(rf"\n{SIDIK_FIELD}:[^\n]*", "", head, count=1)
     return "---" + head + text[end:]
 
 
-def show_at(root: Path, sha: str, rel: str) -> Optional[str]:
-    """Isi berkas `rel` pada commit `sha`, atau `None` bila tidak ada di sana."""
+# ---------------------------------------------------------------- Riwayat Rantai (24 K5)
+#
+# Dokumen taskdir tidak di-commit (Langkah 24), jadi subjek dan badan commit `TASK.md` tidak lagi menjadi jejak
+# rantai. Penggantinya seksi `## Riwayat Rantai` di ujung `TASK.md`: satu baris per kejadian, bernomor urut, dan
+# hanya ditulis `chain.py`. Materai approve adalah kejadian `approve`; plafon, epoch, dan putaran dihitung dari
+# kejadian `reopen`/`eskalasi`/`draft`. Batasnya sama dengan materai analyst: suntingan yang tidak lewat skrip
+# terdeteksi, tetapi skrip tidak dapat membuktikan keaslian Riwayat itu sendiri.
+
+HISTORY_HEADING = "## Riwayat Rantai"
+HISTORY_KINDS = ("akar", "draft", "approve", "reopen", "eskalasi", "amandemen", "abandon")
+HISTORY_FREE = ("persetujuan", "alasan")
+HISTORY_SEP = " · "
+_HISTORY_LINE = re.compile(r"^- (?P<n>\d+) · (?P<kind>[a-z]+)(?P<rows>(?: (?:FLOW|UI|CONTRACT|BRIEF))*) · "
+                           r"(?P<rest>.+)$")
+_HISTORY_FIELD = re.compile(r"^(?P<key>[a-z]+) (?P<value>\S.*)$")
+_CHAIN_CUT = re.compile(r"^## (?:Chain|Riwayat Rantai)[ \t]*$", re.MULTILINE)
+ROOT_KINDS = ("akar", "eskalasi", "amandemen")       # kejadian yang mencatat sidik akar baru
+
+
+def history_section(task_text: str) -> Optional[List[str]]:
+    """Baris seksi `## Riwayat Rantai` tanpa heading-nya, atau `None` bila seksinya absen."""
+    _, body = split_frontmatter(task_text)
+    lines = body.splitlines()
+    out: Optional[List[str]] = None
+    for line, fenced in zip(lines, fenced_mask(lines)):
+        if line.startswith("## ") and not fenced:
+            if out is not None:
+                break
+            if line.strip() == HISTORY_HEADING:
+                out = []
+            continue
+        if out is not None:
+            out.append(line)
+    return out
+
+
+def read_history(task_text: str) -> Tuple[List[Dict[str, Any]], str]:
+    """Kejadian `## Riwayat Rantai` berurutan, dan masalahnya (kosong bila utuh).
+
+    Tiap kejadian: `n`, `kind`, `rows` (hop), `fields` (dict), dan `free` (`(kunci, teks)` atau `None`). Seksi
+    absen berarti nol kejadian (akar belum dikunci). Baris tak terurai, nomor yang tidak berurut dari 1, jenis
+    tak dikenal, atau field ganda adalah masalah: Riwayat yang disunting tangan tidak pernah dibaca setengah.
+    """
+    events: List[Dict[str, Any]] = []
+    for raw in history_section(task_text) or []:
+        line = raw.strip()
+        if not line:
+            continue
+        m = _HISTORY_LINE.match(line)
+        if not m or m.group("kind") not in HISTORY_KINDS:
+            return [], f"baris tak terurai `{line[:80]}`"
+        n = int(m.group("n"))
+        if n != len(events) + 1:
+            return [], f"nomor kejadian {n} ≠ urutan {len(events) + 1}"
+        parts = m.group("rest").split(HISTORY_SEP)
+        fields: Dict[str, str] = {}
+        free: Optional[Tuple[str, str]] = None
+        for i, part in enumerate(parts):
+            key = next((k for k in HISTORY_FREE if part.startswith(f"{k}: ")), "")
+            if key:
+                free = (key, HISTORY_SEP.join(parts[i:])[len(key) + 2:])
+                break
+            f = _HISTORY_FIELD.match(part)
+            if not f or f.group("key") in fields:
+                return [], f"kejadian #{n}: field `{part[:40]}` tak terurai atau ganda"
+            fields[f.group("key")] = f.group("value")
+        events.append({"n": n, "kind": m.group("kind"), "rows": m.group("rows").split(), "fields": fields,
+                       "free": free})
+    return events, ""
+
+
+def task_history(root: Path, taskdir_rel: str) -> Tuple[List[Dict[str, Any]], str]:
+    """`read_history` atas `TASK.md` taskdir; berkas absen = nol kejadian."""
+    path = root / taskdir_rel / "TASK.md"
+    if not path.is_file():
+        return [], ""
     try:
-        return subprocess.check_output(["git", "-C", str(root), "show", f"{sha}:{rel}"],
-                                       stderr=subprocess.DEVNULL, universal_newlines=True)
-    except Exception:
-        return None
+        return read_history(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError):
+        return [], f"`{taskdir_rel}/TASK.md` tak terbaca atau {NOT_UTF8}"
 
 
-def doc_drift(root: Path, rel: str, sha: str) -> str:
-    """Kosong bila isi `rel` di disk sama dengan isinya di `sha` kecuali baris `status:`."""
-    then = show_at(root, sha, rel)
-    if then is None:
-        return f"`{rel}` tidak ada pada commit {sha}"
+def history_line(n: int, kind: str, rows: Iterable[str], fields: Iterable[Tuple[str, str]],
+                 free: Optional[Tuple[str, str]] = None) -> str:
+    """Satu baris kejadian. Teks bebas (`persetujuan:`/`alasan:`) selalu di ujung, satu baris (12 J46)."""
+    now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    parts = [f"- {n} · {kind}" + "".join(f" {r}" for r in rows)]
+    parts += [f"{k} {v}" for k, v in fields] + [f"waktu {now}"]
+    if free:
+        parts.append(f"{free[0]}: {free[1]}")
+    return HISTORY_SEP.join(parts)
+
+
+def append_history(task_text: str, line: str) -> str:
+    """Tambah satu kejadian di ujung `## Riwayat Rantai`; seksinya dibuat di ujung berkas bila belum ada."""
+    if history_section(task_text) is None:
+        return task_text.rstrip("\n") + f"\n\n{HISTORY_HEADING}\n\n{line}\n"
+    lines = task_text.split("\n")
+    mask = fenced_mask(lines)
+    idx = next(i for i, (l, f) in enumerate(zip(lines, mask)) if not f and l.strip() == HISTORY_HEADING)
+    end = next((i for i in range(idx + 1, len(lines)) if not mask[i] and lines[i].startswith("## ")), len(lines))
+    last = max([i for i in range(idx + 1, end) if lines[i].strip()] or [idx])
+    lines[last + 1:last + 1] = ["", line] if last == idx else [line]
+    return "\n".join(lines)
+
+
+def root_sidik(task_text: str) -> str:
+    """Sidik akar `TASK.md`: isi sebelum `## Chain` tanpa baris `status:` (24, pengganti `is_committed`).
+
+    Ledger dan Riwayat ditulis `chain.py` sesudah akar dikunci, dan `status:` berubah lewat `abandon`; ketiganya di
+    luar sidik. Suntingan akar lainnya hanya sah lewat `chain.py amend`/`escalate`, yang mencatat sidik baru.
+    """
+    text = strip_status_line(task_text.lstrip(BOM).replace("\r\n", "\n").replace("\r", "\n"))
+    m = _CHAIN_CUT.search(text)
+    return hashlib.sha1((text[:m.start()] if m else text).rstrip().encode("utf-8")).hexdigest()
+
+
+def sc_sidik(task_text: str) -> str:
+    """Sidik 12 hex butir `SC-{n}` `TASK.md` — materai approve mengikat hop pada SC saat disetujui."""
+    data = json.dumps(sc_ids(task_text), sort_keys=True, ensure_ascii=False)
+    return hashlib.sha1(data.encode("utf-8")).hexdigest()[:12]
+
+
+def file_sidik(root: Path, rel: str) -> str:
+    """Sidik 12 hex isi satu berkas tanpa baris `status:`/`sidik_kontrak:`, atau `absen`."""
     path = root / rel
     if not path.is_file():
-        return f"`{rel}` hilang dari disk"
-    try:
-        now = path.read_text(encoding="utf-8")
-    except UnicodeDecodeError:
-        return f"`{rel}` {NOT_UTF8}"
-    if strip_status_line(now) != strip_status_line(then):
-        return f"`{rel}` berubah sesudah disetujui @ {sha}"
+        return "absen"
+    text = path.read_text(encoding="utf-8", errors="replace")
+    return hashlib.sha1(strip_status_line(text).encode("utf-8")).hexdigest()[:12]
+
+
+def berkas_value(root: Path, taskdir_rel: str, names: Iterable[str]) -> str:
+    """Field `berkas` kejadian: `<nama>=<status>:<sidik12>` dipisah `;` (status `REVIEW-PLAN.md` = verdict-nya)."""
+    items = []
+    for name in names:
+        status = read_status(root / taskdir_rel / name, "verdict" if name == "REVIEW-PLAN.md" else "status")
+        items.append(f"{name}={status or '-'}:{file_sidik(root, f'{taskdir_rel}/{name}')}")
+    return ";".join(items) or "-"
+
+
+def parse_berkas(value: str) -> Dict[str, Tuple[str, str]]:
+    """Kebalikan `berkas_value`: `{nama: (status, sidik12)}`."""
+    out: Dict[str, Tuple[str, str]] = {}
+    for item in (value or "").split(";"):
+        name, _, rest = item.partition("=")
+        if name and name != "-":
+            status, _, sidik = rest.partition(":")
+            out[name] = (status, sidik)
+    return out
+
+
+def last_root_seal(events: List[Dict[str, Any]]) -> str:
+    """Sidik akar (12 hex) yang dicatat kejadian `akar`/`eskalasi`/`amandemen` terakhir, atau kosong."""
+    for e in reversed(events):
+        if e["kind"] in ROOT_KINDS:
+            return e["fields"].get("akar", "")
     return ""
 
 
-def brief_set_drift(root: Path, taskdir_rel: str, sha: str) -> str:
-    """Kosong bila himpunan brief + `REVIEW-PLAN.md` sama dengan saat `sha`, kecuali baris status."""
-    listed = git(root, "ls-tree", "--name-only", sha, f"{taskdir_rel}/").splitlines()
-    then = sorted(Path(p).name for p in listed if re.match(r"brief-\d{2}-.*\.md$", Path(p).name))
-    now = sorted(p.name for p in (root / taskdir_rel).glob(BRIEF_GLOB))
-    if then != now:
-        added = sorted(set(now) - set(then))
-        gone = sorted(set(then) - set(now))
-        parts = ([f"ditambah {', '.join(added)}"] if added else []) + \
-                ([f"hilang {', '.join(gone)}"] if gone else [])
-        return "himpunan brief berubah sesudah breakdown disetujui: " + "; ".join(parts)
-    for name in now + (["REVIEW-PLAN.md"] if "REVIEW-PLAN.md" in
-                       [Path(p).name for p in listed] else []):
-        drift = doc_drift(root, f"{taskdir_rel}/{name}", sha)
-        if drift:
-            return drift
-    allowed = {("READY", "READY"), ("READY", "DONE"), ("READY", "BLOCKED"), ("DONE", "DONE"),
-               ("DONE", "BLOCKED"), ("BLOCKED", "BLOCKED")}
-    for name in now:
-        rel = f"{taskdir_rel}/{name}"
-        before = parse_frontmatter(show_at(root, sha, rel) or "").get("status", "")
-        after = read_status(root / rel)
-        if (str(before).strip(), after) not in allowed:
-            return f"`{name}` berpindah status `{before}` → `{after}` — transisi di luar siklus brief"
-    return ""
+def last_draft(events: List[Dict[str, Any]], row: str) -> Optional[Dict[str, Any]]:
+    """Kejadian `draft <row>` terbaru sesudah `reopen` terakhir yang membuka hop itu, atau `None`."""
+    for e in reversed(events):
+        if e["kind"] == "reopen" and row in e["rows"]:
+            return None
+        if e["kind"] == "draft" and e["rows"] == [row]:
+            return e
+    return None
 
 
-def norm_subject(subject: str) -> str:
-    """Subjek commit untuk perbandingan: spasi dirapatkan, huruf disamakan (09 E14).
+def revisions_since_open(root: Path, taskdir_rel: str, row: str) -> int:
+    """Revisi berturut hop `row` sejak `reopen` apa pun atau `approve` hop itu (12 J43, Riwayat 24 K5).
 
-    Subjek draft/revisi diketik model; salah spasi atau huruf tidak boleh membuat hitungan revisi
-    turun diam-diam. Normalisasi ini tidak melonggarkan kata kuncinya.
+    Hanya kejadian `draft` **pertama** putaran itu yang merupakan draft; tiap `draft` sesudahnya adalah revisi.
+    Dulu subjek `draft` ulang me-reset plafon; kini satu jenis kejadian dan hitungannya sama. Amandemen akar dan
+    eskalasi bukan batas putaran.
     """
-    return " ".join(subject.split()).casefold()
+    return max(0, drafts_since_open(task_history(root, taskdir_rel)[0], row) - 1)
 
 
-def count_subjects(root: Path, pattern: str, *paths: str) -> int:
-    """Jumlah commit yang subjeknya cocok `pattern` (regex), opsional terbatas `paths`."""
-    out = git(root, "log", "--format=%s", "--", *paths) if paths else git(root, "log", "--format=%s")
-    rx = re.compile(pattern)
-    return sum(1 for s in out.splitlines() if rx.search(s))
-
-
-def revisions_since_open(root: Path, rel_paths: List[str], slug: str, label: str) -> int:
-    """Revisi berturut sejak reopen/approve terakhir: subjek `docs(<slug>): revise <label>` (12 J43).
-
-    Hanya `draft <label>` **pertama** putaran itu yang merupakan draft; tiap `draft` sesudahnya adalah
-    revisi terselubung — dulu subjek `draft` ulang me-reset plafon. `TASK.md` taskdir ikut dibaca
-    karena commit `reopen`/`approve breakdown` hanya menyentuh `TASK.md`: tanpanya reopen hop BRIEF
-    tidak pernah menghentikan hitungan. Amandemen akar bukan batas putaran.
-    """
-    task_rel = f"{Path(rel_paths[0]).parent.as_posix()}/TASK.md" if rel_paths else ""
-    out = git(root, "log", "--format=%s", "--", *rel_paths, *([task_rel] if task_rel else []))
-    count = drafts = 0
-    head = norm_subject(f"docs({slug}):")
-    revise, draft = f"{head} revise {label.casefold()}", f"{head} draft {label.casefold()}"
-    stops = (f"{head} reopen", f"{head} approve {label.casefold()}")
-    for subject in map(norm_subject, out.splitlines()):
-        if subject.startswith(revise):
-            count += 1
-        elif subject.startswith(draft):
-            drafts += 1
-        elif subject.startswith(stops):
+def drafts_since_open(events: List[Dict[str, Any]], row: str) -> int:
+    """Kejadian `draft <row>` sejak `reopen` apa pun atau `approve` hop itu — basis hitungan revisi."""
+    drafts = 0
+    for e in reversed(events):
+        if e["kind"] == "reopen" or (e["kind"] == "approve" and e["rows"] == [row]):
             break
-    return count + max(0, drafts - 1)
+        if e["kind"] == "draft" and e["rows"] == [row]:
+            drafts += 1
+    return drafts
 
 
 # ================================================================ 5. blok check & laporan
@@ -1264,20 +1367,19 @@ def check_plugin_files(add: AddFn, cid: int, skill_dir: Path, files: Iterable[st
     return True
 
 
-def check_worktree(add: AddFn, cid: int, root: Path, taskdir_rel: str = "",
-                   allow: Iterable[str] = (), own_action: str = "", foreign_action: str = "") -> bool:
-    """Tree bersih; path di `allow` (mis. `REPORT.md` tertunda) tidak dihitung kotor.
+def check_worktree(add: AddFn, cid: int, root: Path, taskdir_rel: str = "", foreign_action: str = "") -> bool:
+    """Tree bersih di luar laci kerja.
 
-    `own_action` = tindakan gate ini bila seluruh kotoran milik taskdir-nya sendiri (12 J22); tanpanya
-    dipakai tindakan draft gate dokumen (`review_round.py commit`). `foreign_action` menggantikan tindakan
-    kotoran di luar taskdir — mis. jejak perintah verifikasi penutup (12 J55); tanpanya kotoran itu kerja user.
+    Dokumen taskdir diabaikan git (Langkah 24), jadi draft atau laporan yang tertunda tidak pernah tampak kotor dan
+    cabang "kotoran milik taskdir sendiri" (12 J22) tidak lagi ada. `foreign_action` menggantikan tindakan baku,
+    mis. jejak perintah verifikasi penutup (12 J55); tanpanya kotoran itu kerja user. `taskdir_rel` dipertahankan
+    demi pemanggil lama dan tidak dipakai.
     """
     name = "Working tree bersih"
     if not is_git_repo(root):
         add(cid, name, "FAIL", "git tidak dapat membaca repo (bukan repo git, atau ditolak git)",
             "Jalankan di root repo git yang sah; tree yang tak terbaca tidak pernah dianggap bersih.")
         return False
-    allowed = set(allow)
     try:
         lines = dirty_lines(root)
     except GitError as exc:
@@ -1285,33 +1387,23 @@ def check_worktree(add: AddFn, cid: int, root: Path, taskdir_rel: str = "",
             "Pulihkan repo (mis. index rusak: `git reset` atas persetujuan user) lalu ulangi prasyarat; "
             "tree yang tak terbaca tidak pernah dianggap bersih.")
         return False
-    dirty = [l for l in lines if l[3:].strip().strip('"') not in allowed]
-    if dirty:
-        paths = [l[3:].strip().strip('"') for l in dirty]
-        preview = ", ".join(paths[:5])
-        own = bool(taskdir_rel) and all(p.startswith(taskdir_rel + "/") for p in paths)
-        add(cid, name, "FAIL", f"{len(dirty)} berkas belum bersih: {preview}",
-            own_action if own and own_action else
-            "Seluruhnya artefak taskdir ini dari sesi lalu. `CONTRACT.md` atau batch brief lane "
-            "non-MINOR: commit hanya lewat `review_round.py commit --gate <contract|plan> --subject "
-            "\"<subjek gate pemiliknya>\"` — skrip menolak bila ronde reviewer terakhir belum `PASS` "
-            "atas konten itu (cek dulu: `review_round.py status --ready`); ditolak → **jangan commit**, "
-            "lanjutkan dari validator + ronde reviewer gate itu. Brief lane MINOR dan `FLOW.md`/`UI.md` "
-            "(tanpa ronde): commit hanya bila validator gate itu `PASS`. Lalu ulangi prasyarat."
-            if own else foreign_action or
-            "Commit atomik gate ini menuntut tree bersih. Kotoran yang bukan milik rantai "
-            "adalah kerja user — laporkan, jangan di-stash sendiri.")
+    if lines:
+        paths = [l[3:].strip().strip('"') for l in lines]
+        add(cid, name, "FAIL", f"{len(lines)} berkas belum bersih: {', '.join(paths[:5])}",
+            foreign_action or "Commit kode gate ini menuntut tree bersih. Kotoran yang bukan milik rantai adalah "
+                              "kerja user — laporkan, jangan di-stash sendiri.")
         return False
     add(cid, name, "PASS", "nol perubahan menggantung")
     return True
 
 
 def check_task_root(add: AddFn, cid: int, root: Path, taskdir_rel: str) -> Tuple[str, List[str]]:
-    """`TASK.md` akar wajib ada, ter-commit, `ACTIVE`, dan pasangan lane/sections-nya sah.
+    """`TASK.md` akar wajib ada, terkunci, `ACTIVE`, utuh, dan pasangan lane/sections-nya sah.
 
-    Mengembalikan `(lane, sections)` bila lolos, atau `("", [])`. Taskdir tanpa
-    `TASK.md` selalu `FAIL`: sejak v0.4.0 tidak ada lagi taskdir warisan yang
-    dilayani tanpa akar.
+    Terkunci (24 K6): `base_commit` sah dan kejadian `akar` di `## Riwayat Rantai` (`chain.py root`). Utuh: sidik
+    akar sama dengan sidik yang dicatat kejadian `akar`/`eskalasi`/`amandemen` terakhir — pengganti "ter-commit
+    tanpa perubahan menggantung" sejak dokumen taskdir tidak di-commit. Mengembalikan `(lane, sections)` bila
+    lolos, atau `("", [])`. Taskdir tanpa `TASK.md` selalu `FAIL`.
     """
     name = "TASK.md akar, lane & sections"
     rel = f"{taskdir_rel}/TASK.md"
@@ -1320,9 +1412,22 @@ def check_task_root(add: AddFn, cid: int, root: Path, taskdir_rel: str) -> Tuple
         add(cid, name, "FAIL", "`TASK.md` tidak ada di taskdir",
             "Kunci akar lewat `frontend:task` (dipanggil `frontend:lead` Phase 7) lebih dulu.")
         return "", []
-    if not is_committed(root, rel):
-        add(cid, name, "FAIL", "`TASK.md` belum ter-commit atau punya perubahan menggantung",
-            "Akar wajib terkunci commit sebelum gate hilir berangkat.")
+    events, problem = task_history(root, taskdir_rel)
+    if problem:
+        add(cid, name, "FAIL", f"`## Riwayat Rantai` rusak: {problem}",
+            "Laporkan ke user lewat `frontend:lead`; Riwayat hanya ditulis `chain.py`, dilarang menambalnya "
+            "dengan tangan.")
+        return "", []
+    base, problem = task_base_commit(root, taskdir_rel)
+    if not events or events[0]["kind"] != "akar" or not base:
+        add(cid, name, "FAIL", "akar belum terkunci — `base_commit` atau kejadian `akar` di `## Riwayat Rantai` "
+                               "tidak ada",
+            "Akar wajib terkunci `chain.py root` (`frontend:task` Phase 4) sebelum gate hilir berangkat.")
+        return "", []
+    if problem:
+        add(cid, name, "FAIL", f"`base_commit`: {problem}",
+            "Branch kerja ditulis ulang (rebase/reset) sesudah akar dikunci; laporkan ke user lewat "
+            "`frontend:lead` — dilarang menyunting `base_commit` dengan tangan.")
         return "", []
     status = read_status(path)
     if status != "ACTIVE":
@@ -1336,68 +1441,67 @@ def check_task_root(add: AddFn, cid: int, root: Path, taskdir_rel: str) -> Tuple
             "Perbaiki lewat `chain.py escalate` di `frontend:lead`; dilarang menyunting "
             "frontmatter `TASK.md` dengan tangan.")
         return "", []
-    add(cid, name, "PASS", f"TASK.md `ACTIVE`, lane `{lane}`, sections `{','.join(sections) or '-'}`")
+    seal = last_root_seal(events)
+    if root_sidik(path.read_text(encoding="utf-8", errors="replace"))[:12] != seal:
+        add(cid, name, "FAIL", f"`TASK.md` disunting di luar `chain.py amend`/`escalate` (sidik akar ≠ `{seal}`)",
+            "Amandemen akar lewat `frontend:lead` (`validate_task.py --amend` lalu `chain.py amend`), atau "
+            "kembalikan suntingannya.")
+        return "", []
+    add(cid, name, "PASS", f"TASK.md `ACTIVE` @ base {base[:7]}, lane `{lane}`, sections `{','.join(sections) or '-'}`")
     return lane, sections
 
 
 # Urutan lane untuk replay eskalasi — sama dengan `chain.LANE_RANK` (lane hanya naik).
 LANE_RANK = {"HOTFIX_MINOR": 0, "FAST_FORWARD": 1, "REFACTOR_ARCH": 1, "FULL_PIPELINE": 2}
-_ESCALATE_SECTIONS = re.compile(r"^Sections: (?P<old>.*?) → (?P<new>.*)$", re.MULTILINE)
 
 
 def _lane_key(fm: Dict[str, Any]) -> Tuple[str, List[str]]:
     return str(fm.get("lane", "")).strip(), sorted(parse_sections(fm.get("sections", "")))
 
 
-def _escalation_ok(slug: str, before: Tuple[str, List[str]], after: Tuple[str, List[str]],
-                   subject: str, body: str) -> bool:
-    """Satu commit sah mengubah lane/sections hanya bila ia commit `chain.py escalate` yang monoton."""
-    if not norm_subject(subject).startswith(norm_subject(f"docs({slug}): eskalasi lane")):
-        return False
-    if norm_subject(subject) != norm_subject(f"docs({slug}): eskalasi lane {before[0]} → {after[0]}"):
-        return False
-    if LANE_RANK.get(after[0], -1) < LANE_RANK.get(before[0], -1) or not set(before[1]) <= set(after[1]):
-        return False
-    m = _ESCALATE_SECTIONS.search(body)
-    return bool(m) and (sorted(parse_sections(m.group("old"))), sorted(parse_sections(m.group("new")))) == \
-        (before[1], after[1])
+def _sections_field(value: str) -> List[str]:
+    """Nilai field `sections` kejadian Riwayat (`architecture,flow` atau `-`) sebagai list terurut."""
+    value = value.strip()
+    return [] if value in ("", "-") else sorted(parse_sections(value))
+
+
+def sections_value(sections: List[str]) -> str:
+    """Kebalikan `_sections_field`: list sections → nilai field kejadian."""
+    return ",".join(sections) or "-"
 
 
 def lane_tamper(root: Path, taskdir_rel: str) -> str:
-    """Kosong bila `lane`/`sections` hanya pernah bergeser lewat `chain.py escalate` sejak commit akar.
+    """Kosong bila `lane`/`sections` hanya pernah bergeser lewat `chain.py escalate` sejak akar dikunci.
 
-    Riwayat `TASK.md` di-replay dari commit penambahan tertua (12 J18): tiap commit yang mengubah
-    pasangan itu wajib bersubjek `eskalasi lane <lama> → <baru>`, berbadan `Sections: <lama> → <baru>`
-    yang cocok, dan monoton (lane naik, sections bertambah). Subjek `kunci TASK` dapat ditiru; riwayat
-    tidak. Commit akar diketik model, jadi pembandingnya commit pertama yang menambahkan `TASK.md`,
-    bukan subjeknya (09 E12).
+    Riwayat di-replay dari kejadian `akar` (12 J18, 24 K5): tiap kejadian `eskalasi` wajib berangkat dari pasangan
+    terakhir dan monoton (lane naik, sections bertambah), dan hasil akhirnya wajib sama dengan frontmatter di disk.
+    Akar yang belum terkunci tidak divonis di sini.
     """
     rel = f"{taskdir_rel}/TASK.md"
-    slug = taskdir_slug(taskdir_rel)
-    root_add = git(root, "log", "--diff-filter=A", "--format=%H", "--", rel).split()
-    if not root_add:
-        return ""                                  # TASK.md belum pernah di-commit: belum ada akar
-    commits = [l.split("\x1f") for l in
-               git(root, "log", "--reverse", "--format=%H%x1f%s%x1f%b%x1e", "--", rel).split("\x1e")
-               if l.strip()]
-    commits = [(c[0].strip(), c[1] if len(c) > 1 else "", c[2] if len(c) > 2 else "") for c in commits]
-    shas = [c[0] for c in commits]
-    start = shas.index(root_add[-1]) if root_add[-1] in shas else 0
-    state = _lane_key(parse_frontmatter(show_at(root, commits[start][0], rel) or ""))
-    for sha, subject, body in commits[start + 1:]:
-        now = _lane_key(parse_frontmatter(show_at(root, sha, rel) or ""))
-        if now == state:
+    events, problem = task_history(root, taskdir_rel)
+    if problem:
+        return f"`## Riwayat Rantai` rusak: {problem}"
+    if not events or events[0]["kind"] != "akar":
+        return ""
+    first = events[0]["fields"]
+    state = (first.get("lane", ""), _sections_field(first.get("sections", "")))
+    for e in events[1:]:
+        if e["kind"] != "eskalasi":
             continue
-        if not _escalation_ok(slug, state, now, subject, body):
-            return (f"`lane`/`sections` berubah di luar commit akar atau `chain.py escalate` "
-                    f"(commit {sha[:7]} `{subject.strip()[:60]}`)")
-        state = now
+        lanes = [s.strip() for s in e["fields"].get("lane", "").split("→")]
+        secs = [_sections_field(s) for s in e["fields"].get("sections", "").split("→")]
+        if len(lanes) != 2 or len(secs) != 2 or (lanes[0], secs[0]) != state:
+            return f"kejadian eskalasi #{e['n']} tidak berangkat dari lane/sections terakhir `{state[0]}`"
+        after = (lanes[1], secs[1])
+        if LANE_RANK.get(after[0], -1) < LANE_RANK.get(state[0], -1) or not set(state[1]) <= set(after[1]):
+            return f"kejadian eskalasi #{e['n']} tidak monoton (`{state[0]}` → `{after[0]}`)"
+        state = after
     try:
         disk = _lane_key(parse_frontmatter((root / rel).read_text(encoding="utf-8")))
     except (OSError, UnicodeDecodeError):
         return f"`{rel}` tak terbaca atau {NOT_UTF8}"
     if disk != state:
-        return "`lane`/`sections` berubah di luar commit akar atau `chain.py escalate` (belum di-commit)"
+        return "`lane`/`sections` berubah di luar akar atau `chain.py escalate`"
     return ""
 
 
@@ -1414,137 +1518,103 @@ def _snapshot(rels: List[str], read: Callable[[str], Optional[str]]) -> str:
 
 
 def content_snapshot(root: Path, rels: List[str]) -> str:
-    """Sidik sha1 isi berkas di disk tanpa baris `status:` — basis vonis ronde reviewer."""
+    """Sidik sha1 isi berkas di disk tanpa baris `status:`/`sidik_kontrak:` — basis vonis ronde dan materai."""
     # errors="replace" di kedua sisi: berkas non-UTF-8 tetap bersidik deterministik, bukan crash.
     return _snapshot(rels, lambda r: (root / r).read_text(encoding="utf-8", errors="replace")
                      if (root / r).is_file() else None)
 
 
-def snapshot_at(root: Path, sha: str, rels: List[str]) -> str:
-    """Sidik yang sama dengan `content_snapshot`, atas isi berkas di commit `sha`."""
-    def read(rel: str) -> Optional[str]:
-        proc = subprocess.run(["git", "-C", str(root), "show", f"{sha}:{rel}"],
-                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        if proc.returncode != 0:
-            return None
-        # samakan dengan Path.read_text(): newline universal
-        return proc.stdout.decode("utf-8", errors="replace").replace("\r\n", "\n").replace("\r", "\n")
-    return _snapshot(rels, read)
-
-
-def gate_targets_at(root: Path, taskdir_rel: str, gate: str, sha: str) -> List[str]:
-    """Berkas yang direview gate pada commit `sha` — padanan `Rounds.targets()` di disk."""
-    if gate == "contract":
-        return [f"{taskdir_rel}/CONTRACT.md"]
-    names = git(root, "ls-tree", "--name-only", sha, f"{taskdir_rel}/").splitlines()
-    return sorted(n for n in names if fnmatch.fnmatch(Path(n).name, BRIEF_GLOB))
-
-
 def reopen_epoch(root: Path, taskdir_rel: str, gate: str) -> int:
-    """Epoch ronde gate: commit `reopen` yang membuka hop gate ini **atau hop di atasnya**, ditambah
-    commit `eskalasi lane` (12 J42, padanan 11 H27).
+    """Epoch ronde gate: kejadian `reopen` yang membuka hop gate ini **atau hop di atasnya**, ditambah kejadian
+    `eskalasi` (12 J42, padanan 11 H27; dibaca dari Riwayat, 24 K5).
 
-    Dokumen hulu yang berubah membatalkan vonis reviewer hilir walau hop hilir masih `[ ]` dan karena
-    itu tidak ikut kaskade — dulu `reopen CONTRACT` atas BRIEF `[ ]` meninggalkan plafon ronde plan
-    habis selamanya. Angka, bukan sha, supaya tahan rebase.
+    Dokumen hulu yang berubah membatalkan vonis reviewer hilir walau hop hilir masih `[ ]` dan karena itu tidak
+    ikut kaskade — dulu `reopen CONTRACT` atas BRIEF `[ ]` meninggalkan plafon ronde plan habis selamanya.
     """
-    slug = re.escape(taskdir_slug(taskdir_rel))
     rows = [spec[0] for spec in CHAIN_SPEC]
-    upto = "|".join(rows[:rows.index(GATE_ROW[gate]) + 1])
-    task_rel = f"{taskdir_rel}/TASK.md"
-    return (count_subjects(root, rf"^docs\({slug}\): reopen [A-Z ]*\b(?:{upto})\b", task_rel)
-            + count_subjects(root, rf"^docs\({slug}\): eskalasi lane ", task_rel))
+    upto = set(rows[:rows.index(GATE_ROW[gate]) + 1])
+    events, _ = task_history(root, taskdir_rel)
+    return sum(1 for e in events if e["kind"] == "eskalasi" or (e["kind"] == "reopen" and upto & set(e["rows"])))
 
 
-# ---------------------------------------------------------------- materai approve (12 J44, J46)
+# ---------------------------------------------------------------- materai approve (12 J44, J46, 24 K8)
 
-APPROVE_SUBJECT = {"FLOW": "approve FLOW.md", "UI": "approve UI.md", "CONTRACT": "approve CONTRACT.md"}
-STAMP_KEYS = ("Persetujuan user", "Konten disetujui", "Sidik", "Review-Round", "Hop")
-_STAMP_LINE = re.compile(rf"^({'|'.join(re.escape(k) for k in STAMP_KEYS)}):[ \t]*(.*?)[ \t]*$", re.MULTILINE)
 _REVIEW_ROUND = re.compile(r"^(?P<gate>contract|plan) r\d+ t\d+ PASS (?P<sidik>[0-9a-f]{12})$")
 REAPPROVE = "`chain.py reopen --row {row}` lalu setujui ulang lewat gate pemiliknya"
 
 
-def approve_subject_ok(slug: str, row: str, subject: str) -> bool:
-    """Subjek persis yang ditulis `chain.py approve` untuk hop `row`."""
-    subject = subject.strip()
-    if row == "BRIEF":
-        return re.fullmatch(rf"docs\({re.escape(slug)}\): approve breakdown \(\d+ briefs\)", subject) is not None
-    return subject == f"docs({slug}): {APPROVE_SUBJECT[row]}"
+def approval_stamp(events: List[Dict[str, Any]], row: str) -> Optional[Dict[str, Any]]:
+    """Kejadian `approve <row>` terbaru yang lebih baru daripada `reopen` terakhir yang membuka hop itu, atau `None`.
 
-
-def stamp_fields(body: str) -> Tuple[Dict[str, str], List[str]]:
-    """Baris materai di badan commit approve → `(fields, kunci ganda)`; kunci ganda = materai disisipi."""
-    fields: Dict[str, str] = {}
-    dup: List[str] = []
-    for m in _STAMP_LINE.finditer(body):
-        if m.group(1) in fields:
-            dup.append(m.group(1))
-        fields[m.group(1)] = m.group(2)
-    return fields, dup
-
-
-def _log_entries(root: Path, rel: str) -> List[Tuple[str, str, str]]:
-    """`[(sha, subjek, badan)]` commit yang menyentuh `rel`, terbaru dulu."""
-    out = git(root, "log", "--format=%H%x1f%s%x1f%b%x1e", "--", rel)
-    entries = []
-    for chunk in out.split("\x1e"):
-        parts = chunk.strip("\n").split("\x1f")
-        if len(parts) == 3 and parts[0].strip():
-            entries.append((parts[0].strip(), parts[1], parts[2]))
-    return entries
-
-
-def approval_stamp(root: Path, taskdir_rel: str, row: str) -> Optional[Dict[str, Any]]:
-    """Commit `chain.py approve` terbaru hop `row` yang lebih baru daripada reopen terakhirnya, atau `None`.
-
-    Dikenali dari subjek persis + `Hop: <row>`, bukan dari sha ledger: sesudah rebase atau clone sha lama
-    tidak lagi ada, tetapi commit approve-nya tetap ada dengan subjek dan badan yang sama.
+    Padanan pembacaan `git log` lama atas commit approve (12 J44): pindai mundur, `reopen` yang membuka hop itu
+    berarti hop belum bermaterai lagi.
     """
-    slug = taskdir_slug(taskdir_rel)
-    reopen = re.compile(rf"^docs\({re.escape(slug)}\): reopen [A-Z ]*\b{row}\b")
-    for sha, subject, body in _log_entries(root, f"{taskdir_rel}/TASK.md"):
-        if reopen.match(subject.strip()):
+    for e in reversed(events):
+        if e["kind"] == "reopen" and row in e["rows"]:
             return None
-        if approve_subject_ok(slug, row, subject):
-            fields, dup = stamp_fields(body)
-            if fields.get("Hop") == row:
-                return {"sha": sha, "fields": fields, "dup": dup}
+        if e["kind"] == "approve" and e["rows"] == [row]:
+            return e
     return None
 
 
-def approval_targets(root: Path, taskdir_rel: str, row: str, rev: str) -> List[str]:
-    """Berkas yang disidik materai hop `row` pada `rev`: dokumennya, atau seluruh brief + `REVIEW-PLAN.md`."""
+def approval_targets(root: Path, taskdir_rel: str, row: str) -> List[str]:
+    """Berkas yang disidik materai hop `row` di disk: dokumennya, atau seluruh brief + `REVIEW-PLAN.md`."""
     if row in DOC_ROWS:
         return [f"{taskdir_rel}/{CHAIN_BY_ROW[row][2]}"]
-    names = git(root, "ls-tree", "--name-only", rev, f"{taskdir_rel}/").splitlines()
-    return sorted(n for n in names if fnmatch.fnmatch(Path(n).name, BRIEF_GLOB) or Path(n).name == "REVIEW-PLAN.md")
+    taskdir = root / taskdir_rel
+    names = sorted(p.name for p in taskdir.glob(BRIEF_GLOB))
+    if (taskdir / "REVIEW-PLAN.md").is_file():
+        names.append("REVIEW-PLAN.md")
+    return [f"{taskdir_rel}/{n}" for n in names]
 
 
-def review_required_at(root: Path, taskdir_rel: str, row: str, rev: str) -> str:
-    """Gate reviewer yang wajib `PASS` sebelum approve hop `row` pada `rev`, atau kosong.
+def _lane_at(events: List[Dict[str, Any]], n: int) -> str:
+    """Lane yang berlaku tepat sebelum kejadian ke-`n` (replay `akar` + `eskalasi`)."""
+    lane = ""
+    for e in events:
+        if e["n"] >= n:
+            break
+        if e["kind"] == "akar":
+            lane = e["fields"].get("lane", "")
+        elif e["kind"] == "eskalasi":
+            lane = e["fields"].get("lane", "").split("→")[-1].strip()
+    return lane
 
-    Selaras `Chain.approve`: CONTRACT selalu; BRIEF hanya pada lane non-MINOR dengan brief `READY`.
+
+def brief_set_drift(root: Path, taskdir_rel: str, stamp: Dict[str, Any]) -> str:
+    """Kosong bila himpunan brief + `REVIEW-PLAN.md` sama dengan saat disetujui, kecuali baris status.
+
+    Pembandingnya field `berkas` kejadian approve: nama, status, dan sidik isi tiap berkas (24 K8).
     """
-    if row == "CONTRACT":
-        return "contract"
-    if row != "BRIEF":
-        return ""
-    lane = str(parse_frontmatter(show_at(root, rev, f"{taskdir_rel}/TASK.md") or "").get("lane", "")).strip()
-    briefs = [n for n in approval_targets(root, taskdir_rel, row, rev) if Path(n).name != "REVIEW-PLAN.md"]
-    if lane == MINOR_LANE or not any(_status_at(root, rev, n) == "READY" for n in briefs):
-        return ""
-    return "plan"
+    recorded = parse_berkas(stamp["fields"].get("berkas", ""))
+    then = sorted(n for n in recorded if n != "REVIEW-PLAN.md")
+    now = sorted(p.name for p in (root / taskdir_rel).glob(BRIEF_GLOB))
+    if then != now:
+        added = sorted(set(now) - set(then))
+        gone = sorted(set(then) - set(now))
+        parts = ([f"ditambah {', '.join(added)}"] if added else []) + \
+                ([f"hilang {', '.join(gone)}"] if gone else [])
+        return "himpunan brief berubah sesudah breakdown disetujui: " + "; ".join(parts)
+    for name, (_, sidik) in recorded.items():
+        if file_sidik(root, f"{taskdir_rel}/{name}") != sidik:
+            return f"`{taskdir_rel}/{name}` berubah sesudah disetujui (Riwayat #{stamp['n']})"
+    allowed = {("READY", "READY"), ("READY", "DONE"), ("READY", "BLOCKED"), ("DONE", "DONE"),
+               ("DONE", "BLOCKED"), ("BLOCKED", "BLOCKED")}
+    for name in now:
+        before, after = recorded[name][0], read_status(root / taskdir_rel / name)
+        if (before, after) not in allowed:
+            return f"`{name}` berpindah status `{before}` → `{after}` — transisi di luar siklus brief"
+    return ""
 
 
 def verify_chain_row(root: Path, taskdir_rel: str, entry: Dict[str, Any]) -> str:
     """Kosong bila satu baris ledger `[x]` sah: materai approve utuh, dok APPROVED/READY, konten utuh.
 
-    Jangkarnya commit approve (12 J44), bukan sha ledger: subjek persis + `Hop:`, lebih baru daripada
-    reopen terakhir hop itu; `Konten disetujui:`-nya wajib sama dengan sha ledger dan `Sidik:`-nya dengan
-    isi berkas pada commit itu, ditambah `Review-Round:` PASS atas konten yang sama untuk hop yang
-    direview (12 J46). Validator tidak dijalankan ulang: versi validator baru tidak boleh menggugurkan
-    approval lama. Materai tanpa `Sidik:` (versi lama atau diketik tangan) → FAIL, remedi reopen.
+    Jangkarnya kejadian `approve` di `## Riwayat Rantai` (24 K8), bukan sha ledger: kejadian terbaru hop itu yang
+    lebih baru daripada `reopen` terakhirnya. Sidik ledger wajib sama dengan `sidik` kejadian itu, isi berkas di disk
+    sama dengan sidiknya, `SC-{n}` tidak berubah sejak disetujui, dan hop yang direview membawa `review … PASS`
+    atas konten yang sama (12 J46). Validator tidak dijalankan ulang: versi validator baru tidak boleh menggugurkan
+    approval lama.
     """
     row = entry["row"]
     if entry["mark"] != "x":
@@ -1552,71 +1622,68 @@ def verify_chain_row(root: Path, taskdir_rel: str, entry: Dict[str, Any]) -> str
         return f"hop `{row}` {state}"
     sha = entry["sha"]
     remedy = REAPPROVE.format(row=row)
-    stamp = approval_stamp(root, taskdir_rel, row)
+    events, problem = task_history(root, taskdir_rel)
+    if problem:
+        return f"`## Riwayat Rantai` rusak: {problem} — laporkan ke user lewat `frontend:lead`"
+    stamp = approval_stamp(events, row)
     if stamp is None:
-        return (f"hop `{row}` @ {sha or '(kosong)'} tercentang tanpa commit `chain.py approve` sesudah reopen "
-                f"terakhirnya — centang tulisan tangan, atau riwayat yang memuatnya di-squash; {remedy}")
-    anchor, fields = stamp["sha"], stamp["fields"]
-    if stamp["dup"]:
-        return (f"materai approve hop `{row}` ({anchor[:7]}) memuat baris {', '.join(stamp['dup'])} ganda — "
-                f"materai disisipi; {remedy}")
-    if not sha or fields.get("Konten disetujui") != sha:
-        return (f"hop `{row}` @ {sha or '(kosong)'} tidak dimateraikan commit approve terakhirnya "
-                f"({anchor[:7]} memateraikan `{fields.get('Konten disetujui') or '-'}`) — centang tulisan tangan; "
-                f"{remedy}")
-    sidik = fields.get("Sidik", "")
-    if not sidik:
-        return (f"materai approve hop `{row}` ({anchor[:7]}) tanpa `Sidik:` — materai versi lama atau diketik "
-                f"tangan; {remedy}")
-    if snapshot_at(root, anchor, approval_targets(root, taskdir_rel, row, anchor)) != sidik:
-        return (f"isi hop `{row}` pada commit approve {anchor[:7]} ≠ `Sidik:` materainya — riwayat ditulis ulang "
-                f"atau materai diketik tangan; {remedy}")
-    gate = review_required_at(root, taskdir_rel, row, anchor)
+        return (f"hop `{row}` @ {sha or '(kosong)'} tercentang tanpa kejadian `approve` di Riwayat sesudah reopen "
+                f"terakhirnya — centang tulisan tangan; {remedy}")
+    fields = stamp["fields"]
+    sidik = fields.get("sidik", "")
+    if not sha or not re.fullmatch(r"[0-9a-f]{40}", sidik) or not sidik.startswith(sha):
+        return (f"hop `{row}` @ {sha or '(kosong)'} tidak dimateraikan kejadian approve terakhirnya "
+                f"(#{stamp['n']} memateraikan `{sidik[:12] or '-'}`) — centang tulisan tangan; {remedy}")
+    gate = {"CONTRACT": "contract", "BRIEF": "plan"}.get(row, "")
+    if row == "BRIEF":
+        recorded = parse_berkas(fields.get("berkas", ""))
+        if _lane_at(events, stamp["n"]) == MINOR_LANE or not any(s == "READY" for s, _ in recorded.values()):
+            gate = ""
     if gate:
-        m = _REVIEW_ROUND.match(fields.get("Review-Round", ""))
-        reviewed = [n for n in approval_targets(root, taskdir_rel, row, anchor) if Path(n).name != "REVIEW-PLAN.md"]
-        if not m or m.group("gate") != gate or m.group("sidik") != snapshot_at(root, anchor, reviewed)[:12]:
-            return (f"materai approve hop `{row}` ({anchor[:7]}) tanpa `Review-Round: {gate} … PASS` atas konten "
+        m = _REVIEW_ROUND.match(fields.get("review", ""))
+        reviewed = sidik[:12] if row == "CONTRACT" else fields.get("brief", "")
+        if not m or m.group("gate") != gate or m.group("sidik") != reviewed:
+            return (f"materai approve hop `{row}` (Riwayat #{stamp['n']}) tanpa `review {gate} … PASS` atas konten "
                     f"yang sama — approval tanpa ronde reviewer; {remedy}")
-    task_rel = f"{taskdir_rel}/TASK.md"
-    if sc_ids(show_at(root, anchor, task_rel) or "") != \
-            sc_ids((root / task_rel).read_text(encoding="utf-8", errors="replace")):
+    task_text = (root / taskdir_rel / "TASK.md").read_text(encoding="utf-8", errors="replace")
+    if fields.get("sc", "") != sc_sidik(task_text):
         return f"`SC-{{n}}` TASK.md berubah sesudah hop `{row}` disetujui — hop wajib dibuka ulang"
     if row in DOC_ROWS:
         doc = CHAIN_BY_ROW[row][2]
         rel = f"{taskdir_rel}/{doc}"
+        if not (root / rel).is_file():
+            return f"`{rel}` hilang dari disk"
         status = read_status(root / rel)
         if status != "APPROVED":
             return f"`{doc}` berstatus `{status or '(kosong)'}` padahal hop `{row}` tercentang"
-        return doc_drift(root, rel, anchor)
-    return brief_set_drift(root, taskdir_rel, anchor)
+        if content_snapshot(root, [rel]) != sidik:
+            return f"`{rel}` berubah sesudah disetujui @ {sidik[:12]}"
+        return ""
+    return brief_set_drift(root, taskdir_rel, stamp)
 
 
 def locked_brief_problems(root: Path, taskdir_rel: str) -> List[str]:
     """Brief `DONE`/`BLOCKED` saat hop BRIEF terakhir dibuka ulang wajib tetap sama status dan isinya (12 J48).
 
-    Jangkarnya commit `reopen` terakhir yang membuka BRIEF (target atau kaskade): keadaan brief saat hop
-    dibuka. Brief `BLOCKED` tidak pernah naik lagi — sisa pekerjaannya milik brief remedi.
+    Jangkarnya kejadian `reopen` terakhir yang membuka BRIEF (target atau kaskade) beserta field `berkas`-nya:
+    keadaan brief saat hop dibuka. Brief `BLOCKED` tidak pernah naik lagi — sisa pekerjaannya milik brief remedi.
     """
-    slug = re.escape(taskdir_slug(taskdir_rel))
-    reopen = re.compile(rf"^docs\({slug}\): reopen [A-Z ]*\bBRIEF\b")
-    anchor = next((sha for sha, subject, _ in _log_entries(root, f"{taskdir_rel}/TASK.md")
-                   if reopen.match(subject.strip())), "")
-    if not anchor:
+    events, _ = task_history(root, taskdir_rel)
+    anchor = next((e for e in reversed(events) if e["kind"] == "reopen" and "BRIEF" in e["rows"]), None)
+    if anchor is None:
         return []
     problems = []
-    for rel in approval_targets(root, taskdir_rel, "BRIEF", anchor):
-        name = Path(rel).name
-        before = _status_at(root, anchor, rel)
+    for name, (before, sidik) in parse_berkas(anchor["fields"].get("berkas", "")).items():
         if name == "REVIEW-PLAN.md" or before not in ("DONE", "BLOCKED"):
             continue
-        if not (root / rel).is_file():
+        path = root / taskdir_rel / name
+        if not path.is_file():
             problems.append(f"`{name}` ({before}) hilang")
             continue
-        after = read_status(root / rel)
+        after = read_status(path)
         if after != before:
             problems.append(f"`{name}` {before} → {after or '(kosong)'}")
-        elif doc_drift(root, rel, anchor):
+        elif file_sidik(root, f"{taskdir_rel}/{name}") != sidik:
             problems.append(f"`{name}` ({before}) disunting")
     return problems
 
@@ -1662,7 +1729,7 @@ def check_chain_rows(add: AddFn, cid: int, root: Path, taskdir_rel: str,
 
 
 def check_pending(add: AddFn, cid: int, root: Path, taskdir_rel: str, doc: str) -> None:
-    """WARN bila artefak milik gate ini sudah ada dari sesi sebelumnya."""
+    """WARN bila artefak milik gate ini sudah ada dari sesi sebelumnya, beserta apakah draft-nya sudah tercatat."""
     name = f"{doc} tertunda dari sesi lalu"
     path = root / taskdir_rel / doc
     if not path.is_file():
@@ -1674,20 +1741,25 @@ def check_pending(add: AddFn, cid: int, root: Path, taskdir_rel: str, doc: str) 
             "Gate ini sudah tuntas. Revisi atas dokumen yang disetujui hanya lewat "
             "`chain.py reopen` di `frontend:lead`.")
         return
+    row = next(r for r in DOC_ROWS if CHAIN_BY_ROW[r][2] == doc)
     if doc == "CONTRACT.md":
         ready = contract_review_ready(root, taskdir_rel)
         if ready:
             add(cid, name, "WARN", f"`{doc}` tertunda berstatus `{status}`; belum layak diajukan: {ready}",
-                "Jangan commit dan jangan ajukan ke user: lanjutkan perbaikan draft, `validate_doc.py` "
+                "Jangan catat draft dan jangan ajukan ke user: lanjutkan perbaikan draft, `validate_doc.py` "
                 "sampai `PASS`, lalu ronde reviewer (Phase 5 butir 2–3) sebelum diajukan.")
             return
-        add(cid, name, "WARN", f"`{doc}` tertunda berstatus `{status}`; ronde terakhir `PASS` atas konten ini",
-            "Belum ter-commit → `review_round.py commit` (Phase 6 butir 1). Lalu tanyakan ke user "
-            "apakah draft diputuskan (setuju/revisi) atau ditulis ulang, sebelum Phase 0 berjalan.")
+    events, _ = task_history(root, taskdir_rel)
+    draft = last_draft(events, row)
+    if draft and draft["fields"].get("sidik") == content_snapshot(root, [f"{taskdir_rel}/{doc}"])[:12]:
+        add(cid, name, "WARN", f"`{doc}` tertunda berstatus `{status}`; draft tercatat (Riwayat #{draft['n']})",
+            "Tanyakan ke user apakah draft diputuskan (setuju/revisi) atau ditulis ulang, sebelum Phase 0 berjalan.")
         return
-    add(cid, name, "WARN", f"`{doc}` sudah ada berstatus `{status}`",
-        "Lanjutkan dari draft itu: tanyakan ke user apakah draft diputuskan (setuju/revisi) "
-        "atau ditulis ulang, sebelum Phase 0 berjalan.")
+    add(cid, name, "WARN", f"`{doc}` tertunda berstatus `{status}`; konten di disk belum tercatat sebagai draft",
+        f"Lanjutkan dari draft itu: catat lewat `chain.py draft --row {row}` (skrip menjalankan validator"
+        + ("; CONTRACT menuntut ronde reviewer terakhir `PASS` atas konten ini" if row == "CONTRACT" else "")
+        + "), lalu tanyakan ke user apakah draft diputuskan (setuju/revisi) atau ditulis ulang, sebelum Phase 0 "
+          "berjalan.")
 
 
 def contract_review_ready(root: Path, taskdir_rel: str) -> str:
@@ -1702,11 +1774,31 @@ def contract_review_ready(root: Path, taskdir_rel: str) -> str:
         return str(exc)
 
 
+def task_base_commit(root: Path, taskdir_rel: str) -> Tuple[str, str]:
+    """`(base_commit, masalah)` dari frontmatter `TASK.md` (24 K6, G3). Absen → `("", "")`."""
+    path = root / taskdir_rel / "TASK.md"
+    try:
+        value = str(parse_frontmatter(path.read_text(encoding="utf-8")).get("base_commit", "") or "").strip()
+    except (OSError, UnicodeDecodeError):
+        return "", ""
+    if not value:
+        return "", ""
+    return value, _docs_git.base_commit_problem(root, value)
+
+
 def task_root_sha(root: Path, taskdir_rel: str) -> str:
-    """SHA commit yang melahirkan `TASK.md` — titik awal rentang rantai, atau kosong."""
-    out = git(root, "log", "--diff-filter=A", "--format=%H", "--", f"{taskdir_rel}/TASK.md")
-    lines = [l for l in out.splitlines() if l.strip()]
-    return lines[-1].strip() if lines else ""
+    """`base_commit` akar yang sah — titik awal rentang rantai — atau kosong (24 K6).
+
+    Dulu sha commit yang melahirkan `TASK.md`; dokumen taskdir tidak lagi di-commit, jadi rentang kode rantai
+    dihitung dari `HEAD` saat akar dikunci (`chain.py root`). Taskdir era git tanpa `base_commit` tetap dibaca dari
+    commit yang dulu menambahkan `TASK.md`-nya (riwayatnya masih ada sesudah `docs_git.py migrate`), supaya review
+    ad-hoc dan laporan atas taskdir lama tetap punya rentang.
+    """
+    value, problem = task_base_commit(root, taskdir_rel)
+    if value:
+        return "" if problem else value
+    added = git(root, "log", "--diff-filter=A", "--format=%H", "--", f"{taskdir_rel}/TASK.md").split()
+    return added[-1] if added else ""
 
 
 def taskdir_slug(taskdir_rel: str) -> str:
@@ -1753,19 +1845,24 @@ def chain_files_since(root: Path, taskdir_rel: str, since: str) -> List[str]:
 
 
 def review_is_fresh(root: Path, taskdir_rel: str) -> bool:
-    """`REVIEW.md` lebih baru daripada commit `implement unit` terakhir taskdir ini.
+    """`REVIEW.md` menilai keadaan kode rantai sekarang (24 K9, pengganti urutan commit `REVIEW.md`).
 
-    Unit yang mendarat sesudah review penutup belum pernah dinilai; review
-    lama tidak boleh dipakai sebagai penutup rantai yang sudah bertambah.
+    Frontmatter `head:` adalah sha `HEAD` yang dinilai reviewer. Review segar bila `head` leluhur `HEAD` dan tidak ada
+    commit pembawa kode sesudahnya, apa pun subjeknya: unit yang mendarat sesudah review penutup belum pernah dinilai,
+    dan yang dinilai berkas yang disentuh, bukan subjek yang diketik model (09 E13). Commit yang hanya menyentuh
+    `frontenddev/` atau `.claude/` (mis. `finding_source`, profil) tidak membasikannya.
     """
-    rel = f"{taskdir_rel}/REVIEW.md"
-    review_sha = last_commit(root, rel)
-    if not review_sha:
+    path = root / taskdir_rel / "REVIEW.md"
+    try:
+        head = str(parse_frontmatter(path.read_text(encoding="utf-8")).get("head", "") or "").strip()
+    except (OSError, UnicodeDecodeError):
         return False
-    # Tiap penyentuh brief sesudah REVIEW (unit DONE/BLOCKED, batch plan) membatalkan review itu;
-    # dinilai dari berkas yang disentuh, bukan dari subjek yang diketik model (09 E13).
-    later = git(root, "rev-list", f"{review_sha}..HEAD", "--", f"{taskdir_rel}/{BRIEF_GLOB}")
-    return not later.strip()
+    if not re.fullmatch(r"[0-9a-f]{7,40}", head):
+        return False
+    full = git(root, "rev-parse", "--verify", "-q", f"{head}^{{commit}}").strip()
+    if not full or not git_ok(root, "merge-base", "--is-ancestor", full, "HEAD")[0]:
+        return False
+    return not any(carries_code(root, sha) for sha in git(root, "rev-list", f"{full}..HEAD").split())
 
 
 def design_gate_checks(add: AddFn, root: Path, taskdir_rel: str, profile_dir: Path,

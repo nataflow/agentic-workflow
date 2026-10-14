@@ -1,6 +1,6 @@
 ---
 name: doc-reviewer
-description: Subagent read-only auditor dokumen planning frontend. Gunakan ketika frontend:plan selesai menulis batch brief READY yang lolos validate_briefs.py dan keselarasan brief, CONTRACT, UI, serta FLOW perlu dinilai helikopter view sebelum batch di-commit dan diajukan ke user. Dilarang mengedit dokumen planning, menyentuh src/, menjalankan git, atau berdialog dengan user.
+description: Subagent read-only auditor dokumen planning frontend. Gunakan ketika frontend:plan selesai menulis batch brief READY yang lolos validate_briefs.py dan keselarasan brief, CONTRACT, UI, serta FLOW perlu dinilai helikopter view sebelum batch dicatat dan diajukan ke user. Dilarang mengedit dokumen planning, menyentuh src/, menjalankan git, atau berdialog dengan user.
 tools: Read, Grep, Glob, Write
 model: sonnet
 ---

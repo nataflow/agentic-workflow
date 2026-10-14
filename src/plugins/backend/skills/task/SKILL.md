@@ -11,12 +11,12 @@ user-invocable: false
 - Sebut alat ukur pada tiap success criteria — diff, test, atau artefak bernama — dan buang butir tanpa alat ukur.
 - Berhenti begitu tiap permukaan yang diminta punya satu butir pemikul; butir yang menambah permukaan baru dihapus.
 - Dilarang menyentuh `src/`, menulis BRD/PRD/brief, atau mengubah `TASK.md` yang sudah ada.
-- Kunci berkas dalam satu commit tersendiri sebelum mengembalikan kendali ke gerbang.
+- Kunci akar lewat `doc_seal.py root` (`base_commit`) sebelum mengembalikan kendali ke gerbang; `TASK.md` tidak di-commit — dokumen taskdir diabaikan git dan dicerminkan ke nataflow.
 
 ## Precondition [REQUIRED]
 
 1. Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/task/scripts/check_preconditions.py --taskdir <taskdir> --lane <lane> [--chain <chain>] [--ticket-source <ticket_source>]`. Hilangkan `--chain` pada lane `DEFECT_RCA`/`EXEC_BRIEF`.
-2. `PASS` (7/7 checks) → lanjut ke Workflow. `FAIL` → hentikan dan remediasi butir gagal: taskdir belum sah → minta alokasi ke `backend:tech-lead`; profil atau commit convention belum lengkap → `backend:profile`; `TASK.md` sudah ada → serahkan ke gerbang; `chain` di luar enum atau tak selaras dengan `lane` → kembalikan ke `backend:analyst`; working tree kotor → bersihkan dulu; `ticket_source` tidak `READY` atau disunting sesudah approve (check 7) → hentikan dan kembalikan ke gerbang, yang mengembalikannya ke `analyst:spec`.
+2. `PASS` (7/7 checks) → lanjut ke Workflow. Baris `[PERINGATAN]` di atas hasil (JSON `peringatan`: `.claude/nataflow.json` tidak ada) tidak menahan: sebut sekali ke user bahwa dokumen taskdir hanya tersimpan di disk ini, lalu lanjut. `FAIL` → hentikan dan remediasi butir gagal: taskdir belum sah → minta alokasi ke `backend:tech-lead`; profil atau commit convention belum lengkap → `backend:profile`; `TASK.md` sudah ada → serahkan ke gerbang; `chain` di luar enum atau tak selaras dengan `lane` → kembalikan ke `backend:analyst`; working tree kotor → bersihkan dulu; `ticket_source` tidak `READY` atau disunting sesudah approve (check 7) → hentikan dan kembalikan ke gerbang, yang mengembalikannya ke `analyst:spec`.
 
 ## Parameter [REQUIRED]
 
@@ -73,35 +73,35 @@ Susun 1–7 butir berformat `- [ ] **SC-{n}**: <hasil terukur> — verifikasi: <
 
 Tulis minimal satu butir berformat `- <yang tidak dikerjakan> — <alasan>` dari 4 sumber: modul bersinggungan di luar File Scope gerbang; opsi yang disingkirkan pada `clarification`; isu eksplorasi yang ditunda; dan `TAC-{n}` tiket yang bukan porsi taskdir ini (Fase 3 butir 7). Daftar kosong dilarang — bila keempatnya nihil, tulis batas modul dari File Scope.
 
-### Fase 5 — Penulisan & Penguncian Commit
+### Fase 5 — Penulisan & Penguncian Akar
 
 1. Baca `templates/task-template.md` bagian 1, isi placeholder dari Fase 1–4, tulis ke `{taskdir}/TASK.md` dengan `status: ACTIVE`.
 2. `chain` terisi: tulis frontmatter `chain:` bernilai persis itu dan seksi `## Chain` berisi tepat hop chain tersebut, seluruhnya belum tercentang, mengikuti bagian 2 `analyst/references/chain-rules.md`. `chain` kosong: hilangkan baris frontmatter dan seksi itu sepenuhnya. `ticket_source` terisi: tulis frontmatter `ticket_source:` bernilai persis path itu; kosong: hilangkan barisnya.
 3. **Self-test akar**: sebelum butir 4 berangkat, jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/validate_doc.py --kind task --taskdir <taskdir> --fresh [--finding-source <finding_source>]`. `FAIL` → perbaiki seluruh pelanggaran satu keluaran, lalu jalankan sekali lagi. Butir `MANUAL` (T3b, T4, T9) dinilai sendiri memakai predikat bagian 2 berkas itu; rumah kanonik predikatnya di sana, dilarang ditulis ulang di sini.
-4. Stage eksplisit `{taskdir}/TASK.md`, lalu commit dengan `commit_convention` profil bersubjek `docs(<slug>): kunci TASK sebagai akar rantai`.
-5. Catat SHA commit dan kembalikan kendali ke pemanggilnya — `backend:analyst` pada lane planning, `backend:tech-lead` pada lane lainnya.
+4. Kunci akar: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/doc_seal.py root --taskdir <taskdir>`. Skrip menulis `base_commit` = sha `HEAD` (branch kerja taskdir) ke frontmatter `TASK.md`; rentang kode rantai dihitung sejak titik ini. Dilarang men-stage atau meng-commit `TASK.md` dan mengisi `base_commit` dengan tangan.
+5. Catat `base_commit` (7 digit) dan kembalikan kendali ke pemanggilnya — `backend:analyst` pada lane planning, `backend:tech-lead` pada lane lainnya.
 
 ## Guardrails
 
 - **AKAR, BUKAN ANALISIS**: dilarang menulis aktor, business rule, kontrak API, skema DTO, atau pemecahan unit kerja. Batas mekanisnya — begitu dokumen butuh sub-heading di luar empat yang ditetapkan (tabel `## Counters` penutup milik `analyst/scripts/chain_counters.py` bukan isi dokumen), isinya milik `business-analysis`, `system-analysis`, atau `plan`.
 - **TASK.md EKSISTING TAK TERSENTUH**: amandemen `## Success Criteria`/`## Out of Scope`, pembaruan `risk` saat eskalasi dinamis, dan backfill taskdir lama adalah wewenang gerbang; skill ini hanya menulis berkas yang belum ada. Permintaan amandemen dari skill hop tidak pernah sampai ke gerbang langsung — ia mengalir lewat kanal `backend:analyst` Fase 4a supaya keputusan lingkupnya diputuskan user satu kali (`analyst/references/chain-rules.md` bagian 5). Pencentangan ledger `## Chain` dan penulisan ulangnya saat eskalasi chain adalah wewenang `backend:analyst`, bukan skill ini.
 - **NOL SENTUHAN KODE**: dilarang membaca-tulis di bawah `source_root`, menjalankan build atau test, dan membuat berkas di luar `{taskdir}/TASK.md`.
-- **GIT TERBATAS**: dilarang `git push`, `git merge`, `git rebase`, `gh pr create`, dan staging wildcard (`git add .` atau `git add -A`).
+- **GIT TERBATAS**: dilarang `git push`, `git merge`, `git rebase`, `gh pr create`, staging wildcard (`git add .` atau `git add -A`), dan `git add -f` atas `backenddev/docs/`.
 - **CUKUP ITU BERHENTI**: akar mengukur apa yang diminta, bukan apa yang sebaiknya ada. Dilarang menulis kriteria atas permukaan yang tak disebut `request` maupun `evidence`, menambah butir "sekalian" (log, metrik, audit trail, hardening, refactor tetangga) atau butir antisipatif ("nanti pasti butuh"), menambah butir demi mendekati plafon 7 ("biar lengkap"), dan memekarkan `## Out of Scope` jadi daftar rencana kerja berikutnya — seksi itu memagari, bukan menjadwalkan.
-- **RATIONALIZATION PREVENTION**: dilarang menyalin `request` ke `## Description` ("permintaannya sudah jelas"), melewati Fase 3 ("kriterianya sudah ada di brief"), mengosongkan `## Out of Scope` ("scope-nya kecil"), atau menunda commit menunggu approval — TASK.md tidak mengenal gerbang approval.
+- **RATIONALIZATION PREVENTION**: dilarang menyalin `request` ke `## Description` ("permintaannya sudah jelas"), melewati Fase 3 ("kriterianya sudah ada di brief"), mengosongkan `## Out of Scope` ("scope-nya kecil"), atau menunda penguncian akar menunggu approval — TASK.md tidak mengenal gerbang approval.
 
 ## Output [REQUIRED]
 
-Tulis `{taskdir}/TASK.md` mengikuti `templates/task-template.md`. Uji akar 9/9 dan commit mendarat → tutup satu baris tanpa blok: `### TASK ROOT LOCKED — <taskdir>/TASK.md @ <sha> · status ACTIVE · Uji Akar 9/9 lolos`. Selain itu, sajikan:
+Tulis `{taskdir}/TASK.md` mengikuti `templates/task-template.md`. Uji akar 9/9 dan akar terkunci → tutup satu baris tanpa blok: `### TASK ROOT LOCKED — <taskdir>/TASK.md @ <base_commit 7 digit> · status ACTIVE · Uji Akar 9/9 lolos`. Selain itu, sajikan:
 
 ```markdown
 ### TASK ROOT LOCKED — TERTAHAN
 - **Path**    : backenddev/docs/<YYMMDDhhmm>-<slug>/TASK.md · status ACTIVE
 - **Uji Akar**: gagal — <butir yang jatuh beserta alasannya> | 9/9 lolos
-- **Commit**  : GAGAL — <pesan git> | <sha>
+- **Kunci**   : GAGAL — <pesan doc_seal.py> | <base_commit 7 digit>
 ```
 
-`Uji Akar` dan `Commit` wajib muncul di kedua bentuk: `backend:analyst` Fase 2 butir 2 membacanya sebagai predikat masuk hop pertama. Lane, chain, ledger hop, kriteria, dan bukti `file:baris` penopang `## Description` sudah terkunci di `TASK.md` — dilarang menyalinnya ke laporan. Tutup satu baris: `kembali ke <backend:analyst | backend:tech-lead> | Taskdir: <path> | Akar: TASK.md @ <sha | belum terkunci>`.
+`Uji Akar` dan `Kunci` wajib muncul di kedua bentuk: `backend:analyst` Fase 2 butir 2 membacanya sebagai predikat masuk hop pertama. Lane, chain, ledger hop, kriteria, dan bukti `file:baris` penopang `## Description` sudah terkunci di `TASK.md` — dilarang menyalinnya ke laporan. Tutup satu baris: `kembali ke <backend:analyst | backend:tech-lead> | Taskdir: <path> | Akar: TASK.md @ <base_commit 7 digit | belum terkunci>`.
 
 ## Failure path
 
@@ -109,7 +109,7 @@ Tulis `{taskdir}/TASK.md` mengikuti `templates/task-template.md`. Uji akar 9/9 d
 2. **TASK.md sudah ada**: hentikan tanpa membaca isi, laporkan path dan `status` frontmatter, serahkan amandemen ke gerbang.
 3. **Bukti menggantung**: tak satu pun `evidence` mengarah ke berkas nyata → hentikan, minta eksplorasi ulang lewat `code-explorer`. Dilarang mengarang `file:line`.
 4. **Kriteria tak terukur**: nol butir terukur tersisa → laporkan butir gugur dan minta klarifikasi tambahan dari gerbang. Butir yang gugur dilaporkan apa adanya; dilarang menggantinya dengan butir baru demi memenuhi jumlah.
-5. **Commit gagal**: working tree kotor di luar taskdir atau `commit_convention` tak terbaca → pertahankan berkas di working tree, laporkan `Commit: GAGAL` plus pesan git, serahkan penguncian ke gerbang.
+5. **Kunci gagal**: `doc_seal.py root` FAIL (repo tanpa commit, `backenddev/docs/` masih ter-track, atau `base_commit` tidak sah) → pertahankan berkas di disk, laporkan `Kunci: GAGAL` plus pesan skrip, serahkan penguncian ke gerbang.
 6. **Lane tak dikenal**: `lane` di luar 4 enum Fase 3 → hentikan dan laporkan nilai terbaca. Dilarang menebak lane terdekat.
 7. **Chain tak selaras**: `chain` di luar 3 enum, atau lane terminalnya tidak cocok dengan kolom keempat matriks bagian 1.3 `analyst/references/chain-rules.md` → hentikan dan kembalikan ke `backend:analyst`. Dilarang menurunkan chain sendiri dari `lane`.
 

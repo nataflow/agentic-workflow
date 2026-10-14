@@ -16,8 +16,8 @@ import sys
 
 import pytest
 
-from conftest import FE_MINOR_TD as TD, FE_SKILLS, PLUGINS, commit, fe_profile, fe_review_md, fe_run, git, \
-    load_module, run_script, write_files
+from conftest import FE_MINOR_TD as TD, FE_SKILLS, PLUGINS, commit, fe_base_commit, fe_profile, fe_review_md, \
+    fe_run, git, load_module, run_script, write_files
 
 RUNV = FE_SKILLS / "_common/run_verification.py"
 ARCH = "architect/scripts/check_preconditions.py"
@@ -25,7 +25,9 @@ BRIEF = f"{TD}/brief-01-order-button.md"
 MIGRATE = FE_SKILLS / "profile/scripts/migrate_profile.py"
 LIB = load_module(FE_SKILLS / "_common/precondition_lib.py", "fe_lib_12v")
 OTHER_TD = "frontenddev/docs/2609260000-akar"
-TASK = "---\nstatus: ACTIVE\nlane: HOTFIX_MINOR\nsections: \n---\n# x\n\n## Chain\n\n- [ ] BRIEF\n"
+TASK = ("---\nstatus: ACTIVE\nlane: HOTFIX_MINOR\nsections: \n---\n# x\n\n## Chain\n\n- [ ] BRIEF\n\n"
+        "## Riwayat Rantai\n\n- 1 · akar · base 0000000 · lane HOTFIX_MINOR · sections - · akar 000000000000 · "
+        "waktu 2026-10-13T00:00:00Z\n")
 
 
 def runv(tmp, mode, *cmds, timeout=5, env=None):
@@ -45,10 +47,12 @@ def arch(repo, *args):
 
 
 def at_approve(repo):
-    """Mundur ke commit `approve breakdown`: brief-01 `READY`, belum ada unit mendarat."""
-    (repo / TD / "REPORT.md").unlink()
-    sha = git(repo, "log", "--format=%H", "--grep=approve breakdown").split()[0]
-    git(repo, "reset", "-q", "--hard", sha)
+    """Mundur ke sesudah approve breakdown: brief-01 `READY`, belum ada unit mendarat (commit kode dibuang,
+    laporan dan review dihapus dari disk — dokumen taskdir tidak di-commit, Langkah 24)."""
+    for name in ("REPORT.md", "REVIEW.md", "report-01.md"):
+        (repo / TD / name).unlink()
+    git(repo, "reset", "-q", "--hard", "HEAD~1")
+    set_status(repo, BRIEF, "READY")
 
 
 def set_status(repo, rel, status, **extra):
@@ -138,8 +142,7 @@ def test_j13_baseline_tanpa_head_fail(fe_minor_chain):
 
 @pytest.mark.regression("J13")
 def test_j13_baseline_di_akar_pass(fe_minor_chain):
-    akar = git(fe_minor_chain, "log", "--format=%H", "--diff-filter=A", "--", f"{TD}/TASK.md").split()[-1]
-    rc, c = review_log(fe_minor_chain, akar)
+    rc, c = review_log(fe_minor_chain, fe_base_commit(fe_minor_chain, TD))
     assert c["status"] == "PASS", c
 
 
@@ -150,7 +153,7 @@ def test_j15_done_tanpa_kode_fail(fe_minor_chain):
     at_approve(fe_minor_chain)
     set_status(fe_minor_chain, BRIEF, "DONE")
     write_files(fe_minor_chain, {f"{TD}/report-01.md": "---\nunit: \"01\"\nstatus: DONE\n---\n# Unit 01\n"})
-    commit(fe_minor_chain, "feat(order-checkout): implement unit 01 - order button", BRIEF, f"{TD}/report-01.md")
+    git(fe_minor_chain, "commit", "-q", "--allow-empty", "-m", "feat(order-checkout): implement unit 01 - order button")
     c = arch(fe_minor_chain)[4]
     assert c["status"] == "FAIL" and "01" in c["summary"], c
     rep = checks(fe_run(fe_minor_chain, "report/scripts/check_preconditions.py", "--taskdir", TD, "--json"))[4]
@@ -193,33 +196,37 @@ def test_j17_is_committed_false_bila_status_gagal(fe_minor_chain):
 
 @pytest.fixture
 def akar(make_repo):
-    repo = make_repo({f"{OTHER_TD}/TASK.md": TASK})
-    commit(repo, "docs(akar): kunci TASK sebagai akar rantai")
-    return repo
+    return make_repo({f"{OTHER_TD}/TASK.md": TASK})
 
 
-def retask(repo, lane, sections, subject, body=""):
+def retask(repo, lane, sections, event=""):
+    """Geser frontmatter lane/sections; `event` = baris kejadian Riwayat yang ikut ditambahkan (tulisan tangan)."""
     p = repo / OTHER_TD / "TASK.md"
-    p.write_text(re.sub(r"lane: .*\nsections: .*", f"lane: {lane}\nsections: {sections}",
-                        p.read_text(encoding="utf-8")), encoding="utf-8")
-    git(repo, "add", "--", f"{OTHER_TD}/TASK.md")
-    git(repo, "commit", "-qm", subject, *(["-m", body] if body else []))
+    text = re.sub(r"lane: .*\nsections: .*", f"lane: {lane}\nsections: {sections}", p.read_text(encoding="utf-8"))
+    p.write_text(text + (event + "\n" if event else ""), encoding="utf-8")
 
 
 @pytest.mark.regression("J18")
 def test_j18_subjek_akar_tiruan_tetap_tamper(akar):
-    retask(akar, "FULL_PIPELINE", "[flow, architecture]", "docs(akar): kunci TASK (perbaikan)")
+    retask(akar, "FULL_PIPELINE", "[flow, architecture]")
     assert "berubah di luar" in LIB.lane_tamper(akar, OTHER_TD)
 
 
 @pytest.mark.regression("J18")
 def test_j18_eskalasi_turun_atau_badan_palsu_tamper(akar):
-    retask(akar, "FAST_FORWARD", "[architecture]", "docs(akar): eskalasi lane HOTFIX_MINOR → FAST_FORWARD",
-           "Alasan: x\nSections: - → architecture")
+    retask(akar, "FAST_FORWARD", "[architecture]", "- 2 · eskalasi · lane HOTFIX_MINOR → FAST_FORWARD · "
+           "sections - → architecture · akar 000000000000 · waktu 2026-10-13T00:00:00Z · alasan: x")
     assert LIB.lane_tamper(akar, OTHER_TD) == ""
-    retask(akar, "HOTFIX_MINOR", "", "docs(akar): eskalasi lane FAST_FORWARD → HOTFIX_MINOR",
-           "Alasan: x\nSections: architecture → -")
-    assert "berubah di luar" in LIB.lane_tamper(akar, OTHER_TD)
+    retask(akar, "HOTFIX_MINOR", "", "- 3 · eskalasi · lane FAST_FORWARD → HOTFIX_MINOR · "
+           "sections architecture → - · akar 000000000000 · waktu 2026-10-13T00:00:00Z · alasan: x")
+    assert "tidak monoton" in LIB.lane_tamper(akar, OTHER_TD)
+
+
+@pytest.mark.regression("J18")
+def test_j18_eskalasi_tidak_berangkat_dari_pasangan_terakhir(akar):
+    retask(akar, "FULL_PIPELINE", "[flow, architecture]", "- 2 · eskalasi · lane FAST_FORWARD → FULL_PIPELINE · "
+           "sections architecture → architecture,flow · akar 000000000000 · waktu 2026-10-13T00:00:00Z · alasan: x")
+    assert "tidak berangkat" in LIB.lane_tamper(akar, OTHER_TD)
 
 
 @pytest.mark.regression("J18")
@@ -311,8 +318,10 @@ def test_j21_migrasi_terputus_disarankan_lanjut(fe_minor_chain):
 
 @pytest.mark.regression("J22")
 def test_j22_report_tertunda_bukan_kerja_user(fe_minor_chain):
-    c = checks(fe_run(fe_minor_chain, "report/scripts/check_preconditions.py", "--taskdir", TD, "--json"))[7]
-    assert c["status"] == "FAIL" and "bukan milik rantai" not in c["action"] and "Phase 5 butir 4" in c["action"], c
+    write_files(fe_minor_chain, {f"{TD}/REPORT.md": "# Order button — perbaikan label — Report\n\n## Ringkasan\n"})
+    c = checks(fe_run(fe_minor_chain, "report/scripts/check_preconditions.py", "--taskdir", TD, "--json"))
+    assert c[7]["status"] == "PASS", c[7]                         # dokumen taskdir diabaikan git (Langkah 24)
+    assert c[5]["status"] == "FAIL" and "tertunda" in c[5]["summary"] and "Phase 5 butir 4" in c[5]["action"], c[5]
 
 
 # --- J23: NAMA ganda, race killpg ----------------------------------------------------------------
