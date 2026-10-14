@@ -158,7 +158,8 @@ def main():
     try:
         text = task.read_text(encoding="utf-8")
     except UnicodeDecodeError as exc:
-        print(f"COUNTER: [FAIL] {task} bukan UTF-8 ({exc.reason} @ byte {exc.start}) — pulihkan dari git")
+        print(f"COUNTER: [FAIL] {task} bukan UTF-8 ({exc.reason} @ byte {exc.start}) — pulihkan dari cermin nataflow "
+              "atau simpan ulang sebagai UTF-8 (dokumen taskdir tidak di-commit)")
         sys.exit(1)
     counters = parse(text)
     bad = unknown_keys(counters)

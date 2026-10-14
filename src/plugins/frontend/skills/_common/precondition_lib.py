@@ -480,7 +480,8 @@ def undecodable(directory: Path, exc: UnicodeDecodeError) -> str:
     return f"{where} {NOT_UTF8} ({exc.reason} @ byte {exc.start})"
 
 
-UNDECODABLE_ACTION = "Simpan ulang berkasnya sebagai UTF-8 (pulihkan dari git bila rusak); jangan menebak isinya."
+UNDECODABLE_ACTION = ("Simpan ulang berkasnya sebagai UTF-8 (pulihkan dari cermin nataflow bila rusak — dokumen "
+                      "taskdir tidak di-commit); jangan menebak isinya.")
 
 
 def read_status(path: Path, field: str = "status") -> str:
@@ -1974,7 +1975,8 @@ def cli(main: Callable[[], Any]) -> Any:
         return main()
     except UnicodeDecodeError as exc:
         name, msg = "Berkas terbaca", (f"berkas yang dibaca skrip ini bukan UTF-8 ({exc.reason} @ byte {exc.start}) "
-                                       f"— pulihkan dari git atau simpan ulang sebagai UTF-8; jangan menebak isinya")
+                                       f"— pulihkan dari git (berkas ter-track) atau dari cermin nataflow (dokumen taskdir), atau "
+                                       f"simpan ulang sebagai UTF-8; jangan menebak isinya")
     except OSError as exc:
         name, msg = "Lingkungan terbaca", (f"{exc.strerror or exc} ({exc.filename or '—'}) — periksa `--root` dan "
                                            f"pastikan `git` terpasang di PATH")
