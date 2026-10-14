@@ -166,6 +166,23 @@ def test_done_tanpa_commit_unit_ditolak_lalu_sah_sesudah_commit_kode(fe_chain_re
     assert next(c for c in data["checks"] if c["id"] == 4)["status"] == "PASS" and data["phase"] == "PENUTUP", data
 
 
+@pytest.mark.regression("25 R6")
+def test_r6_report_hilang_sesudah_commit_mendarat_hanya_warn(fe_chain_repo):
+    """Dulu FAIL tanpa jalur pemulihan (memantul architect ↔ lead); commit unit tetap bukti DONE."""
+    repo = fe_chain_repo
+    fe_approved_chain(repo)
+    edit(repo, B1, "status: READY", "status: DONE")
+    write_files(repo, {"src/features/orders/OrderDetail.tsx": "export function OrderDetail() { return 1 }\n"})
+    commit(repo, "feat(orders-lacak): implement unit 01 - tombol lacak", "src/features/orders/OrderDetail.tsx")
+    arch = fe_run(repo, "architect/scripts/check_preconditions.py", "--taskdir", FE_TD, "--json")
+    data = json.loads(arch.stdout)
+    c4 = next(c for c in data["checks"] if c["id"] == 4)
+    assert c4["status"] == "WARN" and "report-NN.md` hilang dari disk: 01" in c4["summary"], c4
+    assert "dilarang mendispatch ulang" in c4["action"]
+    assert data["phase"] == "PENUTUP", data
+    assert all(c["status"] != "FAIL" for c in data["checks"] if c["id"] == 4)
+
+
 def _template_section_1() -> str:
     text = (FE_SKILLS / "task/templates/task-template.md").read_text(encoding="utf-8")
     return text.split("## 1. Template Kanonik TASK.md", 1)[1].split("````markdown\n", 1)[1].split("\n````", 1)[0]

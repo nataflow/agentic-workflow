@@ -27,7 +27,7 @@ regresi `@pytest.mark.regression("25 R<n>")` yang gagal tanpa perbaikannya. Rili
 | R3 | frontend | `chain.py escalate --reason ""` menulis kejadian Riwayat tak terbaca, sehingga taskdir `RUSAK` permanen | guard di `escalate` dan di `record` untuk semua teks bebas | `tests/frontend/test_12_ledger.py` |
 | R4 | frontend | template `TASK.md` bagian 1 memuat placeholder `base_commit` dan `## Riwayat Rantai`; `chain.py init` memvonis Riwayat rusak | keduanya keluar dari template; `init` membuang seksi Riwayat yang hanya berisi placeholder | `tests/frontend/test_24_riwayat.py` |
 | R5 | backend, frontend, nataflow | skill nataflow mengklaim bebas gerbang engineer, tetapi daftar pengecualian `gate_text.py` tertutup pada tiga plugin | `/nataflow:*` beserta susulannya masuk pengecualian keempat | `tests/hooks/test_gate_text.py` |
-| R6 | backend, frontend | brief `DONE` tanpa commit unit: backend tanpa penulis sah `DONE → READY`; frontend salah rute ke `TERHENTI (DAG)`/`PENUTUP` dan memantul architect ↔ lead | backend: `doc_seal.py buka-done` (gerbang); frontend: fase `TERPUTUS` di `taskdir_state` dan architect, matriks bukti disk tanpa dispatch | `tests/backend/test_24_doc_seal.py`, `tests/frontend/test_12_orchestration.py` |
+| R6 | backend, frontend | brief `DONE` tanpa commit unit: backend tanpa penulis sah `DONE → READY`; frontend salah rute ke `TERHENTI (DAG)`/`PENUTUP` dan memantul architect ↔ lead | backend: `doc_seal.py buka-done` (gerbang); frontend: fase `TERPUTUS` di `taskdir_state` dan architect, matriks bukti disk tanpa dispatch; `report-NN.md` yang hilang sesudah commit mendarat hanya `WARN` | `tests/backend/test_24_doc_seal.py`, `tests/frontend/test_12_orchestration.py` |
 | R7 | backend | rute pemakaian ulang taskdir memakai keberadaan `HALT.md`, padahal HALT yang dicabut kini tetap di disk sebagai `status: DICABUT` | rute hanya untuk HALT aktif | `tests/backend/test_l24_halt.py` |
 | R8 | backend, frontend | prosa menyuruh meng-commit `TASK.md`/`REVIEW.md` atau memulihkan dokumen taskdir dari riwayat git | instruksi dihapus atau diarahkan ke cermin nataflow dan `counters-log.json` | `tests/test_24_docs_git.py` |
 | R9 | quickdev | baseline profil yang diukur di tree kotor tetap dipakai sebagai pembanding bila SHA-nya sama | `plan_lock.py start` mode `awal` mencetak `PEMBANDING:`; profil hanya bila `tree bersih: ya` | `tests/quickdev/test_13_state.py` |
@@ -50,8 +50,8 @@ regresi `@pytest.mark.regression("25 R<n>")` yang gagal tanpa perbaikannya. Rili
 
 - R5 tetap pengecualian berbasis prosa: gerbang engineer adalah teks pengingat, bukan pagar mekanis.
 - R7 dan R11 adalah perbaikan prosa yang dikunci test teks; tidak ada skrip yang merutekan taskdir backend.
-- DONE yang commit unitnya mendarat tetapi `report-NN.md` hilang tetap `FAIL` di architect frontend dan belum punya
-  jalur pemulihan (temuan minor).
+- Architect frontend memperlakukan `report-NN.md` yang hilang sesudah commit unit mendarat sebagai `WARN`: commit itu
+  tetap bukti `DONE`, dan laporannya hanya dapat dipulihkan dari cermin nataflow, tidak direkonstruksi.
 
 ## Di luar cakupan
 

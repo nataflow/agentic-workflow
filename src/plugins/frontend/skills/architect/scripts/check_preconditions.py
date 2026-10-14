@@ -104,6 +104,7 @@ class PreconditionChecker:
         self.sections: List[str] = []
         self.phase = "-"
         self.next_unit = "-"
+        self.missing_reports: List[str] = []
         self._closure: Optional[Dict[str, Any]] = None
 
     def _add(self, cid: int, name: str, status: str, summary: str, action: str = "") -> None:
@@ -129,12 +130,12 @@ class PreconditionChecker:
         return self._closure.get(nn, ("", False))[1]
 
     def implemented(self, nn: str) -> bool:
-        """Brief `DONE` sah hanya bila laporannya ada dan commit `implement unit <NN>` pembawa kode mendarat sejak
-        `base_commit` (12 J15, padanan 09 E18; 24 K7 — status brief tidak lagi ada di riwayat git)."""
+        """Brief `DONE` sah bila commit `implement unit <NN>` pembawa kode mendarat sejak `base_commit` (12 J15,
+        padanan 09 E18; 24 K7 — status brief tidak lagi ada di riwayat git). `report-<NN>.md` adalah klaim subagent
+        yang sudah ditriase sebelum commit itu; hilangnya sesudah commit mendarat bukan alasan unit dibuka ulang
+        (25 R6) — Check 4 hanya memperingatkannya."""
         path = self.briefs().get(nn)
-        if path is None or not (self.taskdir / f"report-{nn}.md").is_file():
-            return False
-        return bool(done_landed(self.root, f"{self.taskdir_rel}/{path.name}"))
+        return path is not None and bool(done_landed(self.root, f"{self.taskdir_rel}/{path.name}"))
 
     def squashed_finished(self) -> bool:
         """`REPORT.md` ada, `REVIEW.md` `PASS`/`WARNING`, dan `head:` review tidak lagi leluhur `HEAD` (riwayat
@@ -176,6 +177,7 @@ class PreconditionChecker:
             self._add(3, "Ledger ## Chain tercentang", "FAIL", "akar belum sah",
                       "Perbaiki Check 2 lebih dulu.")
         self._check_4_briefs(taskdir_ok)
+        self._warn_missing_reports()
         self.stack = check_profile(self._add, 5, self.profile_dir, PROFILE_FILES)
         check_adapter(self._add, 6, self.stack)
         check_plugin_files(self._add, 7, self.skill_dir, PLUGIN_FILES)
@@ -225,12 +227,8 @@ class PreconditionChecker:
             self._add(4, name, "WARN", "brief DONE tanpa commit `implement unit NN` berkode: " + ", ".join(unlanded),
                       TERPUTUS_ACTION.format(nn=unlanded[0]))
             return
-        fake = [nn for nn, st in states.items() if st == "DONE" and not self.implemented(nn)]
-        if fake:
-            self._add(4, name, "FAIL", "brief DONE ber-commit unit tetapi tanpa `report-NN.md`: " + ", ".join(fake),
-                      "Laporan unit hilang dari disk sesudah commit mendarat; pulihkan dari cermin nataflow atau "
-                      "laporkan ke user — dilarang mendispatch ulang unit yang sudah mendarat.")
-            return
+        self.missing_reports = [nn for nn, st in sorted(states.items())
+                                if st == "DONE" and not (self.taskdir / f"report-{nn}.md").is_file()]
         # Brief BLOCKED tanpa remedi divonis **sebelum** validate_briefs: janji yang dipikulnya kini tak
         # dipikul brief READY/DONE mana pun (Check G), jadi validator pasti FAIL dan menutupi fase TERHENTI
         # beserta rutenya (12 J20).
@@ -281,6 +279,19 @@ class PreconditionChecker:
         else:
             self.phase = "TUNTAS"
         self._add(4, name, "PASS", f"seluruh {len(states)} brief tertutup — fase {self.phase}")
+
+    def _warn_missing_reports(self) -> None:
+        """Brief DONE yang commit unitnya mendarat tetapi `report-<NN>.md`-nya hilang dari disk (25 R6): vonis Check 4
+        yang `PASS` diturunkan ke `WARN`, fase tidak berubah. Dulu `FAIL` tanpa jalur pemulihan."""
+        missing = self.missing_reports
+        c4 = next((r for r in self.results if r["id"] == 4), None)
+        if not missing or c4 is None or c4["status"] != "PASS":
+            return
+        c4["status"] = "WARN"
+        c4["summary"] += f" · `report-NN.md` hilang dari disk: {', '.join(missing)}"
+        c4["action"] = ("Commit unit tetap bukti DONE; laporan unitnya hanya klaim yang sudah ditriase. Pulihkan dari "
+                        "cermin nataflow bila dibutuhkan, sebut di Output — dilarang mendispatch ulang unit yang "
+                        "sudah mendarat.")
 
     def _check_9_head(self) -> None:
         name = "HEAD pada branch"
