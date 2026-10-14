@@ -8,7 +8,7 @@ import json
 
 import pytest
 
-from conftest import PLUGINS, commit, git, load_module, write_files
+from conftest import PLUGINS, REPO, commit, git, load_module, write_files
 
 COPIES = {p: PLUGINS / p / "skills/_common/nataflow_sync.py" for p in ("analyst", "backend", "frontend", "quickdev")}
 WS = "11111111-2222-3333-4444-555555555555"
@@ -251,3 +251,16 @@ def test_remote_rusak(ns, text, needle):
 def test_remote_dari_berkas(ns, tmp_path):
     (tmp_path / "r.json").write_text("[]", encoding="utf-8")
     assert ns.read_remote(str(tmp_path / "r.json"), "") == ({}, [])
+
+
+@pytest.mark.regression("25 R12")
+def test_r12_readme_mendokumentasikan_server_nataflow():
+    """Ketergantungan ke server `nataflow-api` didokumentasikan untuk setiap plugin yang memakainya."""
+    readme = (REPO / "README.md").read_text(encoding="utf-8")
+    section = readme.split("## Server nataflow", 1)[1].split("\n## ", 1)[0]
+    assert "claude mcp add" in section and "/mcp" in section
+    users = sorted(p.name for p in PLUGINS.iterdir() if (p / "skills/_common/nataflow_sync.py").is_file())
+    users.append("nataflow")
+    rows = [l for l in section.splitlines() if l.startswith("| `")]
+    for name in users:
+        assert any(f"`{name}`" in r.split("|")[1] for r in rows), name

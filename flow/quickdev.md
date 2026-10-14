@@ -1,6 +1,6 @@
 # Alur Plugin `quickdev`
 
-> `quickdev` (v0.8.0) adalah alur kerja ringan untuk repo backend, frontend, dan fullstack. Plugin ini punya enam skill, tanpa taskdir, tanpa subagent, tanpa hook, dan hanya satu skrip pengunci rencana (ditambah pustaka sinkron nataflow opsional). Setiap tugas punya **satu berkas rencana** (`plan/<task>.md`), sedangkan perubahan kodenya boleh menyentuh banyak berkas dan layer. Pakai plugin ini untuk perubahan kecil sampai menengah yang tidak butuh BRD/PRD, ledger approval, atau review subagent. Plugin ini juga cocok untuk stack yang tidak dilayani `backend`/`frontend` (Next.js, FastAPI, Django, Rails), atau untuk kerja yang sengaja dibuat ringan di repo yang sudah memakai kedua plugin itu. Kerja berisiko (kontrak API, migrasi skema, perubahan lintas modul yang butuh jejak keputusan) sebaiknya naik ke `backend:tech-lead` atau `frontend:lead`.
+> `quickdev` (v0.9.0) adalah alur kerja ringan untuk repo backend, frontend, dan fullstack. Plugin ini punya enam skill, tanpa taskdir, tanpa subagent, tanpa hook, dan hanya satu skrip pengunci rencana (ditambah pustaka sinkron nataflow opsional). Setiap tugas punya **satu berkas rencana** (`plan/<task>.md`), sedangkan perubahan kodenya boleh menyentuh banyak berkas dan layer. Pakai plugin ini untuk perubahan kecil sampai menengah yang tidak butuh BRD/PRD, ledger approval, atau review subagent. Plugin ini juga cocok untuk stack yang tidak dilayani `backend`/`frontend` (Next.js, FastAPI, Django, Rails), atau untuk kerja yang sengaja dibuat ringan di repo yang sudah memakai kedua plugin itu. Kerja berisiko (kontrak API, migrasi skema, perubahan lintas modul yang butuh jejak keputusan) sebaiknya naik ke `backend:tech-lead` atau `frontend:lead`.
 
 ## Peta Komponen
 
@@ -216,7 +216,7 @@ flowchart TD
      | Keadaan rencana | Mode | Tindakan |
      |---|---|---|
      | `verify` FAIL | — | berhenti, ke `quickdev:plan` |
-     | tanpa blok, nol `[x]`, tree bersih selain direktori rencana dan profil | `awal` | `Base-Commit` = HEAD atau `none`; baseline segar bila `Baseline-Commit` profil ≠ `Base-Commit` |
+     | tanpa blok, nol `[x]`, tree bersih selain direktori rencana dan profil | `awal` | `Base-Commit` = HEAD atau `none`; baris `PEMBANDING:` — baseline segar bila `Baseline-Commit` profil ≠ `Base-Commit`, absen, atau diukur di tree kotor |
      | tanpa blok, nol `[x]`, tree kotor atau bukan repo git | — | `START FAIL` **sebelum** blok ditulis; user commit/stash lalu memanggil ulang |
      | blok `IN_PROGRESS`/`BLOCKED`, ada `[x]` tanpa blok, blok terminal dengan langkah `[ ]` baru, atau segel penutup basi | `resume` | pagar tree ke berkas Section 3; batalkan centang terakhir yang berkasnya tidak berubah; lanjut dari `[ ]` pertama dengan edit idempoten; semua `[x]` → langsung Fase 3 |
      | blok `IN_PROGRESS`/`BLOCKED` dengan `Remediation-State: OPEN` | `remediasi` lanjutan | temuan dicetak ulang dari `Findings-<n>`; ronde tidak bertambah |
@@ -363,7 +363,7 @@ Tidak ada. README menyebutkan "semua kerja berlangsung di percakapan utama", dan
 | Pagar cakupan perbaikan | Perbaikan regresi dan temuan review hanya di berkas Section 3. Di luar itu → `BLOCKED` |
 | Plafon | `max_fix_iterations` (default 3) per eksekusi. `REMEDIATION_CAP = 2` putaran remediasi (`start --findings` menolak putaran ke-3); ronde yang terputus dilanjutkan tanpa menambah hitungan |
 | Baseline aman | Eksekusi baseline seizin user, timeout 5 menit per perintah, migrasi/pengubah data tidak pernah dijalankan (profile maupun execute). Perintah yang ditolak di profile ditanyakan ulang di execute |
-| Baseline terikat commit | Profil mencatat `Baseline-Commit`; `plan_lock.py baseline` hanya menerima ringkasan di HEAD = `Base-Commit` dengan tree bersih. Galat dicocokkan tanpa nomor baris |
+| Baseline terikat commit | Profil mencatat `Baseline-Commit` beserta `tree bersih`; `start` mode `awal` memilih pembanding (`PEMBANDING:`) — profil hanya bila diukur di `Base-Commit` dengan tree bersih; `plan_lock.py baseline` hanya menerima ringkasan di HEAD = `Base-Commit` dengan tree bersih. Galat dicocokkan tanpa nomor baris |
 | Segel verifikasi | `close` menyegel `Verified-Hash` (= `Plan-Hash`) dan `Tree-Hash` (isi berkas yang berbeda dari `Base-Commit` + untracked). Berubah sesudahnya → `consistent: false`, `confirm` FAIL, `start` → `resume` |
 | Teks bebas lewat stdin | Nilai `-` dibaca dari stdin (heredoc `<<'QD_EOF'`), satu per panggilan; `--blocked-step` dirapatkan satu baris; `--profile` berkarakter kontrol ditolak; kunci metadata/blok ganda → FAIL |
 | Review read-only | Hanya perintah git baca dan `plan_lock.py verify`/`status` |

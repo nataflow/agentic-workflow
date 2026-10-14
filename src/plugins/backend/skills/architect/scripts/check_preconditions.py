@@ -170,9 +170,11 @@ class PreconditionChecker:
         if unproven:
             names = ", ".join(b["name"] for b in unproven)
             return self._add(cid, name, "FAIL", f"Brief DONE tanpa commit unit ber-`commit_message` yang membawa kode: {names}",
-                             "Jalankan matriks bukti disk (`references/lifecycle-recovery.md` bagian 3): kode unit "
-                             "ada tetapi belum di-commit → commit kodenya lewat koreksi; kode tidak ada → "
-                             "kembalikan status brief ke `READY`. Dilarang melanjutkan ke brief berikutnya.")
+                             "Jalankan matriks bukti disk (`references/lifecycle-recovery.md` bagian 3): tree kotor "
+                             "(kode unit mungkin ada tetapi belum di-commit) → HENTIKAN, eskalasi ke user; tree bersih "
+                             "→ kembalikan ke `backend:tech-lead`, yang mengembalikan brief ke `READY` lewat "
+                             "`doc_seal.py buka-done` (satu-satunya jalur `DONE → READY`). Dilarang menulis status "
+                             "sendiri dan melanjutkan ke brief berikutnya.")
         start = next((b for b in briefs if b["status"] not in CLOSED), None)
         if start:
             rel = f"{self.td.rel}/{start['name']}"

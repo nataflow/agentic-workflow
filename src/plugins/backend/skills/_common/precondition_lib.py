@@ -854,7 +854,8 @@ def cli(main: Callable[[], Any]) -> Any:
         return main()
     except UnicodeDecodeError as exc:
         name, msg = "Berkas terbaca", (f"berkas yang dibaca skrip ini bukan UTF-8 ({exc.reason} @ byte {exc.start}) "
-                                       f"— pulihkan dari git atau simpan ulang sebagai UTF-8; jangan menebak isinya")
+                                       f"— pulihkan dari git (berkas ter-track) atau dari cermin nataflow (dokumen taskdir), atau "
+                                       f"simpan ulang sebagai UTF-8; jangan menebak isinya")
     except OSError as exc:
         name, msg = "Lingkungan terbaca", (f"{exc.strerror or exc} ({exc.filename or '—'}) — periksa `--root` dan "
                                            f"pastikan `git` terpasang di PATH")

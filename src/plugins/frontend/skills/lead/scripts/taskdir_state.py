@@ -30,6 +30,9 @@ Urutan vonis (yang pertama cocok menang) — sama persis dengan `classify()`:
 9. `DRIFT`      — hop `[x]` yang kontennya berubah sesudah disetujui, atau materainya tidak sah
                   → `chain.py reopen`.
 10. `GATE`      — hop ledger pertama yang belum `[x]` → skill pemiliknya (beserta mode `plan`).
+10a. `TERPUTUS` — brief `DONE` tanpa commit unit pembawa kode (25 R6) → `frontend:architect` fase `TERPUTUS`
+                  (matriks bukti disk, tanpa dispatch). Dinilai sebelum `TERHENTI`: unit itu bukan prasyarat yang
+                  macet (`DAG`) dan bukan tanda seluruh brief tertutup (`PENUTUP`).
 11. `TERHENTI`  — brief `BLOCKED` tanpa remedi, atau brief `READY` yang tak satu pun dapat berangkat
                   (`DAG`, 12 J58) → `chain.py reopen --row BRIEF` → `plan` APPEND.
 12. `EKSEKUSI`  — brief `READY` dapat berangkat (`runnable_briefs`) → `frontend:architect`.
@@ -242,6 +245,12 @@ def classify(root: Path, rel: str) -> Dict[str, str]:
                           + (" — minta keputusan user atas draft" if status == "DRAFT" else ""))
         return out
     closure = brief_closure(taskdir, root)
+    unlanded = sorted(nn for nn, (st, done) in closure.items() if st == "DONE" and not done)
+    if unlanded:
+        out.update(state="TERPUTUS", next=f"frontend:architect (fase TERPUTUS: matriks bukti disk atas brief-{unlanded[0]})",
+                   detail=f"brief-{', '.join(unlanded)} DONE di disk tanpa commit unit pembawa kode — sesi terputus di "
+                          "antara status dan commit, `DONE` diketik tangan, atau commit unit di-reset")
+        return out
     open_blocked = [nn for nn, (st, done) in closure.items() if st == "BLOCKED" and not done
                     and not any(read_status(p, "remedies") == nn for p in taskdir.glob("brief-*.md"))]
     if open_blocked:

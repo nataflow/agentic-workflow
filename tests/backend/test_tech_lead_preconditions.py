@@ -1,6 +1,8 @@
 """Prasyarat `backend:tech-lead`: kepemilikan profil dan zona re-entry (L1.1)."""
 import json
 
+import pytest
+
 from conftest import PLUGINS, be_profile, fe_profile, git, run_script, write_files
 
 SCRIPT = PLUGINS / "backend/skills/tech-lead/scripts/check_preconditions.py"
@@ -105,3 +107,38 @@ def test_g2_read_only_tidak_menulis_penanda(make_repo):
     assert _check(_run(root), 3)["status"] == "PASS"
     assert (root / "backenddev/docs/.gitignore").is_file()
     assert git(root, "status", "--porcelain") == ""
+
+
+@pytest.mark.regression("25 R1")
+def test_r1_reentry_menerima_gitignore_tulisan_profile(make_repo):
+    """GENERATE pertama menulis `.backenddev/` ke `.gitignore`; re-entry tidak boleh macet karenanya."""
+    root = _committed_repo(make_repo)
+    write_files(root, {".claude/profile/backenddev/commands.md": "# changed\n", ".gitignore": ".backenddev/\n"})
+    assert _check(_run(root, "--re-entry"), 3)["status"] == "PASS"
+
+
+@pytest.mark.regression("25 R1")
+def test_r1_reentry_menerima_baris_profile_di_gitignore_ter_track(make_repo):
+    root = make_repo({"go.mod": GIN, "internal/a.go": "package a\n", ".gitignore": "node_modules/\n*.log"})
+    be_profile(root, "go", source_root="internal")
+    git(root, "add", "-A")
+    git(root, "commit", "-qm", "init")
+    # Profil menambah baris di akhir berkas yang tidak berakhir newline.
+    write_files(root, {".gitignore": "node_modules/\n*.log\n.backenddev/\n"})
+    assert _check(_run(root, "--re-entry"), 3)["status"] == "PASS"
+
+
+@pytest.mark.regression("25 R1")
+def test_r1_reentry_menolak_suntingan_gitignore_lain(make_repo):
+    root = make_repo({"go.mod": GIN, "internal/a.go": "package a\n", ".gitignore": "node_modules/\n"})
+    be_profile(root, "go", source_root="internal")
+    git(root, "add", "-A")
+    git(root, "commit", "-qm", "init")
+    write_files(root, {".gitignore": "node_modules/\n.backenddev/\ndist/\n"})
+    out = _check(_run(root, "--re-entry"), 3)
+    assert out["status"] == "FAIL" and ".gitignore" in out["summary"]
+    write_files(root, {".gitignore": ".backenddev/\n"})        # baris user hilang
+    assert _check(_run(root, "--re-entry"), 3)["status"] == "FAIL"
+    # Tanpa --re-entry tree kotor tetap FAIL.
+    write_files(root, {".gitignore": "node_modules/\n.backenddev/\n"})
+    assert _check(_run(root), 3)["status"] == "FAIL"

@@ -480,7 +480,8 @@ def undecodable(directory: Path, exc: UnicodeDecodeError) -> str:
     return f"{where} {NOT_UTF8} ({exc.reason} @ byte {exc.start})"
 
 
-UNDECODABLE_ACTION = "Simpan ulang berkasnya sebagai UTF-8 (pulihkan dari git bila rusak); jangan menebak isinya."
+UNDECODABLE_ACTION = ("Simpan ulang berkasnya sebagai UTF-8 (pulihkan dari cermin nataflow bila rusak — dokumen "
+                      "taskdir tidak di-commit); jangan menebak isinya.")
 
 
 def read_status(path: Path, field: str = "status") -> str:
@@ -1367,13 +1368,15 @@ def check_plugin_files(add: AddFn, cid: int, skill_dir: Path, files: Iterable[st
     return True
 
 
-def check_worktree(add: AddFn, cid: int, root: Path, taskdir_rel: str = "", foreign_action: str = "") -> bool:
+def check_worktree(add: AddFn, cid: int, root: Path, taskdir_rel: str = "", foreign_action: str = "",
+                   dirty_status: str = "FAIL") -> bool:
     """Tree bersih di luar laci kerja.
 
     Dokumen taskdir diabaikan git (Langkah 24), jadi draft atau laporan yang tertunda tidak pernah tampak kotor dan
     cabang "kotoran milik taskdir sendiri" (12 J22) tidak lagi ada. `foreign_action` menggantikan tindakan baku,
-    mis. jejak perintah verifikasi penutup (12 J55); tanpanya kotoran itu kerja user. `taskdir_rel` dipertahankan
-    demi pemanggil lama dan tidak dipakai.
+    mis. jejak perintah verifikasi penutup (12 J55); tanpanya kotoran itu kerja user. `dirty_status` `WARN`
+    menyerahkan kotoran ke vonis lain (fase `TERPUTUS` architect: matriks bukti disk, 25 R6); repo yang tak terbaca
+    tetap `FAIL`. `taskdir_rel` dipertahankan demi pemanggil lama dan tidak dipakai.
     """
     name = "Working tree bersih"
     if not is_git_repo(root):
@@ -1389,10 +1392,10 @@ def check_worktree(add: AddFn, cid: int, root: Path, taskdir_rel: str = "", fore
         return False
     if lines:
         paths = [l[3:].strip().strip('"') for l in lines]
-        add(cid, name, "FAIL", f"{len(lines)} berkas belum bersih: {', '.join(paths[:5])}",
+        add(cid, name, dirty_status, f"{len(lines)} berkas belum bersih: {', '.join(paths[:5])}",
             foreign_action or "Commit kode gate ini menuntut tree bersih. Kotoran yang bukan milik rantai adalah "
                               "kerja user — laporkan, jangan di-stash sendiri.")
-        return False
+        return dirty_status != "FAIL"
     add(cid, name, "PASS", "nol perubahan menggantung")
     return True
 
@@ -1972,7 +1975,8 @@ def cli(main: Callable[[], Any]) -> Any:
         return main()
     except UnicodeDecodeError as exc:
         name, msg = "Berkas terbaca", (f"berkas yang dibaca skrip ini bukan UTF-8 ({exc.reason} @ byte {exc.start}) "
-                                       f"— pulihkan dari git atau simpan ulang sebagai UTF-8; jangan menebak isinya")
+                                       f"— pulihkan dari git (berkas ter-track) atau dari cermin nataflow (dokumen taskdir), atau "
+                                       f"simpan ulang sebagai UTF-8; jangan menebak isinya")
     except OSError as exc:
         name, msg = "Lingkungan terbaca", (f"{exc.strerror or exc} ({exc.filename or '—'}) — periksa `--root` dan "
                                            f"pastikan `git` terpasang di PATH")

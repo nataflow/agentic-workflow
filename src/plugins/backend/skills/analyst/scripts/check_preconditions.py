@@ -368,7 +368,8 @@ class PreconditionChecker:
                 self.results.append({
                     "id": check_id, "name": name, "status": "FAIL",
                     "summary": f"TASK.md bukan UTF-8 ({exc.reason} @ byte {exc.start})",
-                    "action": "Simpan ulang TASK.md sebagai UTF-8 (pulihkan dari git bila rusak); jangan menebak isinya.",
+                    "action": "Simpan ulang TASK.md sebagai UTF-8 (pulihkan dari cermin nataflow bila rusak — dokumen "
+                              "taskdir tidak di-commit); jangan menebak isinya.",
                 })
                 return
         if text is None:

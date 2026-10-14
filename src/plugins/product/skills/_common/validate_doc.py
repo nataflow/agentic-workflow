@@ -72,6 +72,7 @@ SC_MAX = 8
 SCOPE_H3 = ("Termasuk", "Tidak Termasuk")
 SCOPE_IN = re.compile(r"^- \*\*S(\d+)\*\*: .+$")
 SCOPE_OUT = re.compile(r"^- .+ — .+$")
+SCOPE_DROPPED = re.compile(r"^- \*\*S(\d+)\*\*: .+ — .+$")   # butir `S<n>` yang dibatalkan, ID-nya dipertahankan
 PROCESS_H3 = ("Kondisi Sekarang", "Kondisi Target")
 TITLE_MAX = 12
 
@@ -428,17 +429,25 @@ class DocValidator(Checker):
                 errors.append(f"Termasuk: format rusak: {line[:50]}")
         if not ids:
             errors.append("Termasuk tanpa butir `S<n>`")
-        if ids != list(range(1, len(ids) + 1)):
-            errors.append(f"ID scope {ids} tidak unik dan urut dari S1")
         out = [l.strip() for l in meaningful(sub.get("Tidak Termasuk", []))]
+        # ID tetap (25 R10): butir yang dibatalkan pindah ke Tidak Termasuk dengan ID-nya, jadi Termasuk boleh
+        # bercelah; ID gabungan kedua seksi yang wajib unik dan tanpa celah dari S1.
+        dropped = [int(m.group(1)) for m in (SCOPE_DROPPED.match(l) for l in out) if m]
+        every = sorted(ids + dropped)
+        if ids != sorted(set(ids)):
+            errors.append(f"ID scope Termasuk {ids} tidak unik dan berurutan naik")
+        if every != list(range(1, len(every) + 1)):
+            errors.append(f"ID scope {every} (Termasuk + dibatalkan di Tidak Termasuk) tidak unik dan tanpa celah "
+                          "dari S1")
         if not out:
             errors.append("Tidak Termasuk kosong")
         bad = [l[:50] for l in out if not SCOPE_OUT.match(l)]
         if bad:
             errors.append(f"Tidak Termasuk tanpa `— <alasan>`: {bad[0]}")
         self.add(cid, "Scope", not errors, "; ".join(errors[:6]) or f"{len(ids)} termasuk, {len(out)} tidak termasuk",
-                 "`### Termasuk` berisi `- **S<n>**: <butir kerja>` berurutan dari S1 (ID tetap untuk serah-terima), "
-                 "`### Tidak Termasuk` berisi `- <yang tidak dikerjakan> — <alasan>`.")
+                 "`### Termasuk` berisi `- **S<n>**: <butir kerja>` berurutan naik (ID tetap untuk serah-terima), "
+                 "`### Tidak Termasuk` berisi `- <yang tidak dikerjakan> — <alasan>`; butir `S<n>` yang dibatalkan "
+                 "pindah ke sana sebagai `- **S<n>**: <butir> — <alasan>`. Gabungan ID keduanya tanpa celah dari S1.")
 
     # ── bukti kode ──
     def _evidence_refs(self, cid: int, refs: List[Tuple[str, "re.Match[str]"]], forbid: bool) -> None:

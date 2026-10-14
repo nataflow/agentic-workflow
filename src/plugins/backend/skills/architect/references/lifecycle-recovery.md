@@ -152,7 +152,7 @@ Tulis di disk, tanpa commit. Pencabutan tidak menghapus berkasnya: ia menambah `
 | Pencabut | Kapan | Mekanisme |
 | --- | --- | --- |
 | `plan` | Brief perbaikan ber-`repairs: brief-NN` ditulis `scaffold_brief.py --nn` | Skrip menulis `status: DICABUT` + `dicabut: brief-NN (repairs)` |
-| `tech-lead` | `SCOPE`/`SYMBOL` diterima user, atau commit unit di-reset user | `doc_seal.py cabut-halt --alasan "<scope diterima user \| commit di-reset user>"` |
+| `tech-lead` | `SCOPE`/`SYMBOL` diterima user, atau commit unit di-reset user | `doc_seal.py cabut-halt --alasan "<scope diterima user \| commit di-reset user>"`; sesudah reset juga `doc_seal.py buka-done --brief <NN>` (brief `DONE` → `READY`) |
 | `architect` | tidak pernah | — |
 
 `HALT.md` bukan kode, sehingga tidak membuat `REVIEW.md` basi, dan seperti seluruh `backenddev/docs/`
@@ -172,6 +172,7 @@ dispatch tidak pernah berangkat (**tidak ada vonis**). Kata statusnya tidak memb
 | tidak | ya | `READY` | bersih | **Koreksi status** (commit ada, status tertinggal): tulis `status: DONE` di brief, di disk tanpa commit; **dilarang retry**; lanjut `NN+1`. Skrip prasyarat menandainya `entry` `KOREKSI:<NN>:<sha7>` |
 | tidak | ya | apa pun | kotor | **HENTIKAN**, tulis `HALT.md` `verdict: STRAY` berisi `git status --porcelain` (bagian 3a); eskalasi ke user; dilarang meng-commit apa pun |
 | tidak | tidak | `READY` | bersih | Dispatch tak pernah berangkat — ulangi dispatch sebanyak `max_retries_per_brief`; masih gagal ⇒ eskalasi ke user |
+| tidak | tidak | `DONE` | bersih | **DONE tanpa bukti** (commit unit di-reset user, atau `DONE` tidak pernah mendarat; prasyarat check 3 FAIL) — **HENTIKAN**, kembalikan ke `backend:tech-lead`, yang mengembalikan brief ke `READY` lewat `doc_seal.py buka-done`; dilarang menulis status sendiri |
 | tidak | tidak | apa pun | kotor | Perubahan parsial tanpa vonis — **HENTIKAN**, eskalasi ke user; dilarang meng-commit apa pun |
 
 Pembeda commit unit di `git log` adalah subjek yang **sama** dengan `commit_message` pada frontmatter
@@ -182,12 +183,13 @@ pekerjaan yang tidak diklaim siapa pun milik user.
 
 ### Struktur Laporan Kegagalan (`report-<NN>.md`)
 
-File `{taskdir}/report-<NN>.md` wajib memuat:
+File `{taskdir}/report-<NN>.md` ditulis `code-implementor` menurut kontrak di `agents/code-implementor.md` (rumah
+kanoniknya; 25 R11): frontmatter `brief`, `status: BLOCKED`, `reason`, lalu empat seksi berikut.
 
-1. **Trigger Condition**: Alasan tepat penghentian (misal: anchor simbol hilang, type mismatch, test gagal).
-2. **Executed Commands & Output**: Perintah terminal yang dijalankan beserta potongan error verbatim.
-3. **Working Tree State**: Daftar file yang sudah termodifikasi dan baris perubahan yang belum selesai.
-4. **Remediation Recommendation**: Catatan penyesuaian untuk input perencana brief berikutnya. Bila penyebab terhentinya adalah **preseden kode yang menyesatkan** — pola warisan yang disalin brief sebagai contoh, lalu ternyata melanggar `## Anti-patterns` atau `## Invariants` profil — sebut `file:baris` preseden itu beserta polanya di baris tersendiri berawalan `Umpan balik profil:`. Tanpa baris ini pengetahuan itu mati bersama taskdir, dan rantai berikutnya menyalin preseden yang sama karena profil tidak pernah menandainya.
+1. **`## Stop condition / Trigger`**: Alasan tepat penghentian (misal: anchor simbol hilang, type mismatch, test gagal).
+2. **`## Evidence`**: Kutipan `berkas:baris`, perintah terminal yang dijalankan, atau potongan galat verbatim.
+3. **`## Working Tree & Partial Changes`**: Daftar file yang sudah termodifikasi dan baris perubahan yang belum selesai.
+4. **`## Root Cause & Recommended Action`**: Catatan penyesuaian untuk input perencana brief berikutnya. Bila penyebab terhentinya adalah **preseden kode yang menyesatkan** — pola warisan yang disalin brief sebagai contoh, lalu ternyata melanggar `## Anti-patterns` atau `## Invariants` profil — sebut `file:baris` preseden itu beserta polanya di baris tersendiri berawalan `Umpan balik profil:`. Tanpa baris ini pengetahuan itu mati bersama taskdir, dan rantai berikutnya menyalin preseden yang sama karena profil tidak pernah menandainya.
 
 ### Prinsip Fail-Fast
 

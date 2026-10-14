@@ -64,8 +64,9 @@ Aturan bentuk:
 - Cabang (gagal, batal, ditolak) ditulis sebagai sub-butir berindentasi di bawah langkahnya.
 - Tanpa aturan khusus → satu baris `- Tidak ada aturan khusus — <alasan dari catatan>`.
 - `S<n>` adalah **ID tetap** untuk serah-terima: kelak tiap butir Scope dipetakan ke tiket tanpa mengubah charter.
-  Dilarang menomori ulang butir yang sudah ada di charter yang pernah `APPROVED`; butir yang dihapus meninggalkan
-  celah dan validator menolaknya, jadi pindahkan ke Tidak Termasuk beserta alasannya.
+  Dilarang menomori ulang butir yang sudah ada di charter yang pernah `APPROVED`. Butir yang dibatalkan pindah ke
+  Tidak Termasuk **dengan ID-nya**: `- **S2**: <butir> — <alasan dibatalkan>`. Validator menuntut gabungan ID
+  Termasuk dan yang dibatalkan unik dan tanpa celah dari S1; butir baru memakai ID berikutnya sesudah yang terbesar.
 
 ---
 
@@ -82,7 +83,7 @@ Ditagih `validate_doc.py --kind charter` (mekanis):
    terdaftar atau `Sistem`; sub-heading hanya di `IMPROVEMENT`, persis `Kondisi Sekarang` lalu `Kondisi Target`.
 6. Business Rules: `BR-n` urut dari 1 dengan `— pengecualian:`; tanda wajib di `IMPROVEMENT`, dilarang di mode lain.
 7. Success Criteria: 1–8 `SC-n` urut dari 1, tiap `— ukuran:` memuat angka.
-8. Scope: `### Termasuk` dengan `S<n>` unik urut dari S1, `### Tidak Termasuk` minimal satu butir beralasan.
+8. Scope: `### Termasuk` dengan `S<n>` unik berurutan naik, `### Tidak Termasuk` minimal satu butir beralasan; gabungan ID Termasuk dan `S<n>` yang dibatalkan di Tidak Termasuk tanpa celah dari S1.
 9. Nol placeholder di kartu.
 10. Bukti kode per tabel bagian 1.
 11. Charter `APPROVED`: isi sama dengan yang dimateraikan `approved_hash`.

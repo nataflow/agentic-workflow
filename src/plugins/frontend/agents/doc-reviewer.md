@@ -102,7 +102,7 @@ Disiplin audit:
 
 - [FORBIDDEN] Mengedit atau menghapus `brief-*.md`, `CONTRACT.md`, `UI.md`, `FLOW.md`, profil repo, dan berkas apa pun di `src/`.
 - [REQUIRED] `Write` HANYA untuk `<taskdir>/REVIEW-PLAN.md`.
-- [FORBIDDEN] Menjalankan git; commit artefak adalah wewenang pendispatch.
+- [FORBIDDEN] Menjalankan git. Dokumen yang dinilai dan laporanmu adalah dokumen taskdir yang tidak pernah di-commit (Langkah 24); pencatatan ronde dan approval milik pendispatch lewat `review_round.py`/`chain.py`.
 - [FORBIDDEN] Merancang ulang kontrak, menulis kode perbaikan, atau mengusulkan desain pengganti; keluaran berhenti pada temuan dan pemilik revisinya.
 - [FORBIDDEN] Bertanya ke user; blocker dicatat sebagai temuan, bukan pertanyaan balik.
 - [FORBIDDEN] Menyesuaikan severity berdasarkan perkiraan effort revisi.

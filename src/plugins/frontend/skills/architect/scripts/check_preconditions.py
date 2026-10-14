@@ -9,7 +9,7 @@ tercentang penuh dan kontennya utuh (termasuk batch brief dan `REVIEW-PLAN.md`
 yang disetujui), status seluruh brief, profil lengkap beserta adapter, berkas
 dispatcher/template/agent, working tree bersih, dan HEAD tidak detached. Skrip
 juga **menyelesaikan** keadaan rantai di baris `Terselesaikan:` — `fase`
-(EKSEKUSI | PENUTUP | LAPORAN | TUNTAS | TERHENTI | TEMUAN) dan `unit_berikutnya` — sehingga
+(EKSEKUSI | TERPUTUS | PENUTUP | LAPORAN | TUNTAS | TERHENTI | TEMUAN) dan `unit_berikutnya` — sehingga
 titik mulai tidak ditebak dari membaca frontmatter satu per satu.
 
 **Ingest** (`--brief NN`) — dijalankan sebelum tiap dispatch implementor:
@@ -77,6 +77,18 @@ CLOSING_DIRT_ACTION = ("Fase PENUTUP: kotoran di luar taskdir sesudah verifikasi
                        "lalu ulangi Phase 4 dari butir 1. Dilarang membersihkan otomatis.")
 
 
+# Brief DONE tanpa commit unit (25 R6): sesi terputus di antara status DONE dan commit kode, `DONE` diketik
+# tangan, atau commit unit di-reset. Tidak didispatch ulang; disk-nya divonis matriks bukti disk.
+TERPUTUS_ACTION = ("Fase TERPUTUS: jalankan matriks bukti disk (`references/execution-protocol.md` bagian 3) atas "
+                   "brief-{nn} tanpa dispatch, mulai dari `verify_scope.py --brief <brief-{nn}> --worktree`: "
+                   "`report-{nn}.md` DONE + hanya `files_touched` berubah → commit unit; laporan absen/rusak + tree "
+                   "bersih → kembalikan status brief ke `READY` di disk lalu Phase 1 (dispatch ulang); berkas di luar "
+                   "`files_touched` atau laporan FAILED → HENTIKAN, sajikan ke user — dilarang memulihkan kotoran yang "
+                   "asalnya tak diketahui.")
+TERPUTUS_DIRT_ACTION = ("Fase TERPUTUS: kotoran ini divonis matriks bukti disk atas brief-{nn} "
+                        "(`verify_scope.py --worktree`), bukan oleh check ini. Dilarang stash atau bersihkan sendiri.")
+
+
 class PreconditionChecker:
     def __init__(self, taskdir: str, brief: Optional[str] = None, root: Optional[Path] = None,
                  profile_dir: Optional[str] = None):
@@ -92,6 +104,7 @@ class PreconditionChecker:
         self.sections: List[str] = []
         self.phase = "-"
         self.next_unit = "-"
+        self.missing_reports: List[str] = []
         self._closure: Optional[Dict[str, Any]] = None
 
     def _add(self, cid: int, name: str, status: str, summary: str, action: str = "") -> None:
@@ -117,12 +130,27 @@ class PreconditionChecker:
         return self._closure.get(nn, ("", False))[1]
 
     def implemented(self, nn: str) -> bool:
-        """Brief `DONE` sah hanya bila laporannya ada dan commit `implement unit <NN>` pembawa kode mendarat sejak
-        `base_commit` (12 J15, padanan 09 E18; 24 K7 — status brief tidak lagi ada di riwayat git)."""
+        """Brief `DONE` sah bila commit `implement unit <NN>` pembawa kode mendarat sejak `base_commit` (12 J15,
+        padanan 09 E18; 24 K7 — status brief tidak lagi ada di riwayat git). `report-<NN>.md` adalah klaim subagent
+        yang sudah ditriase sebelum commit itu; hilangnya sesudah commit mendarat bukan alasan unit dibuka ulang
+        (25 R6) — Check 4 hanya memperingatkannya."""
         path = self.briefs().get(nn)
-        if path is None or not (self.taskdir / f"report-{nn}.md").is_file():
+        return path is not None and bool(done_landed(self.root, f"{self.taskdir_rel}/{path.name}"))
+
+    def squashed_finished(self) -> bool:
+        """`REPORT.md` ada, `REVIEW.md` `PASS`/`WARNING`, dan `head:` review tidak lagi leluhur `HEAD` (riwayat
+        ditulis ulang). Padanan `taskdir_state.review_head_rewritten` untuk penjaga fase `TERPUTUS` (25 R6)."""
+        review = self.taskdir / "REVIEW.md"
+        if not (self.taskdir / "REPORT.md").is_file() or read_status(review, "verdict") not in ("PASS", "WARNING"):
             return False
-        return bool(done_landed(self.root, f"{self.taskdir_rel}/{path.name}"))
+        head = read_status(review, "head")
+        if not re.fullmatch(r"[0-9a-f]{7,40}", head):
+            return False
+        full = git(self.root, "rev-parse", "--verify", "-q", f"{head}^{{commit}}").strip()
+        if not full:
+            return True
+        return subprocess.run(["git", "-C", str(self.root), "merge-base", "--is-ancestor", full, "HEAD"],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0
 
     def briefs(self) -> Dict[str, Path]:
         out: Dict[str, Path] = {}
@@ -149,12 +177,17 @@ class PreconditionChecker:
             self._add(3, "Ledger ## Chain tercentang", "FAIL", "akar belum sah",
                       "Perbaiki Check 2 lebih dulu.")
         self._check_4_briefs(taskdir_ok)
+        self._warn_missing_reports()
         self.stack = check_profile(self._add, 5, self.profile_dir, PROFILE_FILES)
         check_adapter(self._add, 6, self.stack)
         check_plugin_files(self._add, 7, self.skill_dir, PLUGIN_FILES)
         # Dokumen taskdir diabaikan git (Langkah 24): yang dinilai kotor hanya kode dan dokumen tingkat repo.
-        check_worktree(self._add, 8, self.root, self.taskdir_rel,
-                       foreign_action=CLOSING_DIRT_ACTION if self.phase == "PENUTUP" else "")
+        if self.phase == "TERPUTUS":
+            check_worktree(self._add, 8, self.root, self.taskdir_rel,
+                           foreign_action=TERPUTUS_DIRT_ACTION.format(nn=self.next_unit), dirty_status="WARN")
+        else:
+            check_worktree(self._add, 8, self.root, self.taskdir_rel,
+                           foreign_action=CLOSING_DIRT_ACTION if self.phase == "PENUTUP" else "")
         self._check_9_head()
         if self.brief_nn:
             self._check_10_target()
@@ -178,14 +211,24 @@ class PreconditionChecker:
             self._add(4, name, "FAIL", "status di luar READY/DONE/BLOCKED: " + ", ".join(bad),
                       "Hentikan dan laporkan nilai terbaca beserta path-nya; dilarang menebak.")
             return
-        fake = [nn for nn, st in states.items() if st == "DONE" and not self.implemented(nn)]
-        if fake:
-            self._add(4, name, "FAIL", "brief DONE tanpa commit `implement unit NN` berkode atau "
-                      "`report-NN.md`: " + ", ".join(fake),
-                      "Status DONE hanya ditulis architect tepat sebelum commit unit; terputus di antaranya → "
-                      "matriks bukti disk (`references/execution-protocol.md` bagian 3). Status yang diketik "
-                      "tangan dikembalikan ke READY dan unitnya dieksekusi sungguhan.")
+        unlanded = [nn for nn, st in states.items()
+                    if st == "DONE" and not done_landed(self.root, f"{self.taskdir_rel}/{briefs[nn].name}")]
+        if unlanded and self.squashed_finished():
+            # Rantai tuntas yang di-squash-merge kehilangan commit unitnya, bukan keabsahannya (12 J44) — sama
+            # dengan vonis `TUNTAS` `taskdir_state.py`; jangan dibaca sebagai unit yang terputus.
+            self.phase = "TUNTAS"
+            self._add(4, name, "PASS", "rantai tuntas; commit unit hilang karena riwayat ditulis ulang (squash-merge)")
             return
+        if unlanded:
+            # Fase TERPUTUS (25 R6): dulu FAIL, sehingga architect kembali ke lead dan lead (`taskdir_state`)
+            # merutekannya sebagai TERHENTI (DAG) atau PENUTUP — tak ada pihak yang menjalankan matriksnya.
+            self.phase = "TERPUTUS"
+            self.next_unit = unlanded[0]
+            self._add(4, name, "WARN", "brief DONE tanpa commit `implement unit NN` berkode: " + ", ".join(unlanded),
+                      TERPUTUS_ACTION.format(nn=unlanded[0]))
+            return
+        self.missing_reports = [nn for nn, st in sorted(states.items())
+                                if st == "DONE" and not (self.taskdir / f"report-{nn}.md").is_file()]
         # Brief BLOCKED tanpa remedi divonis **sebelum** validate_briefs: janji yang dipikulnya kini tak
         # dipikul brief READY/DONE mana pun (Check G), jadi validator pasti FAIL dan menutupi fase TERHENTI
         # beserta rutenya (12 J20).
@@ -236,6 +279,19 @@ class PreconditionChecker:
         else:
             self.phase = "TUNTAS"
         self._add(4, name, "PASS", f"seluruh {len(states)} brief tertutup — fase {self.phase}")
+
+    def _warn_missing_reports(self) -> None:
+        """Brief DONE yang commit unitnya mendarat tetapi `report-<NN>.md`-nya hilang dari disk (25 R6): vonis Check 4
+        yang `PASS` diturunkan ke `WARN`, fase tidak berubah. Dulu `FAIL` tanpa jalur pemulihan."""
+        missing = self.missing_reports
+        c4 = next((r for r in self.results if r["id"] == 4), None)
+        if not missing or c4 is None or c4["status"] != "PASS":
+            return
+        c4["status"] = "WARN"
+        c4["summary"] += f" · `report-NN.md` hilang dari disk: {', '.join(missing)}"
+        c4["action"] = ("Commit unit tetap bukti DONE; laporan unitnya hanya klaim yang sudah ditriase. Pulihkan dari "
+                        "cermin nataflow bila dibutuhkan, sebut di Output — dilarang mendispatch ulang unit yang "
+                        "sudah mendarat.")
 
     def _check_9_head(self) -> None:
         name = "HEAD pada branch"

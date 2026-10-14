@@ -20,7 +20,8 @@ Taskdir era git yang terbuka: ber-`TASK.md`, tanpa `REPORT.md`, `status` `ACTIVE
 `base_commit`. Taskdir seperti itu tidak dapat dilanjutkan sesudah migrasi (gerbang menuntut `base_commit`),
 sehingga `migrate` menolaknya kecuali user menerimanya lewat `--terima-terbuka`.
 
-`--plugin backend|frontend` memilih prefix; default-nya plugin tempat salinan ini berada. Exit: 0 = PASS atau WARN,
+`--plugin backend|frontend` memilih prefix; default-nya plugin tempat salinan ini berada, dibaca dari `name`
+di `.claude-plugin/plugin.json` root plugin (25 R2). Exit: 0 = PASS atau WARN,
 1 = FAIL, 2 = argumen salah. `--json` selalu JSON, termasuk di jalur gagal.
 
 Pustaka untuk gerbang: `docs_prefix`, `docs_ignored`, `ensure_ignored`, `tracked_docs`, `open_legacy_taskdirs`,
@@ -60,6 +61,20 @@ def docs_prefix(plugin: str) -> str:
     if plugin not in PREFIXES:
         raise DocsGitError(f"plugin `{plugin}` tidak dikenal (backend | frontend)")
     return PREFIXES[plugin]
+
+
+def own_plugin() -> str:
+    """Plugin tempat salinan ini berada: `name` di `.claude-plugin/plugin.json` root plugin (25 R2).
+
+    Root plugin = dua tingkat di atas `skills/_common/`. Nama direktorinya tidak dapat dipakai: di cache plugin
+    terpasang direktori itu bernama versi (`…/frontend/0.14.0/`). Manifest absen atau rusak → nama direktori.
+    """
+    root = Path(__file__).resolve().parents[2]
+    try:
+        name = json.loads((root / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8-sig")).get("name")
+    except (OSError, ValueError, AttributeError):
+        name = None
+    return name if isinstance(name, str) and name else root.name
 
 
 def docs_rel(prefix: str) -> str:
@@ -322,7 +337,7 @@ def main() -> int:
                            help="user menerima taskdir era git yang masih terbuka tidak dapat dilanjutkan")
     args = parser.parse_args()
     try:
-        prefix = docs_prefix(args.plugin or Path(__file__).resolve().parents[2].name)
+        prefix = docs_prefix(args.plugin or own_plugin())
         start = Path(args.root) if args.root else Path.cwd()
         if not start.is_dir():
             raise DocsGitError(f"`--root {start}` bukan direktori")

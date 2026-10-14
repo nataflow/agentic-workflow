@@ -15,8 +15,12 @@ Saat ini ada satu skill, `create-artifact`.
 
 Prasyarat:
 
-- Server MCP nataflow terdaftar di Claude Code user beserta MCP key-nya (default bernama `nataflow-api`), dan
-  backend-nya berjalan. Plugin tidak mendeklarasikan server dan tidak menyimpan key.
+- Akses ke server nataflow organisasi (`nataflow-api`, aplikasi terpisah yang tidak ikut marketplace ini): URL
+  endpoint MCP `/mcp` dan MCP key dari admin nataflow. Tanpa akses itu plugin ini tidak dapat dipakai.
+- Server terdaftar di Claude Code user lewat `claude mcp add` beserta MCP key-nya (default bernama `nataflow-api`;
+  nama lain ditulis di `mcp_server` `.claude/nataflow.json`), dan backend-nya berjalan. Plugin tidak
+  mendeklarasikan server dan tidak menyimpan key. Langkah dan dampaknya bagi plugin lain: README root, bagian
+  "Server nataflow".
 - `python3` ≥ 3.9 (hanya stdlib) untuk `skills/create-artifact/scripts/artifact.py`.
 - Repo git tidak wajib.
 
@@ -71,7 +75,7 @@ lebih dari 6 kata. Kontrak lengkapnya ada di
 
 ### Kontrak tool MCP
 
-Tool artifact berasal dari `nataflow-api` (taskdir `artifact-html-tools`). Yang dipakai skill:
+Tool artifact disediakan server `nataflow-api`. Yang dipakai skill:
 
 | Tool | Argumen yang dikirim skill | Balikan yang dipakai |
 |---|---|---|
@@ -84,7 +88,7 @@ Tool artifact berasal dari `nataflow-api` (taskdir `artifact-html-tools`). Yang 
 - `type` dan `mimetype` tidak dikirim: tool artifact mematoknya ke `artifact` dan `text/html`.
 - `upsert_artifact` menyimpan `content` persis dan menolak `content_sha256` yang tidak cocok dengan pesan
   `content_sha256 does not match content`. `metadata` menggantikan metadata tersimpan seluruhnya.
-- `upsert_artifact` atas key milik dokumen non-artifact menimpanya jadi artifact (keputusan PRD backend). Karena
+- `upsert_artifact` atas key milik dokumen non-artifact menimpanya jadi artifact (perilaku server). Karena
   itu cek tabrakan memakai `get_document`, bukan `get_artifact`.
 - `create_artifact` tidak dipakai: tool itu tidak ber-key dan memangkas spasi `content`, sehingga sha256 berubah.
 - Balikan tool tidak memuat URL. Endpoint render menuntut header `Authorization: Bearer <token>`, jadi

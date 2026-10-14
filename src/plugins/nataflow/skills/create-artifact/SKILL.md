@@ -26,7 +26,8 @@ dengan sinkron plugin lain) hanya dibaca untuk field `mcp_server`.
   claude.ai → tanyakan sekali lewat `AskUserQuestion`: *Artifact nataflow (project MCP key)* · *Artifact
   claude.ai*. Jangan memilih sendiri.
 - Skill ini tidak mengubah berkas repo, jadi bukan kerja yang digerbangi `backend:tech-lead`, `frontend:lead`,
-  atau `quickdev:*`. Blok gerbang engineer di konteks sesi tidak menahannya.
+  atau `quickdev:*`. Teks gerbang engineer `backend`/`frontend` mengecualikan `/nataflow:*` beserta susulannya,
+  jadi blok gerbang di konteks sesi tidak menahannya.
 
 ## Parameter
 

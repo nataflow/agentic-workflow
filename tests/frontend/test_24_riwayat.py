@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from conftest import FE_FIX, FE_TD, commit, fe_approved_chain, fe_draft, fe_lib, fe_profile, fe_round, fe_run, git, \
+from conftest import FE_FIX, FE_SKILLS, FE_TD, commit, fe_approved_chain, fe_draft, fe_lib, fe_profile, fe_round, fe_run, git, \
     write_files
 
 TASK = f"{FE_TD}/TASK.md"
@@ -154,10 +154,76 @@ def test_done_tanpa_commit_unit_ditolak_lalu_sah_sesudah_commit_kode(fe_chain_re
     edit(repo, B1, "status: READY", "status: DONE")
     write_files(repo, {f"{FE_TD}/report-01.md": '---\nunit: "01"\nstatus: DONE\n---\n# Unit 01\n'})
     arch = fe_run(repo, "architect/scripts/check_preconditions.py", "--taskdir", FE_TD, "--json")
-    c4 = next(c for c in json.loads(arch.stdout)["checks"] if c["id"] == 4)
-    assert c4["status"] == "FAIL" and "01" in c4["summary"], c4
+    data = json.loads(arch.stdout)
+    c4 = next(c for c in data["checks"] if c["id"] == 4)
+    # 25 R6: bukan FAIL (yang memantul ke lead), tetapi fase TERPUTUS di unit itu — tetap tidak dihitung DONE.
+    assert c4["status"] == "WARN" and "01" in c4["summary"], c4
+    assert data["phase"] == "TERPUTUS" and data["next_unit"] == "01", data
     write_files(repo, {"src/features/orders/OrderDetail.tsx": "export function OrderDetail() { return 1 }\n"})
     commit(repo, "feat(orders-lacak): implement unit 01 - tombol lacak", "src/features/orders/OrderDetail.tsx")
     arch = fe_run(repo, "architect/scripts/check_preconditions.py", "--taskdir", FE_TD, "--json")
     data = json.loads(arch.stdout)
     assert next(c for c in data["checks"] if c["id"] == 4)["status"] == "PASS" and data["phase"] == "PENUTUP", data
+
+
+@pytest.mark.regression("25 R6")
+def test_r6_report_hilang_sesudah_commit_mendarat_hanya_warn(fe_chain_repo):
+    """Dulu FAIL tanpa jalur pemulihan (memantul architect ↔ lead); commit unit tetap bukti DONE."""
+    repo = fe_chain_repo
+    fe_approved_chain(repo)
+    edit(repo, B1, "status: READY", "status: DONE")
+    write_files(repo, {"src/features/orders/OrderDetail.tsx": "export function OrderDetail() { return 1 }\n"})
+    commit(repo, "feat(orders-lacak): implement unit 01 - tombol lacak", "src/features/orders/OrderDetail.tsx")
+    arch = fe_run(repo, "architect/scripts/check_preconditions.py", "--taskdir", FE_TD, "--json")
+    data = json.loads(arch.stdout)
+    c4 = next(c for c in data["checks"] if c["id"] == 4)
+    assert c4["status"] == "WARN" and "report-NN.md` hilang dari disk: 01" in c4["summary"], c4
+    assert "dilarang mendispatch ulang" in c4["action"]
+    assert data["phase"] == "PENUTUP", data
+    assert all(c["status"] != "FAIL" for c in data["checks"] if c["id"] == 4)
+
+
+def _template_section_1() -> str:
+    text = (FE_SKILLS / "task/templates/task-template.md").read_text(encoding="utf-8")
+    return text.split("## 1. Template Kanonik TASK.md", 1)[1].split("````markdown\n", 1)[1].split("\n````", 1)[0]
+
+
+@pytest.mark.regression("25 R4")
+def test_r4_template_kanonik_tanpa_base_commit_dan_riwayat():
+    body = _template_section_1()
+    assert "base_commit" not in body
+    assert "## Riwayat Rantai" not in body
+
+
+@pytest.fixture
+def akar_bertemplate_lama(make_repo):
+    """Akar baru tertulis dengan placeholder `## Riwayat Rantai` dari template lama, belum di-`init`."""
+    root = make_repo({"src/features/orders/OrderDetail.tsx": "export function OrderDetail() { return null }\n"})
+    git(root, "checkout", "-q", "-b", "main")
+    fe_profile(root, "react-vite")
+    commit(root, "init")
+    task = (FE_FIX / "task_fast_forward.md").read_text(encoding="utf-8").rstrip("\n")
+    write_files(root, {TASK: task + "\n\n## Riwayat Rantai\n\n<ditulis `chain.py root` dan subperintah "
+                                     "sesudahnya — dilarang diketik atau disunting dengan tangan>\n"})
+    return root
+
+
+@pytest.mark.regression("25 R4")
+def test_r4_init_membuang_placeholder_riwayat_lalu_root_mengunci(akar_bertemplate_lama):
+    root = akar_bertemplate_lama
+    r = chain(root, "init")
+    assert r.returncode == 0, r.out
+    text = (root / TASK).read_text(encoding="utf-8")
+    assert "## Riwayat Rantai" not in text and "## Chain" in text
+    r = chain(root, "root")
+    assert r.returncode == 0, r.out
+    events, problem = riwayat(root)
+    assert problem == "" and [e["kind"] for e in events] == ["akar"]
+
+
+@pytest.mark.regression("25 R4")
+def test_r4_riwayat_berisi_baris_asing_tetap_rusak(akar_bertemplate_lama):
+    root = akar_bertemplate_lama
+    edit(root, TASK, "<ditulis `chain.py root`", "- 1 · akar sunting tangan\n<ditulis `chain.py root`")
+    r = chain(root, "init")
+    assert r.returncode == 1 and "Riwayat Rantai` rusak" in r.out

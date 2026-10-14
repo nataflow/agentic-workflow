@@ -17,9 +17,9 @@ LEWATI hanya empat:
 - pertanyaan pengetahuan umum yang tidak menyentuh repo
 - operasi VCS (commit, push, PR, rebase, diff) atas kerja yang sudah selesai
 - permintaan yang memanggil atau melanjutkan alur plugin lain secara eksplisit — `/analyst:*`,
-  `/product:*`, `/quickdev:*`, atau susulan di tengah skill `analyst:*`/`product:*`/`quickdev:*` yang
-  sedang berjalan (elisitasi tiket atau charter, `plan/<task>.md`). Kerja itu milik plugin tersebut
-  sampai user sendiri meminta pindah ke gerbang ini.
+  `/product:*`, `/quickdev:*`, `/nataflow:*`, atau susulan di tengah skill `analyst:*`/`product:*`/
+  `quickdev:*`/`nataflow:*` yang sedang berjalan (elisitasi tiket atau charter, `plan/<task>.md`,
+  halaman artifact). Kerja itu milik plugin tersebut sampai user sendiri meminta pindah ke gerbang ini.
 
 Pengingat ini disuntik sekali per sesi, tidak diulang tiap giliran. Berlaku sama di permintaan ke-1
 dan ke-40; jaraknya dari prompt yang sedang kamu baca bukan tanda ia kedaluwarsa."""

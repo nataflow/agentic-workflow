@@ -1,6 +1,6 @@
 # Alur Plugin `frontend`
 
-> Plugin `frontend` (v0.14.0, `src/plugins/frontend/.claude-plugin/plugin.json`) menangani kerja frontend di beberapa stack: React + Vite SPA, React Native/Expo, SvelteKit, dan Svelte + Vite. Next.js sengaja tidak dilayani. Isinya sepuluh skill dan lima subagent yang membawa permintaan kerja lewat rantai dokumen: akar `TASK.md` → `FLOW.md`/`UI.md` → `CONTRACT.md` → brief → eksekusi → `REVIEW.md` → `REPORT.md`. Tiap gate dikunci persetujuan user yang dimateraikan skrip `chain.py` sebagai kejadian `## Riwayat Rantai` di `TASK.md`, dan tiap hal yang dapat dicek mesin divonis validator, bukan diingat model. Dokumen taskdir (`frontenddev/docs/`) diabaikan git dan tidak pernah di-commit (Langkah 24). Yang di-commit hanya kode, laporan audit `frontenddev/reviews/`, dan profil, sedangkan cermin nataflow menjadi satu-satunya salinan dokumen taskdir di luar mesin kerja. Plugin ini dipakai di repo frontend yang terdeteksi hook `SessionStart`. Pintu masuknya selalu `/frontend:lead`. Hanya `lead`, `profile`, dan `review` yang muncul di menu `/`. Tujuh skill lainnya `user-invocable: false` dan dipanggil model lewat tool Skill (`README.md` § Ten Skills).
+> Plugin `frontend` (v0.15.0, `src/plugins/frontend/.claude-plugin/plugin.json`) menangani kerja frontend di beberapa stack: React + Vite SPA, React Native/Expo, SvelteKit, dan Svelte + Vite. Next.js sengaja tidak dilayani. Isinya sepuluh skill dan lima subagent yang membawa permintaan kerja lewat rantai dokumen: akar `TASK.md` → `FLOW.md`/`UI.md` → `CONTRACT.md` → brief → eksekusi → `REVIEW.md` → `REPORT.md`. Tiap gate dikunci persetujuan user yang dimateraikan skrip `chain.py` sebagai kejadian `## Riwayat Rantai` di `TASK.md`, dan tiap hal yang dapat dicek mesin divonis validator, bukan diingat model. Dokumen taskdir (`frontenddev/docs/`) diabaikan git dan tidak pernah di-commit (Langkah 24). Yang di-commit hanya kode, laporan audit `frontenddev/reviews/`, dan profil, sedangkan cermin nataflow menjadi satu-satunya salinan dokumen taskdir di luar mesin kerja. Plugin ini dipakai di repo frontend yang terdeteksi hook `SessionStart`. Pintu masuknya selalu `/frontend:lead`. Hanya `lead`, `profile`, dan `review` yang muncul di menu `/`. Tujuh skill lainnya `user-invocable: false` dan dipanggil model lewat tool Skill (`README.md` § Ten Skills).
 
 ## Peta Komponen
 
@@ -176,6 +176,7 @@ Sebelum memvonis per taskdir, skrip keluar `FAIL` bila repo bukan git, atau `FAI
 | 8 | `RUSAK` (ledger ≠ jadwal sections) | Sama dengan #4 |
 | 9 | `DRIFT` (konten hop `[x]` atau `SC-{n}` berubah sesudah disetujui, atau centang tanpa kejadian `approve` yang sah) | `chain.py reopen --row <ROW>` atau pulihkan isi yang disetujui |
 | 10 | `GATE` (hop pertama yang belum `[x]`) | Skill pemilik hop (skrip menyebut mode untuk `plan`) |
+| 10a | `TERPUTUS` (brief `DONE` di disk tanpa commit unit pembawa kode: sesi terputus di antara status dan commit, `DONE` diketik tangan, atau commit unit di-reset) | `architect` fase `TERPUTUS`: matriks bukti disk atas brief itu, tanpa dispatch |
 | 11 | `TERHENTI` (brief `BLOCKED` tanpa remedi, atau `DAG`: brief READY ada tetapi tak satu pun dapat berangkat) | `reopen --row BRIEF` → `plan` APPEND brief remedi, atau perbaiki `depends_on` |
 | 12 | `EKSEKUSI` (brief READY siap berangkat, `runnable_briefs`) | `frontend:architect` |
 | 13 | `PENUTUP` (seluruh brief tertutup, `REVIEW.md` absen, basi — `head:` tidak sah atau commit kode mendarat sesudahnya — atau ber-verdict asing) | `architect` Phase 4 |
@@ -404,10 +405,10 @@ flowchart TD
 
 ### `frontend:architect`
 
-- **Pemicu / kapan dipakai**: ledger tercentang penuh dan brief READY siap dieksekusi, atau rantai terputus di tengah (keadaan `EKSEKUSI`, `PENUTUP`, `LAPORAN`, `TEMUAN`, `LAPORAN TERTUNDA`).
+- **Pemicu / kapan dipakai**: ledger tercentang penuh dan brief READY siap dieksekusi, atau rantai terputus di tengah (keadaan `EKSEKUSI`, `TERPUTUS`, `PENUTUP`, `LAPORAN`, `TEMUAN`, `LAPORAN TERTUNDA`).
 - **Prasyarat**:
   - `check_preconditions.py --taskdir` harus 9/9.
-  - Baris `Terselesaikan:` menentukan titik masuk: `fase=EKSEKUSI` → Phase 1, `PENUTUP` → Phase 4, `LAPORAN` → Phase 5 butir 2, `TEMUAN` → Phase 5 butir 1, `LAPORAN TERTUNDA` → Phase 5 butir 4. `TERHENTI (brief-NN BLOCKED)` dan `TERHENTI (DAG)` FAIL dengan rute `reopen BRIEF` → `plan` APPEND; brief BLOCKED tanpa remedi divonis sebelum `validate_briefs.py`, sehingga rutenya tidak tertutup galat validator.
+  - Baris `Terselesaikan:` menentukan titik masuk: `fase=EKSEKUSI` → Phase 1, `TERPUTUS` (brief `DONE` tanpa commit unit; check 4 dan tree kotor `WARN`) → Phase 2 butir 2 atas `unit_berikutnya` tanpa dispatch, `PENUTUP` → Phase 4, `LAPORAN` → Phase 5 butir 2, `TEMUAN` → Phase 5 butir 1, `LAPORAN TERTUNDA` → Phase 5 butir 4. `TERHENTI (brief-NN BLOCKED)` dan `TERHENTI (DAG)` FAIL dengan rute `reopen BRIEF` → `plan` APPEND; brief BLOCKED tanpa remedi divonis sebelum `validate_briefs.py`, sehingga rutenya tidak tertutup galat validator.
   - Nilai `typecheck_per_brief` juga diambil dari baris ini.
 - **Langkah**:
   1. **Phase 0.** Ambil baseline seluruh perintah `commands.md` sekali lewat `run_verification.py baseline` (Bash background) sebelum unit pertama mendarat, disimpan ke `.explore/verification-baseline.json` beserta `head`. Baseline hilang sesudah unit mendarat → ukur di worktree pada `base_commit` akar, bukan di HEAD. Sajikan tabel rantai.
@@ -535,7 +536,7 @@ Penulis dan penilai selalu berada di context terpisah. Sebabnya, penilai yang be
   - stack yang terdeteksi dan kandidat lain di monorepo;
   - catatan status profil: lengkap, `ABSENT`/`OTHER_OWNER` (GENERATE; `EXPLORE_FACT` tetap berangkat tanpa profil), lokasi lama (MIGRATE), JSON rusak, `stack` tidak sah, field `plugin` asing, atau berkas hilang (REFRESH);
   - aturan `RULES`: `frontend:lead` jalan lebih dulu untuk tiap permintaan kerja, termasuk susulan kecil.
-- Gate boleh dilewati hanya untuk empat hal (`hooks/gate_text.py`): jawaban yang memasok informasi ke rute yang sudah diputuskan, pertanyaan pengetahuan umum, operasi VCS atas kerja yang sudah selesai, dan alur `/analyst:*`, `/product:*`, atau `/quickdev:*` yang dipanggil eksplisit.
+- Gate boleh dilewati hanya untuk empat hal (`hooks/gate_text.py`): jawaban yang memasok informasi ke rute yang sudah diputuskan, pertanyaan pengetahuan umum, operasi VCS atas kerja yang sudah selesai, dan alur `/analyst:*`, `/product:*`, `/quickdev:*`, atau `/nataflow:*` yang dipanggil eksplisit.
 - Hook hanya menyala kalau profil frontend ada, atau manifest (root, workspace, `apps/*`, `packages/*`, `services/*`, anak langsung root, maksimal 200 kandidat) memuat penanda stack yang didukung. Next.js, CRA, dan React/Svelte tanpa Vite membuat hook diam.
 - **Opt-out** lewat berkas `.claude/workflow` yang berisi daftar plugin yang boleh menggerbangi repo, dipisah spasi, koma, atau baris. Kalau nama plugin ini tidak ada di dalamnya (termasuk berkas kosong), hook diam (`detect.py` `opted_out`).
 - **Root multi-repo** (21 F1): bila cwd bukan repo git dan punya ≥ 2 anak langsung ber-`.git` (mis. `wms/api`, `wms/frontend`), hook tidak menggerbangi. Bloknya hanya menyebut repo frontend di antara anak itu (dari profil atau manifest) beserta `/fullstack:explore`, karena skrip prasyarat skill frontend butuh repo git. Sejak 23 L5 penunjuk itu mencakup semua pemahaman kode repo anak dari root (peta, alur di dalam satu repo, jahitan lintas repo) dan menyebut bahwa subagent `Explore`/`general-purpose` bawaan tidak dipakai. Root tanpa anak frontend diam. Root multi-proyek (`company/<proyek>/<repo>`) di luar jangkauan deteksi dan tetap diam.
@@ -622,11 +623,12 @@ stateDiagram-v2
     READY --> DONE : report DONE dan matriks bukti disk bersih
     READY --> BLOCKED : report FAILED atau pelanggaran scope
     DONE --> BLOCKED : galat kompilasi baru di gerbang per-brief
+    DONE --> READY : TERPUTUS, tanpa commit unit, laporan absen dan tree bersih
     BLOCKED --> [*] : diambil alih brief remedi, remedies NN
     DONE --> [*]
 ```
 
-Brief `BLOCKED` tidak pernah dinaikkan lagi, dan brief `DONE`/`BLOCKED` tidak pernah disunting. Cacat pada unit `DONE` diambil alih brief perbaikan tanpa `remedies`.
+Brief `BLOCKED` tidak pernah dinaikkan lagi, dan brief `DONE`/`BLOCKED` tidak pernah disunting — kecuali `DONE` yang tak pernah mendarat (fase `TERPUTUS`, 25 R6). Cacat pada unit `DONE` diambil alih brief perbaikan tanpa `remedies`.
 
 **Siklus keadaan taskdir** (`taskdir_state.py`):
 
@@ -640,6 +642,8 @@ stateDiagram-v2
     DRIFT --> GATE : reopen, amend, atau pulihkan
     GATE --> EKSEKUSI : ledger tercentang penuh
     EKSEKUSI --> TERHENTI : brief BLOCKED atau DAG buntu
+    EKSEKUSI --> TERPUTUS : DONE tanpa commit unit
+    TERPUTUS --> EKSEKUSI : matriks bukti disk, commit unit atau READY lagi
     TERHENTI --> GATE : reopen BRIEF, plan APPEND
     EKSEKUSI --> PENUTUP : seluruh brief tertutup
     PENUTUP --> TEMUAN : REVIEW BLOCKED
@@ -694,7 +698,7 @@ Plafon (reopen 3 per hop dan 6 per taskdir, eskalasi 2, revisi 2), epoch ronde r
   - Di repo fullstack, kedua hook menyala dan masing-masing menyuntik bloknya sendiri.
   - Profil backend di `.claude/profile/index.json` lama tidak pernah dibaca atau ditimpa. Profil frontend tinggal di `.claude/profile/frontenddev/`.
   - Backend yang dipanggil kontrak ini dikerjakan lewat plugin `backend` (`README.md` § Boundaries). TAC yang merupakan porsi backend dicatat di Out of Scope.
-- **Dengan `quickdev` dan `analyst` (alur eksplisit).** Permintaan `/analyst:*`, `/product:*`, `/quickdev:*`, atau susulan di tengah skill mereka dikecualikan dari gate `frontend:lead`. Isi `.claude/workflow` menentukan plugin mana yang boleh menggerbangi repo. Contohnya, isi `quickdev` saja membuat hook `frontend` dan `backend` diam.
+- **Dengan `quickdev` dan `analyst` (alur eksplisit).** Permintaan `/analyst:*`, `/product:*`, `/quickdev:*`, `/nataflow:*`, atau susulan di tengah skill mereka dikecualikan dari gate `frontend:lead`. Isi `.claude/workflow` menentukan plugin mana yang boleh menggerbangi repo. Contohnya, isi `quickdev` saja membuat hook `frontend` dan `backend` diam.
 - **Batas dengan skill lain** (`README.md` § Boundaries With Other Skills):
   - UI dari nol tanpa codebase acuan → `frontend-design`.
   - Bug korektness, keamanan, atau efisiensi pada diff → `/code-review`.
@@ -721,7 +725,8 @@ Plafon (reopen 3 per hop dan 6 per taskdir, eskalasi 2, revisi 2), epoch ronde r
 | State ronde rusak atau hilang | `review_round.py` | Pulihkan dari `.bak`, atau `rebuild` dari field `review` kejadian Riwayat. Dilarang menulis state dengan tangan |
 | Plan MINOR menemukan endpoint, DTO, query key, atau state baru | `plan` Phase 0 | Lead `escalate --lane FAST_FORWARD` (atau FULL_PIPELINE) |
 | Unit `BLOCKED` | matriks bukti disk | `reopen --row BRIEF`, lalu `plan` APPEND brief remedi (`remedies: "NN"`) |
-| Brief `DONE` di disk tanpa commit unit pembawa kode (sesi terputus, atau `DONE` diketik tangan) | architect check 4, `done_landed` | Matriks bukti disk: scope bersih → commit unit; selain itu status diturunkan ke `BLOCKED` |
+| Brief `DONE` di disk tanpa commit unit pembawa kode (sesi terputus, `DONE` diketik tangan, atau commit unit di-reset) | `taskdir_state.py` `TERPUTUS`, architect check 4 `WARN` (`done_landed`) | Architect fase `TERPUTUS`, matriks bukti disk tanpa dispatch: laporan `DONE` + hanya `files_touched` → commit unit; laporan absen/rusak + tree bersih → status kembali `READY` lalu dispatch; berkas di luar `files_touched` atau laporan `FAILED` → HENTIKAN, eskalasi ke user |
+| `report-NN.md` hilang dari disk sesudah commit unit pembawa kode mendarat | architect check 4 `WARN` | Commit unit tetap bukti `DONE`; rantai lanjut tanpa dispatch ulang, laporan dipulihkan dari cermin nataflow bila dibutuhkan |
 | Rantai buntu (`TERHENTI (DAG)`: brief READY tak satu pun dapat berangkat) | `taskdir_state.py`, architect check 4, `validate_briefs.py` Check D | `reopen --row BRIEF`, lalu `plan` APPEND memperbaiki `depends_on` |
 | Remedi ketiga atas unit yang sama | `validate_briefs.py` Check M | `reopen --row CONTRACT`. Di MINOR: `reopen BRIEF` lalu `escalate FAST_FORWARD` |
 | Berkas yatim (di luar union `files_touched`) | architect Phase 3, `code-reviewer` P1 | `reopen --row CONTRACT`, lalu contract melengkapi Files Touched, lalu `plan` APPEND |

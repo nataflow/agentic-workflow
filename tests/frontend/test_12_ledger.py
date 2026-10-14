@@ -105,6 +105,20 @@ def test_j42_eskalasi_membuka_putaran_contract(fe_chain_repo):
     assert r.returncode == 0, r.out
 
 
+@pytest.mark.regression("25 R3")
+@pytest.mark.parametrize("reason", ["", "   "])
+def test_r3_eskalasi_alasan_kosong_ditolak_tanpa_merusak_riwayat(fe_chain_repo, reason):
+    repo = fe_chain_repo
+    before = (repo / TASK).read_text(encoding="utf-8")
+    r = chain(repo, "escalate", "--lane", "FULL_PIPELINE", "--sections", "flow,architecture", "--reason", reason)
+    assert r.returncode == 1 and "`--reason` kosong" in r.out
+    assert (repo / TASK).read_text(encoding="utf-8") == before
+    ok(chain(repo, "escalate", "--lane", "FULL_PIPELINE", "--sections", "flow,architecture",
+             "--reason", "contract menemukan alur baru"))
+    s = state(repo, "--json")
+    assert "RUSAK" not in s.out
+
+
 # ------------------------------------------------------------------ J43
 
 
@@ -187,6 +201,17 @@ def test_j44_squash_rantai_tuntas_bukan_drift(fe_minor_chain):
     r = state(repo)
     assert "nol taskdir terbuka" in r.out, r.out
     assert "TUNTAS" in state(repo, "--all").out
+
+
+@pytest.mark.regression("25 R6")
+def test_r6_architect_squash_rantai_tuntas_bukan_terputus(fe_minor_chain):
+    """Commit unit hilang karena squash-merge: architect sejalan dengan `taskdir_state` (TUNTAS), bukan TERPUTUS."""
+    repo = fe_minor_chain
+    squash_to_root(repo, "feat: order checkout label (#12)")
+    out = json.loads(fe_run(repo, "architect/scripts/check_preconditions.py", "--taskdir", FE_MINOR_TD,
+                            "--json").stdout)
+    c4 = next(c for c in out["checks"] if c["id"] == 4)
+    assert out["phase"] == "TUNTAS" and c4["status"] == "PASS", c4
 
 
 @pytest.mark.regression("J44")

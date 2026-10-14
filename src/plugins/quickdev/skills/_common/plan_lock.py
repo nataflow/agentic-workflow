@@ -9,7 +9,8 @@
             langkah `[ ]` tersisa (rencana direvisi) atau segel basi (13 Q9/Q14) → `resume`; ronde
             remediasi yang masih `OPEN` → `remediasi` lanjutan (13 Q3).
 - `baseline` kunci ringkasan baseline segar (`Baseline`, `Baseline-Commit`); sah hanya di HEAD = Base-Commit
-            dengan tree bersih, yaitu sebelum mutasi pertama (13 Q6).
+            dengan tree bersih, yaitu sebelum mutasi pertama (13 Q6). `start` mode `awal` mencetak `PEMBANDING:`:
+            profil hanya bila `Baseline-Commit`-nya = Base-Commit dan `tree bersih: ya` (25 R9).
 - `close`   tulis status terminal execute ke blok (COMPLETED | BLOCKED | VERIFICATION_MANUAL_REQUIRED);
             dari IN_PROGRESS, atau BLOCKED dari VERIFICATION_MANUAL_REQUIRED (verifikasi manual gagal).
             COMPLETED/VERIFICATION_MANUAL_REQUIRED menyegel `Verified-Hash` (= Plan-Hash) dan `Tree-Hash`.
@@ -239,6 +240,35 @@ def repo_top(p: "Plan") -> Optional[Path]:
     r = git(p.path.parent, "rev-parse", "--show-toplevel")
     top = r.stdout.strip() if r is not None and r.returncode == 0 else ""
     return Path(top) if top else None
+
+
+_BASELINE_LINE = re.compile(r"^Baseline-Commit:\s*`?(?P<sha>[0-9a-f]{7,40}|none)`?(?P<rest>.*)$", re.M)
+
+
+def profile_comparator(p: "Plan", top: Path, base: str) -> str:
+    """Pembanding baseline mode `awal` dari baris `Baseline-Commit` Section 5 profil (25 R9).
+
+    Profil adalah pembanding hanya bila diukur di `Base-Commit` **dan** di tree bersih: baseline tree kotor tidak
+    mewakili commit mana pun, jadi galat di berkas yang dulu kotor tidak boleh terbaca sebagai bawaan.
+    """
+    prof = top / posixpath.normpath(p.meta().get("Profile") or "repo-profile.md")
+    try:
+        text = prof.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return f"baseline segar — profil `{prof.name}` tak terbaca"
+    m = _BASELINE_LINE.search(text)
+    if not m:
+        return "baseline segar — profil tanpa baris `Baseline-Commit`"
+    sha, rest = m.group("sha"), m.group("rest")
+    same = sha == base if "none" in (sha, base) else base.startswith(sha) or sha.startswith(base)
+    if not same:
+        return f"baseline segar — `Baseline-Commit` profil {sha[:12]} ≠ Base-Commit {base[:12]}"
+    clean = re.search(r"tree bersih:\s*`?\s*(ya|tidak)", rest)
+    if not clean:
+        return "baseline segar — profil tidak mencatat `tree bersih` (format lama)"
+    if clean.group(1) != "ya":
+        return "baseline segar — baseline profil diukur di tree kotor"
+    return f"profil @{sha[:12]}"
 
 
 def gate_paths(p: "Plan", top: Path) -> list:
@@ -478,6 +508,8 @@ def cmd_start(p: Plan, a) -> int:
         print(f"INFO: HEAD maju {ahead} commit sejak Base-Commit — review menilainya sebagai bagian tugas")
     if b.get("Baseline"):
         print(f"BASELINE: {b['Baseline']} @{b.get('Baseline-Commit', '-')[:12]}")
+    elif mode == "awal":
+        print(f"PEMBANDING: {profile_comparator(p, top, b.get('Base-Commit', ''))}")
     return 0
 
 

@@ -167,7 +167,7 @@ Dan dua penjaga keadaan:
   FAIL (pulihkan dari `.bak`, yang ditulis sejak `save` pertama); kejadian `draft` di Riwayat membawa field
   `review <gate> r<n> t<total> PASS`, sehingga state yang hilang terdeteksi (`rebuild` memulihkan hitungannya).
 - `lead/scripts/taskdir_state.py` — memvonis keadaan tiap taskdir (`AKAR`, `GATE`, `DRIFT`,
-  `EKSEKUSI`, `TERHENTI`, `PENUTUP`, `TEMUAN`, `LAPORAN`, `LAPORAN TERTUNDA`, `TUNTAS`, `DITUTUP`, `RUSAK`) beserta satu
+  `EKSEKUSI`, `TERPUTUS`, `TERHENTI`, `PENUTUP`, `TEMUAN`, `LAPORAN`, `LAPORAN TERTUNDA`, `TUNTAS`, `DITUTUP`, `RUSAK`) beserta satu
   rute berikutnya, dari disk, ledger, dan Riwayat — bukan dari ingatan sesi. `TUNTAS` dinilai sebelum ledger dan
   berarti `REPORT.md` lolos `validate_report.py` (`LAPORAN TERTUNDA`: tertulis tetapi gagal validator);
   taskdir era git tanpa `base_commit` divonis `TUNTAS` bila ber-`REPORT.md`, selain itu `RUSAK`; repo yang
@@ -401,8 +401,8 @@ ada di `hooks/gate_text.py`.
 - **Profil hilang, tidak sah, atau tidak lengkap**: permintaan kerja tetap lewat `frontend:lead`,
   yang merutekan lane `PROFILE` (GENERATE | REFRESH | MIGRATE) lebih dulu lalu melanjutkan rute tertunda.
   `EXPLORE_FACT` berangkat tanpa profil. Profil sendiri yang field `plugin`-nya asing dirutekan REFRESH.
-- **Alur plugin lain**: permintaan yang memanggil atau melanjutkan `/analyst:*`, `/product:*`, atau
-  `/quickdev:*` secara eksplisit dikecualikan dari gate.
+- **Alur plugin lain**: permintaan yang memanggil atau melanjutkan `/analyst:*`, `/product:*`,
+  `/quickdev:*`, atau `/nataflow:*` secara eksplisit dikecualikan dari gate.
 - **Tiket analyst**: tiket `READY` diserahkan ke `/frontend:lead` lewat parameter `ticket_source`
   (path `analyst/tickets/<YYMMDDhhmm>-<slug>/TICKET.md`). `AC-{n}`/`BR-{n}` kartu dirujuk `TAC-{n}`/`TBR-{n}`
   agar tidak bertabrakan dengan `AC-{n}` CONTRACT; tiap `TAC-{n}` dipikul `SC-{n}` atau tercatat di

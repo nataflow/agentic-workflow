@@ -1,6 +1,6 @@
 # TASK Template & Self-test Akar — `task`
 
-Dipakai di Phase 4 (`SKILL.md`) sebagai isi berkas `frontenddev/docs/<YYMMDDhhmm>-<slug>/TASK.md`. Ikuti bagian 1 persis — satu H1 dan empat heading, tidak lebih (ditambah `## Riwayat Rantai` yang hanya ditulis `chain.py`): begitu dokumen menuntut sub-heading di luar keempatnya, isinya milik `ux-design`, `ui-design`, `contract`, atau `plan`. Bagian 2 dan 3 tidak ikut tersalin ke artefak.
+Dipakai di Phase 4 (`SKILL.md`) sebagai isi berkas `frontenddev/docs/<YYMMDDhhmm>-<slug>/TASK.md`. Ikuti bagian 1 persis — satu H1 dan empat heading, tidak lebih (ditambah `## Riwayat Rantai` yang hanya ditulis `chain.py root` dan tidak ada di template): begitu dokumen menuntut sub-heading di luar keempatnya, isinya milik `ux-design`, `ui-design`, `contract`, atau `plan`. Bagian 2 dan 3 tidak ikut tersalin ke artefak.
 
 Bentuk berkas ini sengaja sejajar dengan `TASK.md` milik `backend` — frontmatter, heading inti, butir `SC-{n}` ber-alat-ukur, dan ledger `## Chain` — supaya satu fitur full-stack punya dua akar yang dapat disandingkan baris demi baris. Yang berbeda hanya enum `lane`, field `sections`, hop ledger, dan daftar alat ukur sah.
 
@@ -17,7 +17,6 @@ created: <YYYY-MM-DD>
 finding_source: <path REVIEW.md asal>
 findings: [<P1-1>, <P2-3>]
 ticket_source: <path TICKET.md analyst>
-base_commit: <ditulis `chain.py root` — dilarang diketik>
 ---
 
 # <Fitur — jenis kerja, maksimal 8 kata>
@@ -41,11 +40,9 @@ base_commit: <ditulis `chain.py root` — dilarang diketik>
 ## Chain
 
 <ditulis `chain.py init` dari `sections` — dilarang diketik dengan tangan>
-
-## Riwayat Rantai
-
-<ditulis `chain.py root` dan subperintah sesudahnya — dilarang diketik atau disunting dengan tangan>
 ````
+
+Template sengaja tanpa frontmatter `base_commit` dan seksi `## Riwayat Rantai`: keduanya ditulis `chain.py root` saat akar dikunci (Phase 4 butir 5), lalu Riwayat ditambah subperintah sesudahnya. Placeholder yang diketik untuk keduanya menggagalkan self-test (25 R4).
 
 Baris `## Chain` memuat **tepat** hop yang dijadwalkan `sections`, berurutan: `FLOW` (bila `flow`), `UI` (bila `ui`), `CONTRACT` (bila `sections` non-kosong), dan `BRIEF` (selalu). Hop dicentang hanya oleh `chain.py approve`, dibuka ulang hanya oleh `chain.py reopen`, dan ditambah hanya oleh `chain.py escalate`:
 

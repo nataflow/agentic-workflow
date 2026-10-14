@@ -1,7 +1,9 @@
 """L2.4 — vonis henti architect di `HALT.md`; `plan` mencabutnya lewat baris `repairs` (`status: DICABUT`)."""
 import json
 
-from conftest import TD, be_checks, be_run, brief, commit, git, land, write_files
+import pytest
+
+from conftest import BE_SKILLS, TD, be_checks, be_run, brief, commit, git, land, write_files
 
 def _spec_path(repo):
     """Spec batch di laci `.explore/` taskdir — satu-satunya lokasi yang diterima scaffold (B11)."""
@@ -83,3 +85,18 @@ def test_halt_under_taskdir_keeps_review_fresh(chain_repo):
     write_files(chain_repo, {f"{TD}/HALT.md": HALT.replace("verdict: COMPILE", "verdict: STRAY")})
     c3 = be_checks(chain_repo, ARCH, "--taskdir", TD)[3]
     assert c3["entry"] == "FASE_5"
+
+
+@pytest.mark.regression("25 R7")
+def test_r7_rute_taskdir_hanya_halt_aktif():
+    """`HALT.md` tidak lagi dihapus sesudah dicabut (24 K11); rute PLANNING hanya untuk HALT aktif."""
+    tl = BE_SKILLS / "tech-lead"
+    texts = {
+        "SKILL.md": (tl / "SKILL.md").read_text(encoding="utf-8"),
+        "gate-lifecycle.md": (tl / "references/gate-lifecycle.md").read_text(encoding="utf-8"),
+        "decisions.md": (tl / "references/decisions.md").read_text(encoding="utf-8"),
+    }
+    assert "`HALT.md` aktif (bukan `status: DICABUT`)" in texts["SKILL.md"]
+    assert "| Taskdir memuat brief `BLOCKED` atau `HALT.md` aktif |" in texts["gate-lifecycle.md"]
+    assert "`HALT.md` ber-`status: DICABUT`" in texts["gate-lifecycle.md"]
+    assert "HALT.md aktif ──►" in texts["decisions.md"]

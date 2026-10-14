@@ -184,6 +184,18 @@ def test_plugin_eksplisit_menimpa_default(repo):
     assert out["prefix"] == "frontenddev" and (repo / "frontenddev/docs/.gitignore").is_file()
 
 
+@pytest.mark.regression("25 R2")
+def test_r2_default_plugin_di_layout_cache_terpasang(plugin, repo, tmp_path):
+    """Cache plugin terpasang: `<cache>/<marketplace>/<plugin>/<versi>/` — nama direktori root plugin = versi."""
+    import shutil
+    installed = tmp_path / "cache" / "nataflow" / plugin / "0.14.0"
+    shutil.copytree(PLUGINS / plugin, installed, ignore=shutil.ignore_patterns("__pycache__"))
+    proc = run_script(installed / "skills/_common/docs_git.py", "status", "--json", cwd=repo)
+    out = json.loads(proc.stdout)
+    assert "error" not in out, out
+    assert out["docs"] == f"{PREFIX[plugin]}/docs"
+
+
 def test_base_commit_problem(plugin, repo):
     mod = load_module(COPIES[plugin], f"docs_git_{plugin}_base")
     head = mod.head_sha(repo)
@@ -213,3 +225,24 @@ def test_base_commit_bertahan_rebase_ke_base_baru(plugin, repo):
     git(repo, "checkout", "-q", "kerja")
     git(repo, "rebase", "-q", main)
     assert mod.base_commit_problem(repo, base) == ""
+
+
+STALE_GIT_DOC_PROSE = (
+    r"Commit `REVIEW\.md`",                       # frontend dispatcher reviewer
+    r"riwayat git `TASK\.md`",                    # pemulihan `## Counters` backend analyst
+    r"staging path eksplisit `\{taskdir\}/TASK\.md`",   # eskalasi chain backend
+    r"commit artefak adalah wewenang pendispatch",
+)
+
+
+@pytest.mark.regression("25 R8")
+@pytest.mark.parametrize("plugin", list(COPIES))
+def test_r8_prosa_tidak_menyuruh_commit_dokumen_taskdir(plugin):
+    """Dokumen taskdir diabaikan git (Langkah 24): prosa yang menyuruh meng-commit-nya atau memulihkannya dari
+    riwayat git mendorong model ke `git add -f` atas berkas yang sengaja di luar git."""
+    import re
+    hits = []
+    for md in sorted((PLUGINS / plugin).rglob("*.md")):
+        text = md.read_text(encoding="utf-8")
+        hits += [f"{md.relative_to(PLUGINS)}: {pat}" for pat in STALE_GIT_DOC_PROSE if re.search(pat, text)]
+    assert hits == []

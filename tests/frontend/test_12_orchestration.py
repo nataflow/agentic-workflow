@@ -203,6 +203,46 @@ def test_j58c_runnable_briefs(make_repo):
     assert lib.runnable_briefs(root / TD, root) == ["02"]
 
 
+# --- 25 R6: brief DONE tanpa commit unit → TERPUTUS, bukan DAG/PENUTUP --------------------------
+
+def terputus_taskdir(make_repo, dependent: bool):
+    """Ledger BRIEF `[x]`; brief 01 `DONE` di disk tanpa commit unit (sesi terputus sebelum commit kode)."""
+    lib = load_module(FE_SKILLS / "_common" / "precondition_lib.py", "pl_25_r6")
+    root, base = minor_root(make_repo, row=lib.chain_line("BRIEF", "x", "READY abc1234"))
+    files = {f"{TD}/brief-01-label-a.md": brief(base, "01", "LabelA", status="DONE", total=2 if dependent else 1)}
+    if dependent:
+        files[f"{TD}/brief-02-label-b.md"] = brief(base, "02", "LabelB", total=2, deps='"01"')
+    write_files(root, files)
+    return root
+
+
+@pytest.mark.regression("25 R6")
+@pytest.mark.parametrize("dependent", [True, False], ids=["ber-dependen", "tunggal"])
+def test_r6_taskdir_state_done_tanpa_commit_terputus(make_repo, monkeypatch, dependent):
+    """Dulu: ber-dependen → `TERHENTI (DAG)` (reopen BRIEF, salah obat); tunggal → `PENUTUP` "seluruh brief tertutup"."""
+    root = terputus_taskdir(make_repo, dependent)
+    mod = load_module(STATE, f"tds_25_r6_{dependent}")
+    monkeypatch.setattr(mod, "verify_chain_row", lambda *a, **k: "")   # ledger legacy dianggap sah
+    out = mod.classify(root, TD)
+    assert out["state"] == "TERPUTUS", out
+    assert "frontend:architect" in out["next"] and "brief-01" in out["next"], out
+
+
+@pytest.mark.regression("25 R6")
+def test_r6_architect_terputus_menyerahkan_tree_kotor_ke_matriks(make_repo):
+    root, base = minor_root(make_repo)
+    write_files(root, {f"{TD}/brief-01-label-a.md": brief(base, "01", "LabelA")})
+    approve_brief(root)
+    write_files(root, {f"{TD}/brief-01-label-a.md": brief(base, "01", "LabelA", status="DONE"),
+                       f"{TD}/report-01.md": "---\nunit: \"01\"\nstatus: DONE\n---\n# Unit 01\n",
+                       "src/features/label/LabelA.tsx": "export const LabelA = () => null;\n"})
+    data = architect(root)
+    c4, c8 = check(data, 4), check(data, 8)
+    assert data["phase"] == "TERPUTUS" and data["next_unit"] == "01", c4
+    assert c4["status"] == "WARN" and "matriks bukti disk" in c4["action"], c4
+    assert c8["status"] == "WARN" and "TERPUTUS" in c8["action"], c8
+
+
 @pytest.mark.regression("J58")
 def test_j58c_taskdir_state_dag_terhenti(make_repo, monkeypatch):
     root, _ = dag_taskdir(make_repo)

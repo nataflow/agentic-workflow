@@ -14,6 +14,7 @@ berkas plugin, keluaran), di-bootstrap relatif terhadap berkas ini.
 """
 
 import argparse
+from collections import Counter
 from pathlib import Path
 import subprocess
 import sys
@@ -30,6 +31,11 @@ RE_ENTRY_ALLOWED_PREFIXES = (
     "backenddev/issues/",
     "docs/api/",
 )
+
+# `.gitignore` akar boleh kotor pada re-entry hanya bila selisihnya terhadap HEAD semata baris yang
+# ditulis `backend:profile` Fase 5 (pemilik tunggal mutasinya); berkas itu lalu ikut di-stage gerbang
+# di `gate-lifecycle.md` bagian 6 butir 2. Selisih lain di berkas yang sama tetap milik user (25 R1).
+PROFILE_GITIGNORE_LINES = frozenset({".backenddev/", ".backenddev", "/.backenddev/", "/.backenddev"})
 
 
 # Helper izin tulis dipakai bersama lintas skrip prasyarat; rumah kanoniknya
@@ -60,6 +66,25 @@ import docs_git  # noqa: E402
 # Selama masa transisi MIGRATE: `git mv` meninggalkan penghapusan berkas profil
 # backend di lokasi lama `.claude/profile/<berkas>`. Cabut di rilis berikutnya.
 RE_ENTRY_ALLOWED_PREFIXES += tuple(f"{LEGACY_PROFILE_DIR_REL}/{f}" for f in PROFILE_FILES)
+
+
+def gitignore_profile_only(root: Path) -> bool:
+    """True bila `.gitignore` akar hanya menambah baris `PROFILE_GITIGNORE_LINES` terhadap HEAD (25 R1).
+
+    Dibandingkan per baris tak kosong sebagai multiset: baris yang hilang atau baris tambahan lain
+    berarti suntingan user, bukan jejak `backend:profile`. Berkas absen atau git gagal → False.
+    """
+    try:
+        new = (root / ".gitignore").read_text(encoding="utf-8", errors="replace").splitlines()
+        proc = subprocess.run(["git", "-C", str(root), "show", "HEAD:.gitignore"],
+                              capture_output=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    old = proc.stdout.decode("utf-8", "replace").splitlines() if proc.returncode == 0 else []
+    new_c = Counter(line.strip() for line in new if line.strip())
+    old_c = Counter(line.strip() for line in old if line.strip())
+    added, removed = new_c - old_c, old_c - new_c
+    return not removed and bool(added) and set(added) <= PROFILE_GITIGNORE_LINES
 
 
 class PreconditionChecker:
@@ -252,6 +277,8 @@ class PreconditionChecker:
             if dirty:
                 if self.re_entry:
                     outside = [p for p in dirty if not any(is_under(p, x) for x in RE_ENTRY_ALLOWED_PREFIXES)]
+                    if ".gitignore" in outside and gitignore_profile_only(self.root):
+                        outside.remove(".gitignore")
 
                     if outside:
                         sample = ", ".join(outside[:3])

@@ -84,7 +84,7 @@ skeletons), `dispatcher/` (prompts used to dispatch subagents), `scripts/`, and 
   under `backenddev/docs/<taskdir>/`, which is gitignored and never committed (step 24). Integrity is a content
   seal on disk written by `skills/_common/doc_seal.py`: `root` (`base_commit` = HEAD), `approve` (BRD/PRD
   `approved_seal` + ledger tick `@ APPROVED <sidik12>`), `lock-briefs` (`sidik_kontrak`), `tick --hop BRIEF`,
-  `cabut-halt` (`HALT.md` `status: DICABUT`). Brief DONE is proven by a code commit with the brief's
+  `cabut-halt` (`HALT.md` `status: DICABUT`), `buka-done` (the only `DONE → READY`, when no unit commit proves it). Brief DONE is proven by a code commit with the brief's
   `commit_message` in `base_commit..HEAD`; `REVIEW.md` is stale once code lands after its `range:` head.
 - **frontend** — same shape with entry `frontend:lead`: TASK → FLOW (ux-design) → UI (ui-design) →
   CONTRACT → briefs → architect → review → report, under `frontenddev/docs/<taskdir>/` (gitignored, never

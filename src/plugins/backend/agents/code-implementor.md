@@ -40,6 +40,6 @@ Kembalikan amplop maksimal 10 baris, tanpa teks lain:
 
 Jalur gagal mengganti tiga baris tengahnya jadi `Status: BLOCKED (<sebab>)`, `Cause: <1 kalimat>`, dan `Report File: {taskdir}/report-{NN}.md`; `Commit:` menunjuk penanda `wip(<domain>)`.
 
-`{taskdir}/report-{NN}.md` ditulis HANYA pada jalur gagal: frontmatter `brief`, `status: BLOCKED`, `reason`, lalu `## Stop condition / Trigger`, `## Evidence` (kutipan `berkas:baris` atau galat tool), `## Working Tree & Partial Changes`, `## Root Cause & Recommended Action`.
+`{taskdir}/report-{NN}.md` ditulis HANYA pada jalur gagal: frontmatter `brief`, `status: BLOCKED`, `reason`, lalu `## Stop condition / Trigger`, `## Evidence` (kutipan `berkas:baris` atau galat tool), `## Working Tree & Partial Changes`, `## Root Cause & Recommended Action`. Bila sebab terhentinya **preseden kode yang menyesatkan** — pola warisan yang disalin brief sebagai contoh, lalu ternyata melanggar `## Anti-patterns` atau `## Invariants` profil — tutup seksi terakhir dengan satu baris tersendiri `Umpan balik profil: <berkas:baris> — <pola>`; `architect` meneruskannya ke gerbang untuk ditandai di profil. Tanpa preseden semacam itu baris ini tidak ditulis.
 
 Tutup dengan serah-terima ke `backend:architect` di main loop.

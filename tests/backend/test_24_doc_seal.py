@@ -150,6 +150,41 @@ def test_cabut_halt(chain_repo):
     assert seal(chain_repo, "cabut-halt", "--taskdir", TD, "--alasan", "x")[0] == 1
 
 
+@pytest.mark.regression("25 R6")
+def test_r6_buka_done_sesudah_commit_unit_di_reset(chain_repo):
+    """`TERTAHAN (scope)` lalu user me-reset commit unit: brief tinggal `DONE` tanpa bukti di git."""
+    b = brief(chain_repo, "01", "lock", "READY")
+    land(chain_repo, b)
+    write_files(chain_repo, {f"{TD}/HALT.md": "---\nbrief: brief-01-lock.md\nverdict: SCOPE\n---\n# HALT\n"})
+    git(chain_repo, "reset", "-q", "--hard", "HEAD~1")
+    assert "status: DONE" in b.read_text()
+    c3 = be_checks(chain_repo, ARCH, "--taskdir", TD)[3]
+    assert c3["status"] == "FAIL" and "buka-done" in c3["action"]
+    code, out = seal(chain_repo, "buka-done", "--taskdir", TD, "--brief", "01", "--alasan", "commit di-reset user")
+    assert code == 1 and "HALT.md` aktif" in out["summary"]
+    assert seal(chain_repo, "cabut-halt", "--taskdir", TD, "--alasan", "commit di-reset user")[0] == 0
+    code, out = seal(chain_repo, "buka-done", "--taskdir", TD, "--brief", "1", "--alasan", "commit di-reset user")
+    assert code == 0, out
+    assert "status: READY" in b.read_text()
+    assert be_checks(chain_repo, ARCH, "--taskdir", TD)[3]["status"] == "PASS"
+
+
+@pytest.mark.regression("25 R6")
+def test_r6_buka_done_menolak_done_terbukti_dan_tree_kotor(chain_repo):
+    b = brief(chain_repo, "01", "lock", "READY")
+    land(chain_repo, b)
+    code, out = seal(chain_repo, "buka-done", "--taskdir", TD, "--brief", "01", "--alasan", "x")
+    assert code == 1 and "terbukti" in out["summary"]
+    b2 = brief(chain_repo, "02", "refund", "DONE")
+    write_files(chain_repo, {"src/order.go": "package order\n// belum di-commit\n"})
+    code, out = seal(chain_repo, "buka-done", "--taskdir", TD, "--brief", "02", "--alasan", "x")
+    assert code == 1 and "tree kotor" in out["summary"]
+    assert "status: DONE" in b2.read_text()
+    code, out = seal(chain_repo, "buka-done", "--taskdir", TD, "--brief", "03", "--alasan", "x")
+    assert code == 1 and "tidak ada" in out["summary"]
+    assert seal(chain_repo, "buka-done", "--taskdir", TD, "--brief", "02", "--alasan", " ")[0] == 1
+
+
 def test_status_ringkas(chain_repo):
     code, out = seal(chain_repo, "status", "--taskdir", TD)
     assert code == 0 and out["base_commit"] and out["halt"] == "-" and out["briefs"] == {}

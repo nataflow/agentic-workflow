@@ -1,6 +1,6 @@
 # Alur Plugin `product`
 
-> Plugin `product` (v0.1.0, `src/plugins/product/.claude-plugin/plugin.json`) menginisiasi produk baru, fitur baru,
+> Plugin `product` (v0.1.1, `src/plugins/product/.claude-plugin/plugin.json`) menginisiasi produk baru, fitur baru,
 > atau improvement fitur menjadi `product/<slug>/CHARTER.md` berisi enam pilar — Purpose, Actors, Business Process,
 > Business Rules, Success Criteria, Scope. Tiga skill (`init` sebagai titik masuk, `discover` dan `spec` internal) dan
 > dua subagent (`code-scout`, `charter-reviewer`). Kebenaran dijaga skrip stdlib di `skills/_common/`; prosa skill
@@ -99,7 +99,8 @@ Sidik:
 
 - **Masuk**: tidak ada; `/product:init` dipanggil user atau model dari gagasan mentah.
 - **Keluar (disiapkan, belum aktif)**: butir `S<n>` charter `APPROVED` dibawa satu per satu ke `/analyst:intake`.
-  ID `S<n>` divalidasi unik dan berurutan, dan `spec` dilarang menomori ulang butir yang pernah disetujui.
+  ID `S<n>` divalidasi unik dan tanpa celah atas gabungan Termasuk dan butir yang dibatalkan di Tidak Termasuk (ID
+  dibawa serta), dan `spec` dilarang menomori ulang butir yang pernah disetujui.
 - **Gerbang engineer**: `hooks/gate_text.py` backend dan frontend mengecualikan `/product:*`, sehingga mode codebase
   berjalan di repo backend/frontend tanpa dicegat.
 

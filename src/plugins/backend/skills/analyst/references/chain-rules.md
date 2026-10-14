@@ -137,8 +137,7 @@ Prosedur transisi:
 2. Tulis ulang frontmatter `TASK.md`: `chain:` bernilai hasil transisi, `risk:` bernilai hasil kolom terakhir, `lane:` bernilai lane terminal chain baru.
 3. Sisipkan baris hop baru ke ledger `## Chain` **sebelum** hop yang belum tercentang, pertahankan centang hop yang sudah tuntas.
 4. Tulis ulang klausa `— verifikasi:` tiap `SC-{n}` agar cocok dengan kolom alat ukur lane baru pada tabel Fase 3 `task/SKILL.md`, **tanpa mengubah prosa hasil yang diukur**. Lalu jalankan ulang `python3 «validate_doc.py» --kind task --taskdir <taskdir>` (path absolut di `SKILL.md` Fase 5 butir 2; tanpa `--fresh`) atas berkas hasilnya; check T8a ikut karena transisi inilah satu-satunya mutasi yang menulis ulang ledger, `lane:`, dan pasangan `(risk, chain)` sekaligus; T8b dilewati karena ledger pasca-transisi memang sudah membawa centang hop yang tuntas.
-5. Commit pembaruan dengan staging path eksplisit `{taskdir}/TASK.md` dan subjek `docs(<slug>): eskalasi chain <asal> ke <hasil>`.
-6. Berangkatkan hop baru dari Fase 3.
+5. Berangkatkan hop baru dari Fase 3. `TASK.md` tetap di disk tanpa commit: dokumen taskdir diabaikan git (Langkah 24), dan transisinya dicerminkan ke nataflow bersama hop berikutnya.
 
 Butir 4 ada karena lane ikut berubah saat chain naik, dan kolom alat ukur `SC-{n}` terikat pada lane. Yang ditulis ulang hanyalah alat ukurnya — hasil yang diukur tidak berubah karena jalannya bertambah panjang. Kriteria yang benar-benar gugur adalah amandemen akar milik gerbang, bukan eskalasi.
 
