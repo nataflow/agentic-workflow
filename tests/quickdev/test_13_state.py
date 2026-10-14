@@ -219,3 +219,45 @@ def test_q6_baseline_ditolak_sesudah_mutasi_atau_head_bergeser(repo, pl):
     commit(repo, "maju", "app.js")
     r = pl("baseline", "--summary", "x")
     assert r.returncode == 1 and "Base-Commit" in r.stdout
+
+
+# --- 25 R9: baseline profil di tree kotor bukan pembanding -------------------------------------
+
+def _profil(repo, line):
+    (repo / "repo-profile.md").write_text(f"# profil\n\n## 5. Baseline\n\n{line}\n\n| Jenis | Perintah |\n",
+                                          encoding="utf-8")
+    commit(repo, "docs: profil", "repo-profile.md")
+    return git(repo, "rev-parse", "HEAD").strip()
+
+
+@pytest.mark.regression("25 R9")
+def test_r9_baseline_profil_di_commit_lain_diukur_ulang(repo, pl):
+    head = git(repo, "rev-parse", "HEAD").strip()
+    _profil(repo, f"Baseline-Commit: `{head}` — tree bersih: `ya`")
+    # Profil di-commit sesudah diukur; baseline-nya diukur di commit sebelumnya → beda dari Base-Commit.
+    pl("lock", "--answer", "ok")
+    out = pl("start").stdout
+    assert "mode=awal" in out and "PEMBANDING: baseline segar" in out and "≠ Base-Commit" in out
+
+
+@pytest.mark.regression("25 R9")
+@pytest.mark.parametrize("tail, want", [
+    ("— tree bersih: `ya`", "PEMBANDING: profil @"),
+    ("— tree bersih: `tidak: src/a.ts`", "PEMBANDING: baseline segar — baseline profil diukur di tree kotor"),
+    ("", "PEMBANDING: baseline segar — profil tidak mencatat `tree bersih`"),
+])
+def test_r9_pembanding_mode_awal(repo, pl, tail, want):
+    # Baseline-Commit = HEAD sesudah profil di-commit tidak mungkin; tulis profil tanpa commit (dikecualikan dari
+    # predikat tree bersih karena berkas profil adalah artefak gate) dengan sha HEAD sekarang.
+    head = git(repo, "rev-parse", "HEAD").strip()
+    (repo / "repo-profile.md").write_text(f"# profil\n\nBaseline-Commit: `{head}` {tail}\n", encoding="utf-8")
+    pl("lock", "--answer", "ok")
+    out = pl("start").stdout
+    assert "mode=awal" in out and want in out, out
+
+
+@pytest.mark.regression("25 R9")
+def test_r9_profil_tanpa_baseline_commit(repo, pl):
+    pl("lock", "--answer", "ok")
+    out = pl("start").stdout
+    assert "PEMBANDING: baseline segar — profil tanpa baris `Baseline-Commit`" in out, out

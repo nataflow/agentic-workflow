@@ -91,7 +91,8 @@ baseline dilaporkan sebagai "artefak build perlu di-ignore", tidak dihapus.
 
 `execute` membandingkan hasil verifikasinya dengan pembanding yang terikat commit: baseline segar yang
 dikunci `plan_lock.py baseline` di `Base-Commit` (mode `awal`, sebelum mutasi), atau profil bila
-`Baseline-Commit`-nya sama dengan `Base-Commit`. Profil yang diukur di commit lain hanya memvonis berkas yang
+`Baseline-Commit`-nya sama dengan `Base-Commit` dan diukur di tree bersih (`start` mencetak `PEMBANDING:`).
+Profil yang diukur di commit lain atau di tree kotor hanya memvonis berkas yang
 disentuh rencana; galat lain dicatat `UNVERIFIED`. Galat dicocokkan per berkas + aturan/nama test tanpa nomor
 baris. Perintah yang ditolak user di `profile` hanya dijalankan `execute` sesudah izin baru.
 
