@@ -31,7 +31,7 @@ Semua path berkas di dokumen ini relatif terhadap `src/plugins/backend/`.
 | `check_preconditions.py` | script (per skill) | Prasyarat sebelum fase pertama (exit 0 = PASS, 1 = FAIL) | `skills/<skill>/scripts/check_preconditions.py` |
 | `precondition_lib.py` | script | Parser frontmatter, taskdir, chain, status git, dan profil; mengimpor `hooks/detect.py` | `skills/_common/precondition_lib.py` |
 | `brief_status.py` | script | Mesin status brief, bukti `DONE` dari commit unit sejak `base_commit`, tautan `supersedes`, kesegaran `REVIEW.md` dari ujung `range:`, dan `HALT.md` (`DICABUT` tidak menahan) | `skills/_common/brief_status.py` |
-| `doc_seal.py` | script | Materai dokumen taskdir di disk: `root` (`base_commit`), `approve` (`approved_seal` BRD/PRD + centang ledger), `lock-briefs` (`sidik_kontrak`), `tick --hop BRIEF`, `cabut-halt`, dan `status` | `skills/_common/doc_seal.py` |
+| `doc_seal.py` | script | Materai dokumen taskdir di disk: `root` (`base_commit`), `approve` (`approved_seal` BRD/PRD + centang ledger), `lock-briefs` (`sidik_kontrak`), `tick --hop BRIEF`, `cabut-halt`, `buka-done` (brief `DONE` tanpa commit unit → `READY`), dan `status` | `skills/_common/doc_seal.py` |
 | `docs_git.py` | script | Penanda ignore `backenddev/docs/.gitignore`, status, dan migrasi sekali jalan dokumen taskdir yang masih ter-track. Salinan identik dengan `frontend` | `skills/_common/docs_git.py` |
 | `validate_doc.py` | script | Self-test mekanis `TASK.md`/`BRD.md`/`PRD.md` | `skills/_common/validate_doc.py` |
 | `run_verification.py` | script | Verifikasi `baseline` dan `closing` (vonis relatif baseline) | `skills/_common/run_verification.py` |
@@ -179,7 +179,7 @@ flowchart TD
 | `plan` jalur RCA, brief READY terkunci (`lock-briefs`) | `backend:architect` pada taskdir sama |
 | `plan` jalur RCA membawa pemicu eskalasi | Tanya user. Bila naik, amandemen ke `PRD_BRIEF` lalu `PLANNING` (analyst mulai dari hop PRD) |
 | `audit` | Ringkasan per severity, user memilih ≤7 temuan, taskdir baru, lalu `PLANNING` + `finding_source` |
-| `architect` `TERTAHAN (scope)` / `HALT.md` `SCOPE`/`SYMBOL` | Tanya user: bila diterima, `doc_seal.py cabut-halt` lalu architect lagi; bila di-reset, user sendiri yang me-reset lalu `PLANNING` |
+| `architect` `TERTAHAN (scope)` / `HALT.md` `SCOPE`/`SYMBOL` | Tanya user: bila diterima, `doc_seal.py cabut-halt` lalu architect lagi; bila di-reset, user sendiri yang me-reset, gerbang mencabut `HALT.md` dan menjalankan `doc_seal.py buka-done` (brief `DONE` → `READY`), lalu `PLANNING` |
 | `architect` `HALT.md` `COMPILE`/`STRAY` | `PLANNING` pada taskdir sama. `plan` menambah baris `repairs` |
 | `architect` severity `P1` | `PLANNING` pada taskdir sama, `finding_source` = `REVIEW.md`, `reentry_reason` = `REVIEW P1: <ID>` |
 | `architect` `COMPLETED` / `COMPLETED (WARNING)` | Rantai selesai. Pada WARNING, tawarkan taskdir perbaikan P2 (tidak otomatis) |
@@ -599,9 +599,10 @@ Ledger `## Chain` di `TASK.md` berjalan `- [ ]` → `- [x] … @ APPROVED <sidik
 | User menolak BRD/PRD dua kali, OQ memblokir 3 kali, amandemen/re-entry/transisi chain ke-3 | `chain_counters.py` di `## Counters` `TASK.md` | Rantai berhenti, lalu gerbang mengklasifikasi ulang permintaan dari awal (`analyst` Failure path 4, 5, 7, 8, 9) |
 | `NOT_READY_FOR_IMPLEMENTATION` | `analyst` Fase 6 | `tech-lead` membuka ulang `PLANNING` pada taskdir sama dengan `reentry_reason` berisi predikat gagal |
 | `plan` LANGSUNG / RCA menyentuh pemicu eskalasi | `plan` Fase 1 (`entry-rules.md` 1A/1C) | LANGSUNG: eskalasi chain #1 di analyst. RCA: user memilih naik ke PRD lewat amandemen akar |
+| Brief `DONE` tanpa commit unit pembawa kode (commit di-reset user, atau `DONE` tak pernah mendarat) | Check 3 architect, matriks bukti disk | Tree kotor: eskalasi ke user. Tree bersih: gerbang mengonfirmasi ke user lalu `doc_seal.py buka-done` (brief → `READY`), lalu architect men-dispatch ulang |
 | Brief `BLOCKED` | Implementor (`report-NN.md`), matriks bukti disk architect | Rantai berhenti tanpa review. `PLANNING` pada taskdir sama, lalu `plan` menulis pengganti ber-`supersedes` |
 | `HALT.md` COMPILE/STRAY | Gerbang kompilasi / `git status` architect | `PLANNING` pada taskdir sama, lalu `plan` menulis baris `repairs` dan mencabut `HALT.md` lewat `doc_seal.py cabut-halt` |
-| `HALT.md` SCOPE/SYMBOL (termasuk kontrak brief yang disunting sesudah `sidik_kontrak`) | `verify_scope.py`, `symbol_map.py` | Gerbang bertanya ke user: bila diterima, `doc_seal.py cabut-halt` lalu architect lagi. Bila tidak, user me-reset lalu `PLANNING` |
+| `HALT.md` SCOPE/SYMBOL (termasuk kontrak brief yang disunting sesudah `sidik_kontrak`) | `verify_scope.py`, `symbol_map.py` | Gerbang bertanya ke user: bila diterima, `doc_seal.py cabut-halt` lalu architect lagi. Bila tidak, user me-reset, lalu `cabut-halt` + `doc_seal.py buka-done` dan `PLANNING` |
 | Isi `BRD.md`/`PRD.md` berubah sesudah approve (`approved_seal` tidak cocok) | Prasyarat `system-analysis`/`plan` | Re-entry membuka hop itu, lalu gerbang dokumen Fase 4 berjalan lagi. Materai tidak ditulis tangan |
 | Verifikasi penutup merah | `run_verification.py closing` exit 1 | 4a cacat eksekusi: `DEFECT_RCA` atau brief perbaikan. 4b cacat perencanaan / berkas yatim: `PLANNING` re-entry, lalu `scaffold_brief.py --append` |
 | `REVIEW.md` P1 | `code-reviewer` | Tidak diperbaiki di architect. `PLANNING` pada taskdir sama dengan `finding_source` = `REVIEW.md`. Dihitung ke plafon re-entry |

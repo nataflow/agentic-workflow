@@ -161,7 +161,7 @@ dilakukan `tech-lead` di Fase 5. Profil lama milik plugin lain tidak dibaca dan 
 
 | Pemilik | Yang di-commit | Yang dikunci di disk (tanpa commit) |
 |---|---|---|
-| `tech-lead` | profil, laporan audit, `docs/api/` | pencabutan `HALT.md` (`doc_seal.py cabut-halt`) |
+| `tech-lead` | profil, laporan audit, `docs/api/` | pencabutan `HALT.md` (`doc_seal.py cabut-halt`), brief `DONE` tanpa commit → `READY` (`doc_seal.py buka-done`) |
 | `task` | — | akar `TASK.md` (`doc_seal.py root`) |
 | `analyst` | — | approval BRD/PRD (`doc_seal.py approve`), tutup ledger (`doc_seal.py tick`), eskalasi chain |
 | `plan` | penanda `OBSOLETE`/`DROPPED` di `finding_source` | batch brief (`doc_seal.py lock-briefs`) |
@@ -222,7 +222,7 @@ Tiap skill punya `skills/<skill>/scripts/check_preconditions.py` yang dijalankan
 |---|---|
 | `_common/precondition_lib.py` | parser frontmatter, taskdir, chain, status git, profil, dan materai approval BRD/PRD (`approved_seal`); mengimpor `hooks/detect.py` |
 | `_common/docs_git.py status\|ensure\|migrate` | penanda ignore `backenddev/docs/` dan migrasi sekali jalan repo lama; salinan identik dengan frontend |
-| `_common/doc_seal.py root\|approve\|lock-briefs\|tick\|cabut-halt\|status` | materai dokumen taskdir di disk, pengganti commit dokumen |
+| `_common/doc_seal.py root\|approve\|lock-briefs\|tick\|cabut-halt\|buka-done\|status` | materai dokumen taskdir di disk, pengganti commit dokumen |
 | `_common/brief_status.py` | status brief dan penulis tunggalnya |
 | `_common/run_verification.py baseline\|closing` | verifikasi baseline dan penutup, log mesin di `.explore/` |
 | `_common/verify_scope.py` | diff commit/worktree terhadap `File scope` brief; kontrak brief wajib sama dengan `sidik_kontrak`-nya |

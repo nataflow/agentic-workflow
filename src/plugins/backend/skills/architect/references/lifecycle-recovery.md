@@ -152,7 +152,7 @@ Tulis di disk, tanpa commit. Pencabutan tidak menghapus berkasnya: ia menambah `
 | Pencabut | Kapan | Mekanisme |
 | --- | --- | --- |
 | `plan` | Brief perbaikan ber-`repairs: brief-NN` ditulis `scaffold_brief.py --nn` | Skrip menulis `status: DICABUT` + `dicabut: brief-NN (repairs)` |
-| `tech-lead` | `SCOPE`/`SYMBOL` diterima user, atau commit unit di-reset user | `doc_seal.py cabut-halt --alasan "<scope diterima user \| commit di-reset user>"` |
+| `tech-lead` | `SCOPE`/`SYMBOL` diterima user, atau commit unit di-reset user | `doc_seal.py cabut-halt --alasan "<scope diterima user \| commit di-reset user>"`; sesudah reset juga `doc_seal.py buka-done --brief <NN>` (brief `DONE` → `READY`) |
 | `architect` | tidak pernah | — |
 
 `HALT.md` bukan kode, sehingga tidak membuat `REVIEW.md` basi, dan seperti seluruh `backenddev/docs/`
@@ -172,6 +172,7 @@ dispatch tidak pernah berangkat (**tidak ada vonis**). Kata statusnya tidak memb
 | tidak | ya | `READY` | bersih | **Koreksi status** (commit ada, status tertinggal): tulis `status: DONE` di brief, di disk tanpa commit; **dilarang retry**; lanjut `NN+1`. Skrip prasyarat menandainya `entry` `KOREKSI:<NN>:<sha7>` |
 | tidak | ya | apa pun | kotor | **HENTIKAN**, tulis `HALT.md` `verdict: STRAY` berisi `git status --porcelain` (bagian 3a); eskalasi ke user; dilarang meng-commit apa pun |
 | tidak | tidak | `READY` | bersih | Dispatch tak pernah berangkat — ulangi dispatch sebanyak `max_retries_per_brief`; masih gagal ⇒ eskalasi ke user |
+| tidak | tidak | `DONE` | bersih | **DONE tanpa bukti** (commit unit di-reset user, atau `DONE` tidak pernah mendarat; prasyarat check 3 FAIL) — **HENTIKAN**, kembalikan ke `backend:tech-lead`, yang mengembalikan brief ke `READY` lewat `doc_seal.py buka-done`; dilarang menulis status sendiri |
 | tidak | tidak | apa pun | kotor | Perubahan parsial tanpa vonis — **HENTIKAN**, eskalasi ke user; dilarang meng-commit apa pun |
 
 Pembeda commit unit di `git log` adalah subjek yang **sama** dengan `commit_message` pada frontmatter

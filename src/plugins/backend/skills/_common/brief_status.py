@@ -11,7 +11,9 @@ Status brief dan penulis tunggalnya:
 
 * `READY`       — `plan` (`scaffold_brief.py --nn`).
 * `DONE`        — `code-implementor`; koreksi `READY → DONE` oleh `architect`
-                  hanya saat commit unit terbukti mendarat.
+                  hanya saat commit unit terbukti mendarat. Arah balik `DONE → READY`
+                  hanya `doc_seal.py buka-done` (gerbang), saat tidak ada commit unit
+                  pembawa kode dan tree bersih (25 R6).
 * `BLOCKED`     — `code-implementor` saat stop condition.
 * `SUPERSEDED`  — hanya `scaffold_brief.py --nn <pengganti>`, atas brief `BLOCKED`
                   atau brief `READY` hilir yang diterbitkan ulang. Terminal.

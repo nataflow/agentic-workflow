@@ -137,7 +137,7 @@ Sajikan laporan deterministik kepada main loop:
   - Dilarang memperbaiki temuan review P1 di dalam siklus architect.
   - Dilarang menahan rantai untuk meminta otorisasi commit, di awal maupun di tiap brief.
   - Dilarang mengabaikan working tree kotor saat inisialisasi.
-  - Dilarang mengedit berkas brief, kecuali koreksi `status: READY → DONE` pada baris "commit ada, status tertinggal" matriks bukti disk — suntingan status di disk saja, tanpa commit.
+  - Dilarang mengedit berkas brief, kecuali koreksi `status: READY → DONE` pada baris "commit ada, status tertinggal" matriks bukti disk — suntingan status di disk saja, tanpa commit. Arah balik `DONE → READY` (brief `DONE` tanpa commit unit) bukan wewenang skill ini: kembalikan ke `backend:tech-lead`, yang menjalankan `doc_seal.py buka-done`.
   - Dilarang melakukan git reset destruktif tanpa persetujuan eksplisit user.
   - Dilarang menyimpulkan status akhir brief dari kata balikan tanpa bukti disk.
 

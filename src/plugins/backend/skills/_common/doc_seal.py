@@ -15,6 +15,10 @@ penulisnya:
                   ke tiap brief `READY` (24 K10). Brief `DONE`/`BLOCKED`/`SUPERSEDED` tidak disentuh.
 - `tick`        — centang hop `BRIEF` `@ READY <sidik12 batch>` sesudah tiap brief hidup terkunci utuh.
 - `cabut-halt`  — `HALT.md` → `status: DICABUT` beserta alasannya (24 K11); berkasnya tetap sebagai jejak.
+- `buka-done`   — brief `DONE` tanpa commit unit pembawa kode → `READY` (25 R6), satu-satunya jalur `DONE → READY`:
+                  commit unit di-reset user sesudah `TERTAHAN (scope)`, atau `DONE` yang tidak pernah mendarat.
+                  Menolak bila commit unit terbukti, tree kotor (kode unit mungkin ada belum di-commit), atau
+                  `HALT.md` aktif masih menahan brief itu.
 - `status`      — vonis seluruh materai taskdir (read-only).
 
 Batas yang dinyatakan apa adanya: materai menangkap suntingan dokumen yang tidak lewat skrip ini, bukan
@@ -34,10 +38,14 @@ from typing import Any, Dict, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import docs_git  # noqa: E402
-from brief_status import HALT_FILE, HALT_REVOKED, read_frontmatter, scan_briefs, set_frontmatter  # noqa: E402
+from brief_status import (  # noqa: E402
+    HALT_FILE, HALT_REVOKED, done_sha, halted_nn, read_frontmatter, scan_briefs, set_frontmatter,
+)
 from precondition_lib import (  # noqa: E402
+    GitError,
     check_taskdir,
     cli,
+    dirty_paths,
     doc_seal,
     find_repo_root,
     task_base_commit,
@@ -222,6 +230,37 @@ def cmd_cabut_halt(td: Taskdir, args) -> Dict[str, Any]:
     return {"status": "PASS", "summary": f"{HALT_FILE} {fm.get('brief', '?')} ({fm.get('verdict', '?')}) dicabut"}
 
 
+def cmd_buka_done(td: Taskdir, args) -> Dict[str, Any]:
+    if not args.alasan.strip() or "\n" in args.alasan:
+        raise SealError("`--alasan` wajib satu baris berisi")
+    td.require_root()
+    nn = args.brief.strip()
+    if nn.isdigit() and len(nn) == 1:
+        nn = f"0{nn}"
+    brief = next((b for b in scan_briefs(td.path) if b["nn"] == nn), None)
+    if brief is None:
+        raise SealError(f"brief-{nn} tidak ada di {td.rel}")
+    if brief["status"] != "DONE":
+        raise SealError(f"{brief['name']} berstatus `{brief['status']}`, bukan `DONE` — tidak ada yang dibuka")
+    commit_message = str(read_frontmatter(brief["path"]).get("commit_message", "")).strip()
+    sha = done_sha(td.root, f"{td.rel}/{brief['name']}", commit_message)
+    if sha:
+        raise SealError(f"commit unit {sha} membawa kode {brief['name']} — `DONE` terbukti, dilarang dibuka")
+    if halted_nn(td.path) == nn:
+        raise SealError(f"`{HALT_FILE}` aktif menahan brief-{nn} — cabut lewat `doc_seal.py cabut-halt` lebih dulu")
+    try:
+        dirty = dirty_paths(td.root)
+    except GitError as exc:
+        raise SealError(f"git status gagal: {exc}") from exc
+    if dirty:
+        sample = ", ".join(dirty[:3]) + (f", +{len(dirty) - 3} lainnya" if len(dirty) > 3 else "")
+        raise SealError(f"tree kotor ({sample}) — kode unit mungkin ada tetapi belum di-commit; eskalasi ke user "
+                        "(matriks bukti disk `architect/references/lifecycle-recovery.md` bagian 3)")
+    set_frontmatter(brief["path"], status="READY")
+    return {"status": "PASS", "brief": brief["name"],
+            "summary": f"{brief['name']} DONE → READY (tanpa commit unit; {' '.join(args.alasan.split())})"}
+
+
 def cmd_status(td: Taskdir, args) -> Dict[str, Any]:
     problems: List[str] = []
     base, problem = task_base_commit(td.root, td.path)
@@ -258,7 +297,7 @@ def cmd_status(td: Taskdir, args) -> Dict[str, Any]:
 
 
 COMMANDS = {"root": cmd_root, "approve": cmd_approve, "lock-briefs": cmd_lock_briefs, "tick": cmd_tick,
-            "cabut-halt": cmd_cabut_halt, "status": cmd_status}
+            "cabut-halt": cmd_cabut_halt, "buka-done": cmd_buka_done, "status": cmd_status}
 
 
 def main() -> int:
@@ -273,8 +312,10 @@ def main() -> int:
             p.add_argument("--answer", required=True, help="jawaban user apa adanya; `-` = baca dari stdin")
         if name == "tick":
             p.add_argument("--hop", required=True, choices=["BRIEF"])
-        if name == "cabut-halt":
+        if name in ("cabut-halt", "buka-done"):
             p.add_argument("--alasan", required=True)
+        if name == "buka-done":
+            p.add_argument("--brief", required=True, help="NN brief, mis. `02`")
     args = ap.parse_args()
     try:
         data = COMMANDS[args.cmd](Taskdir(args.taskdir), args)
