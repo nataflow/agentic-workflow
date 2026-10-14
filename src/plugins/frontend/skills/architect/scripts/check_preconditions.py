@@ -136,6 +136,21 @@ class PreconditionChecker:
             return False
         return bool(done_landed(self.root, f"{self.taskdir_rel}/{path.name}"))
 
+    def squashed_finished(self) -> bool:
+        """`REPORT.md` ada, `REVIEW.md` `PASS`/`WARNING`, dan `head:` review tidak lagi leluhur `HEAD` (riwayat
+        ditulis ulang). Padanan `taskdir_state.review_head_rewritten` untuk penjaga fase `TERPUTUS` (25 R6)."""
+        review = self.taskdir / "REVIEW.md"
+        if not (self.taskdir / "REPORT.md").is_file() or read_status(review, "verdict") not in ("PASS", "WARNING"):
+            return False
+        head = read_status(review, "head")
+        if not re.fullmatch(r"[0-9a-f]{7,40}", head):
+            return False
+        full = git(self.root, "rev-parse", "--verify", "-q", f"{head}^{{commit}}").strip()
+        if not full:
+            return True
+        return subprocess.run(["git", "-C", str(self.root), "merge-base", "--is-ancestor", full, "HEAD"],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0
+
     def briefs(self) -> Dict[str, Path]:
         out: Dict[str, Path] = {}
         if self.taskdir.is_dir():
@@ -196,6 +211,12 @@ class PreconditionChecker:
             return
         unlanded = [nn for nn, st in states.items()
                     if st == "DONE" and not done_landed(self.root, f"{self.taskdir_rel}/{briefs[nn].name}")]
+        if unlanded and self.squashed_finished():
+            # Rantai tuntas yang di-squash-merge kehilangan commit unitnya, bukan keabsahannya (12 J44) — sama
+            # dengan vonis `TUNTAS` `taskdir_state.py`; jangan dibaca sebagai unit yang terputus.
+            self.phase = "TUNTAS"
+            self._add(4, name, "PASS", "rantai tuntas; commit unit hilang karena riwayat ditulis ulang (squash-merge)")
+            return
         if unlanded:
             # Fase TERPUTUS (25 R6): dulu FAIL, sehingga architect kembali ke lead dan lead (`taskdir_state`)
             # merutekannya sebagai TERHENTI (DAG) atau PENUTUP — tak ada pihak yang menjalankan matriksnya.

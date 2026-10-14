@@ -203,6 +203,17 @@ def test_j44_squash_rantai_tuntas_bukan_drift(fe_minor_chain):
     assert "TUNTAS" in state(repo, "--all").out
 
 
+@pytest.mark.regression("25 R6")
+def test_r6_architect_squash_rantai_tuntas_bukan_terputus(fe_minor_chain):
+    """Commit unit hilang karena squash-merge: architect sejalan dengan `taskdir_state` (TUNTAS), bukan TERPUTUS."""
+    repo = fe_minor_chain
+    squash_to_root(repo, "feat: order checkout label (#12)")
+    out = json.loads(fe_run(repo, "architect/scripts/check_preconditions.py", "--taskdir", FE_MINOR_TD,
+                            "--json").stdout)
+    c4 = next(c for c in out["checks"] if c["id"] == 4)
+    assert out["phase"] == "TUNTAS" and c4["status"] == "PASS", c4
+
+
 @pytest.mark.regression("J44")
 def test_j44_approve_menulis_sidik(fe_chain_repo):
     repo = fe_chain_repo
