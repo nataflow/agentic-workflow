@@ -44,6 +44,34 @@ Marketplace git memakai `version` di `plugin.json`: pengguna hanya mendapat peru
   `<root>/<proyek>/<repo>`), dan butuh repo aplikasinya sudah diprofilkan `backend`/`frontend`.
 - Di Windows yang hanya punya `py`/`python` tanpa `python3`, hook SessionStart tidak jalan.
 
+## Server nataflow
+
+`nataflow-api` adalah server nataflow organisasi (aplikasi terpisah, tidak ikut marketplace ini) yang membuka
+endpoint MCP `/mcp`. Marketplace ini tidak menyertakan server, URL, maupun MCP key-nya: keduanya didapat dari
+admin nataflow organisasi. Tanpa akses itu plugin `nataflow` tidak berguna, dan sinkron di plugin lain tidak aktif.
+
+**Pendaftaran.** Sekali per user, daftarkan server lewat `claude mcp add` dengan nama `nataflow-api` (atau nama
+lain yang lalu ditulis di field `mcp_server` `.claude/nataflow.json`), URL endpoint `/mcp` server, dan MCP key
+dengan cara autentikasi yang ditetapkan server. Plugin tidak mendeklarasikan server (tidak ada `.mcp.json`) dan
+tidak pernah menyimpan key. Server terhubung bila `/mcp` di Claude Code menampilkannya beserta tool seperti
+`get_project_info`. Tiap MCP key terikat ke tepat satu project; sinkron ke lebih dari satu workspace butuh key
+ber-scope project.
+
+**Siapa yang bergantung, dan apa yang terjadi tanpa server:**
+
+| Plugin | Pemakaian | Tanpa `.claude/nataflow.json` | Config ada, server tak terjangkau |
+|---|---|---|---|
+| `nataflow` | wajib — satu-satunya tujuan `create-artifact` | memakai default `nataflow-api` | `GAGAL`, draft tetap di disk, tanpa jalur cadangan |
+| `analyst` | tiket → task, notulen → dokumen | sinkron dilewati | segmen `nataflow GAGAL`, alur tidak tertahan |
+| `backend`, `frontend` | taskdir → workdir beserta dokumennya | sinkron dilewati; gerbang `task` memperingatkan | segmen `nataflow GAGAL`, rantai tidak tertahan |
+| `quickdev` | rencana → workdir | sinkron dilewati | segmen `nataflow GAGAL`, alur tidak tertahan |
+| `product`, `fullstack` | tidak dipakai | — | — |
+
+**Risiko yang perlu diketahui.** Sejak Langkah 24 dokumen taskdir backend/frontend (`TASK.md`, BRD/PRD, brief,
+`REVIEW.md`, `REPORT.md`) tidak di-commit. Tanpa server nataflow, satu-satunya salinan dokumen itu ada di disk
+mesin kerja: kehilangan disk berarti kehilangan jejak audit rantai, sementara kode tetap aman di git. Repo yang
+membutuhkan jejak itu tanpa nataflow perlu mencadangkan `backenddev/docs/` dan `frontenddev/docs/` sendiri.
+
 ## Memilih Plugin
 
 | Situasi | Plugin |

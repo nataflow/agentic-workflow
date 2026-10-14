@@ -1,6 +1,6 @@
 {
   "name": "nataflow",
-  "description": "Skill untuk kerja langsung dengan server nataflow: artifact berupa halaman HTML mandiri (laporan, dashboard, diagram, prototipe) yang ditulis model, dinilai gerbang kontrak halaman, lalu di-upsert ke project milik MCP key lewat tool MCP artifact",
+  "description": "Skill untuk kerja langsung dengan server nataflow: artifact berupa halaman HTML mandiri (laporan, dashboard, diagram, prototipe) yang ditulis model, dinilai gerbang kontrak halaman, lalu di-upsert ke project milik MCP key lewat tool MCP artifact — butuh akses server nataflow organisasi (endpoint MCP dan MCP key)",
   "version": "0.1.0",
   "author": {
     "name": "Fakhrul Nugroho",
