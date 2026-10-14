@@ -14,7 +14,7 @@ bisnisnya, dan memberi ukuran yang dapat menyatakan solusinya benar.
 
 `validate_doc.py --kind charter` dan `--kind notes` sudah `PASS`: frontmatter, enam heading pilar beserta
 `## Catatan Elisitasi` di posisi terakhir, format dan penomoran Actors, langkah proses (aktornya terdaftar),
-`BR-n` beserta pengecualian, `SC-n` berangka, `S<n>` unik berurutan, tanda `[ADA]/[BARU]` dan `[TETAP]/[UBAH]/[BARU]`
+`BR-n` beserta pengecualian, `SC-n` berangka, `S<n>` unik tanpa celah (termasuk yang dibatalkan), tanda `[ADA]/[BARU]` dan `[TETAP]/[UBAH]/[BARU]`
 per mode, nol placeholder, dan keberadaan tiap `path:baris` di disk. Catatan elisitasi tertutup tanpa pertanyaan
 memblokir dan tanpa `Asumsi:`. Dilarang menghitung ulang satu pun — temuan atasnya `BLOCKER [MEKANIS]` yang palsu.
 

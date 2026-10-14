@@ -119,7 +119,7 @@ dengan tangan. Tanpa git → skrip melewati commit.
   `charter.py reopen --to elicitation` dan `product:discover`.
 - **APPROVAL LEWAT SKRIP**: dilarang menulis `status: APPROVED`, `approved_hash`, atau `review:` dengan tangan.
 - **ID SCOPE STABIL**: `S<n>` yang pernah disetujui tidak dinomori ulang; butir yang dibatalkan pindah ke Tidak
-  Termasuk.
+  Termasuk beserta ID-nya (`- **S<n>**: <butir> — <alasan>`), dan butir baru memakai ID berikutnya.
 - **REVIEWER LEWAT TEMPLATE**: `charter-reviewer` hanya lewat prompt terhidrasi `dispatcher/reviewer.md`; blok
   vonisnya diteruskan tanpa parafrase.
 - **ATOMIC COMMIT**: commit hanya lewat `charter.py`; dilarang `git add .`/`-A`/`-f`, `--no-verify`, push.

@@ -106,7 +106,36 @@ def test_kriteria_sukses_wajib_berangka(ws):
 def test_scope_id_unik_berurutan_untuk_handoff(ws):
     _closed_card(ws)
     edit(ws.root, "- **S3**:", "- **S2**:")
-    assert "tidak unik dan urut" in _fails(ws, "Scope")
+    assert "tidak unik" in _fails(ws, "Scope")
+
+
+DROP_S2 = "- **S2**: Pencatatan pengeluaran beserta foto nota\n"
+OUT_LINE = "- Pengelolaan stok bahan — belum dibutuhkan pada versi pertama\n"
+
+
+@pytest.mark.regression("25 R10")
+def test_r10_butir_tengah_dibatalkan_pindah_beserta_id(ws):
+    """Template melarang menomori ulang dan menyuruh memindahkan butir ke Tidak Termasuk; dulu validator menolak
+    celah S1, S3 di Termasuk sehingga charter APPROVED yang dibuka ulang buntu."""
+    _closed_card(ws)
+    edit(ws.root, DROP_S2, "")
+    edit(ws.root, OUT_LINE, OUT_LINE + "- **S2**: Pencatatan pengeluaran beserta foto nota — dibatalkan, ditunda ke versi dua\n")
+    proc = validate(ws.root, "charter")
+    assert proc.returncode == 0, proc.stdout
+
+
+@pytest.mark.regression("25 R10")
+def test_r10_celah_tanpa_id_dibatalkan_tetap_ditolak(ws):
+    _closed_card(ws)
+    edit(ws.root, DROP_S2, "")
+    assert "tanpa celah" in _fails(ws, "Scope")
+
+
+@pytest.mark.regression("25 R10")
+def test_r10_id_dibatalkan_bentrok_dengan_termasuk_ditolak(ws):
+    _closed_card(ws)
+    edit(ws.root, OUT_LINE, OUT_LINE + "- **S3**: Laporan laba mingguan — dibatalkan\n")
+    assert "tidak unik dan tanpa celah" in _fails(ws, "Scope")
 
 
 def test_scope_tidak_termasuk_beralasan(ws):

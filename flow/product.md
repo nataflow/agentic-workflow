@@ -99,7 +99,8 @@ Sidik:
 
 - **Masuk**: tidak ada; `/product:init` dipanggil user atau model dari gagasan mentah.
 - **Keluar (disiapkan, belum aktif)**: butir `S<n>` charter `APPROVED` dibawa satu per satu ke `/analyst:intake`.
-  ID `S<n>` divalidasi unik dan berurutan, dan `spec` dilarang menomori ulang butir yang pernah disetujui.
+  ID `S<n>` divalidasi unik dan tanpa celah atas gabungan Termasuk dan butir yang dibatalkan di Tidak Termasuk (ID
+  dibawa serta), dan `spec` dilarang menomori ulang butir yang pernah disetujui.
 - **Gerbang engineer**: `hooks/gate_text.py` backend dan frontend mengecualikan `/product:*`, sehingga mode codebase
   berjalan di repo backend/frontend tanpa dicegat.
 
