@@ -428,7 +428,7 @@ def cmd_check(root: Path, args: argparse.Namespace) -> int:
           "Alokasikan lewat `ticket.py new` dari analyst:intake.")
     gate = args.gate
     needed = {"elicit": ("elicit/templates/elicit-template.md", "elicit/references/elicitation-guide.md",
-                         "elicit/references/literasi-teknis.md", "elicit/dispatcher/scout.md",
+                         "elicit/references/literasi-teknis.md", "elicit/dispatcher/explorer.md",
                          "intake/references/batch.md"),
               "spec": ("spec/templates/ticket-template.md", "spec/dispatcher/reviewer.md",
                        "intake/references/batch.md")}[gate]

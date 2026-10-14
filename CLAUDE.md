@@ -69,11 +69,15 @@ skeletons), `dispatcher/` (prompts used to dispatch subagents), `scripts/`, and 
 ### The plugins
 
 - **analyst** — turns a stakeholder request into a non-technical `TICKET.md` (`intake` → `elicit` →
-  `spec`, reviewed by `ticket-reviewer`). `elicit` reads code only through the shallow `code-scout` subagent
-  (evidence for `TECH`, question context otherwise). Two to five requests in one message become a batch
-  (`skills/intake/references/batch.md`): `ticket.py new --urutan k/N` allocates every ticketdir up front, scouts
+  `spec`, reviewed by `ticket-reviewer`). `elicit` reads code only through the `analyst:code-explorer` subagent
+  (sonnet, read-only, adapted from `backend:code-explorer`; a test pins its read-window numbers to that source):
+  `BUKTI`/`menyeluruh` gives `path:baris` evidence plus current structure for `TECH`; `KONTEKS`/`ringkas` reports
+  current behavior (roles, rules, statuses, messages) that `elicit` pre-fills as `Asumsi:` for the requester to
+  confirm, never as fact. Prose always uses the full agent name because backend/frontend also ship a
+  `code-explorer`. Two to five requests in one message become a batch
+  (`skills/intake/references/batch.md`): `ticket.py new --urutan k/N` allocates every ticketdir up front, explorers
   run in parallel, then tickets finish one at a time. `notulen` turns rough meeting notes into a gitignored
-  `NOTULEN.md` (`skills/notulen/scripts/notulen.py`), may dispatch `code-scout` in `KONTEKS` mode to sharpen
+  `NOTULEN.md` (`skills/notulen/scripts/notulen.py`), may dispatch the shallow `code-scout` (sonnet, `KONTEKS` only) to sharpen
   clarifying questions (never as notulen content; `check` rejects `path:baris`), and is optionally mirrored to
   nataflow as a `notes.meeting` document. `skills/_common/ticket.py` is the state machine; a READY ticket is handed to
   `backend:tech-lead`/`frontend:lead` as `ticket_source`.

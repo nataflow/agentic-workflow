@@ -17,7 +17,7 @@ COMMON = ANALYST / "skills" / "_common"
 TICKET = COMMON / "ticket.py"
 VALIDATE = COMMON / "validate_doc.py"
 AGENT = ANALYST / "agents" / "code-scout.md"
-DISPATCHER = ANALYST / "skills" / "elicit" / "dispatcher" / "scout.md"
+DISPATCHER = ANALYST / "skills" / "elicit" / "dispatcher" / "explorer.md"  # 27 E2: scout.md elicit diganti
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 TDIR = "analyst/tickets/2609231400-cicilan"
 TECH_TDIR = "analyst/tickets/2610011000-relasi-project-workspace"
@@ -44,16 +44,18 @@ def test_x1_scout_read_only_dangkal_dan_berplafon():
     fm, body = lib.split_frontmatter(AGENT.read_text(encoding="utf-8"))
     assert fm["name"] == "code-scout"
     assert [t.strip() for t in fm["tools"].split(",")] == ["Read", "Grep", "Glob"]
-    assert fm["model"] == "haiku" and str(fm["maxTurns"]).isdigit()
+    assert fm["model"] == "sonnet" and str(fm["maxTurns"]).isdigit()  # 27 E5: haiku → sonnet
     assert "## Code Scout" in body and "Pemanggilan: <n> dari 8" in body
     for section in ("### Ditemukan", "### Tidak ditemukan", "### Belum disisir"):
         assert section in body
 
 
 @pytest.mark.regression("18 X2")
+@pytest.mark.regression("27 E2")
 def test_x2_dispatcher_merujuk_agent_dan_slotnya():
     text = DISPATCHER.read_text(encoding="utf-8")
-    assert "agents/code-scout.md" in text
+    assert "agents/code-explorer.md" in text
+    assert not (ANALYST / "skills" / "elicit" / "dispatcher" / "scout.md").exists()
     for slot in ("{mode}", "{root}", "{batas}", "{pertanyaan}"):
         assert slot in text
 
@@ -61,7 +63,8 @@ def test_x2_dispatcher_merujuk_agent_dan_slotnya():
 # --- X2: gerbang elicit -------------------------------------------------------------------------
 
 @pytest.mark.regression("18 X2")
-def test_x2_check_elicit_menagih_dispatcher_scout(tmp_path, make_repo):
+@pytest.mark.regression("27 E2")
+def test_x2_check_elicit_menagih_dispatcher_explorer(tmp_path, make_repo):
     plugin = tmp_path / "plugin"
     shutil.copytree(ANALYST, plugin, ignore=shutil.ignore_patterns("__pycache__"))
     script = plugin / "skills" / "_common" / "ticket.py"
@@ -73,11 +76,11 @@ def test_x2_check_elicit_menagih_dispatcher_scout(tmp_path, make_repo):
 
     ok = run_script(script, "check", "--gate", "elicit", "--ticketdir", tdir, "--json", cwd=root)
     assert ok.returncode == 0, ok.stdout
-    (plugin / "skills" / "elicit" / "dispatcher" / "scout.md").unlink()
+    (plugin / "skills" / "elicit" / "dispatcher" / "explorer.md").unlink()
     bad = run_script(script, "check", "--gate", "elicit", "--ticketdir", tdir, "--json", cwd=root)
     by_id = {c["id"]: c for c in json.loads(bad.stdout)["checks"]}
     assert bad.returncode == 1 and by_id[2]["status"] == "FAIL"
-    assert "elicit/dispatcher/scout.md" in by_id[2]["summary"]
+    assert "elicit/dispatcher/explorer.md" in by_id[2]["summary"]
 
 
 # --- X3: validator elicit -----------------------------------------------------------------------

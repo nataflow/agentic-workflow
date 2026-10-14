@@ -296,14 +296,15 @@ class DocValidator(Checker):
                  "`| n | ... | Apakah \"<istilah>\" nama produk? | Ya | <peminta> |`. Kemunculan di permintaan "
                  "asli saja tidak cukup.")
 
-        # 11 — konteks `code-scout` bukan fakta (18 X3): bukti kode hanya milik `TECH`. Permintaan Asli dikecualikan
-        # karena dimateraikan dan berasal dari peminta. Path tanpa `/` atau `.` (mis. jam `10:30`) bukan rujukan berkas.
+        # 11 — konteks `code-explorer` bukan fakta (18 X3, 27 E2): bukti kode hanya milik `TECH`. Permintaan Asli
+        # dikecualikan karena dimateraikan dan berasal dari peminta. Path tanpa `/` atau `.` (mis. jam `10:30`) bukan
+        # rujukan berkas.
         if typ != "TECH":
             leaked = [f"`{m.group(0)[1:-1]}` ({h})" for h, body in self.h3.items() if h != "Permintaan Asli"
                       for line in body for m in EVIDENCE.finditer(line) if re.search(r"[/.]", m.group(1))]
             self.add(11, "Tanpa bukti kode", not leaked,
                      "lolos" if not leaked else f"{len(leaked)} rujukan `path:baris`: " + ", ".join(leaked[:3]),
-                     "Konteks `code-scout` pada tiket non-TECH bukan fakta: tulis ulang sebagai perilaku yang "
+                     "Konteks `code-explorer` pada tiket non-TECH bukan fakta: tulis ulang sebagai perilaku yang "
                      "terlihat pengguna atau `Asumsi:` tanpa rujukan berkas, lalu konfirmasi ke peminta.")
 
     # ── kartu tiket ──

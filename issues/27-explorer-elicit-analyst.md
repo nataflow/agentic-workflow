@@ -5,7 +5,23 @@ lengkap, sehingga pertanyaan elisitasi terlalu susah dijawab. User mengusulkan `
 supaya tiket lebih akurat karena membaca kondisi codebase langsung. Seluruh keputusan di bawah diambil di sesi desain
 yang sama. Basis kode: commit `7dd5f53` (analyst 0.16.0).
 
-**Status (2026-10-14):** RENCANA. Belum ada perubahan di `src/`; pelaksanaan menunggu persetujuan dokumen ini.
+**Status (2026-10-14):** SELESAI. E1–E6 dan D1 terpasang, dikerjakan dalam lima tahap dengan peta blast radius
+sebelum tiap tahap (bagian Pelaksanaan). Test baru di `tests/analyst/test_explorer_27.py` (12); `test_scout_18.py` X1
+dan X2 disesuaikan. Suite penuh hijau (2668 passed, 7 skipped), subset analyst + lint hijau di Python 3.9, lint
+`--base origin/main` 0 FAIL 0 WARN, dan `claude plugin validate .` lolos. Versi: analyst 0.17.0.
+
+Selisih pelaksanaan terhadap Kontrak di bawah:
+
+- **Penghapusan `elicit/dispatcher/scout.md` pindah ke Tahap 2**, bersamaan dengan prosa yang merujuknya, karena lint
+  R1 me-resolve rujukan `dispatcher/scout.md` relatif ke skill. Rujukan README baris 44 ikut dimajukan dari D1.
+- **`test_scout_18.py` X2 bagian dispatcher** (`test_x2_dispatcher_merujuk_agent_dan_slotnya`) terlewat dari peta
+  Tahap 2 dan diarahkan ke `explorer.md` di tahap itu (koreksi dicatat di bawah).
+- **Penegakan K11 menemukan tiga sebutan nama pendek** (Guardrail `elicit`, baris panduan, judul dispatcher); ketiganya
+  diganti nama penuh di Tahap 4.
+- **Dispatcher menambah satu baris Penanganan Balikan** untuk `Confidence: low`: `Asumsi:`-nya ditanyakan terbuka,
+  bukan sebagai konfirmasi tunggal.
+- **Phase 2 `elicit`** merinci bentuk pertanyaan konfirmasi: opsi *Betul* · *Ada yang berbeda (sebut)* · *Tidak tahu
+  — tanya orang lain*; pilar yang tidak sempat masuk giliran dikonfirmasi di Phase 4.
 
 ## Tujuan
 
@@ -280,34 +296,34 @@ harus disesuaikan, bukan test baru.
 - Plugin `product` beserta salinan `code-scout`-nya.
 
 ## E1 [Tinggi] `elicit` hanya punya penelusur kode dangkal
-- [ ] Selesai
+- [x] Selesai
 
 `agents/code-explorer.md` menurut Kontrak (K3–K6, K9, K12).
 
 ## E2 [Tinggi] Dispatcher dan gerbang `elicit` terikat ke `code-scout`
-- [ ] Selesai
+- [x] Selesai
 
 `dispatcher/explorer.md` (slot, Slot Hidrasi, gerbang masuk, Penanganan Balikan), hapus `dispatcher/scout.md` milik
 `elicit`, ganti daftar berkas `check --gate elicit`, dan teks check 11.
 
 ## E3 [Tinggi] Prosa `elicit` membuat peminta menceritakan keadaan sekarang
-- [ ] Selesai
+- [x] Selesai
 
 `SKILL.md`, `elicitation-tech.md`, dan `elicitation-guide.md` menurut Kontrak (K7, K8, K11).
 
 ## E4 [Sedang] `intake` dan batch menyebut `code-scout`
-- [ ] Selesai
+- [x] Selesai
 
 Kalimat rujukan `intake/SKILL.md` dan `batch.md` bagian 6 (K10, K11).
 
 ## E5 [Sedang] `code-scout` haiku dan masih menyebut `elicit`
-- [ ] Selesai
+- [x] Selesai
 
 Model sonnet, deskripsi khusus notulen, mode `BUKTI` dihapus, dan kalimat mode di `notulen/dispatcher/scout.md`
 disesuaikan (K2).
 
 ## E6 [Sedang] Test kontrak explorer dan drift
-- [ ] Selesai
+- [x] Selesai
 
 `tests/analyst/test_explorer_27.py`:
 
@@ -324,7 +340,7 @@ Penyesuaian: `test_scout_18.py` X1 (`model == "sonnet"`) dan X2 (dispatcher expl
 perubahan perilaku.
 
 ## D1 [Rendah] Dokumen dan versi
-- [ ] Selesai
+- [x] Selesai
 
 - README analyst: paragraf subagent, diagram alur, tabel validator, dan butir roadmap "`code-scout` di `intake` dan
   `spec`".
@@ -334,7 +350,7 @@ perubahan perilaku.
 - Paragraf analyst di `CLAUDE.md`.
 - Versi analyst 0.16.0 → 0.17.0.
 
-## Verifikasi ujung ke ujung (rencana)
+## Verifikasi ujung ke ujung
 
 Repo scratch kecil dengan layar daftar invoice berstatus Belum Bayar/Lunas dan aturan "hanya Admin yang boleh
 membatalkan". Claude Code headless dengan `--plugin-dir` analyst dari working tree, prompt tanpa menyebut skill:
@@ -345,6 +361,24 @@ membatalkan". Claude Code headless dengan `--plugin-dir` analyst dari working tr
 - Konteks utama tidak memakai `Read`/`Grep`/`Glob` atas kode repo.
 - `Kondisi Saat Ini` berisi `Asumsi:` tanpa rujukan berkas, dan pertanyaan pertamanya berbentuk konfirmasi.
 - `validate_doc.py --kind elicit` `PASS` di tiap giliran.
+
+**Hasil (2026-10-14).** Repo scratch Go (`internal/invoice/{model,service}.go`, `cmd/api/main.go`; tanpa profil),
+`claude -p` dengan `--plugin-dir` analyst dari working tree, prompt "tolong buatkan tiket dari permintaan Rina (tim
+finance): invoice perlu bisa dicicil, pelanggan korporat sering minta bayar bertahap":
+
+- `analyst:intake` → `analyst:elicit` → `ticket.py new` → `analyst:code-explorer` (nama penuh) mode `KONTEKS`
+  kedalaman `ringkas`, 5 dari 20 pemanggilan, `Profil: tanpa profil`, `Confidence: medium`.
+- Konteks utama tidak memakai `Read`/`Grep`/`Glob` atas kode repo; yang dibacanya hanya `dispatcher/explorer.md` dan
+  `TICKET.md`. Seluruh pembacaan kode dilakukan subagent.
+- Balikan explorer memuat aktor ("hanya admin yang bisa membatalkan invoice"), aturan ("bayar harus melunasi
+  sekaligus", "invoice Lunas tidak bisa dibatalkan"), status beserta transisinya, dan pesan literal, masing-masing
+  berbukti `path:baris`. Scout lama hanya melaporkan letak.
+- `Kondisi Saat Ini` berisi empat baris `Asumsi:` tanpa rujukan berkas; `validate_doc.py --kind elicit` `PASS`
+  (check 9 menghitung empat `Asumsi:`, check 11 lolos). Mode headless tidak bisa bertanya, jadi pertanyaan untuk
+  Rina dicatat sebagai `Q-{n}` dan draft di-commit `tertunda`, sesuai alur `TERTAHAN`.
+- Catatan: beberapa butir balikan ditulis tanpa label aspek (`Pembuatan invoice:`, kalimat bebas), dan dua
+  `Asumsi:` diturunkan dari temuan negatif ("pelanggan korporat belum dibedakan"). Keduanya tetap menunggu
+  konfirmasi peminta, jadi tidak lolos sebagai fakta; dinilai ulang bila berulang di pemakaian nyata.
 
 ## Batas yang dinyatakan apa adanya
 
@@ -365,3 +399,70 @@ membatalkan". Claude Code headless dengan `--plugin-dir` analyst dari working tr
 - Menyimpan balikan ke disk atau panen lintas sesi (K13).
 - Pelonggaran kuota `code-scout` notulen (K2).
 - `product:discover` dan salinan `code-scout` milik `product`.
+
+## Pelaksanaan
+
+### Tahap 1 — peta blast radius (sebelum kode)
+
+Diperiksa dengan `grep` atas `src/plugins/analyst`, `tests/`, `flow/`, `CLAUDE.md`, dan `.claude-plugin/`:
+
+| Perubahan | Konsumen yang ditemukan | Akibat |
+|---|---|---|
+| `agents/code-explorer.md` (baru) | lint F2 (field frontmatter), R1/R3 (rujukan dan `${CLAUDE_PLUGIN_ROOT}` literal di badan agent) | Badan agent tanpa `${CLAUDE_PLUGIN_ROOT}`; rujukan berkas hanya yang ada. |
+| `elicit/dispatcher/explorer.md` (baru) | `ticket.py check --gate elicit` check 2 | Daftar berkas wajib menagih `explorer.md`. |
+| Daftar berkas `check --gate elicit` (`ticket.py:431`) | `tests/analyst/test_scout_18.py` X2 (menghapus `scout.md` lalu menuntut `FAIL`), `test_batch_19.py` B4 dan `test_ticket_10.py`/`test_ticket_8a.py` (menuntut check 2 `PASS` atas plugin utuh) | X2 disesuaikan ke `explorer.md` di tahap ini; test lain tetap hijau karena `explorer.md` ada. |
+| Teks check 11 `validate_doc.py` | Tidak ada test yang memaku teks `Tindakan`/komentarnya (`grep` atas `tests/`) | Aman. |
+| Penghapusan `elicit/dispatcher/scout.md` | Rujukan `dispatcher/scout.md` di `elicit/SKILL.md` (baris 11, 18, 43, 47) dan `../dispatcher/scout.md` di `elicitation-tech.md`; lint R1 me-resolve rujukan itu relatif ke skill | **Ditunda ke Tahap 2**, bersamaan dengan prosa yang merujuknya. Bila dihapus sekarang, R1 melaporkan rujukan yang hanya ada di `notulen`. |
+
+Hasil Tahap 1: agent, dispatcher, daftar berkas gerbang, dan teks check 11 terpasang; `test_scout_18.py` X2 menagih
+`explorer.md`. Subset analyst/lint/smoke hijau (666), lint 0 FAIL 0 WARN.
+
+### Tahap 2 — peta blast radius (sebelum kode)
+
+| Perubahan | Konsumen yang ditemukan | Akibat |
+|---|---|---|
+| `elicit/SKILL.md` (deskripsi, Iron Law, Precondition 1, Phase 0–2, Guardrails, rationalization, Failure path 6) | Lint F3 dan batas deskripsi 1536; R1 untuk rujukan `dispatcher/explorer.md`. Tidak ada test yang memaku teks skill `elicit` (`grep` atas `tests/`) | Deskripsi diukur ulang sesudah disunting. |
+| `references/elicitation-tech.md` bagian 2, `references/elicitation-guide.md` bagian 1 | R1 (`../dispatcher/scout.md` → `../dispatcher/explorer.md`); tidak ada test teks | Aman. |
+| `intake/SKILL.md` (NOL KODE, rationalization), `intake/references/batch.md` (pembuka, bagian 6, bagian 7) | `test_batch_19.py` B4 hanya memeriksa keberadaan `batch.md` lewat gerbang; tidak ada test teks | Aman. |
+| Penghapusan `elicit/dispatcher/scout.md` | Selain prosa di atas: `README.md` analyst baris 44 (`skills/elicit/dispatcher/scout.md`). README berada di dalam plugin, jadi R1 ikut memindainya | Rujukan README baris 44 **dimajukan dari D1 ke tahap ini**; sisa README tetap di D1. `notulen/dispatcher/scout.md` dan rujukan `notulen` tidak tersentuh. |
+| Di luar plugin | `flow/analyst.md` (baris 24, 148, 195) tidak dipindai lint dan tidak dipaku test | Tetap di D1. |
+
+**Koreksi peta sesudah eksekusi:** `tests/analyst/test_scout_18.py` X2 (`test_x2_dispatcher_merujuk_agent_dan_slotnya`) membaca `elicit/dispatcher/scout.md` lewat konstanta `DISPATCHER` dan terlewat dari `grep` teks skill di atas. Test itu diarahkan ke `explorer.md` di tahap ini, ditambah tuntutan bahwa `scout.md` milik `elicit` sudah tidak ada.
+
+Hasil Tahap 2: prosa `elicit`, `elicitation-tech.md`, `elicitation-guide.md`, `intake`, dan `batch.md` memakai
+`analyst:code-explorer`; `elicit/dispatcher/scout.md` dihapus; paragraf subagent README dipisah (explorer untuk
+`elicit`, scout untuk `notulen`). Subset analyst/lint/smoke hijau (666), lint 0 FAIL 0 WARN.
+
+### Tahap 3 — peta blast radius (sebelum kode)
+
+| Perubahan | Konsumen yang ditemukan | Akibat |
+|---|---|---|
+| `agents/code-scout.md` `model` haiku → sonnet | `tests/analyst/test_scout_18.py` X1 (`fm["model"] == "haiku"`); README analyst paragraf scout (`haiku`) | X1 dan README disesuaikan di tahap ini. |
+| Deskripsi dan badan scout tanpa `elicit`, mode `BUKTI` dihapus | `test_scout_18.py` X1 (`## Code Scout`, `Pemanggilan: <n> dari 8`, tiga seksi); `tests/analyst/test_notulen_20.py` S2 (`analyst:notulen` di deskripsi, tools, frasa `notulen rapat` di badan) | Blok balikan, kuota, dan frasa itu dipertahankan. |
+| Kalimat mode `notulen/dispatcher/scout.md` baris 34 | `test_notulen_20.py` S2 memaku baris mode `KONTEKS`, rujukan `agents/code-scout.md`, slot, dan plafon — tidak memaku kalimat baris 34 | Aman. |
+| Tidak tersentuh | `notulen/SKILL.md`, `notulen.py` (teks check `Tanpa rujukan kode` menyebut `code-scout`, tetap benar), `notulen-template.md` | Tidak diubah. |
+
+Hasil Tahap 3: `code-scout` sonnet, deskripsi dan badan khusus notulen, mode `BUKTI` dihapus; `test_scout_18.py` X1
+menagih `sonnet`. Subset analyst/lint/smoke hijau (666), lint 0 FAIL 0 WARN.
+
+### Tahap 4 — peta blast radius (sebelum kode)
+
+| Perubahan | Konsumen yang ditemukan | Akibat |
+|---|---|---|
+| `tests/analyst/test_explorer_27.py` (baru) | `pytest.ini` (`--import-mode=importlib`, penanda `regression`), `conftest.py` (`PLUGINS`, `load_module`); membaca `backend/agents/code-explorer.md` (K14) | Tidak ada CLI baru, jadi `tests/test_smoke.py` `CASES` tidak berubah. Nama modul `analyst_lib` dimuat dengan nama unik `analyst_lib_27e`. |
+| Penegakan K11 di test | Sebutan nama pendek `code-explorer` di `elicit/SKILL.md` (Guardrail KODE SEBAGAI KONTEKS), `elicitation-guide.md` (baris `Kondisi Saat Ini`), dan judul `dispatcher/explorer.md` | Ketiganya diganti `analyst:code-explorer` di tahap ini. Sebutan pendek yang tersisa hanya kalimat pembeda dari agent plugin lain (berisi kata "plugin"). |
+
+Hasil Tahap 4: `tests/analyst/test_explorer_27.py` (12 test: E1–E5, K14). Mutasi sementara (nama pendek di dispatch
+`elicit`, scout kembali haiku) membuat 3 test gagal, lalu dipulihkan. Subset analyst + lint hijau di Python 3.9 (271).
+
+### Tahap 5 — peta blast radius (sebelum kode)
+
+| Perubahan | Konsumen yang ditemukan | Akibat |
+|---|---|---|
+| `analyst/.claude-plugin/plugin.json` `version` 0.16.0 → 0.17.0 dan `description` | Lint M7 (`--base`, bump versi per plugin yang berubah), M4 (`description` entri `marketplace.json` = `plugin.json`). Tidak ada test yang memaku versi atau deskripsi analyst | Deskripsi disalin byte-sama ke `marketplace.json`. |
+| README analyst (diagram alur dan batch, catatan plafon batch, alur `TECH`, tabel validator, butir roadmap) | Lint R1 (rujukan berkas) | Rujukan yang ditulis harus ada. |
+| `flow/analyst.md`, `CLAUDE.md` | Tidak dipindai lint, tidak dipaku test | Bagian `notulen` tetap menyebut `code-scout`. |
+
+Hasil Tahap 5: README analyst, `flow/analyst.md`, deskripsi `plugin.json`/`marketplace.json` (sama, M4), paragraf
+analyst `CLAUDE.md`, dan versi analyst 0.17.0. `lint_plugins.py --base origin/main` 0 FAIL 0 WARN, seluruh JSON
+manifest valid, dan `claude plugin validate .` lolos.

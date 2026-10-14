@@ -31,7 +31,7 @@ Telusuri kode secara dangkal untuk klarifikasi satu notulen rapat analyst.
 | `{batas}` | Direktori yang disebut catatan atau pencatat, bila ada | **[OPTIONAL]** `-` bila kosong; dilarang menebak direktori dari nama stack |
 | `{pertanyaan}` | Konsep sistem yang disebut catatan: singkatan atau nama yang ambigu, layar, menu, laporan, status, data, fitur | **[REQUIRED]** 1–5 butir bernomor `  - P1: …`, memakai kata-kata catatan apa adanya |
 
-Mode selalu `KONTEKS`. Notulen merekam rapat, bukan membuktikan klaim, jadi mode `BUKTI` tidak dipakai di sini.
+Mode selalu `KONTEKS`, satu-satunya mode agent ini: notulen merekam rapat, bukan membuktikan klaim.
 
 ### Aturan untuk Pendispatch
 
