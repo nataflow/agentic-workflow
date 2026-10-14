@@ -235,7 +235,7 @@ Tiap skill punya `skills/<skill>/scripts/check_preconditions.py` yang dijalankan
 
 ## Pemulihan
 
-- **`tech-lead` Fase 3** memakai ulang taskdir yang belum tuntas. Brief BLOCKED atau `HALT.md` → `PLANNING`
+- **`tech-lead` Fase 3** memakai ulang taskdir yang belum tuntas. Brief BLOCKED atau `HALT.md` aktif (bukan `DICABUT`) → `PLANNING`
   pada taskdir yang sama dengan `reentry_reason`; brief READY → `architect`; dokumen DRAFT → `analyst`.
   Taskdir tanpa ledger `## Chain` (lane `DEFECT_RCA`, backfill `EXEC_BRIEF`) dirutekan ke `plan` jalur RCA atau
   `debug`, bukan `PLANNING`. Taskdir baru hanya dibuat bila semua brief DONE/SUPERSEDED **dan** `REPORT.md`

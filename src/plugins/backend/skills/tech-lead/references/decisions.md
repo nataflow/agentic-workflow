@@ -99,7 +99,7 @@ backenddev/
 +-----------------------------------------------------------------------------------+
 |                            Taskdir Recovery State Machine                         |
 +-----------------------------------------------------------------------------------+
-| 1. Brief BLOCKED / HALT.md ──► analyst re-entry (reentry_reason) → pengganti plan |
+| 1. Brief BLOCKED / HALT.md aktif ──► analyst re-entry (reentry_reason) → plan     |
 | 2. Brief READY Belum Jalan ──► Rutekan langsung ke backend:architect            |
 | 3. Artefak DRAFT Ditemukan ──► Rutekan ke backend:analyst (gerbang dokumennya)  |
 | 4. Semua Brief DONE + REPORT.md / Baru ──► Buat taskdir baru untuk request baru   |
