@@ -154,8 +154,12 @@ def test_j15_done_tanpa_kode_fail(fe_minor_chain):
     set_status(fe_minor_chain, BRIEF, "DONE")
     write_files(fe_minor_chain, {f"{TD}/report-01.md": "---\nunit: \"01\"\nstatus: DONE\n---\n# Unit 01\n"})
     git(fe_minor_chain, "commit", "-q", "--allow-empty", "-m", "feat(order-checkout): implement unit 01 - order button")
-    c = arch(fe_minor_chain)[4]
-    assert c["status"] == "FAIL" and "01" in c["summary"], c
+    # 25 R6: DONE tanpa kode tidak lagi FAIL (yang memantul architect ↔ lead), tetapi fase TERPUTUS yang tetap
+    # menahan rantai di unit itu — tidak pernah dihitung DONE — dan menyerahkannya ke matriks bukti disk.
+    out = json.loads(fe_run(fe_minor_chain, ARCH, "--taskdir", TD, "--json").stdout)
+    c = {x["id"]: x for x in out["checks"]}[4]
+    assert c["status"] == "WARN" and "01" in c["summary"], c
+    assert out["phase"] == "TERPUTUS" and out["next_unit"] == "01", out
     rep = checks(fe_run(fe_minor_chain, "report/scripts/check_preconditions.py", "--taskdir", TD, "--json"))[4]
     assert rep["status"] == "FAIL" and "tanpa commit unit berkode" in rep["summary"], rep
 

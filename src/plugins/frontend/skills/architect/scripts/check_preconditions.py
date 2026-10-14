@@ -9,7 +9,7 @@ tercentang penuh dan kontennya utuh (termasuk batch brief dan `REVIEW-PLAN.md`
 yang disetujui), status seluruh brief, profil lengkap beserta adapter, berkas
 dispatcher/template/agent, working tree bersih, dan HEAD tidak detached. Skrip
 juga **menyelesaikan** keadaan rantai di baris `Terselesaikan:` — `fase`
-(EKSEKUSI | PENUTUP | LAPORAN | TUNTAS | TERHENTI | TEMUAN) dan `unit_berikutnya` — sehingga
+(EKSEKUSI | TERPUTUS | PENUTUP | LAPORAN | TUNTAS | TERHENTI | TEMUAN) dan `unit_berikutnya` — sehingga
 titik mulai tidak ditebak dari membaca frontmatter satu per satu.
 
 **Ingest** (`--brief NN`) — dijalankan sebelum tiap dispatch implementor:
@@ -75,6 +75,18 @@ CLOSING_DIRT_ACTION = ("Fase PENUTUP: kotoran di luar taskdir sesudah verifikasi
                        "`AskUserQuestion`: buang/pulihkan (keputusan user), tambah pola ignore lewat `frontend:profile` "
                        "REFRESH, atau brief perbaikan (`chain.py reopen --row BRIEF`) bila berkas itu bagian rantai; "
                        "lalu ulangi Phase 4 dari butir 1. Dilarang membersihkan otomatis.")
+
+
+# Brief DONE tanpa commit unit (25 R6): sesi terputus di antara status DONE dan commit kode, `DONE` diketik
+# tangan, atau commit unit di-reset. Tidak didispatch ulang; disk-nya divonis matriks bukti disk.
+TERPUTUS_ACTION = ("Fase TERPUTUS: jalankan matriks bukti disk (`references/execution-protocol.md` bagian 3) atas "
+                   "brief-{nn} tanpa dispatch, mulai dari `verify_scope.py --brief <brief-{nn}> --worktree`: "
+                   "`report-{nn}.md` DONE + hanya `files_touched` berubah → commit unit; laporan absen/rusak + tree "
+                   "bersih → kembalikan status brief ke `READY` di disk lalu Phase 1 (dispatch ulang); berkas di luar "
+                   "`files_touched` atau laporan FAILED → HENTIKAN, sajikan ke user — dilarang memulihkan kotoran yang "
+                   "asalnya tak diketahui.")
+TERPUTUS_DIRT_ACTION = ("Fase TERPUTUS: kotoran ini divonis matriks bukti disk atas brief-{nn} "
+                        "(`verify_scope.py --worktree`), bukan oleh check ini. Dilarang stash atau bersihkan sendiri.")
 
 
 class PreconditionChecker:
@@ -153,8 +165,12 @@ class PreconditionChecker:
         check_adapter(self._add, 6, self.stack)
         check_plugin_files(self._add, 7, self.skill_dir, PLUGIN_FILES)
         # Dokumen taskdir diabaikan git (Langkah 24): yang dinilai kotor hanya kode dan dokumen tingkat repo.
-        check_worktree(self._add, 8, self.root, self.taskdir_rel,
-                       foreign_action=CLOSING_DIRT_ACTION if self.phase == "PENUTUP" else "")
+        if self.phase == "TERPUTUS":
+            check_worktree(self._add, 8, self.root, self.taskdir_rel,
+                           foreign_action=TERPUTUS_DIRT_ACTION.format(nn=self.next_unit), dirty_status="WARN")
+        else:
+            check_worktree(self._add, 8, self.root, self.taskdir_rel,
+                           foreign_action=CLOSING_DIRT_ACTION if self.phase == "PENUTUP" else "")
         self._check_9_head()
         if self.brief_nn:
             self._check_10_target()
@@ -178,13 +194,21 @@ class PreconditionChecker:
             self._add(4, name, "FAIL", "status di luar READY/DONE/BLOCKED: " + ", ".join(bad),
                       "Hentikan dan laporkan nilai terbaca beserta path-nya; dilarang menebak.")
             return
+        unlanded = [nn for nn, st in states.items()
+                    if st == "DONE" and not done_landed(self.root, f"{self.taskdir_rel}/{briefs[nn].name}")]
+        if unlanded:
+            # Fase TERPUTUS (25 R6): dulu FAIL, sehingga architect kembali ke lead dan lead (`taskdir_state`)
+            # merutekannya sebagai TERHENTI (DAG) atau PENUTUP — tak ada pihak yang menjalankan matriksnya.
+            self.phase = "TERPUTUS"
+            self.next_unit = unlanded[0]
+            self._add(4, name, "WARN", "brief DONE tanpa commit `implement unit NN` berkode: " + ", ".join(unlanded),
+                      TERPUTUS_ACTION.format(nn=unlanded[0]))
+            return
         fake = [nn for nn, st in states.items() if st == "DONE" and not self.implemented(nn)]
         if fake:
-            self._add(4, name, "FAIL", "brief DONE tanpa commit `implement unit NN` berkode atau "
-                      "`report-NN.md`: " + ", ".join(fake),
-                      "Status DONE hanya ditulis architect tepat sebelum commit unit; terputus di antaranya → "
-                      "matriks bukti disk (`references/execution-protocol.md` bagian 3). Status yang diketik "
-                      "tangan dikembalikan ke READY dan unitnya dieksekusi sungguhan.")
+            self._add(4, name, "FAIL", "brief DONE ber-commit unit tetapi tanpa `report-NN.md`: " + ", ".join(fake),
+                      "Laporan unit hilang dari disk sesudah commit mendarat; pulihkan dari cermin nataflow atau "
+                      "laporkan ke user — dilarang mendispatch ulang unit yang sudah mendarat.")
             return
         # Brief BLOCKED tanpa remedi divonis **sebelum** validate_briefs: janji yang dipikulnya kini tak
         # dipikul brief READY/DONE mana pun (Check G), jadi validator pasti FAIL dan menutupi fase TERHENTI

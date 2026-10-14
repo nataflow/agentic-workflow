@@ -167,7 +167,7 @@ Dan dua penjaga keadaan:
   FAIL (pulihkan dari `.bak`, yang ditulis sejak `save` pertama); kejadian `draft` di Riwayat membawa field
   `review <gate> r<n> t<total> PASS`, sehingga state yang hilang terdeteksi (`rebuild` memulihkan hitungannya).
 - `lead/scripts/taskdir_state.py` — memvonis keadaan tiap taskdir (`AKAR`, `GATE`, `DRIFT`,
-  `EKSEKUSI`, `TERHENTI`, `PENUTUP`, `TEMUAN`, `LAPORAN`, `LAPORAN TERTUNDA`, `TUNTAS`, `DITUTUP`, `RUSAK`) beserta satu
+  `EKSEKUSI`, `TERPUTUS`, `TERHENTI`, `PENUTUP`, `TEMUAN`, `LAPORAN`, `LAPORAN TERTUNDA`, `TUNTAS`, `DITUTUP`, `RUSAK`) beserta satu
   rute berikutnya, dari disk, ledger, dan Riwayat — bukan dari ingatan sesi. `TUNTAS` dinilai sebelum ledger dan
   berarti `REPORT.md` lolos `validate_report.py` (`LAPORAN TERTUNDA`: tertulis tetapi gagal validator);
   taskdir era git tanpa `base_commit` divonis `TUNTAS` bila ber-`REPORT.md`, selain itu `RUSAK`; repo yang

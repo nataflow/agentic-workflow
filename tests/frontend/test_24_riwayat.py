@@ -154,8 +154,11 @@ def test_done_tanpa_commit_unit_ditolak_lalu_sah_sesudah_commit_kode(fe_chain_re
     edit(repo, B1, "status: READY", "status: DONE")
     write_files(repo, {f"{FE_TD}/report-01.md": '---\nunit: "01"\nstatus: DONE\n---\n# Unit 01\n'})
     arch = fe_run(repo, "architect/scripts/check_preconditions.py", "--taskdir", FE_TD, "--json")
-    c4 = next(c for c in json.loads(arch.stdout)["checks"] if c["id"] == 4)
-    assert c4["status"] == "FAIL" and "01" in c4["summary"], c4
+    data = json.loads(arch.stdout)
+    c4 = next(c for c in data["checks"] if c["id"] == 4)
+    # 25 R6: bukan FAIL (yang memantul ke lead), tetapi fase TERPUTUS di unit itu — tetap tidak dihitung DONE.
+    assert c4["status"] == "WARN" and "01" in c4["summary"], c4
+    assert data["phase"] == "TERPUTUS" and data["next_unit"] == "01", data
     write_files(repo, {"src/features/orders/OrderDetail.tsx": "export function OrderDetail() { return 1 }\n"})
     commit(repo, "feat(orders-lacak): implement unit 01 - tombol lacak", "src/features/orders/OrderDetail.tsx")
     arch = fe_run(repo, "architect/scripts/check_preconditions.py", "--taskdir", FE_TD, "--json")

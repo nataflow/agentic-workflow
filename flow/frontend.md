@@ -176,6 +176,7 @@ Sebelum memvonis per taskdir, skrip keluar `FAIL` bila repo bukan git, atau `FAI
 | 8 | `RUSAK` (ledger ≠ jadwal sections) | Sama dengan #4 |
 | 9 | `DRIFT` (konten hop `[x]` atau `SC-{n}` berubah sesudah disetujui, atau centang tanpa kejadian `approve` yang sah) | `chain.py reopen --row <ROW>` atau pulihkan isi yang disetujui |
 | 10 | `GATE` (hop pertama yang belum `[x]`) | Skill pemilik hop (skrip menyebut mode untuk `plan`) |
+| 10a | `TERPUTUS` (brief `DONE` di disk tanpa commit unit pembawa kode: sesi terputus di antara status dan commit, `DONE` diketik tangan, atau commit unit di-reset) | `architect` fase `TERPUTUS`: matriks bukti disk atas brief itu, tanpa dispatch |
 | 11 | `TERHENTI` (brief `BLOCKED` tanpa remedi, atau `DAG`: brief READY ada tetapi tak satu pun dapat berangkat) | `reopen --row BRIEF` → `plan` APPEND brief remedi, atau perbaiki `depends_on` |
 | 12 | `EKSEKUSI` (brief READY siap berangkat, `runnable_briefs`) | `frontend:architect` |
 | 13 | `PENUTUP` (seluruh brief tertutup, `REVIEW.md` absen, basi — `head:` tidak sah atau commit kode mendarat sesudahnya — atau ber-verdict asing) | `architect` Phase 4 |
@@ -404,10 +405,10 @@ flowchart TD
 
 ### `frontend:architect`
 
-- **Pemicu / kapan dipakai**: ledger tercentang penuh dan brief READY siap dieksekusi, atau rantai terputus di tengah (keadaan `EKSEKUSI`, `PENUTUP`, `LAPORAN`, `TEMUAN`, `LAPORAN TERTUNDA`).
+- **Pemicu / kapan dipakai**: ledger tercentang penuh dan brief READY siap dieksekusi, atau rantai terputus di tengah (keadaan `EKSEKUSI`, `TERPUTUS`, `PENUTUP`, `LAPORAN`, `TEMUAN`, `LAPORAN TERTUNDA`).
 - **Prasyarat**:
   - `check_preconditions.py --taskdir` harus 9/9.
-  - Baris `Terselesaikan:` menentukan titik masuk: `fase=EKSEKUSI` → Phase 1, `PENUTUP` → Phase 4, `LAPORAN` → Phase 5 butir 2, `TEMUAN` → Phase 5 butir 1, `LAPORAN TERTUNDA` → Phase 5 butir 4. `TERHENTI (brief-NN BLOCKED)` dan `TERHENTI (DAG)` FAIL dengan rute `reopen BRIEF` → `plan` APPEND; brief BLOCKED tanpa remedi divonis sebelum `validate_briefs.py`, sehingga rutenya tidak tertutup galat validator.
+  - Baris `Terselesaikan:` menentukan titik masuk: `fase=EKSEKUSI` → Phase 1, `TERPUTUS` (brief `DONE` tanpa commit unit; check 4 dan tree kotor `WARN`) → Phase 2 butir 2 atas `unit_berikutnya` tanpa dispatch, `PENUTUP` → Phase 4, `LAPORAN` → Phase 5 butir 2, `TEMUAN` → Phase 5 butir 1, `LAPORAN TERTUNDA` → Phase 5 butir 4. `TERHENTI (brief-NN BLOCKED)` dan `TERHENTI (DAG)` FAIL dengan rute `reopen BRIEF` → `plan` APPEND; brief BLOCKED tanpa remedi divonis sebelum `validate_briefs.py`, sehingga rutenya tidak tertutup galat validator.
   - Nilai `typecheck_per_brief` juga diambil dari baris ini.
 - **Langkah**:
   1. **Phase 0.** Ambil baseline seluruh perintah `commands.md` sekali lewat `run_verification.py baseline` (Bash background) sebelum unit pertama mendarat, disimpan ke `.explore/verification-baseline.json` beserta `head`. Baseline hilang sesudah unit mendarat → ukur di worktree pada `base_commit` akar, bukan di HEAD. Sajikan tabel rantai.
@@ -622,11 +623,12 @@ stateDiagram-v2
     READY --> DONE : report DONE dan matriks bukti disk bersih
     READY --> BLOCKED : report FAILED atau pelanggaran scope
     DONE --> BLOCKED : galat kompilasi baru di gerbang per-brief
+    DONE --> READY : TERPUTUS, tanpa commit unit, laporan absen dan tree bersih
     BLOCKED --> [*] : diambil alih brief remedi, remedies NN
     DONE --> [*]
 ```
 
-Brief `BLOCKED` tidak pernah dinaikkan lagi, dan brief `DONE`/`BLOCKED` tidak pernah disunting. Cacat pada unit `DONE` diambil alih brief perbaikan tanpa `remedies`.
+Brief `BLOCKED` tidak pernah dinaikkan lagi, dan brief `DONE`/`BLOCKED` tidak pernah disunting — kecuali `DONE` yang tak pernah mendarat (fase `TERPUTUS`, 25 R6). Cacat pada unit `DONE` diambil alih brief perbaikan tanpa `remedies`.
 
 **Siklus keadaan taskdir** (`taskdir_state.py`):
 
@@ -640,6 +642,8 @@ stateDiagram-v2
     DRIFT --> GATE : reopen, amend, atau pulihkan
     GATE --> EKSEKUSI : ledger tercentang penuh
     EKSEKUSI --> TERHENTI : brief BLOCKED atau DAG buntu
+    EKSEKUSI --> TERPUTUS : DONE tanpa commit unit
+    TERPUTUS --> EKSEKUSI : matriks bukti disk, commit unit atau READY lagi
     TERHENTI --> GATE : reopen BRIEF, plan APPEND
     EKSEKUSI --> PENUTUP : seluruh brief tertutup
     PENUTUP --> TEMUAN : REVIEW BLOCKED
@@ -721,7 +725,7 @@ Plafon (reopen 3 per hop dan 6 per taskdir, eskalasi 2, revisi 2), epoch ronde r
 | State ronde rusak atau hilang | `review_round.py` | Pulihkan dari `.bak`, atau `rebuild` dari field `review` kejadian Riwayat. Dilarang menulis state dengan tangan |
 | Plan MINOR menemukan endpoint, DTO, query key, atau state baru | `plan` Phase 0 | Lead `escalate --lane FAST_FORWARD` (atau FULL_PIPELINE) |
 | Unit `BLOCKED` | matriks bukti disk | `reopen --row BRIEF`, lalu `plan` APPEND brief remedi (`remedies: "NN"`) |
-| Brief `DONE` di disk tanpa commit unit pembawa kode (sesi terputus, atau `DONE` diketik tangan) | architect check 4, `done_landed` | Matriks bukti disk: scope bersih → commit unit; selain itu status diturunkan ke `BLOCKED` |
+| Brief `DONE` di disk tanpa commit unit pembawa kode (sesi terputus, `DONE` diketik tangan, atau commit unit di-reset) | `taskdir_state.py` `TERPUTUS`, architect check 4 `WARN` (`done_landed`) | Architect fase `TERPUTUS`, matriks bukti disk tanpa dispatch: laporan `DONE` + hanya `files_touched` → commit unit; laporan absen/rusak + tree bersih → status kembali `READY` lalu dispatch; berkas di luar `files_touched` atau laporan `FAILED` → HENTIKAN, eskalasi ke user |
 | Rantai buntu (`TERHENTI (DAG)`: brief READY tak satu pun dapat berangkat) | `taskdir_state.py`, architect check 4, `validate_briefs.py` Check D | `reopen --row BRIEF`, lalu `plan` APPEND memperbaiki `depends_on` |
 | Remedi ketiga atas unit yang sama | `validate_briefs.py` Check M | `reopen --row CONTRACT`. Di MINOR: `reopen BRIEF` lalu `escalate FAST_FORWARD` |
 | Berkas yatim (di luar union `files_touched`) | architect Phase 3, `code-reviewer` P1 | `reopen --row CONTRACT`, lalu contract melengkapi Files Touched, lalu `plan` APPEND |
