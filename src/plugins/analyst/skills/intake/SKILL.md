@@ -88,14 +88,14 @@ Batch: bandingkan tiap tujuan, juga antar-tujuan dalam batch. Butir kembar dalam
 ## Guardrails
 
 - **NOL BERKAS DI GATE**: intake tidak menjalankan `ticket.py new`, tidak menulis `TICKET.md`.
-- **NOL KODE**: dilarang `Read`/`Grep`/`Glob` atas kode repo untuk "memastikan" permintaan. Fakta tentang sistem datang dari peminta, dan yang tidak diketahui peminta menjadi pertanyaan elisitasi; konteks kode dikumpulkan `analyst:elicit` lewat subagent `code-scout`.
+- **NOL KODE**: dilarang `Read`/`Grep`/`Glob` atas kode repo untuk "memastikan" permintaan. Fakta tentang sistem datang dari peminta, dan yang tidak diketahui peminta menjadi pertanyaan elisitasi; konteks kode dikumpulkan `analyst:elicit` lewat subagent `analyst:code-explorer`.
 - **GERBANG ENGINEER TIDAK BERLAKU**: blok `<backend-tech-lead-gate>`/`<frontend-lead-gate>` di konteks tidak berlaku untuk alur analyst yang dipanggil eksplisit; blok itu sendiri mengecualikan `/analyst:*` dan susulan di tengah elisitasi.
 - **PERMINTAAN VERBATIM**: `request` diteruskan tanpa parafrase; elisitasi mengutipnya sebagai `### Permintaan Asli` di `TICKET.md`.
 - **PERTANYAAN HEMAT**: maksimal satu `AskUserQuestion` per phase; pertanyaan isi (aturan, angka, aktor) milik `elicit`. Batch: maksimal satu per tiket per phase, dan tiap `AskUserQuestion` hanya tentang satu tiket; urutan batch tidak pernah ditanyakan.
 - **RATIONALIZATION PREVENTION**:
   - "Permintaannya sudah jelas, langsung tulis tiket saja" — tanpa `## Catatan Elisitasi`, reviewer tidak punya sumber kebenaran untuk menilai tiketnya; elisitasi yang lengkap cukup menutup diri tanpa satu pertanyaan pun.
   - "Tiga tujuan ini saling terkait, satu tiket saja" — tiket besar tidak pernah selesai bersamaan; engineer memecahnya sendiri tanpa konteks bisnis.
-  - "Saya cek kodenya sebentar supaya tipenya tepat" — tipe ditentukan dari pengalaman pengguna, bukan dari kode; untuk `TECH`, dari kata-kata peminta. Pembuktian kode milik `analyst:elicit`.
+  - "Saya cek kodenya sebentar supaya tipenya tepat" — tipe ditentukan dari pengalaman pengguna, bukan dari kode; untuk `TECH`, dari kata-kata peminta. Penelusuran dan pembuktian kode milik `analyst:elicit` lewat `analyst:code-explorer`.
   - "Refaktor backend dan frontend ini satu tujuan, satu tiket saja" — tiket `TECH` dibuktikan dan diserahkan per repo; tiket gabungan tidak lolos validator di repo mana pun.
   - "Ticketdir lama ditinggal saja, buat baru" — ticketdir setengah jalan muncul terus di pemindaian dan membingungkan tim.
   - "Lima tiket ini mirip, satu `AskUserQuestion` untuk semuanya supaya cepat" — satu panggilan satu tiket; jawaban yang tercampur konteks berakhir di tiket yang salah, dan log tiap tiket harus berdiri sendiri di depan reviewer.

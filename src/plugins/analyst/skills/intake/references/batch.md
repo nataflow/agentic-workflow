@@ -1,6 +1,6 @@
 # Batch Intake — Beberapa Tiket Berurutan
 
-Dimuat `analyst:intake` (Phase 1 dan 4–6), `analyst:elicit` (alokasi dan scout awal batch, tiket tertahan), dan `analyst:spec` (lanjut ke tiket berikutnya). Ini satu-satunya rumah aturan batch: skill lain merujuk ke sini dan dilarang menulis ulang isinya. `<ticket.py>` di bawah adalah path skrip dari Precondition skill pemuatnya.
+Dimuat `analyst:intake` (Phase 1 dan 4–6), `analyst:elicit` (alokasi dan penelusuran kode awal batch, tiket tertahan), dan `analyst:spec` (lanjut ke tiket berikutnya). Ini satu-satunya rumah aturan batch: skill lain merujuk ke sini dan dilarang menulis ulang isinya. `<ticket.py>` di bawah adalah path skrip dari Precondition skill pemuatnya.
 
 ## 1. Kapan Batch
 
@@ -38,17 +38,17 @@ Semua ticketdir dialokasikan sebelum tiket pertama dielisitasi, supaya permintaa
 2. Tiket urutan k = 2…N, berurutan: perintah yang sama dengan `--urutan <k>/<N> --batch <id>`.
 3. `NEW FAIL` di tengah → perbaiki sebabnya dan ulangi **hanya** urutan itu; tiket yang sudah `PASS` tidak dialokasikan ulang. Slug kembar dengan ticketdir terbuka berarti tujuan itu duplikat yang lolos intake Phase 5: jangan alokasikan, sebut di ringkasan sebagai `Belum disentuh` beserta ticketdir lamanya.
 
-## 6. Scout Awal Batch — `analyst:elicit`
+## 6. Penelusuran Kode Awal Batch — `analyst:elicit`
 
-1. Sesudah semua `new` `PASS`, tentukan tiket yang membutuhkan scout: `TECH` selalu (`mode: BUKTI`, klaim kondisi sekarang dari permintaannya); tipe lain hanya bila permintaannya menyebut layar, menu, laporan, status, atau data yang mungkin sudah ada (`mode: KONTEKS`).
-2. Hidrasi template dispatch scout (Precondition 1 `analyst:elicit`) per tiket, lalu dispatch **semuanya dalam satu pesan** supaya berjalan paralel. Dispatch ini dihitung sebagai dispatch pertama tiket itu.
+1. Sesudah semua `new` `PASS`, tentukan tiket yang membutuhkan `analyst:code-explorer`: `TECH` selalu (`mode: BUKTI` kedalaman `menyeluruh`, klaim kondisi sekarang dari permintaannya); tipe lain hanya bila permintaannya menyebut layar, menu, laporan, status, atau data yang mungkin sudah ada (`mode: KONTEKS` kedalaman `ringkas`).
+2. Hidrasi template dispatch explorer (Precondition 1 `analyst:elicit`) per tiket, lalu dispatch **semuanya dalam satu pesan** supaya berjalan paralel. Dispatch ini dihitung sebagai dispatch pertama tiket itu.
 3. Balikan disimpan di percakapan berlabel slug tiketnya, dan dilarang ditulis ke disk.
-4. Tiket ke-k boleh menjalankan elicit Phase 1 sebelum balikan scout-nya tiba, tetapi Phase 2 menunggu balikan scout tiket ke-k saja.
+4. Tiket ke-k boleh menjalankan elicit Phase 1 sebelum balikan explorer-nya tiba, tetapi Phase 2 menunggu balikan explorer tiket ke-k saja.
 5. Balikan hilang dari percakapan (diringkas otomatis, atau sesi baru) → dispatch ulang satu kali, tidak dihitung plafon.
 
 ## 7. Satu Tiket dalam Batch
 
-- Tiket berjalan penuh lewat `analyst:elicit` → `analyst:spec` seperti tiket tunggal. Plafon berlaku **per tiket**: 5 giliran tanya-jawab, 2 dispatch scout, dan 3 pertanyaan per giliran.
+- Tiket berjalan penuh lewat `analyst:elicit` → `analyst:spec` seperti tiket tunggal. Plafon berlaku **per tiket**: 5 giliran tanya-jawab, 2 dispatch explorer, dan 3 pertanyaan per giliran.
 - Satu `AskUserQuestion` hanya untuk satu tiket. Header tiap pertanyaannya `Tiket <k>/<N>`.
 - Tanpa fakta lintas tiket: jawaban yang diberikan untuk tiket lain hanya boleh masuk tiket ini sebagai `Asumsi:`, yang wajib dikonfirmasi di elicit Phase 4 tiket ini.
 - Tiket **selesai** bila salah satu sudah tersaji: baris penutup `analyst:spec` (`READY` beserta segmen nataflow-nya, *Tahan*, atau dibatalkan), atau blok `TERTAHAN` `analyst:elicit`/`analyst:spec`.
@@ -59,7 +59,7 @@ Sesudah tiket ke-k selesai: `python3 <ticket.py> state --batch <id>`, lalu tiket
 
 ## 9. Lanjutan Lintas Sesi
 
-`ticket.py state` menampilkan tiket satu batch berurutan dengan segmen `batch <id> <k>/<N>`. Intake Phase 1 merutekan tiket **terbuka berurutan terkecil** di batch itu, lalu batch berlanjut per bagian 8. Tiket yang tertahan di sesi sebelumnya ikut didahulukan: elicit Phase 0 (lanjutan) menanyakan apakah jawaban yang ditunggu sudah tersedia. Bila belum, tiket itu kembali `TERTAHAN` dan batch lanjut ke tiket berikutnya. Balikan scout sesi lama tidak terbawa: dispatch ulang per bagian 6 butir 5 saat giliran tiket itu tiba.
+`ticket.py state` menampilkan tiket satu batch berurutan dengan segmen `batch <id> <k>/<N>`. Intake Phase 1 merutekan tiket **terbuka berurutan terkecil** di batch itu, lalu batch berlanjut per bagian 8. Tiket yang tertahan di sesi sebelumnya ikut didahulukan: elicit Phase 0 (lanjutan) menanyakan apakah jawaban yang ditunggu sudah tersedia. Bila belum, tiket itu kembali `TERTAHAN` dan batch lanjut ke tiket berikutnya. Balikan explorer sesi lama tidak terbawa: dispatch ulang per bagian 6 butir 5 saat giliran tiket itu tiba.
 
 ## 10. Blok
 

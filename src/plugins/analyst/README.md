@@ -40,14 +40,22 @@ selalu dimulai dari `/analyst:intake`.
 kartu `PASS`/`BLOCKED` terhadap catatan elisitasi di berkas yang sama sebelum diajukan ke user; ia didispatch langsung lewat
 `skills/spec/dispatcher/reviewer.md`, tanpa skill pembungkus.
 
-`code-scout` (`agents/code-scout.md`) adalah penelusur kode dangkal read-only (`Read`/`Grep`/`Glob`, model
-`haiku`, kuota 8 pemanggilan) yang didispatch `elicit` lewat `skills/elicit/dispatcher/scout.md`, maksimal dua kali
-per tiket; dalam batch, dispatch pertama semua tiket berjalan paralel di awal batch. Ia hanya melaporkan apa yang ada di kode dan di mana, tanpa flow, alur, atau edge case. Konteks utama
-`elicit` tidak membaca kode sendiri. Untuk tiket `TECH` balikannya menjadi bukti `path:baris`; untuk tipe lain
-balikannya hanya bahan pertanyaan atau `Asumsi:` yang dikonfirmasi peminta, karena kode menunjukkan apa yang ada,
-bukan apa yang diinginkan peminta. `notulen` juga boleh mendispatch-nya, selalu mode `KONTEKS`, lewat
-`skills/notulen/dispatcher/scout.md` (maksimal dua kali per notulen) untuk istilah, singkatan, atau layar yang disebut
-catatan rapat; balikannya hanya mempertajam pertanyaan ke pencatat.
+`code-explorer` (`agents/code-explorer.md`) adalah penelusur kode read-only (`Read`/`Grep`/`Glob`, model `sonnet`)
+yang didispatch `elicit` lewat `skills/elicit/dispatcher/explorer.md`, maksimal dua kali per tiket; dalam batch,
+dispatch pertama semua tiket berjalan paralel di awal batch. Ia memahami cara kode bekerja sekarang di sekitar konsep
+yang disebut peminta: aktor dan izinnya, aturan beserta angkanya, status dan transisinya, pesan yang terlihat
+pengguna, dan untuk tiket `TECH` struktur sekarang menurut `category`-nya. Kedalaman `ringkas` (kuota 20 pemanggilan)
+untuk tipe non-`TECH`, `menyeluruh` (kuota 40) untuk `TECH`. Profil backend/frontend dipakai sebagai peta bila ada.
+Konteks utama `elicit` tidak membaca kode sendiri. Untuk tiket `TECH` balikannya menjadi bukti `path:baris`; untuk
+tipe lain keadaan sekarang ditulis lebih dulu sebagai `Asumsi:` yang dikonfirmasi atau dikoreksi peminta, sedangkan
+aturan dan aktor sekarang hanya menjadi opsi pertanyaan, karena kode menunjukkan apa yang ada, bukan apa yang
+diinginkan peminta. Nama agent selalu ditulis penuh `analyst:code-explorer`, karena plugin backend dan frontend juga
+punya agent `code-explorer` dengan kontrak berbeda.
+
+`code-scout` (`agents/code-scout.md`) adalah penelusur kode dangkal read-only (`Read`/`Grep`/`Glob`, model `sonnet`,
+kuota 8 pemanggilan) khusus `notulen`, selalu mode `KONTEKS`, lewat `skills/notulen/dispatcher/scout.md` (maksimal
+dua kali per notulen) untuk istilah, singkatan, atau layar yang disebut catatan rapat. Ia hanya melaporkan apa yang
+ada di kode dan di mana, tanpa flow, alur, atau edge case; balikannya hanya mempertajam pertanyaan ke pencatat.
 
 ## Workflow
 
@@ -56,7 +64,8 @@ permintaan ──► intake ──┬─► di luar wilayah (kerja teknis kecil)
                         ├─► status tiket ──────────────────────────► jawaban, berhenti
                         │
                         └─► elicit ─► ticket.py new ─► TICKET.md (kerangka + permintaan asli, elicitation: OPEN)
-                              │        code-scout (≤2 dispatch per tiket): bukti TECH, atau konteks pertanyaan
+                              │        code-explorer (≤2 dispatch per tiket): bukti TECH, atau kondisi sekarang
+                              │          sebagai Asumsi: yang dikonfirmasi peminta
                               │        tanya-jawab ≤3/giliran, tulis tiap giliran (≤5 giliran per tiket)
                               │        menunggu jawaban pihak lain → TERTAHAN, lanjut di sesi berikutnya
                               │        konfirmasi fakta → ticket.py close (CLOSED + segel catatan + commit)
@@ -80,7 +89,7 @@ permintaan (2–5 tujuan) ─► intake: pecah, tipe, duplikat, urutan otomatis,
                              │      → blok INTAKE — BATCH
                              ▼
                            elicit: ticket.py new --urutan k/N ×N (semua tersegel di disk)
-                             │     code-scout semua tiket paralel dalam satu pesan
+                             │     code-explorer semua tiket paralel dalam satu pesan
                              ▼
                            tiket 1: elicit → spec → READY/ditahan/tertahan ─► tiket 2 ─► … ─► tiket N
                                                                                    ▼
@@ -89,7 +98,7 @@ permintaan (2–5 tujuan) ─► intake: pecah, tipe, duplikat, urutan otomatis,
 
 Urutan ditentukan tanpa pertanyaan dari kata-kata peminta: prasyarat lebih dulu, lalu urgensi yang disebut,
 lalu urutan di pesan. Tiap tiket diselesaikan penuh sebelum tiket berikutnya, satu `AskUserQuestion` hanya
-membahas satu tiket (header `Tiket k/N`), dan plafon giliran serta scout berlaku per tiket. Jawaban untuk satu
+membahas satu tiket (header `Tiket k/N`), dan plafon giliran serta dispatch explorer berlaku per tiket. Jawaban untuk satu
 tiket tidak menjadi fakta tiket lain kecuali dikonfirmasi lewat `Asumsi:`. Tiket yang tertahan tidak menahan
 batch, dan sesi berikutnya melanjutkan dari tiket terbuka berurutan terkecil. Aturan lengkap:
 `skills/intake/references/batch.md`.
@@ -150,8 +159,9 @@ kecil, stacktrace, dan pertanyaan letak kode tetap langsung ke gerbang engineer.
   atau `DEPENDENCY`. Category menentukan apa yang wajib tergali dan dipikul AC (mis. `DATA_MODEL` → migrasi
   naik-turun dan nasib data lama).
 - **Elisitasi ringkas** (`skills/elicit/references/elicitation-tech.md`): brief lead engineer dipetakan ke pilar,
-  tiap klaim kondisi sekarang dibuktikan subagent `code-scout` (kuota 8 `Read`/`Grep`/`Glob`) dan butir yang
-  ditemukannya dicatat sebagai `path:baris`, lalu hanya celahnya yang ditanyakan.
+  tiap klaim kondisi sekarang dibuktikan subagent `analyst:code-explorer` kedalaman `menyeluruh` (kuota 40
+  `Read`/`Grep`/`Glob`, struktur sekarang menurut `category`) dan butir yang ditemukannya dicatat sebagai
+  `path:baris`, lalu hanya celahnya yang ditanyakan.
 - **Kartu**: Latar Belakang, Kondisi Saat Ini (berbukti `path:baris`), Kondisi Target (struktur akhir, bukan
   langkah), Keputusan `D-{n}` (alasan + alternatif), Batasan `C-{n}`, Acceptance Criteria `AC-{n}` dengan
   `— verifikasi:`, Dampak & Rollout, Di Luar Cakupan, Pertanyaan Terbuka, Lampiran.
@@ -187,7 +197,7 @@ apa adanya. Kerangka dan aturan isinya: `skills/notulen/templates/notulen-templa
 | `_common/ticket.py new` | ticketdir baru beserta `TICKET.md` awal: kerangka persis bagian 1 `elicit-template.md`, permintaan asli dari `--request` sebagai blockquote, dan `request_hash`; ticketdir `KOSONG` ber-slug sama dipakai ulang; `--urutan <k>/<N>` (2 ≤ N ≤ 5, dan `--batch <id>` untuk k ≥ 2) menulis `batch`/`urutan` dan menolak batch tak dikenal, N berbeda, atau urutan kembar; repo git bersinkron nataflow → `analyst/tickets/.gitignore` (`*`) ditulis bila belum ada; `git=ya\|tidak\|diabaikan` |
 | `_common/ticket.py close` | satu-satunya penulis `elicitation: CLOSED`: hanya bila `validate_doc.py --kind elicit` `PASS` (bila tidak, berkas dikembalikan); menyegel catatan (`elicit_hash`, `elicit_log`) dan commit `docs(ticket): elisitasi <slug>`; menutup ulang catatan yang berubah sejak segel menuntut baris log baru `Dibuka ulang`; tiket lama tanpa segel diadopsi sekali |
 | `_common/ticket.py check --gate elicit\|spec` | prasyarat gate atas satu ticketdir; gate `spec` menolak catatan elisitasi yang berbeda dari segelnya; mencetak `root=` (path ticketdir relatif root, bukan cwd) dan, untuk draft, `ronde` dan `sidik` (slot prompt reviewer), `review_basi` (bagian yang berubah sesudah review), serta `review_report` |
-| `_common/validate_doc.py --kind elicit` | frontmatter, termasuk pasangan `batch`/`urutan` yang sah; `## Catatan Elisitasi`: struktur, pilar per tipe, log bernomor, tiap heading sekali, permintaan asli sama dengan `request_hash`; tipe selain `TECH` dilarang memuat `` `path:baris` `` di luar permintaan asli (konteks `code-scout` bukan fakta); `CLOSED` ⇒ nol pilar kosong, nol pertanyaan memblokir, nol `Asumsi:` di mana pun dalam baris, dan tiap `domain_terms` punya baris konfirmasi berjawaban `Ya` di log |
+| `_common/validate_doc.py --kind elicit` | frontmatter, termasuk pasangan `batch`/`urutan` yang sah; `## Catatan Elisitasi`: struktur, pilar per tipe, log bernomor, tiap heading sekali, permintaan asli sama dengan `request_hash`; tipe selain `TECH` dilarang memuat `` `path:baris` `` di luar permintaan asli (konteks `code-explorer` bukan fakta); `CLOSED` ⇒ nol pilar kosong, nol pertanyaan memblokir, nol `Asumsi:` di mana pun dalam baris, dan tiap `domain_terms` punya baris konfirmasi berjawaban `Ya` di log |
 | `_common/validate_doc.py --kind ticket` | kartu: struktur per tipe (tiap heading sekali), AC Given/When/Then, BR terpikul AC, ID `Q-{n}` sama dengan `TIDAK MEMBLOKIR` di catatan, nol placeholder, **nol kebocoran teknis** |
 | `_common/ticket.py review` | vonis `PASS`/`BLOCKED` **wajib** membawa blok reviewer (`--report`): `- Verdict:` sama dengan `--verdict`, dan `- Sidik:` (disalin reviewer dari prompt) sama dengan sidik `<kartu>/<catatan elisitasi>` di disk — draft yang berubah sesudah dispatch ditolak; blok wajib konsisten (`- BLOCKER:` = jumlah butir, `PASS` ⇔ nol BLOCKER, `- Ronde:` = ronde yang dicatat); blok disimpan ke `review.md`; ditolak bila salah satu validator `FAIL` atau catatan berbeda dari segelnya; plafon 2 ronde per revisi, dibuka ulang hanya bila catatan elisitasi disegel ulang |
 | `_common/ticket.py approve` | `READY` hanya bila kedua validator (`ticket`, `elicit`) `PASS`, `elicitation: CLOSED` dengan catatan sama dengan segelnya, **dan** vonis review `PASS` atas sidik kartu dan catatan elisitasi sekarang; menulis `approved_hash` dan `approved_seal` (segel yang dibaca engineer) |
@@ -345,8 +355,8 @@ sinkron tidak meng-commit tiketnya (lihat Git), sehingga task inilah satu-satuny
 - **`acceptance`** — UAT: membaca `REPORT.md` engineer dan memvonis AC tiket dalam bahasa bisnis.
 - **Notulen ke tiket** — seksi calon tiket di notulen dan serah terima `D-{n}`/`A-{n}` ke `/analyst:intake`;
   notulen dari transkrip atau rekaman rapat; reviewer independen untuk notulen.
-- **`code-scout` di `intake` dan `spec`** — penentuan wilayah backend/frontend di `intake` dan pemeriksaan kartu di
-  `spec`.
+- **`code-explorer` di `intake` dan `spec`** — penentuan tipe atau wilayah backend/frontend di `intake` dan
+  pemeriksaan kartu di `spec`. `intake` tetap tanpa kode (Langkah 27 K10).
 - **Sinkron nataflow lanjutan** — status task selesai saat seluruh engineer tuntas (plugin engineer hanya
   menaikkannya ke `in_progress`, karena satu tiket bisa menaungi taskdir backend dan frontend), penghapusan task
   saat tiket dibatalkan, dan catatan elisitasi sebagai dokumen (sengaja tidak dikirim).
