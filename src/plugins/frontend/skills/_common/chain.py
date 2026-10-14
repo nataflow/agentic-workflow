@@ -164,7 +164,13 @@ class Chain:
 
     def record(self, text: str, kind: str, rows: List[str], fields: List[Tuple[str, str]],
                free: Optional[Tuple[str, str]] = None) -> Tuple[str, int]:
-        """`text` ditambah satu kejadian Riwayat bernomor berikutnya."""
+        """`text` ditambah satu kejadian Riwayat bernomor berikutnya.
+
+        Teks bebas kosong ditolak di sini untuk semua kejadian: baris `· alasan: ` tanpa isi tidak terbaca
+        `read_history`, dan taskdir jatuh `RUSAK` dengan `abandon` sebagai satu-satunya jalan keluar (25 R3).
+        """
+        if free is not None and not free[1].strip():
+            raise ChainError(f"`{free[0]}` kosong — kejadian Riwayat menuntut teks bebas berisi.")
         n = len(self.history(text)) + 1
         return append_history(text, history_line(n, kind, rows, fields, free)), n
 
@@ -589,6 +595,8 @@ class Chain:
         return f"CHAIN ABANDON: {self.taskdir_rel} ABANDONED{note}"
 
     def escalate(self, lane: str, sections_raw: str, reason: str) -> str:
+        if not reason.strip():
+            raise ChainError("`--reason` kosong — sebut pemicu eskalasi (mis. temuan yang menuntut hop baru).")
         reason = one_line(reason, "--reason")
         self.require_active()
         events = self.require_rooted()
