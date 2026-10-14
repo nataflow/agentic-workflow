@@ -267,15 +267,19 @@ tidak menulis berkas dan tidak meng-commit, dan kegagalannya tidak menahan ranta
   selama berkasnya masih di disk; yang hilang dibiarkan dengan isi terakhirnya di server. `.explore/` tidak
   pernah ikut. Laporan `audit`, `docs/api/`, dan profil (ter-commit, dari `HEAD`) didorong ke workspace; yang
   dihapus dari git ditandai `removed: true`.
-- **Kapan** (main loop saja): `analyst` Fase 2 (akar terkunci) dan Fase 4 (BRD/PRD `APPROVED`), serta
-  `tech-lead` Fase 5 sesudah artefak repo yang menunggu di-commit. Prosedurnya di
-  `skills/tech-lead/references/nataflow-sync.md`; subagent tidak berubah.
+- **Kapan** (main loop saja, langsung saat dokumen disetujui atau tuntas — bukan di akhir rantai): `task`
+  sesudah akar terkunci (semua lane); `analyst` Fase 4 sesudah BRD/PRD `APPROVED` dan Fase 6 sesudah batch brief
+  terkunci (brief tidak punya approval user, kunci batch adalah titik approval-nya); `architect` sesudah
+  `REVIEW.md` terbit, atau sebelum laporan penutup bila rantai berhenti sebelum review; `report` sesudah
+  `REPORT.md` tertulis. `tech-lead` Fase 5 menyapu sisanya (`plan` jalur `RCA`, `debug`, dokumen repo) sesudah
+  artefak repo yang menunggu di-commit, tanpa menyinkron ulang `architect` dan `analyst` yang sudah menyinkron.
+  Prosedurnya di `skills/tech-lead/references/nataflow-sync.md`; subagent tidak berubah.
 - **Status**: workdir `done` bila `REPORT.md` ada, `blocked` bila `HALT.md` belum dicabut atau brief `BLOCKED`, selain itu
   `active`. Task naik ke `in_progress` sejak eksekusi dimulai; task milik taskdir ini menjadi `done` saat
   `REPORT.md` terbit, sedangkan task tiket tidak ditutup plugin ini.
 - **Hemat token**: `sync_payload.py` menerbitkan isi hanya untuk dokumen yang berbeda dari manifest remote.
-- **Gagal tidak memblokir**: slot **Nataflow** laporan re-entry dan baris `Nataflow` laporan `analyst`
-  memuat `dilewati` atau `GAGAL: <sebab>`. Ulangi lewat `/backend:tech-lead` ("sinkron ulang taskdir <slug>").
+- **Gagal tidak memblokir**: slot **Nataflow** laporan `task`, `analyst`, `architect`, `report`, dan re-entry
+  `tech-lead` memuat `dilewati` atau `GAGAL: <sebab>`. Ulangi lewat `/backend:tech-lead` ("sinkron ulang taskdir <slug>").
 
 ## Hidup Berdampingan
 

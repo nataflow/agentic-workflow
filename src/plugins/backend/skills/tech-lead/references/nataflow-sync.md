@@ -1,6 +1,6 @@
 # Prosedur Sinkron nataflow
 
-Dimuat di main loop oleh `backend:analyst` (Fase 2 sesudah akar terkunci, Fase 4 sesudah centang ledger BRD/PRD) dan `backend:tech-lead` (Fase 5 sesudah artefak yang menunggu di-commit, serta rute "sinkron ulang"). Subagent tidak pernah menjalankannya. Hasilnya tepat satu segmen untuk slot **Nataflow**: `workdir <nama> · <n> dokumen (<c> baru, <u> diperbarui, <s> sama)`, `repo · <n> dokumen (…)`, `dilewati`, atau `GAGAL: <sebab>`.
+Dimuat di main loop oleh skill pemilik titik status backend, tepat saat dokumen taskdir disetujui atau tuntas (tabel di bawah), dan oleh `backend:tech-lead` Fase 5 sebagai sapuan serta rute "sinkron ulang". Subagent tidak pernah menjalankannya. Hasilnya tepat satu segmen untuk slot **Nataflow**: `workdir <nama> · <n> dokumen (<c> baru, <u> diperbarui, <s> sama)`, `repo · <n> dokumen (…)`, `dilewati`, atau `GAGAL: <sebab>`.
 
 Dokumen taskdir hanya ada di disk dan tidak pernah di-commit (Langkah 24); nataflow satu-satunya salinannya di luar mesin ini. Dokumen tingkat repo (audit, API, profil) tetap ter-commit. Prosedur ini tidak menulis berkas dan tidak meng-commit, sehingga check `Git Clean Working Tree`, kesegaran `REVIEW.md`, dan materai approve tidak tersentuh. `GAGAL` tidak menahan rantai: langkah lanjut ditentukan seperti biasa, dan sinkron diulang lewat rute "sinkron ulang".
 
@@ -8,12 +8,19 @@ Dokumen taskdir hanya ada di disk dan tidak pernah di-commit (Langkah 24); nataf
 
 ## Target per titik panggil
 
-| Titik | Target |
-|---|---|
-| `analyst` Fase 2 (akar baru terkunci), `analyst` Fase 4 (BRD/PRD `APPROVED`) | `--taskdir <taskdir>` |
-| `tech-lead` Fase 5, pengirim `analyst`, `plan` jalur `RCA`, `debug`, `architect` | `--taskdir <taskdir pengirim>` |
-| `tech-lead` Fase 5, pengirim `audit` / `document-api` / `profile` | `--repo-docs audit` / `api` / `profile` |
-| Rute "sinkron ulang taskdir `<td>`" | `--taskdir <td>`; tambahkan `--repo-docs` yang diminta user bila ada |
+| Titik | Dokumen yang baru disetujui / tuntas | Target |
+|---|---|---|
+| `task` Fase 5 butir 5, sesudah `doc_seal.py root` (semua lane) | `TASK.md` | `--taskdir <taskdir>` |
+| `analyst` Fase 4 butir 4, sesudah `doc_seal.py approve` | `BRD.md` / `PRD.md` `APPROVED` | `--taskdir <taskdir>` |
+| `analyst` Fase 6 butir 0, sesudah `doc_seal.py tick --hop BRIEF` | batch brief terkunci `READY` | `--taskdir <taskdir>` |
+| `architect` Fase 4 butir 2, sesudah `REVIEW.md` terbit | `REVIEW.md`, status brief | `--taskdir <taskdir>` |
+| `report` Fase 4 butir 4, sesudah `REPORT.md` tertulis | `REPORT.md` | `--taskdir <taskdir>` |
+| `architect`, sebelum laporan penutup putaran yang tidak melewati review maupun `report` | status brief, `report-NN.md`, `HALT.md` | `--taskdir <taskdir>` |
+| `tech-lead` Fase 5, pengirim `plan` jalur `RCA`, `debug`, atau `analyst` selain `READY_FOR_IMPLEMENTATION` | brief jalur `RCA`, `RCA.md`, ledger | `--taskdir <taskdir pengirim>` |
+| `tech-lead` Fase 5, pengirim `audit` / `document-api` / `profile` | laporan audit, `docs/api/`, profil | `--repo-docs audit` / `api` / `profile` |
+| Rute "sinkron ulang taskdir `<td>`" | seluruh taskdir | `--taskdir <td>`; tambahkan `--repo-docs` yang diminta user bila ada |
+
+`tech-lead` Fase 5 tidak menyinkron ulang pengirim yang sudah menyinkron sesudah mutasi disk terakhirnya — `architect`, dan `analyst` bervonis `READY_FOR_IMPLEMENTATION`: segmen laporannya disalin ke slot **Nataflow** (`gate-lifecycle.md` bagian 6 butir 2a).
 
 ## Langkah — taskdir
 

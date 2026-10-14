@@ -106,6 +106,7 @@ Verifikasi berkumpul di sini, tepat satu kali sesudah brief `NN` tertinggi berst
    - Subagent mengevaluasi diff `git merge-base {base_branch} HEAD`..`HEAD`, menerbitkan `{taskdir}/REVIEW.md` di disk, lalu meng-commit baris indeks issues-nya sendiri.
    - Tangkap balikan berupa path `REVIEW.md` dan satu tingkat severity tertinggi, lalu petakan lewat `### Penanganan Balikan` template itu. Ambil SHA commit indeks dari `git log`, bukan dari balikan.
    - Sesudah balikan, pastikan `git status --porcelain` kosong di luar `.explore/`. Sisa `backenddev/issues/README.md` → baris commit gagal `### Penanganan Balikan`.
+   - **Sinkron nataflow**: `REVIEW.md` terbit → jalankan prosedur `tech-lead/references/nataflow-sync.md` (`--taskdir <taskdir>`) di main loop sebelum butir 3, apa pun severity-nya, sehingga hasil review dan status brief terbaru tercermin seketika. Segmennya dibawa ke laporan penutup; `GAGAL` tidak mengubah triase.
 3. **Triase Temuan Review**:
    - Dilarang memperbaiki temuan langsung jika severity tertinggi `P1`. Laporkan temuannya dan kembalikan kendali ke gerbang `tech-lead`.
    - Rangkum hasilnya di laporan penutupan jika severity `P2`/`P3`/`CLEAN`.
@@ -118,7 +119,7 @@ Sajikan laporan deterministik kepada main loop:
 2. **Gerbang Success Criteria**: Baca `## Success Criteria` di `{taskdir}/TASK.md` dan pasangkan tiap butir dengan bukti dari commit unit, `REVIEW.md`, atau hasil gerbang verifikasi penutup.
    - Tandai rantai `TERTAHAN`, sebut butir yang belum terpenuhi, dan kembalikan kendali ke `backend:tech-lead` untuk klasifikasi kerja lanjutan jika ada butir tanpa bukti. Dilarang menyatakan rantai selesai walau severity `REVIEW.md` bernilai `CLEAN`.
    - Tandai rantai `TERTAHAN (akar absen)` dan kembalikan kendali ke `backend:tech-lead` jika `{taskdir}/TASK.md` tidak ada: setiap taskdir yang berujung di skill ini wajib berakar (`tech-lead/references/gate-lifecycle.md` bagian 1a). Dilarang menutup rantai tanpa akar.
-3. **Penerbitan Laporan Rantai**: Panggil `backend:report` dengan `taskdir` dan `base_branch` aktif jika rantai tidak `TERTAHAN`. Skill tersebut menulis `{taskdir}/REPORT.md` sendiri di disk. Catat path-nya dari laporannya. Catat `dilewati (laporan sudah terbit)` jika `REPORT.md` sudah ada. Lewati penerbitan dan catat alasannya jika rantai `TERTAHAN`, rantai berhenti `BLOCKED`, atau severity `REVIEW.md` bernilai `P1` — pada ketiganya `report` akan menolaknya sendiri di prasyarat atau Fase 1-nya, jadi dispatch itu hanya membuang giliran. Dilarang menulis `REPORT.md` sendiri.
+3. **Penerbitan Laporan Rantai**: Panggil `backend:report` dengan `taskdir` dan `base_branch` aktif jika rantai tidak `TERTAHAN`. Skill tersebut menulis `{taskdir}/REPORT.md` sendiri di disk lalu mencerminkannya ke nataflow. Catat path dan segmen `Nataflow`-nya dari laporannya. Catat `dilewati (laporan sudah terbit)` jika `REPORT.md` sudah ada. Lewati penerbitan dan catat alasannya jika rantai `TERTAHAN`, rantai berhenti `BLOCKED`, atau severity `REVIEW.md` bernilai `P1` — pada ketiganya `report` akan menolaknya sendiri di prasyarat atau Fase 1-nya, jadi dispatch itu hanya membuang giliran. Dilarang menulis `REPORT.md` sendiri.
 4. Tampilkan path `{taskdir}/REVIEW.md`, severity tertinggi, branch aktif, dan total commit yang mendarat. Rantai yang berhenti `BLOCKED` menulis `tidak dinilai (rantai terhenti)` pada kedua kolom review, bukan path berkas yang tidak pernah terbit.
 5. Tegaskan larangan `git push`/PR tanpa instruksi user, lalu kembalikan kendali ke main loop.
 
@@ -143,7 +144,9 @@ Sajikan laporan deterministik kepada main loop:
 
 ## Output [REQUIRED]
 
-Verifikasi PASS, seluruh brief tertutup, dan review `CLEAN`/`P3`/`P2` → tutup satu baris tanpa blok: `### ARCHITECT EXECUTION REPORT — <COMPLETED | COMPLETED (WARNING)> · <taskdir> · Branch <nama> · Brief <n> DONE (+<m> SUPERSEDED) · Verifikasi <PASS | tidak terverifikasi (TIMEOUT, diterima user)> · Review <CLEAN | P3 (<n>) | P2 (<n>): <ID, ID>> · REVIEW.md @ <sha> · REPORT.md @ <sha>`, ditambah baris `Umpan balik profil` bila ada. `COMPLETED (WARNING)` dipakai tepat bila severity tertinggi `P2`; daftar ID `P2` wajib tertulis, dan `report` membawanya ke `## Catatan`. Hapus `(+<m> SUPERSEDED)` bila `m` nol. Blok di bawah hanya untuk `BLOCKED | TERTAHAN`; hapus tiap baris bernilai `—`:
+Sinkron nataflow berjalan di titik dokumen tuntas, bukan sekali di akhir: Fase 4 butir 2 sesudah `REVIEW.md` terbit, dan `backend:report` sesudah `REPORT.md` tertulis. Putaran yang menutup tanpa melewati satu pun dari keduanya — rantai berhenti sebelum review (brief `BLOCKED`, `HALT.md`, verifikasi merah, berkas yatim) atau `REPORT.md` sudah ada (`dilewati`) — menjalankan prosedur `tech-lead/references/nataflow-sync.md` (`--taskdir <taskdir>`) sekali di main loop sebelum laporan di bawah, sehingga status brief, `report-NN.md`, dan `HALT.md` ikut tercermin. Slot `Nataflow` memuat segmen sinkron terakhir putaran ini; `GAGAL` tidak mengubah vonis.
+
+Verifikasi PASS, seluruh brief tertutup, dan review `CLEAN`/`P3`/`P2` → tutup satu baris tanpa blok: `### ARCHITECT EXECUTION REPORT — <COMPLETED | COMPLETED (WARNING)> · <taskdir> · Branch <nama> · Brief <n> DONE (+<m> SUPERSEDED) · Verifikasi <PASS | tidak terverifikasi (TIMEOUT, diterima user)> · Review <CLEAN | P3 (<n>) | P2 (<n>): <ID, ID>> · REVIEW.md @ <sha> · REPORT.md @ <sha> · Nataflow <segmen>`, ditambah baris `Umpan balik profil` bila ada. `COMPLETED (WARNING)` dipakai tepat bila severity tertinggi `P2`; daftar ID `P2` wajib tertulis, dan `report` membawanya ke `## Catatan`. Hapus `(+<m> SUPERSEDED)` bila `m` nol. Blok di bawah hanya untuk `BLOCKED | TERTAHAN`; hapus tiap baris bernilai `—`:
 
 ```markdown
 ### ARCHITECT EXECUTION REPORT — <BLOCKED | TERTAHAN>
@@ -153,6 +156,7 @@ Verifikasi PASS, seluruh brief tertutup, dan review `CLEAN`/`P3`/`P2` → tutup 
 - **Simbol di luar anchor**: <brief-NN · simbol · file:baris> | —
 - **Review**: P1 (wajib eskalasi) | tidak dinilai · REVIEW.md @ <sha> | dilewati (<alasan>)
 - **Umpan balik profil**: <`file:baris` + pola preseden menyesatkan, dari baris `Umpan balik profil:` report-NN.md> | —
+- **Nataflow**: <segmen sinkron terakhir>
 ```
 
 `Verifikasi FAIL (cacat perencanaan)` beserta daftar `Berkas yatim` diteruskan gerbang ke `analyst` sebagai `reentry_reason` — tulis keduanya utuh. `Umpan balik profil` bertahan sekalipun rantai bersih: gerbang menanyakannya ke user lalu meneruskannya ke `backend:profile` sebagai `reported_anti_patterns`, dan tanpa baris itu pengetahuannya mati bersama taskdir. Commit trail per brief beserta kesesuaiannya terhadap `## File scope` diverifikasi dari `git log`, bukan dicetak ulang di sini.

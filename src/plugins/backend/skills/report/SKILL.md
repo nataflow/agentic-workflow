@@ -57,8 +57,9 @@ user-invocable: false
 
 1. Baca `templates/report-template.md`, isi seluruh placeholder-nya dari Fase 1–3, lalu tulis hasilnya ke `{taskdir}/REPORT.md`.
 2. Verifikasi berkas: tepat satu H1, `## Ringkasan` berisi satu kalimat, `## Perubahan` berisi minimal dua butir, dan `## Catatan` hadir berisi atau tidak hadir sama sekali.
-3. Dilarang men-stage atau meng-commit `{taskdir}/REPORT.md`: `backenddev/docs/` diabaikan git (Langkah 24), dan gerbang mencerminkannya ke nataflow di Fase 5-nya.
-4. Kembalikan kendali ke `backend:architect`.
+3. Dilarang men-stage atau meng-commit `{taskdir}/REPORT.md`: `backenddev/docs/` diabaikan git (Langkah 24).
+4. **Sinkron nataflow**: berkas lolos butir 2 → jalankan prosedur `tech-lead/references/nataflow-sync.md` (`--taskdir <taskdir>`) di main loop, sehingga `REPORT.md` tercermin seketika dan workdir menjadi `done`. Segmennya masuk baris penutup; `GAGAL` tidak membatalkan laporan.
+5. Kembalikan kendali ke `backend:architect`.
 
 ## Guardrails
 
@@ -72,7 +73,7 @@ user-invocable: false
 
 ## Output [REQUIRED]
 
-Tulis `{taskdir}/REPORT.md` persis mengikuti `templates/report-template.md` — seksi wajib dan aturan penghapusan `## Catatan` kosong ada di sana. Berkas tertulis → tutup satu baris tanpa blok: `### REPORT LOCKED — <taskdir>/REPORT.md · <n> butir dari <n> berkas · <n> isu tercatat | tanpa isu`. Penulisan gagal → sajikan:
+Tulis `{taskdir}/REPORT.md` persis mengikuti `templates/report-template.md` — seksi wajib dan aturan penghapusan `## Catatan` kosong ada di sana. Berkas tertulis → tutup satu baris tanpa blok: `### REPORT LOCKED — <taskdir>/REPORT.md · <n> butir dari <n> berkas · <n> isu tercatat | tanpa isu · Nataflow <segmen>`. Penulisan gagal → sajikan:
 
 ```markdown
 ### REPORT LOCKED — GAGAL
