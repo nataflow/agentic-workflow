@@ -1,6 +1,6 @@
 # Prosedur Sinkron nataflow
 
-Dimuat di main loop oleh skill pemilik titik status frontend. Subagent tidak pernah menjalankannya. Hasilnya tepat satu segmen `nataflow <…>` untuk baris penutup skill pemanggil: `nataflow workdir <nama> · <n> dokumen (<c> baru, <u> diperbarui, <s> sama)`, `nataflow repo · <n> dokumen (…)`, `nataflow dilewati`, atau `nataflow GAGAL: <sebab>`.
+Dimuat di main loop oleh skill pemilik titik status frontend, tepat saat dokumen taskdir disetujui atau tuntas (tabel di bawah) — bukan ditunda ke akhir rantai. Subagent tidak pernah menjalankannya. Hasilnya tepat satu segmen `nataflow <…>` untuk baris penutup skill pemanggil: `nataflow workdir <nama> · <n> dokumen (<c> baru, <u> diperbarui, <s> sama)`, `nataflow repo · <n> dokumen (…)`, `nataflow dilewati`, atau `nataflow GAGAL: <sebab>`.
 
 Disk (dokumen taskdir) dan git (dokumen tingkat repo) tetap sumber kebenaran; nataflow hanya cermin. Prosedur ini tidak menulis berkas dan tidak meng-commit, sehingga ledger `## Chain`, `## Riwayat Rantai` (materai approve), dan tree bersih tidak tersentuh. Dokumen taskdir tidak di-commit (Langkah 24), jadi isinya dibaca dari disk; nataflow satu-satunya salinannya di luar mesin ini. `GAGAL` tidak menahan gate maupun eksekusi, dan sinkron diulang lewat rute "sinkron ulang taskdir" `frontend:lead`.
 
@@ -13,7 +13,8 @@ Disk (dokumen taskdir) dan git (dokumen tingkat repo) tetap sumber kebenaran; na
 | `task` | Phase 4 sesudah `chain.py root` | `--taskdir <taskdir>` |
 | `lead` | Keadaan `AKAR` sesudah `chain.py root` tertinggal; Phase 8 sesudah `chain.py reopen`/`escalate`/`abandon`/`amend`; rute "sinkron ulang taskdir" | `--taskdir <taskdir>` |
 | `ux-design`, `ui-design`, `contract`, `plan` | Butir **Setuju**, sesudah `chain.py approve` PASS | `--taskdir <taskdir>` |
-| `architect` | Sekali per putaran, sebelum baris `ARCHITECT — …` atau blok `### ARCHITECT — BLOCKED`/`TERTAHAN` | `--taskdir <taskdir>` |
+| `architect` | Phase 4 butir 4, sesudah `REVIEW.md` lolos `validate_review.py` (verdict apa pun); Phase 5 butir 4, sesudah laporan tertunda lolos `validate_report.py` | `--taskdir <taskdir>` |
+| `architect` | Sebelum baris `ARCHITECT — …` atau blok `### ARCHITECT — BLOCKED`/`TERTAHAN`, hanya bila putaran itu tidak melewati titik review maupun laporan (rantai berhenti sebelum review, atau `REPORT.md` sudah terbit) | `--taskdir <taskdir>` |
 | `report` | Phase 4 sesudah `REPORT.md` lolos `validate_report.py` | `--taskdir <taskdir>` |
 | `review` | Sesudah commit laporan `frontenddev/reviews/` | `--repo-docs review` |
 | `profile` | Sesudah commit profil (termasuk PATCH) | `--repo-docs profile` |

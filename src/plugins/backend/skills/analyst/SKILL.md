@@ -56,7 +56,7 @@ Tiga keadaan normal masuk lewat jalur ini: taskdir ber-`BRD.md`/`PRD.md` `DRAFT`
 1. Panggil `backend:task` dengan `taskdir`, `lane` terminal chain (matriks bagian 1.3 `references/chain-rules.md`, kolom keempat), `risk`, `request`, `evidence`, `clarification`, `chain`, `finding_source`, dan `ticket_source` apa adanya.
 2. Tangkap laporan `### TASK ROOT LOCKED`; `Uji Akar` bukan `9/9 lolos` atau `Kunci` bernilai `GAGAL` → `## Failure path` butir 2.
 3. Verifikasi `TASK.md` **yang baru diterbitkan `task` di giliran ini** memuat frontmatter `chain:` sesuai Fase 1 dan seksi `## Chain` berisi tepat hop chain itu, seluruhnya belum tercentang. Butir ini tidak berlaku pada jalur resume Fase 0.
-4. **Sinkron nataflow** (akar yang terkunci di giliran ini saja): jalankan prosedur `tech-lead/references/nataflow-sync.md` dengan target `--taskdir <taskdir>` di main loop. Segmennya dibawa ke baris `Nataflow` laporan penutup; `GAGAL` tidak menahan Fase 3.
+4. **Sinkron nataflow**: `backend:task` sudah mencerminkan akar yang dikuncinya (Fase 5 butir 5 skill itu). Bawa segmen `Nataflow` laporan `### TASK ROOT LOCKED` ke baris `Nataflow` laporan penutup, tanpa menjalankan prosedurnya lagi; `GAGAL` tidak menahan Fase 3.
 
 ### Fase 3 — Eksekusi Hop Rantai
 
@@ -119,6 +119,7 @@ Dijalankan saat laporan hop mana pun melaporkan aturan atau kontrak yang menyent
 Ini satu-satunya titik yang memeriksa rantai sebagai satu kesatuan. Tiap skill hulu memeriksa dokumennya sendiri; tidak ada yang memeriksa sambungannya sekali lagi sesudah brief terbit.
 
 0. **Tutup ledger.** `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/doc_seal.py tick --taskdir <taskdir> --hop BRIEF` mencentang hop `BRIEF` di `## Chain` `TASK.md` beserta sidik batch brief terkunci (`- [x] BRIEF — backend:plan → brief-*.md @ READY <sidik12>`). Brief tidak melewati gerbang dokumen Fase 4, tetapi ia tetap hop ledger — tanpa langkah ini predikat B di bawah mustahil dipenuhi dan tiap rantai bervonis `NOT_READY_FOR_IMPLEMENTATION` betapapun benar isinya. Skrip menolak brief yang belum dikunci `plan` atau disunting sesudahnya → lewati pencentangan, jangan menulisnya dengan tangan, dan biarkan predikat B gagal apa adanya.
+   **Sinkron nataflow** sesudah langkah ini, apa pun hasil `tick`-nya: jalankan prosedur `tech-lead/references/nataflow-sync.md` (`--taskdir <taskdir>`) di main loop supaya batch brief terkunci dan centang ledger `BRIEF` tercermin seketika — kunci batch adalah titik approval brief, karena brief tidak melewati gerbang dokumen Fase 4. Payload hanya membawa brief yang sudah dikunci. Butir 1–4 hanya membaca, jadi segmen ini segmen terakhir rantai; `GAGAL` tidak menahan vonis.
 1. **Vonis lima belas predikat** berikut, satu baris hasil per predikat. Satu predikat gagal → status `NOT_READY_FOR_IMPLEMENTATION`; laporkan predikat yang gagal beserta ID yang membuatnya gagal, dan dilarang menurunkannya jadi catatan serah terima.
 
    | # | Predikat |
@@ -162,7 +163,7 @@ Ini satu-satunya titik yang memeriksa rantai sebagai satu kesatuan. Tiap skill h
 
 ## Output [REQUIRED]
 
-Vonis `READY_FOR_IMPLEMENTATION` (15/15) → tutup satu baris tanpa blok: `### PLANNING CHAIN REPORT — READY_FOR_IMPLEMENTATION (15/15) · <taskdir> · Chain <enum> · Risk <level> · Brief <n> READY @ <sidik12>`, ditambah baris `Nataflow: <segmen sinkron terakhir>` bila sinkron berjalan dan baris `Verifikasi Manual` bila ada. Selain itu, sajikan blok berikut dan hapus tiap baris bernilai `—`:
+Vonis `READY_FOR_IMPLEMENTATION` (15/15) → tutup satu baris tanpa blok: `### PLANNING CHAIN REPORT — READY_FOR_IMPLEMENTATION (15/15) · <taskdir> · Chain <enum> · Risk <level> · Brief <n> READY @ <sidik12>`, ditambah baris `Nataflow: <segmen sinkron Fase 6>` dan baris `Verifikasi Manual` bila ada. Selain itu, sajikan blok berikut dan hapus tiap baris bernilai `—`:
 
 ```markdown
 ### PLANNING CHAIN REPORT — NOT_READY_FOR_IMPLEMENTATION

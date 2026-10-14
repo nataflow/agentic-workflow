@@ -313,9 +313,11 @@ tidak tersentuh. Kegagalannya tidak menahan gate maupun eksekusi.
   `CONTRACT.md` hanya bila baris ledger-nya `[x]` dan tidak DRIFT; brief dan `REVIEW-PLAN.md` sesudah hop BRIEF
   disetujui (atau brief `DONE`/`BLOCKED`); `report-NN.md`, `REVIEW.md`, `REPORT.md`. Hop yang dibuka ulang
   tercermin dengan status terbarunya; berkas taskdir yang dihapus dari disk tidak didorong ulang. `frontenddev/reviews/` dan profil didorong ke workspace.
-- **Kapan** (main loop saja): `task` sesudah `chain.py root`, tiap gate sesudah `chain.py approve`, `architect` sekali
-  per putaran, `report` sesudah laporan terbit, `lead` sesudah `reopen`/`escalate`/`abandon`/`amend`, serta
-  `review`/`profile` sesudah commit. Prosedurnya di `skills/lead/references/nataflow-sync.md`.
+- **Kapan** (main loop saja, langsung saat dokumen disetujui atau tuntas — bukan di akhir rantai): `task` sesudah
+  `chain.py root`, tiap gate (FLOW, UI, CONTRACT, BRIEF) sesudah `chain.py approve`, `architect` sesudah
+  `REVIEW.md` lolos validator (atau sebelum baris penutup bila rantai berhenti sebelum review), `report` sesudah
+  laporan terbit, `lead` sesudah `reopen`/`escalate`/`abandon`/`amend`, serta `review`/`profile` sesudah commit.
+  Prosedurnya di `skills/lead/references/nataflow-sync.md`.
 - **Status**: workdir dari `taskdir_state.py` (`TUNTAS` → `done`, `DITUTUP` → `abandoned`, `TERHENTI`/`TEMUAN` →
   `blocked`). Task naik ke `in_progress` sejak eksekusi dimulai; task milik taskdir ini menjadi `done`/`cancelled`,
   sedangkan task tiket tidak ditutup plugin ini.

@@ -109,10 +109,10 @@ flowchart TD
 Alurnya, secara ringkas:
 
 1. **Gate tunggal.** Hook `SessionStart` mengingatkan model bahwa tiap permintaan kerja lewat `frontend:lead` dulu (`hooks/gate_text.py`). Lead tidak menyentuh `src/`. Tugasnya menyapu lokasi fitur dengan kuota ketat, memindai taskdir terbuka, memilih lane dan `sections`, lalu memprovisi taskdir `frontenddev/docs/<YYMMDDhhmm>-<slug>/`.
-2. **Akar dulu.** Keempat lane yang berakar selalu mulai dari `frontend:task`, yang menulis `TASK.md` berisi `SC-{n}` terukur. `chain.py init` menulis ledger `## Chain` sesuai jadwal `sections`, lalu `chain.py root` mengunci akar: `base_commit` = `HEAD` dan kejadian `akar` di `## Riwayat Rantai`.
+2. **Akar dulu.** Keempat lane yang berakar selalu mulai dari `frontend:task`, yang menulis `TASK.md` berisi `SC-{n}` terukur. `chain.py init` menulis ledger `## Chain` sesuai jadwal `sections`, lalu `chain.py root` mengunci akar: `base_commit` = `HEAD` dan kejadian `akar` di `## Riwayat Rantai`. Akar terkunci langsung dicerminkan ke nataflow.
 3. **Gate kondisional.** `flow` menjadwalkan Gate Flow, `ui` menjadwalkan Gate Design, `sections` yang tidak kosong menjadwalkan Gate Contract, dan Gate Breakdown selalu jalan. `HOTFIX_MINOR` hanya punya hop BRIEF dan tidak melewati Plan Review (`README.md` § Workflow).
 4. **Pola tiap gate.** Draft `DRAFT` ditulis, lolos validator (dan ronde reviewer untuk CONTRACT/BRIEF non-MINOR), lalu dicatat `chain.py draft` sebagai kejadian Riwayat. Setelah itu gate bertanya ke user lewat `AskUserQuestion`. Kalau disetujui, `chain.py approve` menulis `APPROVED`, mencentang ledger `@ APPROVED <sidik12>`, dan mencatat kejadian `approve` yang memateraikan sidik konten (tanpa baris `status:`), ronde reviewer, sidik `SC-{n}`, dan jawaban user. Hilir menjangkarkan keutuhan pada kejadian itu; tidak ada commit dokumen. Approve PASS diikuti sinkron nataflow (`lead/references/nataflow-sync.md`), yang hasilnya masuk baris penutup gate sebagai segmen `nataflow <…>`.
-5. **Eksekusi.** `architect` menjalankan brief satu per satu lewat `code-implementor`. Status unit divonis dari disk, dan lint, test, serta build hanya jalan sekali di penutup. Setelah itu `code-reviewer` menilai commit kode rantai sejak `base_commit`, lalu `report` menulis `REPORT.md`.
+5. **Eksekusi.** `architect` menjalankan brief satu per satu lewat `code-implementor`. Status unit divonis dari disk, dan lint, test, serta build hanya jalan sekali di penutup. Setelah itu `code-reviewer` menilai commit kode rantai sejak `base_commit`, lalu `report` menulis `REPORT.md`. `REVIEW.md` dan `REPORT.md` masing-masing dicerminkan ke nataflow begitu lolos validatornya, bukan menunggu rantai selesai.
 6. **Cacat diperbaiki di taskdir yang sama.** Perbaikan selalu lewat `chain.py reopen`/`escalate` yang diputuskan di lead Phase 8, tidak pernah dengan membuka taskdir baru.
 7. **Plafon habis = rumuskan ulang.** Ronde reviewer, revisi, re-entry, dan eskalasi berplafon. Bila plafon habis, lead menanyakan user lewat `AskUserQuestion`: rumuskan ulang di taskdir baru (`chain.py abandon` taskdir lama) atau hentikan. Tidak ada jalan pintas yang me-reset plafon, termasuk amandemen akar dan `draft` ulang.
 8. **Dokumen taskdir di luar git.** Prasyarat `task` (check 10) menulis penanda `frontenddev/docs/.gitignore` (berisi `*`, ikut mengabaikan dirinya sendiri). Repo yang masih men-track dokumen taskdir divonis `MIGRASI` oleh `taskdir_state.py` dan dimigrasikan sekali lewat `docs_git.py migrate` sesudah persetujuan user. Bukti `DONE` brief dan kesegaran review dibaca dari commit kode, bukan dari commit dokumen.
@@ -254,7 +254,7 @@ flowchart TD
   3. Tulis `## Success Criteria` 1–7 butir berformat `- [ ] **SC-{n}**: <hasil> — verifikasi: <alat ukur>`. Alat ukur yang sah: `test`, `diff`, `typecheck`, `lint`, `build`, `QA manual:`.
      - Kalau ada `finding_source`, temuan yang kodenya sudah berubah ditandai `OBSOLETE`, dan tiap temuan tersisa dipikul tepat satu SC.
      - Kalau ada `ticket_source`, tiap `AC-{n}` kartu dirujuk sebagai `TAC-{n}` dan wajib dipikul SC atau dicatat di `## Out of Scope`.
-  4. Tulis `## Out of Scope` minimal satu butir. Tulis `TASK.md` dari template, jalankan `chain.py init` untuk menulis `## Chain`, lalu `validate_task.py` dan self-test butir 5 dan 8. Terakhir, `chain.py root` mengunci akar.
+  4. Tulis `## Out of Scope` minimal satu butir. Tulis `TASK.md` dari template, jalankan `chain.py init` untuk menulis `## Chain`, lalu `validate_task.py` dan self-test butir 5 dan 8. Terakhir, `chain.py root` mengunci akar, lalu akar langsung disinkron ke nataflow.
 - **Subagent yang didispatch**: tidak ada.
 - **Output / artefak**: `TASK.md` dengan `status: ACTIVE`, `lane`, `sections`, dan ledger `[ ]`. Laporannya `### TASK ROOT LOCKED — <path> @ base <sha7> …`.
 - **Gerbang & commit**: tidak ada gerbang approval dan tidak ada commit dokumen. Akar dikunci `chain.py root` (`base_commit` + kejadian `akar`). Berkas `finding_source` yang temuannya ditandai OBSOLETE di-commit tersendiri: `docs(review): tandai temuan OBSOLETE`.
@@ -425,10 +425,12 @@ flowchart TD
      - Kalau hijau, prasyarat dijalankan ulang: jejak verifikasi di tree (snapshot, coverage, `lint --fix`) disajikan ke user sebelum reviewer berangkat.
      - Tree bersih → dispatch `code-reviewer`, lalu `validate_review.py --log` (menagih `baseline_head` sebelum unit pertama dan tree bersih sesudah reviewer).
      - Kalau PASS, `REVIEW.md` tetap di disk. `finding_source` yang lolos `validate_audit.py --only-status-changed` di-commit `docs(<slug>): closing review <verdict>`.
+     - Lalu sinkron nataflow apa pun verdict-nya, sehingga `REVIEW.md` dan status unit tercermin sebelum Phase 5.
   6. **Phase 5.**
      - Verdict BLOCKED → kembali ke lead.
      - PASS/WARNING → kumpulkan `preseden menyesatkan`. Kalau user setuju, teruskan ke `frontend:profile` mode PATCH. Lalu panggil `frontend:report`.
-     - `REPORT.md` tertulis tetapi gagal validator (`LAPORAN TERTUNDA`) → butir 4: `validate_report.py`; FAIL → hapus `REPORT.md` dan panggil `report` sekali lagi.
+     - `REPORT.md` tertulis tetapi gagal validator (`LAPORAN TERTUNDA`) → butir 4: `validate_report.py`; PASS → sinkron nataflow; FAIL → hapus `REPORT.md` dan panggil `report` sekali lagi.
+     - Putaran yang berhenti sebelum review (unit BLOCKED, verifikasi merah, berkas yatim, jejak verifikasi) atau mendapati `REPORT.md` sudah terbit menjalankan sinkron sekali sebelum baris penutup. Baris penutup membawa segmen sinkron terakhir.
 - **Subagent yang didispatch**:
   - `code-implementor`: satu per brief, sekuensial, retry maksimal 1 hanya kalau laporan absen dan tree bersih. Balikannya `REPORT <unit>: DONE | FAILED`.
   - `code-reviewer`: sekali per penutup, dispatch ulang maksimal 1 kalau `REVIEW.md` absen atau validator FAIL. Verdict `PASS`, `WARNING`, atau `BLOCKED` diturunkan mekanis.
@@ -436,7 +438,7 @@ flowchart TD
   - Status brief `DONE`/`BLOCKED`, dan `report-<NN>.md` yang ditambahi `## Triase` oleh architect.
   - `REVIEW.md`.
   - Di `.explore/`: `verification-baseline.json`, `closing-verification.md`/`.json`, `gate-<NN>.md`, dan `verification-logs/`.
-  - Baris penutup `ARCHITECT — COMPLETED …` atau blok `### ARCHITECT — BLOCKED | TERTAHAN`.
+  - Baris penutup `ARCHITECT — COMPLETED … · nataflow <segmen>` atau blok `### ARCHITECT — BLOCKED | TERTAHAN` berslot **Nataflow**.
 - **Gerbang & commit**:
   - Commit unit `feat(<slug>): implement unit <NN> - <nama>` membawa kode `files_touched` saja. Status brief `DONE` ditulis di disk tepat sebelumnya.
   - `BLOCKED` adalah suntingan status di disk, tanpa commit.
@@ -479,10 +481,10 @@ flowchart TD
     TR -->|"bersih"| REV["dispatch code-reviewer"]
     REV --> VR{"validate_review.py --log"}
     VR -->|"FAIL, ulang maks 1"| REV
-    VR -->|"PASS, verdict BLOCKED"| CBR["REVIEW.md di disk, kembali ke lead"]
-    VR -->|"PASS, verdict PASS/WARNING"| CR["REVIEW.md di disk, commit finding_source bila berubah"]
+    VR -->|"PASS, verdict BLOCKED"| CBR["REVIEW.md di disk + sinkron nataflow, kembali ke lead"]
+    VR -->|"PASS, verdict PASS/WARNING"| CR["REVIEW.md di disk, commit finding_source bila berubah, sinkron nataflow"]
     CR --> FB["Phase 5: umpan balik profil, PATCH opsional"]
-    FB --> RPT["frontend:report"]
+    FB --> RPT["frontend:report → REPORT.md + sinkron nataflow"]
 ```
 
 ### `frontend:report`
@@ -498,7 +500,7 @@ flowchart TD
   4. Tulis `REPORT.md` dan jalankan `validate_report.py` (maksimal 2 putaran perbaikan). Tanpa commit.
 - **Subagent yang didispatch**: tidak ada.
 - **Output / artefak**: `REPORT.md`, penanda keadaan `TUNTAS`. Laporannya `### REPORT LOCKED — … · terbit · … · SC <n> terbukti / <n> manual / <n> belum`.
-- **Gerbang & commit**: tanpa commit. `REPORT.md` yang lolos `validate_report.py` menandai `TUNTAS` dan dicerminkan ke nataflow. Yang tertulis tetapi gagal validator divonis `LAPORAN TERTUNDA` dan diselesaikan architect Phase 5 butir 4.
+- **Gerbang & commit**: tanpa commit. `REPORT.md` yang lolos `validate_report.py` menandai `TUNTAS` dan langsung dicerminkan ke nataflow oleh skill ini (Phase 4 butir 4). Yang tertulis tetapi gagal validator divonis `LAPORAN TERTUNDA` dan diselesaikan architect Phase 5 butir 4.
 - **Lanjut ke**: kembali ke `frontend:architect`, lalu `frontend:lead`. Keputusan push, PR, dan merge tetap milik user.
 
 ### `frontend:review`
@@ -685,7 +687,7 @@ Plafon (reopen 3 per hop dan 6 per taskdir, eskalasi 2, revisi 2), epoch ronde r
 
 ## Handoff Lintas Plugin
 
-- **Cermin nataflow (opsional).** Satu taskdir = satu workdir `frontenddev:<repo>:<path taskdir>`. Taskdir bertiket menempel ke task tiket analyst (metadata `ticket_key` = direktori `ticket_source`), sehingga taskdir frontend dan backend dari satu tiket bernaung di satu task. Isi dokumen taskdir dibaca dari disk (metadata `commit` kosong, `head` = `HEAD` saat sinkron): `TASK.md` berakar terkunci; `FLOW.md`/`UI.md`/`CONTRACT.md` bila baris ledger-nya `[x]` dan tidak DRIFT; brief dan `REVIEW-PLAN.md` sesudah hop BRIEF disetujui (atau brief `DONE`/`BLOCKED`); `report-NN.md`, `REVIEW.md`, dan `REPORT.md`. Hop yang dibuka ulang tercermin dengan status terbarunya; hop DRIFT tidak didorong ulang. Berkas yang hilang dari disk tidak didorong dan dibiarkan dengan isi terakhirnya di server (24 G5). Tanpa config, dokumen taskdir hanya ada di disk ini (24 K2). Status workdir dari `taskdir_state.py` (`TUNTAS` → `done`, `DITUTUP` → `abandoned`, `TERHENTI`/`TEMUAN` → `blocked`). `frontenddev/reviews/` dan profil (ter-commit, isi `HEAD`) didorong ke workspace; yang dihapus dari git ditandai `removed: true`. Config `.claude/nataflow.json` dibaca bersama keempat plugin.
+- **Cermin nataflow (opsional).** Satu taskdir = satu workdir `frontenddev:<repo>:<path taskdir>`. Taskdir bertiket menempel ke task tiket analyst (metadata `ticket_key` = direktori `ticket_source`), sehingga taskdir frontend dan backend dari satu tiket bernaung di satu task. Isi dokumen taskdir dibaca dari disk (metadata `commit` kosong, `head` = `HEAD` saat sinkron): `TASK.md` berakar terkunci; `FLOW.md`/`UI.md`/`CONTRACT.md` bila baris ledger-nya `[x]` dan tidak DRIFT; brief dan `REVIEW-PLAN.md` sesudah hop BRIEF disetujui (atau brief `DONE`/`BLOCKED`); `report-NN.md`, `REVIEW.md`, dan `REPORT.md`. Hop yang dibuka ulang tercermin dengan status terbarunya; hop DRIFT tidak didorong ulang. Berkas yang hilang dari disk tidak didorong dan dibiarkan dengan isi terakhirnya di server (24 G5). Tanpa config, dokumen taskdir hanya ada di disk ini (24 K2). Status workdir dari `taskdir_state.py` (`TUNTAS` → `done`, `DITUTUP` → `abandoned`, `TERHENTI`/`TEMUAN` → `blocked`). `frontenddev/reviews/` dan profil (ter-commit, isi `HEAD`) didorong ke workspace; yang dihapus dari git ditandai `removed: true`. Config `.claude/nataflow.json` dibaca bersama keempat plugin. Sinkron berjalan langsung di titik dokumen disetujui atau tuntas (26): `task` sesudah `chain.py root`, tiap gate sesudah `chain.py approve` (FLOW, UI, CONTRACT, BRIEF), `architect` sesudah `REVIEW.md` lolos validator, dan `report` sesudah `REPORT.md` terbit; tabel lengkapnya di `skills/lead/references/nataflow-sync.md`.
 
 - **Dari `analyst` (tiket).**
   - Tiket READY diserahkan ke `/frontend:lead` lewat parameter `ticket_source` = `analyst/tickets/<YYMMDDhhmm>-<slug>/TICKET.md`. Parameter ini tidak boleh disimpulkan dari isi prompt. Kalau user menempel sesuatu yang mirip kartu tiket tanpa path, lead menanyakan path-nya.

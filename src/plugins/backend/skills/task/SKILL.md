@@ -79,7 +79,8 @@ Tulis minimal satu butir berformat `- <yang tidak dikerjakan> — <alasan>` dari
 2. `chain` terisi: tulis frontmatter `chain:` bernilai persis itu dan seksi `## Chain` berisi tepat hop chain tersebut, seluruhnya belum tercentang, mengikuti bagian 2 `analyst/references/chain-rules.md`. `chain` kosong: hilangkan baris frontmatter dan seksi itu sepenuhnya. `ticket_source` terisi: tulis frontmatter `ticket_source:` bernilai persis path itu; kosong: hilangkan barisnya.
 3. **Self-test akar**: sebelum butir 4 berangkat, jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/validate_doc.py --kind task --taskdir <taskdir> --fresh [--finding-source <finding_source>]`. `FAIL` → perbaiki seluruh pelanggaran satu keluaran, lalu jalankan sekali lagi. Butir `MANUAL` (T3b, T4, T9) dinilai sendiri memakai predikat bagian 2 berkas itu; rumah kanonik predikatnya di sana, dilarang ditulis ulang di sini.
 4. Kunci akar: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/doc_seal.py root --taskdir <taskdir>`. Skrip menulis `base_commit` = sha `HEAD` (branch kerja taskdir) ke frontmatter `TASK.md`; rentang kode rantai dihitung sejak titik ini. Dilarang men-stage atau meng-commit `TASK.md` dan mengisi `base_commit` dengan tangan.
-5. Catat `base_commit` (7 digit) dan kembalikan kendali ke pemanggilnya — `backend:analyst` pada lane planning, `backend:tech-lead` pada lane lainnya.
+5. **Sinkron nataflow**: akar terkunci → jalankan prosedur `tech-lead/references/nataflow-sync.md` (`--taskdir <taskdir>`) di main loop, sehingga `TASK.md` tercermin seketika di lane mana pun. Segmennya masuk baris penutup; `GAGAL` tidak membatalkan akar. `Kunci: GAGAL` → lewati butir ini: payload menolak akar tanpa `base_commit`.
+6. Catat `base_commit` (7 digit) dan kembalikan kendali ke pemanggilnya — `backend:analyst` pada lane planning, `backend:tech-lead` pada lane lainnya.
 
 ## Guardrails
 
@@ -92,13 +93,14 @@ Tulis minimal satu butir berformat `- <yang tidak dikerjakan> — <alasan>` dari
 
 ## Output [REQUIRED]
 
-Tulis `{taskdir}/TASK.md` mengikuti `templates/task-template.md`. Uji akar 9/9 dan akar terkunci → tutup satu baris tanpa blok: `### TASK ROOT LOCKED — <taskdir>/TASK.md @ <base_commit 7 digit> · status ACTIVE · Uji Akar 9/9 lolos`. Selain itu, sajikan:
+Tulis `{taskdir}/TASK.md` mengikuti `templates/task-template.md`. Uji akar 9/9 dan akar terkunci → tutup satu baris tanpa blok: `### TASK ROOT LOCKED — <taskdir>/TASK.md @ <base_commit 7 digit> · status ACTIVE · Uji Akar 9/9 lolos · Nataflow <segmen>`. Selain itu, sajikan:
 
 ```markdown
 ### TASK ROOT LOCKED — TERTAHAN
 - **Path**    : backenddev/docs/<YYMMDDhhmm>-<slug>/TASK.md · status ACTIVE
 - **Uji Akar**: gagal — <butir yang jatuh beserta alasannya> | 9/9 lolos
 - **Kunci**   : GAGAL — <pesan doc_seal.py> | <base_commit 7 digit>
+- **Nataflow**: <segmen> | —
 ```
 
 `Uji Akar` dan `Kunci` wajib muncul di kedua bentuk: `backend:analyst` Fase 2 butir 2 membacanya sebagai predikat masuk hop pertama. Lane, chain, ledger hop, kriteria, dan bukti `file:baris` penopang `## Description` sudah terkunci di `TASK.md` — dilarang menyalinnya ke laporan. Tutup satu baris: `kembali ke <backend:analyst | backend:tech-lead> | Taskdir: <path> | Akar: TASK.md @ <base_commit 7 digit | belum terkunci>`.
