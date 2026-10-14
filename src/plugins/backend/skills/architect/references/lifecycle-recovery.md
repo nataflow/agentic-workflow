@@ -183,12 +183,13 @@ pekerjaan yang tidak diklaim siapa pun milik user.
 
 ### Struktur Laporan Kegagalan (`report-<NN>.md`)
 
-File `{taskdir}/report-<NN>.md` wajib memuat:
+File `{taskdir}/report-<NN>.md` ditulis `code-implementor` menurut kontrak di `agents/code-implementor.md` (rumah
+kanoniknya; 25 R11): frontmatter `brief`, `status: BLOCKED`, `reason`, lalu empat seksi berikut.
 
-1. **Trigger Condition**: Alasan tepat penghentian (misal: anchor simbol hilang, type mismatch, test gagal).
-2. **Executed Commands & Output**: Perintah terminal yang dijalankan beserta potongan error verbatim.
-3. **Working Tree State**: Daftar file yang sudah termodifikasi dan baris perubahan yang belum selesai.
-4. **Remediation Recommendation**: Catatan penyesuaian untuk input perencana brief berikutnya. Bila penyebab terhentinya adalah **preseden kode yang menyesatkan** — pola warisan yang disalin brief sebagai contoh, lalu ternyata melanggar `## Anti-patterns` atau `## Invariants` profil — sebut `file:baris` preseden itu beserta polanya di baris tersendiri berawalan `Umpan balik profil:`. Tanpa baris ini pengetahuan itu mati bersama taskdir, dan rantai berikutnya menyalin preseden yang sama karena profil tidak pernah menandainya.
+1. **`## Stop condition / Trigger`**: Alasan tepat penghentian (misal: anchor simbol hilang, type mismatch, test gagal).
+2. **`## Evidence`**: Kutipan `berkas:baris`, perintah terminal yang dijalankan, atau potongan galat verbatim.
+3. **`## Working Tree & Partial Changes`**: Daftar file yang sudah termodifikasi dan baris perubahan yang belum selesai.
+4. **`## Root Cause & Recommended Action`**: Catatan penyesuaian untuk input perencana brief berikutnya. Bila penyebab terhentinya adalah **preseden kode yang menyesatkan** — pola warisan yang disalin brief sebagai contoh, lalu ternyata melanggar `## Anti-patterns` atau `## Invariants` profil — sebut `file:baris` preseden itu beserta polanya di baris tersendiri berawalan `Umpan balik profil:`. Tanpa baris ini pengetahuan itu mati bersama taskdir, dan rantai berikutnya menyalin preseden yang sama karena profil tidak pernah menandainya.
 
 ### Prinsip Fail-Fast
 

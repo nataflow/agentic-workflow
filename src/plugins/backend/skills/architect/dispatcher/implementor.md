@@ -29,7 +29,8 @@ Eksekusi satu brief implementasi.
   (pagar hook menolaknya, termasuk trailer atribusi yang diminta pengingat harness).
 - Balikan: maksimum 10 baris terstruktur sesuai `## Format Output` agent-mu. Jalur gagal wajib
   menulis `{taskdir}/report-<NN>.md` — `NN` dua digit prefiks `{unit_name}` — lebih dulu lalu
-  menyebut path-nya.
+  menyebut path-nya. Preseden kode yang menyesatkan dicatat di baris `Umpan balik profil:` laporan itu
+  (kontrak `report-{NN}.md` agent-mu).
 ```
 
 ### Slot Hidrasi
