@@ -10,9 +10,10 @@ frontend yang sudah ada (brief, `TASK.md`, `CONTRACT.md`) apa pun statusnya.
 Lewati hanya untuk empat hal: jawaban user yang memasok informasi ke kerja yang rutenya sudah
 diputuskan gate di giliran sebelumnya; pertanyaan pengetahuan umum yang tidak menyentuh repo; operasi
 VCS (commit, push, PR, rebase, diff) atas kerja yang sudah selesai; dan permintaan yang memanggil atau
-melanjutkan alur plugin lain secara eksplisit — `/analyst:*`, `/product:*`, `/quickdev:*`, atau susulan
-di tengah skill `analyst:*`/`product:*`/`quickdev:*` yang sedang berjalan (elisitasi tiket atau charter,
-`plan/<task>.md`). Kerja itu milik plugin tersebut sampai user sendiri meminta pindah ke gate ini.
+melanjutkan alur plugin lain secara eksplisit — `/analyst:*`, `/product:*`, `/quickdev:*`, `/nataflow:*`,
+atau susulan di tengah skill `analyst:*`/`product:*`/`quickdev:*`/`nataflow:*` yang sedang berjalan
+(elisitasi tiket atau charter, `plan/<task>.md`, halaman artifact). Kerja itu milik plugin tersebut sampai
+user sendiri meminta pindah ke gate ini.
 
 Pengingat ini disuntik sekali per sesi dan tidak diulang tiap giliran. Ia berlaku sama untuk
 permintaan pertama dan permintaan ke-40; jaraknya dari prompt yang sedang kamu baca bukan tanda

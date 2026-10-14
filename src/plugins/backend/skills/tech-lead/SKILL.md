@@ -38,7 +38,7 @@ description: Gunakan ketika ada permintaan kerja baru atau susulan di repo backe
 Evaluasi setiap pesan user, termasuk susulan di tengah sesi:
 
 1. Aktifkan gerbang untuk permintaan perubahan perilaku, bugfix, audit, eksekusi artefak, susulan cakupan, atau koreksi arah. Pertanyaan baca-kode murni (letak simbol, pemanggil, tracing) dan "sinkron ulang taskdir" juga lewat gerbang, tetapi hanya menjalankan Fase 0 `--read-only` lalu jalur cepat `references/explore-fact.md` atau `references/nataflow-sync.md`.
-2. Jawab langsung tanpa gerbang hanya untuk 4 pengecualian: jawaban klarifikasi Fase 2 / `## Open questions`, konsep umum non-repo, operasi VCS murni atas kerja tuntas, atau alur plugin lain yang dipanggil/dilanjutkan eksplisit (`/analyst:*`, `/product:*`, `/quickdev:*`) (`references/gate-scope.md` bagian 1).
+2. Jawab langsung tanpa gerbang hanya untuk 4 pengecualian: jawaban klarifikasi Fase 2 / `## Open questions`, konsep umum non-repo, operasi VCS murni atas kerja tuntas, atau alur plugin lain yang dipanggil/dilanjutkan eksplisit (`/analyst:*`, `/product:*`, `/quickdev:*`, `/nataflow:*`) (`references/gate-scope.md` bagian 1).
 3. Persetujuan `BRD.md`/`PRD.md` bukan pemicu: teruskan ke `backend:analyst` (`gate-scope.md` bagian 2).
 4. Tahan dan proses sebagai pemicu terpisah jika permintaan baru disisipkan saat rantai berjalan, atau objek kerja berupa berkas non-`src/` berefek runtime (`references/gate-lifecycle.md` bagian 5).
 

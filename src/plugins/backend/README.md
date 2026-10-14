@@ -192,7 +192,7 @@ oleh skrip prasyarat, sehingga vonis hook sama dengan vonis skrip.
   `tech-lead`, yang menawarkan GENERATE; JSON rusak, tanpa stack, stack tidak dikenal, field `plugin` asing
   pada profil sendiri, atau tidak lengkap → REFRESH.
 - **Pengecualian**: jawaban atas klarifikasi rute yang sudah diputuskan, pengetahuan umum, operasi VCS atas
-  kerja selesai, dan alur `/analyst:*`, `/product:*`, atau `/quickdev:*` yang dipanggil atau dilanjutkan
+  kerja selesai, dan alur `/analyst:*`, `/product:*`, `/quickdev:*`, atau `/nataflow:*` yang dipanggil atau dilanjutkan
   secara eksplisit.
 - **Opt-out `.claude/workflow`**: lihat Hidup Berdampingan.
 

@@ -77,7 +77,7 @@ Ketujuh plugin biasanya dipasang user-wide. Yang menentukan perilaku di satu rep
   lama di `.claude/profile/` dimigrasikan oleh pemiliknya (mode MIGRATE) dan tidak disentuh plugin lain.
   `quickdev` memakai `repo-profile.md` sendiri.
 - **Pemanggilan eksplisit.** Teks gerbang engineer mengecualikan permintaan yang memanggil atau melanjutkan
-  `/analyst:*`, `/product:*`, dan `/quickdev:*`. Skill quickdev hanya jalan bila user mengetik `/quickdev:<skill>`.
+  `/analyst:*`, `/product:*`, `/quickdev:*`, dan `/nataflow:*`. Skill quickdev hanya jalan bila user mengetik `/quickdev:<skill>`.
 - **Penanda `.claude/workflow`.** Berkas teks di repo pengguna berisi nama plugin yang boleh menggerbangi
   repo itu, dipisah spasi atau baris. Hook yang namanya tidak tercantum akan diam. Isi `quickdev` membuat
   kedua hook engineer diam; isi `frontend quickdev` hanya menyalakan frontend. Bila berkas tidak ada,

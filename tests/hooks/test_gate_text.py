@@ -37,6 +37,7 @@ def _verdict(plugin, state, location="own"):
 def test_lewati_mentions_other_plugins(plugin):
     text = _load(plugin, "gate_text").render(_verdict(plugin, "OK"))
     assert "/analyst:*" in text and "/product:*" in text and "/quickdev:*" in text
+    assert "/nataflow:*" in text            # 25 R5: create-artifact mengklaim bebas gerbang engineer
 
 
 @pytest.mark.parametrize("plugin", list(GATES))

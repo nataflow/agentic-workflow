@@ -55,7 +55,7 @@ Skill ber-`user-invocable: false` tidak muncul di menu `/`. Untuk memulai, melan
 flowchart TD
     U["Permintaan user"] --> HK["SessionStart: detect.py menyuntik blok backend-tech-lead-gate"]
     HK --> TL["backend:tech-lead — Gerbang Masuk"]
-    TL -->|"4 pengecualian: klarifikasi, konsep umum, VCS, /analyst:* /product:* /quickdev:*"| DIRECT["Jawab langsung tanpa gerbang"]
+    TL -->|"4 pengecualian: klarifikasi, konsep umum, VCS, /analyst:* /product:* /quickdev:* /nataflow:*"| DIRECT["Jawab langsung tanpa gerbang"]
     TL --> F0{"Fase 0: prasyarat --read-only, profil ada?"}
     F0 -->|"profil absen/rusak/lama & rute mengubah kode"| PROF["backend:profile GENERATE / REFRESH / MIGRATE"]
     F0 -->|"ya"| F1["Fase 1: eksplorasi kode — code-explorer atau fast-path ≤3 Glob+Grep"]
