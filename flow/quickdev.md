@@ -398,7 +398,7 @@ Tidak ada. README menyebutkan "semua kerja berlangsung di percakapan utama", dan
 | Penanda alur | `.claude/workflow` | `profile` Fase 4, atas persetujuan user | `quickdev` → hook backend/frontend diam. `frontend quickdev` → hanya hook frontend menyala |
 | Laporan explore / spesifikasi clarify / laporan review | Terminal | `explore`, `clarify`, `review` | Tidak menjadi berkas |
 | Perubahan kode | Working tree (uncommitted) | `execute` | Commit adalah keputusan user |
-| Cermin nataflow (opsional) | Server MCP nataflow | prosedur sinkron | Workdir `quickdev:<repo>:<path rencana>` + task; dokumen `quickdev.plan` (isi disk) dan `profile` (workspace). Status workdir: `COMPLETED*` → `done`, `BLOCKED` → `blocked`, selain itu `active`; task `in_progress` sejak eksekusi dimulai, `done` saat `COMPLETED*` |
+| Cermin nataflow (opsional) | Server MCP nataflow | prosedur sinkron | Workdir `quickdev:<repo>:<path rencana>` + task; dokumen `quickdev.plan` (isi disk) dan `profile` (workspace). Status workdir: `COMPLETED*` → `done`, `BLOCKED` → `blocked`, selain itu `active`; task `in_progress` sejak rencana terkunci (workdir terbit, 28 T1), `done` saat `COMPLETED*` |
 
 Header keenam section profil per templat:
 

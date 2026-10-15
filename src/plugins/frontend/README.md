@@ -319,8 +319,9 @@ tidak tersentuh. Kegagalannya tidak menahan gate maupun eksekusi.
   laporan terbit, `lead` sesudah `reopen`/`escalate`/`abandon`/`amend`, serta `review`/`profile` sesudah commit.
   Prosedurnya di `skills/lead/references/nataflow-sync.md`.
 - **Status**: workdir dari `taskdir_state.py` (`TUNTAS` → `done`, `DITUTUP` → `abandoned`, `TERHENTI`/`TEMUAN` →
-  `blocked`). Task naik ke `in_progress` sejak eksekusi dimulai; task milik taskdir ini menjadi `done`/`cancelled`,
-  sedangkan task tiket tidak ditutup plugin ini.
+  `blocked`). Task naik ke `in_progress` sejak workdir terbit (`chain.py root`); task milik taskdir ini menjadi
+  `done`/`cancelled`, sedangkan task tiket baru `done` bila seluruh workdir di bawahnya (frontend maupun backend,
+  dibaca lewat `list_workdir`) sudah `done`/`abandoned`. Status task tidak pernah diturunkan.
 - **Gagal tidak memblokir**: baris penutup memuat segmen `nataflow <… | dilewati | GAGAL: <sebab>>`. Ulangi lewat
   `/frontend:lead` ("sinkron ulang taskdir <slug>").
 

@@ -12,7 +12,8 @@ Sengaja bukan subperintah `chain.py`: `chain.py` satu-satunya penulis ledger, se
   `REVIEW-PLAN.md` bila hop BRIEF `[x]` sah, atau brief sudah `DONE`/`BLOCKED`; `report-NN.md`, `REVIEW.md`, dan
   `REPORT.md` apa adanya; `.explore/` tidak pernah. Metadata `commit` kosong, `head` = sha `HEAD` saat sinkron.
   Status workdir dari `taskdir_state.py`: `TUNTAS` → `done`, `DITUTUP` → `abandoned`, `TERHENTI`/`TEMUAN` →
-  `blocked`, selain itu `active`.
+  `blocked`, selain itu `active`. Task naik ke `in_progress` sejak workdir terbit (28 T1); task milik taskdir ini
+  `done`/`cancelled` mengikuti workdir, task tiket hanya lewat `--workdirs` (28 T2).
 - `--repo-docs review|profile`: `frontenddev/reviews/` atau profil sebagai dokumen `adhoc.review`/`profile` di bawah
   workspace, dengan key `<repo>/<path>` (T10).
 
@@ -26,6 +27,10 @@ teks balikan `list_document include_content=false` di stdin, ditambah key remote
 yang dibuka ulang didorong dari disk dengan status terbarunya (F9); berkas taskdir yang sudah tidak ada dibiarkan
 dengan isi terakhirnya di server (24 G5), sedangkan dokumen repo yang dihapus dari git didorong dengan
 `removed: true`. Hop yang DRIFT tidak pernah didorong ulang: cermin tetap menampilkan isi yang disetujui.
+
+`--workdirs -`: teks balikan `list_workdir task_id` di stdin, hanya bila payload fase pertama membawa
+`task.siblings` (task tiket, workdir `done`/`abandoned`) → `task_status` pengganti `task.status`: `done` bila seluruh
+workdir di bawah task itu sudah `done`/`abandoned` dan sedikitnya satu `done`, selain itu tetap `task.status` (28 T2).
 
 Keluaran `--json` selalu JSON: `SKIP` (config absen), `FAIL` (`problems`), atau `PASS`.
 
@@ -222,6 +227,23 @@ def taskdir_state(root: Path, td: str) -> Tuple[str, str]:
     return str(rows[0].get("state", "")), ""
 
 
+def siblings_phase(args, config: Dict[str, Any], key: str, status: str, task: Dict[str, Any]) -> int:
+    """`--workdirs`: status task tiket dari seluruh workdir di bawahnya (28 T2). Tanpa `task.siblings` → `task.status`."""
+    workdirs, problems = ns.read_workdirs(args.workdirs, sys.stdin.read() if args.workdirs == "-" else "")
+    if problems:
+        return ns.emit_fail(args.json, PREFIX, problems)
+    target, problems = (ns.sibling_task_status(workdirs, key, status, task["status"]) if task.get("siblings")
+                        else (task["status"], []))
+    if problems:
+        return ns.emit_fail(args.json, PREFIX, problems)
+    open_ = sum(1 for k, s in workdirs.items() if (status if k == key else s) not in ns.WORKDIR_FINAL)
+    payload = {"status": "PASS", "enabled": True, "mcp_server": config["mcp_server"], "task_status": target,
+               "workdirs_total": len(workdirs), "workdirs_open": open_}
+    ns.emit(payload, args.json, f"{PREFIX} PASS: {len(workdirs)} workdir di bawah task, {open_} belum tuntas → task "
+                                f"{target['status'] if target else 'tidak diubah'} — argumen lewat `--json`")
+    return 0
+
+
 def ticket_key(task_text: str) -> Tuple[Optional[str], str]:
     """`ticket_source` frontmatter → `ticket_key` analyst (dirname path `TICKET.md`), `None` tanpa tiket."""
     raw = ns.frontmatter_value(task_text, "ticket_source")
@@ -257,18 +279,21 @@ def run_taskdir(args, root: Path, config: Dict[str, Any]) -> int:
     problems = ns.workdir_problems(key, name, status)
     if problems:
         return ns.emit_fail(args.json, PREFIX, problems)
-    started = any(doc_type(n) in ("unit.report", "review", "report") for n in texts) or any(
-        doc_status(t) in ("DONE", "BLOCKED") for n, t in texts.items() if doc_type(n) == "brief")
     ident = {"source": "analyst", "ticket_key": tkey} if tkey else {"source": SOURCE, "workdir_key": key}
     title = ns.h1_title(task_text) or name
     task = ns.task_args(config, args.workspace_id, ident, repo, title, ns.pick_sections(task_text, TASK_SECTIONS) or title)
-    # Task tiket bisa menaungi taskdir backend juga: plugin ini hanya menaikkannya ke `in_progress` (E8).
-    target = "in_progress" if started else ""
+    # Workdir terbit → `in_progress` (28 T1). Task tiket bisa menaungi taskdir backend juga (15 E8): ia baru `done`
+    # bila seluruh workdir di bawahnya tuntas, diputuskan `--workdirs` atas balikan `list_workdir` (28 T2).
+    target = "in_progress"
     if not tkey and status == "done":
         target = "done"
     elif not tkey and status == "abandoned":
         target = "cancelled"
     task["status"] = ns.task_status(target)
+    if tkey and status in ns.WORKDIR_FINAL:
+        task["siblings"] = True
+    if args.workdirs is not None:
+        return siblings_phase(args, config, key, status, task)
     meta = {"source": SOURCE, "repo": repo, "path": td, "lane": ns.frontmatter_value(task_text, "lane"),
             "sections": ns.frontmatter_value(task_text, "sections"), "state": state, "ticket_key": tkey or ""}
     payload = {"status": "PASS", "enabled": True, "mcp_server": config["mcp_server"], "repo": repo,
@@ -288,6 +313,8 @@ def workspace_label(args) -> str:
 
 
 def run_repo_docs(args, root: Path, config: Dict[str, Any]) -> int:
+    if args.workdirs is not None:
+        return ns.emit_fail(args.json, PREFIX, ["--workdirs hanya untuk --taskdir"])
     repo = ns.repo_identity(root, config)
     rel_dir, docs, problems = select_repo_docs(root, args.repo_docs, repo)
     if problems:
@@ -315,7 +342,10 @@ def main() -> int:
                         help="dokumen tingkat repo: review atau profile")
     ap.add_argument("--workspace", default="", help="alias `workspaces` tujuan task baru atau induk dokumen repo; "
                                                     "wajib dipilih user bila config berisi lebih dari satu workspace")
-    ap.add_argument("--remote", default=None, help="teks balikan list_document include_content=false (`-` = stdin)")
+    phase = ap.add_mutually_exclusive_group()
+    phase.add_argument("--remote", default=None, help="teks balikan list_document include_content=false (`-` = stdin)")
+    phase.add_argument("--workdirs", default=None, help="teks balikan list_workdir task_id (`-` = stdin), bila payload "
+                                                        "membawa task.siblings")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
     root = find_repo_root().resolve()

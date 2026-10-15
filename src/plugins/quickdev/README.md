@@ -228,7 +228,7 @@ tidak menulis berkas apa pun, sehingga `Plan-Hash`, `Verified-Hash`, dan `Tree-H
 - **Kapan**: `plan` sesudah `LOCK PASS` dan sesudah `unlock` (cermin menjadi `DRAFT`); `execute` sesudah tiap
   `close`/`confirm`; `profile` sesudah profil tertulis. Rencana yang belum pernah dikunci tidak didorong.
 - **Status**: workdir `active`, `blocked` (`BLOCKED`), atau `done` (`COMPLETED`, `COMPLETED (manual)`); task naik
-  ke `in_progress` begitu eksekusi dimulai dan `done` saat selesai, tanpa pernah diturunkan.
+  ke `in_progress` begitu rencana terkunci (workdir terbit) dan `done` saat selesai, tanpa pernah diturunkan.
 - **Hemat token**: `plan_lock.py sync-payload` menyusun seluruh argumen dalam dua fase. Isi dokumen hanya
   diterbitkan bila sha, tipe, atau metadatanya berbeda dari manifest `list_document` remote.
 - **Gagal tidak memblokir**: ringkasan skill memuat baris `NATAFLOW: <… | dilewati | GAGAL: <sebab>>`, dan

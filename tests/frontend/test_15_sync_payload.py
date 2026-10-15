@@ -77,7 +77,8 @@ def test_akar_saja_dan_draft_tidak_ikut(repo):
     assert create["title"] == "Orders — tombol lacak"
     assert create["description"].startswith("## Description") and "## Chain" not in create["description"]
     wd = out["workdir"]
-    assert (wd["key"], wd["status"]) == (key, "active") and out["task"]["status"] is None
+    assert (wd["key"], wd["status"]) == (key, "active")
+    assert out["task"]["status"] == {"status": "in_progress", "from": ["todo"]} and "siblings" not in out["task"], "workdir terbit → in_progress (28 T1)"
     meta = json.loads(wd["metadata"])
     assert meta["lane"] == "FAST_FORWARD" and meta["state"] == "GATE"
     assert keys(push(repo)) == ["TASK.md"], "CONTRACT DRAFT tidak ikut"

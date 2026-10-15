@@ -79,7 +79,8 @@ def test_fase_satu_task_sendiri(repo):
     create = out["task"]["create"]
     assert create["title"] == "Order fix" and create["description"].startswith("## Success Criteria")
     assert json.loads(create["metadata"]) == {"source": "backenddev", "workdir_key": key, "repo": "tim/api"}
-    assert out["task"]["status"] is None
+    assert out["task"]["status"] == {"status": "in_progress", "from": ["todo"]}, "workdir terbit → in_progress (28 T1)"
+    assert "siblings" not in out["task"]
     wd = out["workdir"]
     assert (wd["key"], wd["name"], wd["status"]) == (key, "2609240900-order-fix", "active")
     assert json.loads(wd["metadata"]) == {"source": "backenddev", "repo": "tim/api", "path": TD,
@@ -111,7 +112,7 @@ def test_status_workdir_dan_task_dari_disk(repo):
     b1 = brief(repo, "01", "order-lock", "READY")
     lock(repo)
     out = sp(repo, "--taskdir", TD)[1]
-    assert out["workdir"]["status"] == "active" and out["task"]["status"] is None
+    assert out["workdir"]["status"] == "active" and out["task"]["status"] == {"status": "in_progress", "from": ["todo"]}, "28 T1"
     b1.write_text(b1.read_text(encoding="utf-8").replace("status: READY", "status: BLOCKED"), encoding="utf-8")
     out = sp(repo, "--taskdir", TD)[1]
     assert out["workdir"]["status"] == "blocked"
@@ -134,6 +135,7 @@ def test_taskdir_bertiket_menempel_ke_task_analyst(repo):
     assert out["task"]["lookup"]["metadata"] == json.dumps(ident, separators=(",", ":"))
     assert json.loads(out["task"]["create"]["metadata"]) == dict(ident, repo="tim/api")
     assert out["task"]["status"]["status"] == "in_progress", "task tiket tidak ditutup oleh satu taskdir (E8)"
+    assert out["task"]["siblings"] is True, "penutupan task tiket diputuskan --workdirs (28 T2)"
     assert json.loads(out["workdir"]["metadata"])["ticket_key"] == TICKET
 
 
