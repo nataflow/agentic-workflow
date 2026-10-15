@@ -275,8 +275,9 @@ tidak menulis berkas dan tidak meng-commit, dan kegagalannya tidak menahan ranta
   artefak repo yang menunggu di-commit, tanpa menyinkron ulang `architect` dan `analyst` yang sudah menyinkron.
   Prosedurnya di `skills/tech-lead/references/nataflow-sync.md`; subagent tidak berubah.
 - **Status**: workdir `done` bila `REPORT.md` ada, `blocked` bila `HALT.md` belum dicabut atau brief `BLOCKED`, selain itu
-  `active`. Task naik ke `in_progress` sejak eksekusi dimulai; task milik taskdir ini menjadi `done` saat
-  `REPORT.md` terbit, sedangkan task tiket tidak ditutup plugin ini.
+  `active`. Task naik ke `in_progress` sejak workdir terbit (akar terkunci); task milik taskdir ini menjadi `done`
+  saat `REPORT.md` terbit, sedangkan task tiket baru `done` bila seluruh workdir di bawahnya (backend maupun
+  frontend, dibaca lewat `list_workdir`) sudah `done`/`abandoned`. Status task tidak pernah diturunkan.
 - **Hemat token**: `sync_payload.py` menerbitkan isi hanya untuk dokumen yang berbeda dari manifest remote.
 - **Gagal tidak memblokir**: slot **Nataflow** laporan `task`, `analyst`, `architect`, `report`, dan re-entry
   `tech-lead` memuat `dilewati` atau `GAGAL: <sebab>`. Ulangi lewat `/backend:tech-lead` ("sinkron ulang taskdir <slug>").

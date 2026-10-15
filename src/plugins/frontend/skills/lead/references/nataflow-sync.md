@@ -25,7 +25,7 @@ Disk (dokumen taskdir) dan git (dokumen tingkat repo) tetap sumber kebenaran; na
    - `SKIP` (`.claude/nataflow.json` tidak ada di repo) → segmen `nataflow dilewati`; selesai.
    - `FAIL` → segmen `nataflow GAGAL: <isi problems apa adanya>`; selesai.
    - `PASS` → pegang `mcp_server`, `task`, `workdir`, `list_document`, dan `documents_total` apa adanya. `workspace_choices` ikut ada bila `.claude/nataflow.json` berisi lebih dari satu workspace; baru dipakai di langkah 3.
-2. **Tool.** Keenam tool bernama `mcp__<mcp_server>__list_task`, `…__create_task`, `…__update_task_status`, `…__upsert_workdir`, `…__list_document`, dan `…__upsert_document`. Yang masih tertunda dimuat lebih dulu lewat ToolSearch (`select:` keenamnya). Salah satu tidak tersedia → segmen `nataflow GAGAL: server MCP <mcp_server> tidak tersedia`; selesai.
+2. **Tool.** Ketujuh tool bernama `mcp__<mcp_server>__list_task`, `…__create_task`, `…__update_task_status`, `…__upsert_workdir`, `…__list_workdir`, `…__list_document`, dan `…__upsert_document`. Yang masih tertunda dimuat lebih dulu lewat ToolSearch (`select:` ketujuhnya). Salah satu tidak tersedia → segmen `nataflow GAGAL: server MCP <mcp_server> tidak tersedia`; selesai.
 3. **Task.** Panggil `list_task` dengan argumen `task.lookup` apa adanya, lalu hitung task di hasilnya:
    - 0 → bila payload membawa `workspace_choices`, tanyakan dulu workspace tujuan lewat `AskUserQuestion` (satu opsi per entri: label `alias`, deskripsi `workspace_id`), lalu jalankan ulang langkah 1 dengan `--workspace <alias terpilih>` dan pakai `task` keluarannya. Lalu `create_task` dengan argumen `task.create` apa adanya; task balikannya dipakai di langkah berikut.
    - 1 → pakai task itu (task tiket analyst, yang bisa juga menaungi taskdir backend, atau task taskdir ini).
@@ -41,7 +41,15 @@ Disk (dokumen taskdir) dan git (dokumen tingkat repo) tetap sumber kebenaran; na
 
    `FAIL` → segmen `nataflow GAGAL: <isi problems apa adanya>`; selesai. `PASS` → pegang `documents` dan `same`.
 6. **Dokumen.** Untuk tiap entri `documents`: `upsert_document` dengan entri itu apa adanya ditambah `reference_id` = `id` workdir. Catat `action` balikan (`created`, `updated`, `unchanged`).
-7. **Status task.** `task.status` terisi dan `status` task langkah 3 termasuk dalam `task.status.from` → `update_task_status` dengan `task_id` dan `status` = `task.status.status`. Selain itu lewati.
+7. **Status task.** Status tujuan adalah `task.status`: `in_progress` sejak workdir terbit, `done` saat taskdir tuntas. Task tiket analyst bisa menaungi taskdir backend dan frontend sekaligus, jadi bila `task.siblings` bernilai `true` (task tiket, workdir ini tuntas) status tujuannya diputuskan dari seluruh workdir task itu: `list_workdir` dengan `task_id` = `id` dan `workspace_id` = `workspace_id` task langkah 3, lalu serahkan teks balikannya apa adanya lewat stdin:
+
+   ```
+   <sync_payload.py> --taskdir <taskdir> --workdirs - --json <<'NATAFLOW_EOF'
+   <teks balikan list_workdir apa adanya>
+   NATAFLOW_EOF
+   ```
+
+   `FAIL` → segmen `nataflow GAGAL: <isi problems apa adanya>`; selesai. `PASS` → status tujuan diganti `task_status` keluarannya (`done` hanya bila seluruh workdir task itu sudah `done`/`abandoned`). Status tujuan terisi dan `status` task langkah 3 termasuk dalam `from`-nya → `update_task_status` dengan `task_id` dan `status` = `status`-nya. Selain itu lewati.
 8. **Segmen.** `nataflow workdir <workdir.name> · <documents_total> dokumen (<created> baru, <updated> diperbarui, <same + unchanged> sama)`. Tool galat di langkah mana pun → segmen `nataflow GAGAL: <pesan tool apa adanya>`, dan langkah sesudahnya tidak dijalankan.
 
 ## Langkah — dokumen repo
@@ -56,7 +64,7 @@ Dipakai `review` dan `profile`. Urutannya sama dengan langkah taskdir, dengan pe
 
 ## Larangan
 
-- Dilarang menyusun, menyunting, meringkas, atau menerjemahkan nilai argumen di luar keluaran `sync_payload.py`. Satu-satunya nilai dari balikan tool adalah `task_id`, `workspace_id` task untuk `upsert_workdir`, dan `reference_id`. `metadata` dikirim sebagai teks JSON persis seperti tercetak.
+- Dilarang menyusun, menyunting, meringkas, atau menerjemahkan nilai argumen di luar keluaran `sync_payload.py`. Satu-satunya nilai dari balikan tool adalah `task_id`, `workspace_id` task untuk `upsert_workdir` dan `list_workdir`, dan `reference_id`. Status task tiket tidak diputuskan sendiri dari balikan `list_workdir`: teksnya diserahkan ke `--workdirs` apa adanya. `metadata` dikirim sebagai teks JSON persis seperti tercetak.
 - Dilarang memilih berkas sendiri: dokumen gate `DRAFT`, hop yang DRIFT, `.explore/`, dan akar yang belum terkunci sengaja tidak ada di payload. Berkas taskdir yang dihapus dari disk tidak didorong ulang; baris remote-nya dibiarkan dengan isi terakhir.
 - Dilarang memanggil `upsert_documents` (batch) atau `delete_document`. Berkas yang dihapus dari git sudah diterbitkan skrip dengan metadata `removed: true`.
 - Dilarang memilih workspace sendiri: `workspace_choices` selalu ditanyakan ke user, dan `--workspace` hanya menerima alias yang dipilih user.

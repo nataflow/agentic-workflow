@@ -726,7 +726,7 @@ def cmd_sync_payload(a) -> int:
     if problems:
         return ns.emit_fail(a.json, SYNC, problems)
     task = ns.task_args(config, workspace_id, {"source": "quickdev", "workdir_key": key}, repo, title, body)
-    task["status"] = ns.task_status("done" if done else "in_progress" if execution else "")
+    task["status"] = ns.task_status("done" if done else "in_progress")       # workdir terbit → in_progress (28 T1)
     meta = {"source": "quickdev", "repo": repo, "path": rel, "plan_status": m.get("Status", ""),
             "plan_hash": m.get("Plan-Hash", ""), "base_commit": b.get("Base-Commit", ""), "execution": execution}
     workdir = ns.workdir_args(key, path.stem, status, {k: v for k, v in meta.items() if v})

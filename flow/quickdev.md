@@ -1,6 +1,6 @@
 # Alur Plugin `quickdev`
 
-> `quickdev` (v0.9.0) adalah alur kerja ringan untuk repo backend, frontend, dan fullstack. Plugin ini punya enam skill, tanpa taskdir, tanpa subagent, tanpa hook, dan hanya satu skrip pengunci rencana (ditambah pustaka sinkron nataflow opsional). Setiap tugas punya **satu berkas rencana** (`plan/<task>.md`), sedangkan perubahan kodenya boleh menyentuh banyak berkas dan layer. Pakai plugin ini untuk perubahan kecil sampai menengah yang tidak butuh BRD/PRD, ledger approval, atau review subagent. Plugin ini juga cocok untuk stack yang tidak dilayani `backend`/`frontend` (Next.js, FastAPI, Django, Rails), atau untuk kerja yang sengaja dibuat ringan di repo yang sudah memakai kedua plugin itu. Kerja berisiko (kontrak API, migrasi skema, perubahan lintas modul yang butuh jejak keputusan) sebaiknya naik ke `backend:tech-lead` atau `frontend:lead`.
+> `quickdev` (v0.10.0) adalah alur kerja ringan untuk repo backend, frontend, dan fullstack. Plugin ini punya enam skill, tanpa taskdir, tanpa subagent, tanpa hook, dan hanya satu skrip pengunci rencana (ditambah pustaka sinkron nataflow opsional). Setiap tugas punya **satu berkas rencana** (`plan/<task>.md`), sedangkan perubahan kodenya boleh menyentuh banyak berkas dan layer. Pakai plugin ini untuk perubahan kecil sampai menengah yang tidak butuh BRD/PRD, ledger approval, atau review subagent. Plugin ini juga cocok untuk stack yang tidak dilayani `backend`/`frontend` (Next.js, FastAPI, Django, Rails), atau untuk kerja yang sengaja dibuat ringan di repo yang sudah memakai kedua plugin itu. Kerja berisiko (kontrak API, migrasi skema, perubahan lintas modul yang butuh jejak keputusan) sebaiknya naik ke `backend:tech-lead` atau `frontend:lead`.
 
 ## Peta Komponen
 
@@ -398,7 +398,7 @@ Tidak ada. README menyebutkan "semua kerja berlangsung di percakapan utama", dan
 | Penanda alur | `.claude/workflow` | `profile` Fase 4, atas persetujuan user | `quickdev` → hook backend/frontend diam. `frontend quickdev` → hanya hook frontend menyala |
 | Laporan explore / spesifikasi clarify / laporan review | Terminal | `explore`, `clarify`, `review` | Tidak menjadi berkas |
 | Perubahan kode | Working tree (uncommitted) | `execute` | Commit adalah keputusan user |
-| Cermin nataflow (opsional) | Server MCP nataflow | prosedur sinkron | Workdir `quickdev:<repo>:<path rencana>` + task; dokumen `quickdev.plan` (isi disk) dan `profile` (workspace). Status workdir: `COMPLETED*` → `done`, `BLOCKED` → `blocked`, selain itu `active`; task `in_progress` sejak eksekusi dimulai, `done` saat `COMPLETED*` |
+| Cermin nataflow (opsional) | Server MCP nataflow | prosedur sinkron | Workdir `quickdev:<repo>:<path rencana>` + task; dokumen `quickdev.plan` (isi disk) dan `profile` (workspace). Status workdir: `COMPLETED*` → `done`, `BLOCKED` → `blocked`, selain itu `active`; task `in_progress` sejak rencana terkunci (workdir terbit, 28 T1), `done` saat `COMPLETED*` |
 
 Header keenam section profil per templat:
 

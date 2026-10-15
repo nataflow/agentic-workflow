@@ -1,7 +1,7 @@
 {
   "name": "analyst",
   "description": "Skill dan subagent jembatan antara pengguna/stakeholder dan engineer: klasifikasi permintaan, elisitasi terarah dengan peminta non-engineer (kondisi kode sekarang ditelusuri subagent code-explorer dan diajukan sebagai asumsi yang dikonfirmasi peminta), dan penulisan TICKET.md non-teknis (user story, acceptance criteria, aturan bisnis) setara kartu Jira/Trello — ditambah tiket teknis TECH dari lead engineer (refaktor, relasi data, arsitektur, kinerja, dependensi) berbukti file:baris yang mengunci kondisi target — dengan review independen dan persetujuan user; hingga lima permintaan sekaligus diproses sebagai batch berurutan. Tiket READY diserahkan ke backend:tech-lead / frontend:lead lewat parameter ticket_source. Skill notulen merapikan catatan kasar rapat menjadi NOTULEN.md tanpa mengarang isi (code-scout hanya mempertajam pertanyaan klarifikasi ke pencatat), dengan sinkron opsional ke nataflow",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "author": {
     "name": "Fakhrul Nugroho",
     "email": "fakhrulnugroho15@gmail.com"

@@ -12,7 +12,8 @@ Isinya hanya primitif yang tidak bergantung pada artefak plugin mana pun:
 - workspace tujuan dari `workspaces` config (`choose_workspace`): nol entri → workspace key, satu → otomatis,
   lebih dari satu → user memilih alias saat sinkron;
 - argumen tool MCP: task (`lookup`/`create`/`status`), workdir, dokumen (`upsert_document` tanpa `reference_id`);
-- diff dokumen terhadap manifest remote (balikan `list_document include_content=false`).
+- diff dokumen terhadap manifest remote (balikan `list_document include_content=false`);
+- status penutup task tiket dari seluruh workdir di bawahnya (balikan `list_workdir task_id`, langkah 28).
 
 Sinkron tidak menulis berkas apa pun (D5) dan tidak membuka koneksi jaringan (D4): skrip hanya menyusun argumen
 yang dikirim model apa adanya. Semua `metadata` berupa teks JSON ringkas, karena tool MCP menerimanya sebagai string.
@@ -39,6 +40,7 @@ TYPE_MAX = 50     # `type` dokumen di server
 TYPE_RE = re.compile(r"^[a-z]+(\.[a-z]+)*$")
 MIMETYPE = "text/markdown"
 WORKDIR_STATUSES = ("active", "blocked", "done", "abandoned")
+WORKDIR_FINAL = ("done", "abandoned")    # workdir yang tidak lagi menyisakan kerja di bawah task-nya
 # Status task yang boleh ditimpa per status tujuan (E8): status tidak pernah diturunkan dari `done`/`cancelled`.
 TASK_STATUS_FROM = {"in_progress": ["todo"], "done": ["todo", "in_progress"], "cancelled": ["todo", "in_progress"]}
 
@@ -432,18 +434,84 @@ def split_remote(docs: List[Dict[str, Any]], remote: Dict[str, Dict[str, Any]]) 
     return push, len(docs) - len(push)
 
 
-def read_remote(source: str, stdin_text: str) -> Tuple[Optional[Dict[str, Dict[str, Any]]], List[str]]:
-    """Nilai `--remote`: `-` = stdin, selain itu path berkas berisi teks balikan `list_document`."""
+def read_tool_text(flag: str, source: str, stdin_text: str) -> Tuple[Optional[str], List[str]]:
+    """Nilai `--remote`/`--workdirs`: `-` = stdin, selain itu path berkas berisi teks balikan tool."""
     if source == "-":
-        text = stdin_text
-    else:
-        try:
-            text = Path(source).read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError) as exc:
-            return None, [f"--remote `{source}` tidak terbaca ({exc})"]
+        return stdin_text, []
+    try:
+        return Path(source).read_text(encoding="utf-8"), []
+    except (OSError, UnicodeDecodeError) as exc:
+        return None, [f"{flag} `{source}` tidak terbaca ({exc})"]
+
+
+def read_remote(source: str, stdin_text: str) -> Tuple[Optional[Dict[str, Dict[str, Any]]], List[str]]:
+    """Nilai `--remote`: teks balikan `list_document`."""
+    text, problems = read_tool_text("--remote", source, stdin_text)
+    if problems:
+        return None, problems
     if not text.strip():
         return None, ["--remote kosong — serahkan teks balikan list_document (larik kosong `[]` bila tidak ada)"]
     return parse_remote(text)
+
+
+# ── Workdir saudara (langkah 28) ──────────────────────────────────────────────
+
+def parse_workdirs(text: str) -> Tuple[Optional[Dict[str, str]], List[str]]:
+    """Teks balikan `list_workdir` → `{key: status}`; workdir tanpa `key` (dibuat di luar sinkron) memakai `id`.
+
+    Diterima larik `workdirView` apa adanya, atau objek yang membungkusnya di `workdirs`/`data`. Status kosong atau
+    tidak dikenal dibaca `active`: workdir yang keadaannya tidak jelas tidak pernah ikut menutup task.
+    """
+    try:
+        data = json.loads(text.lstrip(BOM))
+    except ValueError as exc:
+        return None, [f"--workdirs bukan JSON sah ({exc}) — serahkan teks balikan list_workdir apa adanya"]
+    if isinstance(data, dict):
+        for field in ("workdirs", "data"):
+            if isinstance(data.get(field), list):
+                data = data[field]
+                break
+    if not isinstance(data, list):
+        return None, ["--workdirs harus larik workdir balikan list_workdir"]
+    workdirs: Dict[str, str] = {}
+    for item in data:
+        if not isinstance(item, dict):
+            return None, ["--workdirs memuat entri yang bukan objek workdir"]
+        ident = item.get("key") or item.get("id")
+        if not isinstance(ident, str) or not ident:
+            return None, ["--workdirs memuat workdir tanpa `key` maupun `id`"]
+        status = str(item.get("status") or "").strip().lower()
+        workdirs[ident] = status if status in WORKDIR_STATUSES else "active"
+    return workdirs, []
+
+
+def read_workdirs(source: str, stdin_text: str) -> Tuple[Optional[Dict[str, str]], List[str]]:
+    """Nilai `--workdirs`: teks balikan `list_workdir task_id`."""
+    text, problems = read_tool_text("--workdirs", source, stdin_text)
+    if problems:
+        return None, problems
+    if not text.strip():
+        return None, ["--workdirs kosong — serahkan teks balikan list_workdir apa adanya"]
+    return parse_workdirs(text)
+
+
+def sibling_task_status(workdirs: Dict[str, str], own_key: str, own_status: str,
+                        base: Optional[Dict[str, Any]]) -> Tuple[Optional[Dict[str, Any]], List[str]]:
+    """Status task tiket sesudah workdir ini tuntas (28 T2) → `(status, masalah)`.
+
+    Satu task tiket bisa menaungi taskdir backend dan frontend (15 E8), jadi task itu baru `done` bila seluruh workdir
+    di bawahnya sudah `done`/`abandoned` dan sedikitnya satu `done`; selain itu `base` (status fase pertama). Workdir
+    ini wajib ada di balikan sebagai bukti daftarnya milik task induk yang benar; statusnya diambil dari disk, karena
+    baru saja ditulis `upsert_workdir`.
+    """
+    if own_key not in workdirs:
+        return None, [f"workdir `{own_key}` tidak ada di balikan list_workdir — panggil list_workdir dengan "
+                      f"task_id task induk workdir ini"]
+    statuses = dict(workdirs)
+    statuses[own_key] = own_status
+    if all(s in WORKDIR_FINAL for s in statuses.values()) and "done" in statuses.values():
+        return task_status("done"), []
+    return base, []
 
 
 # ── Keluaran ──────────────────────────────────────────────────────────────────

@@ -10,7 +10,8 @@ prosedur `tech-lead/references/nataflow-sync.md` (D4); skrip ini satu-satunya pe
   `approved_seal` utuh; brief yang sudah dikunci (`sidik_kontrak`), semua status; `RCA.md`, `report-NN.md`,
   `HALT.md`, `REVIEW.md`, `REPORT.md` apa adanya; `.explore/` tidak pernah. Metadata `commit` kosong, `head` = sha
   `HEAD` saat sinkron. Status workdir: `REPORT.md` → `done`, `HALT.md` yang belum dicabut atau brief `BLOCKED` →
-  `blocked`, selain itu `active`.
+  `blocked`, selain itu `active`. Task naik ke `in_progress` sejak workdir terbit (28 T1); task milik taskdir ini
+  `done` saat `REPORT.md` ada, task tiket hanya lewat `--workdirs` (28 T2).
 - `--repo-docs audit|api|profile`: laporan `backenddev/issues/`, `docs/api/`, atau profil sebagai dokumen
   `audit`/`api.doc`/`profile` di bawah workspace, dengan key `<repo>/<path>` (T10).
 
@@ -24,6 +25,10 @@ teks balikan `list_document include_content=false` di stdin, ditambah key remote
 dokumen taskdir yang berkasnya masih di disk didorong dengan status terbarunya, yang sudah tidak ada dibiarkan
 dengan isi terakhirnya di server (24 G5); dokumen repo yang masih di `HEAD` didorong dengan status terbaru, yang
 sudah dihapus dari git → versi terakhirnya dengan `removed: true`.
+
+`--workdirs -`: teks balikan `list_workdir task_id` di stdin, hanya bila payload fase pertama membawa
+`task.siblings` (task tiket, `REPORT.md` ada) → `task_status` pengganti `task.status`: `done` bila seluruh workdir di
+bawah task itu sudah `done`/`abandoned`, selain itu tetap `task.status` (28 T2).
 
 Keluaran `--json` selalu JSON: `SKIP` (config absen), `FAIL` (`problems`), atau `PASS`.
 
@@ -60,7 +65,6 @@ FIXED_TYPES = {"TASK.md": "task", "BRD.md": "brd", "PRD.md": "prd", "RCA.md": "r
 BRIEF_NAME = re.compile(r"^brief-\d{2}-[^/]+\.md$")
 UNIT_REPORT = re.compile(r"^report-\d{2}\.md$")
 APPROVAL_DOCS = ("brd", "prd")                         # hanya APPROVED yang didorong (D2)
-STARTED = ("DONE", "BLOCKED", "SUPERSEDED")            # brief yang sudah disentuh eksekusi
 REPO_DOCS = {"audit": ("backenddev/issues", "audit"), "api": ("docs/api", "api.doc"),
              "profile": (PROFILE_DIR_REL, "profile")}
 TASK_SECTIONS = ("Description", "Success Criteria", "Out of Scope")
@@ -196,6 +200,23 @@ def diff_phase(args, config: Dict[str, Any], docs: List[Dict[str, Any]], extras_
     return 0
 
 
+def siblings_phase(args, config: Dict[str, Any], key: str, status: str, task: Dict[str, Any]) -> int:
+    """`--workdirs`: status task tiket dari seluruh workdir di bawahnya (28 T2). Tanpa `task.siblings` → `task.status`."""
+    workdirs, problems = ns.read_workdirs(args.workdirs, sys.stdin.read() if args.workdirs == "-" else "")
+    if problems:
+        return ns.emit_fail(args.json, PREFIX, problems)
+    target, problems = (ns.sibling_task_status(workdirs, key, status, task["status"]) if task.get("siblings")
+                        else (task["status"], []))
+    if problems:
+        return ns.emit_fail(args.json, PREFIX, problems)
+    open_ = sum(1 for k, s in workdirs.items() if (status if k == key else s) not in ns.WORKDIR_FINAL)
+    payload = {"status": "PASS", "enabled": True, "mcp_server": config["mcp_server"], "task_status": target,
+               "workdirs_total": len(workdirs), "workdirs_open": open_}
+    ns.emit(payload, args.json, f"{PREFIX} PASS: {len(workdirs)} workdir di bawah task, {open_} belum tuntas → task "
+                                f"{target['status'] if target else 'tidak diubah'} — argumen lewat `--json`")
+    return 0
+
+
 def ticket_key(task_text: str) -> Tuple[Optional[str], str]:
     """`ticket_source` frontmatter → `ticket_key` analyst (dirname path `TICKET.md`), `None` tanpa tiket."""
     raw = ns.frontmatter_value(task_text, "ticket_source")
@@ -229,8 +250,6 @@ def run_taskdir(args, root: Path, config: Dict[str, Any]) -> int:
     done = "REPORT.md" in kinds
     halted = "HALT.md" in kinds and ns.frontmatter_value(texts["HALT.md"], "status").upper() != HALT_REVOKED
     blocked = halted or "BLOCKED" in briefs
-    started = done or any(s in STARTED for s in briefs) or any(
-        t in ("unit.report", "halt", "review") for t in kinds.values())
     status = "done" if done else "blocked" if blocked else "active"
     problems = ns.workdir_problems(key, name, status)
     if problems:
@@ -239,8 +258,13 @@ def run_taskdir(args, root: Path, config: Dict[str, Any]) -> int:
     title = ns.h1_title(task_text) or name
     task = ns.task_args(config, args.workspace_id, ident, repo, title,
                         ns.pick_sections(task_text, TASK_SECTIONS) or title)
-    # Task tiket bisa menaungi taskdir frontend juga: plugin ini hanya menaikkannya ke `in_progress` (E8).
-    task["status"] = ns.task_status("done" if done and not tkey else "in_progress" if started else "")
+    # Workdir terbit → `in_progress` (28 T1). Task tiket bisa menaungi taskdir frontend juga (15 E8): ia baru `done`
+    # bila seluruh workdir di bawahnya tuntas, diputuskan `--workdirs` atas balikan `list_workdir` (28 T2).
+    task["status"] = ns.task_status("done" if done and not tkey else "in_progress")
+    if tkey and done:
+        task["siblings"] = True
+    if args.workdirs is not None:
+        return siblings_phase(args, config, key, status, task)
     meta = {"source": SOURCE, "repo": repo, "path": td, "lane": ns.frontmatter_value(task_text, "lane"),
             "chain": ns.frontmatter_value(task_text, "chain"), "risk": ns.frontmatter_value(task_text, "risk"),
             "ticket_key": tkey or ""}
@@ -261,6 +285,8 @@ def workspace_label(args) -> str:
 
 
 def run_repo_docs(args, root: Path, config: Dict[str, Any]) -> int:
+    if args.workdirs is not None:
+        return ns.emit_fail(args.json, PREFIX, ["--workdirs hanya untuk --taskdir"])
     repo = ns.repo_identity(root, config)
     rel_dir, docs, problems = select_repo_docs(root, args.repo_docs, repo)
     if problems:
@@ -287,7 +313,10 @@ def main() -> int:
                         help="dokumen tingkat repo: audit, api, atau profile")
     ap.add_argument("--workspace", default="", help="alias `workspaces` tujuan task baru atau induk dokumen repo; "
                                                     "wajib dipilih user bila config berisi lebih dari satu workspace")
-    ap.add_argument("--remote", default=None, help="teks balikan list_document include_content=false (`-` = stdin)")
+    phase = ap.add_mutually_exclusive_group()
+    phase.add_argument("--remote", default=None, help="teks balikan list_document include_content=false (`-` = stdin)")
+    phase.add_argument("--workdirs", default=None, help="teks balikan list_workdir task_id (`-` = stdin), bila payload "
+                                                        "membawa task.siblings")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
     root = find_repo_root()

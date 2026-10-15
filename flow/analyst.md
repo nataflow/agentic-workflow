@@ -1,6 +1,6 @@
 # Alur Plugin `analyst`
 
-> Plugin `analyst` (v0.15.0) adalah jembatan antara pengguna/stakeholder dan engineer. Ia menerima permintaan,
+> Plugin `analyst` (v0.18.0) adalah jembatan antara pengguna/stakeholder dan engineer. Ia menerima permintaan,
 > keluhan, atau laporan bug dari sisi pengguna, menggali faktanya lewat tanya-jawab dengan peminta
 > non-engineer, lalu menerbitkan `TICKET.md`: kartu tiket non-teknis setara kartu Jira/Trello, berisi user
 > story, acceptance criteria, dan aturan bisnis. Tiket melewati review independen dan persetujuan user sebelum
@@ -550,7 +550,9 @@ frontmatter dan tanpa `## Catatan Asli`; judulnya `<H1> — <tanggal rapat>`, di
   kartu, metadata `ticket_key`/`repo`) dan `review.md`, dan tidak pernah dibaca balik oleh analyst maupun
   engineer. Artefak engineer kini menempel ke task yang sama lewat workdir: taskdir `backend`/`frontend` dengan
   `ticket_source` menurunkan `ticket_key` persis sama. Satu-satunya status yang dikirim analyst adalah
-  `cancelled` untuk tiket pernah-`READY` yang dibatalkan; plugin engineer hanya menaikkannya ke `in_progress`.
+  `cancelled` untuk tiket pernah-`READY` yang dibatalkan. Plugin engineer menaikkan task itu ke `in_progress`
+  begitu workdir pertama terbit, dan menutupnya `done` baru bila seluruh workdir di bawahnya (backend maupun
+  frontend, dibaca lewat `list_workdir`) sudah `done`/`abandoned` (28 T2).
 - **Batas dengan plugin lain**: kontrak teknis dan brief milik `backend`, alur/bentuk layar milik
   `frontend`, perubahan kecil tanpa taskdir milik `quickdev`. Dua skill sengaja belum dibuat: `split`
   (pemecahan epic; untuk sementara intake memakai antrian tiket) dan `acceptance` (UAT atas `REPORT.md`

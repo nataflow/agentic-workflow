@@ -324,6 +324,8 @@ sinkron tidak meng-commit tiketnya (lihat Git), sehingga task inilah satu-satuny
   dibatalkan membuat task cerminnya `cancelled`; itu satu-satunya status task yang dikirim analyst.
 - **Induk kerja engineer**: taskdir `backend`/`frontend` yang berangkat dari `ticket_source` tiket ini menempel
   ke task yang sama sebagai workdir, beserta artefaknya (`TASK.md`, PRD, brief, `REVIEW.md`, `REPORT.md`).
+  Plugin engineer menaikkan task ke `in_progress` begitu workdir pertama terbit, dan menutupnya `done` baru bila
+  seluruh workdir di bawahnya sudah `done`/`abandoned` (Langkah 28).
 - **Gagal tidak memblokir**: baris penutup `SPEC — READY` memuat segmen `nataflow <dibuat #<code> | diperbarui
   #<code> | dilewati | GAGAL: <sebab>>`. `GAGAL` tidak menurunkan `READY`; ulangi lewat `/analyst:intake`
   ("sinkron ulang tiket `<ticketdir>`").
@@ -357,6 +359,5 @@ sinkron tidak meng-commit tiketnya (lihat Git), sehingga task inilah satu-satuny
   notulen dari transkrip atau rekaman rapat; reviewer independen untuk notulen.
 - **`code-explorer` di `intake` dan `spec`** — penentuan tipe atau wilayah backend/frontend di `intake` dan
   pemeriksaan kartu di `spec`. `intake` tetap tanpa kode (Langkah 27 K10).
-- **Sinkron nataflow lanjutan** — status task selesai saat seluruh engineer tuntas (plugin engineer hanya
-  menaikkannya ke `in_progress`, karena satu tiket bisa menaungi taskdir backend dan frontend), penghapusan task
-  saat tiket dibatalkan, dan catatan elisitasi sebagai dokumen (sengaja tidak dikirim).
+- **Sinkron nataflow lanjutan** — penghapusan task saat tiket dibatalkan, dan catatan elisitasi sebagai dokumen
+  (sengaja tidak dikirim).

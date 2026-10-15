@@ -81,7 +81,7 @@ def test_fase_satu_tanpa_isi(repo):
     assert create["title"] == "Implementation Plan — t"
     assert create["description"].startswith("## 1. Overview & Objectives\nTambah validasi kuota.")
     assert "## 3." not in create["description"]
-    assert out["task"]["status"] is None, "belum dieksekusi → status task tidak disentuh"
+    assert out["task"]["status"] == {"status": "in_progress", "from": ["todo"]}, "rencana terkunci = workdir terbit → in_progress (28 T1)"
     wd = out["workdir"]
     assert (wd["key"], wd["name"], wd["status"]) == (key, "t", "active") and "workspace_id" not in wd
     assert out["workspace_id"] == WS and out["task"]["create"]["workspace_id"] == WS
