@@ -39,6 +39,7 @@ CASES = [
      None),
 
     ("nataflow/skills/create-artifact/scripts/artifact.py", ["config", "--json"], True, None),
+    ("nataflow/skills/create-artifact/scripts/artifact.py", ["list", "--json"], True, None),
 
     ("product/skills/_common/charter.py", ["state", "--all", "--json"], True, None),
     ("product/skills/_common/charter.py", ["guard", "--mode", "NEW_PRODUCT", "--json"], True, None),

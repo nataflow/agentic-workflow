@@ -11,6 +11,7 @@ import pytest
 from conftest import PLUGINS, REPO, commit, git, load_module, write_files
 
 COPIES = {p: PLUGINS / p / "skills/_common/nataflow_sync.py" for p in ("analyst", "backend", "frontend", "quickdev")}
+COPIES["nataflow"] = PLUGINS / "nataflow/skills/create-artifact/scripts/nataflow_sync.py"
 WS = "11111111-2222-3333-4444-555555555555"
 URL = "https://nataflow.test/mcp"
 
@@ -21,7 +22,7 @@ def ns():
 
 
 @pytest.mark.regression("15 B1")
-def test_salinan_identik_di_keempat_plugin():
+def test_salinan_identik_di_kelima_lokasi():
     blobs = {p: path.read_bytes() for p, path in COPIES.items()}
     assert len(set(blobs.values())) == 1, "salinan nataflow_sync.py berbeda antarplugin"
 

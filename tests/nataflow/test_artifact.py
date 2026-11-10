@@ -1,10 +1,11 @@
-"""Gerbang artifact nataflow: `artifact.py config` dan `check`, plus teks SKILL create-artifact."""
+"""Gerbang artifact nataflow: `artifact.py` config/check/list/pull/publish, plus teks SKILL create-artifact."""
 import hashlib
 import json
 
 import pytest
 
 from conftest import PLUGINS, run_script
+from nataflow_fake import KEY, FakeMCP, Nataflow, enable_sync
 
 SKILL_DIR = PLUGINS / "nataflow" / "skills" / "create-artifact"
 SCRIPT = SKILL_DIR / "scripts" / "artifact.py"
@@ -163,37 +164,123 @@ def test_check_missing_file(tmp_path):
     assert proc.returncode == 1 and "tidak bisa dibaca" in out["problems"][0]
 
 
-def test_config_default(make_repo):
-    root = make_repo()
-    proc = run_script(SCRIPT, "config", "--json", cwd=root)
-    out = json.loads(proc.stdout)
-    assert proc.returncode == 0
-    assert out["mcp_server"] == "nataflow-api" and out["config_source"] == "default"
-    assert out["draft_dir"].endswith("nataflow-artifacts")
+@pytest.fixture
+def fake():
+    with FakeMCP() as f:
+        yield f, Nataflow(f)
 
 
-def test_config_reads_repo_root_from_subdir(make_repo):
-    root = make_repo({".claude/nataflow.json": json.dumps({"mcp_server": "nataflow-staging",
-                                                           "workspaces": {}}),
-                      "pkg/a.txt": "x"})
-    proc = run_script(SCRIPT, "config", "--json", cwd=root / "pkg")
-    out = json.loads(proc.stdout)
-    assert proc.returncode == 0 and out["mcp_server"] == "nataflow-staging"
+def art(root, *args):
+    proc = run_script(SCRIPT, *args, "--json", cwd=root)
+    assert "Traceback" not in proc.stderr, proc.stderr
+    return proc.returncode, json.loads(proc.stdout)
 
 
-@pytest.mark.parametrize("content", ["{rusak", "[]", json.dumps({"mcp_server": "ada spasi"}),
-                                     json.dumps({"mcp_server": 3})], ids=["json", "array", "spasi", "angka"])
-def test_config_broken_fails(make_repo, content):
+@pytest.mark.regression("29 S6")
+def test_config_url_key_dan_project(make_repo, fake):
+    f, nf = fake
+    root = make_repo({"pkg/a.txt": "x"})
+    enable_sync(root, f.url)
+    code, out = art(root / "pkg", "config")
+    assert code == 0 and out["status"] == "PASS" and out["url"] == f.url
+    assert out["project_id"] == nf.project["id"] and out["draft_dir"].endswith("nataflow-artifacts")
+    assert KEY not in json.dumps(out)
+
+
+def test_config_absen_wajib_setup(make_repo):
+    code, out = art(make_repo(), "config")
+    assert code == 1 and "nataflow.json tidak ada" in out["problems"][0] and "nataflow.local.json" in out["problems"][0]
+
+
+@pytest.mark.parametrize("content,needle", [
+    ("{rusak", "bukan JSON sah"), ("[]", "harus objek JSON"),
+    (json.dumps({"mcp_server": "nataflow-api"}), "`mcp_server` sudah diganti `url`"),
+    (json.dumps({"url": 3}), "harus string")], ids=["json", "array", "mcp_server", "angka"])
+def test_config_rusak_gagal(make_repo, content, needle):
     root = make_repo({".claude/nataflow.json": content})
-    proc = run_script(SCRIPT, "config", "--json", cwd=root)
-    out = json.loads(proc.stdout)
-    assert proc.returncode == 1 and out["status"] == "FAIL" and out["problems"]
+    code, out = art(root, "config")
+    assert code == 1 and out["status"] == "FAIL" and needle in out["problems"][0]
 
 
-def test_config_outside_git(make_repo):
+def test_config_luar_git_tanpa_cek_ignore(make_repo, fake):
+    f, _ = fake
     root = make_repo(git_init=False)
-    proc = run_script(SCRIPT, "config", "--json", cwd=root)
-    assert proc.returncode == 0 and json.loads(proc.stdout)["mcp_server"] == "nataflow-api"
+    enable_sync(root, f.url, ignore=False)
+    assert art(root, "config")[0] == 0
+
+
+def test_config_key_tidak_diabaikan_gagal_tanpa_panggilan(make_repo, fake):
+    f, _ = fake
+    root = make_repo()
+    enable_sync(root, f.url, ignore=False)
+    code, out = art(root, "config")
+    assert code == 1 and "tidak diabaikan git" in out["problems"][0] and f.requests == []
+
+
+def test_publish_baru_lalu_tabrakan_lalu_timpa(tmp_path, make_repo, fake):
+    f, nf = fake
+    root = make_repo()
+    enable_sync(root, f.url)
+    draft = tmp_path / "d.html"
+    draft.write_text(GOOD, encoding="utf-8")
+    code, out = art(root, "publish", "--file", str(draft))
+    assert code == 0 and out["status"] == "CREATED" and out["key"] == "ringkasan-sprint-12", out
+    doc = nf.docs[0]
+    assert (doc["type"], doc["mimetype"], doc["content"]) == ("artifact", "text/html", GOOD)
+    assert "<main>" not in json.dumps(out), "isi HTML tidak dicetak"
+    code, out = art(root, "publish", "--file", str(draft))
+    assert out["status"] == "TABRAKAN" and out["existing_title"] == "Ringkasan Sprint 12"
+    assert f.writes() == ["upsert_artifact"], "tabrakan tidak menulis"
+    code, out = art(root, "publish", "--file", str(draft), "--overwrite")
+    assert out["status"] == "UNCHANGED"
+    draft.write_text(GOOD.replace("<h1>Ringkasan</h1>", "<h1>Ringkasan baru</h1>"), encoding="utf-8")
+    assert art(root, "publish", "--file", str(draft), "--overwrite")[1]["status"] == "UPDATED"
+
+
+def test_publish_tidak_menimpa_dokumen_non_artifact(tmp_path, make_repo, fake):
+    f, nf = fake
+    root = make_repo()
+    enable_sync(root, f.url)
+    nf.add_doc("project", nf.project["id"], "ringkasan-sprint-12", "notes.meeting", "x", {})
+    draft = tmp_path / "d.html"
+    draft.write_text(GOOD, encoding="utf-8")
+    code, out = art(root, "publish", "--file", str(draft), "--overwrite")
+    assert code == 0 and out["status"] == "TABRAKAN_DOKUMEN" and out["existing_type"] == "notes.meeting"
+    assert f.writes() == []
+
+
+def test_publish_draft_gagal_check_tanpa_jaringan(tmp_path, make_repo, fake):
+    f, _ = fake
+    root = make_repo()
+    enable_sync(root, f.url)
+    draft = tmp_path / "d.html"
+    draft.write_text(GOOD.replace('<meta charset="utf-8">', ""), encoding="utf-8")
+    code, out = art(root, "publish", "--file", str(draft))
+    assert code == 1 and out["problems"] and f.requests == []
+
+
+def test_list_dan_pull(tmp_path, make_repo, fake):
+    f, nf = fake
+    root = make_repo()
+    enable_sync(root, f.url)
+    nf.add_doc("project", nf.project["id"], "dash", "artifact", GOOD, {"title": "Dasbor"}, mimetype="text/html")
+    code, out = art(root, "list")
+    assert code == 0 and out["artifacts"] == [{"key": "dash", "title": "Dasbor"}]
+    draft = tmp_path / "x" / "dash.html"
+    code, out = art(root, "pull", "--key", "dash", "--file", str(draft))
+    assert code == 0 and out["status"] == "PASS" and draft.read_text(encoding="utf-8") == GOOD
+    assert out["content_sha256"] == hashlib.sha256(GOOD.encode()).hexdigest() and "<main>" not in json.dumps(out)
+    code, out = art(root, "pull", "--key", "tidak-ada", "--file", str(draft))
+    assert code == 0 and out["status"] == "NOT_FOUND"
+
+
+def test_key_banyak_project_gagal(make_repo, fake):
+    f, nf = fake
+    root = make_repo()
+    enable_sync(root, f.url)
+    f.tools["get_project_info"] = lambda a: [nf.project, dict(nf.project, id="lain")]
+    code, out = art(root, "config")
+    assert code == 1 and "key menjangkau 2 project" in out["problems"][0]
 
 
 # ── teks SKILL ────────────────────────────────────────────────────────────────

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Pustaka sinkron nataflow bersama (langkah 15) — salinan identik di keempat plugin.
+"""Pustaka sinkron nataflow bersama (langkah 15, 29) — salinan identik di lima lokasi.
 
-`skills/_common/nataflow_sync.py` ada di `analyst`, `backend`, `frontend`, dan `quickdev` dengan isi byte-identik:
-plugin dipasang terpisah sehingga tidak bisa saling mengimpor. Ubah keempatnya bersamaan.
+`skills/_common/nataflow_sync.py` ada di `analyst`, `backend`, `frontend`, dan `quickdev`, ditambah
+`nataflow/skills/create-artifact/scripts/` (config dan MCP key yang sama), dengan isi byte-identik: plugin dipasang
+terpisah sehingga tidak bisa saling mengimpor. Ubah kelimanya bersamaan.
 
 Isinya hanya primitif yang tidak bergantung pada artefak plugin mana pun:
 
