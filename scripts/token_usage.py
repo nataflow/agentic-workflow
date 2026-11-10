@@ -24,6 +24,7 @@ Zero external dependencies (Python Standard Library only).
 
 import argparse
 import json
+import os
 import re
 import statistics
 import sys
@@ -42,8 +43,11 @@ PRA_SKILL = "(pra-skill)"
 # ============================================================ util
 
 def slug_of(path: str) -> str:
-    """Nama direktori proyek Claude Code untuk sebuah path: tiap karakter non-alfanumerik jadi `-`."""
-    return re.sub(r"[^A-Za-z0-9]", "-", str(Path(path).expanduser().resolve()))
+    """Nama direktori proyek Claude Code untuk sebuah path: tiap karakter non-alfanumerik jadi `-`.
+
+    Path dijadikan absolut tanpa resolve symlink, karena Claude Code menamai direktori dari cwd apa adanya
+    (di macOS `resolve()` mengubah `/home` jadi `/System/Volumes/Data/home`)."""
+    return re.sub(r"[^A-Za-z0-9]", "-", os.path.abspath(os.path.expanduser(path)))
 
 
 def parse_bobot(spec: Optional[str]) -> Dict[str, float]:
