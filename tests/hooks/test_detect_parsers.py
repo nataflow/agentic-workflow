@@ -50,15 +50,12 @@ rocket = "0.5"
 """
 
 
-def test_cargo_deps_tomllib_and_fallback(tmp_path, monkeypatch):
+def test_cargo_deps(tmp_path):
     cargo = tmp_path / "Cargo.toml"
     cargo.write_text(CARGO)
-    with_toml = detect.cargo_deps(cargo)
-    monkeypatch.setattr(detect, "tomllib", None)
-    fallback = detect.cargo_deps(cargo)
-    assert with_toml == fallback
-    assert {"serde", "axum", "warp"} <= with_toml
-    assert "rocket" not in with_toml
+    deps = detect.cargo_deps(cargo)
+    assert {"serde", "axum", "warp"} <= deps
+    assert "rocket" not in deps
 
 
 def test_pom_comment_ignored(tmp_path):
@@ -103,7 +100,6 @@ def test_go_work_use_block(tmp_path):
     assert "./cmd/api" in globs and "./lib" in globs
 
 
-@pytest.mark.skipif(detect.tomllib is None, reason="members workspace Cargo hanya dibaca lewat tomllib (Python >= 3.11)")
 def test_cargo_workspace_members(tmp_path):
     write_files(tmp_path, {
         "Cargo.toml": '[workspace]\nmembers = ["crates/*"]\n',

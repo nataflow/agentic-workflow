@@ -7,7 +7,7 @@ gerbang milik tiap plugin ada di `hooks/gate_text.py` masing-masing. Skrip
 prasyarat mengimpor fungsi deteksi dari sini lewat
 `skills/_common/precondition_lib.py`, sehingga vonis hook = vonis skrip.
 
-Standard library saja. `tomllib` dipakai bila ada (Python >= 3.11).
+Standard library saja (Python >= 3.12).
 """
 from __future__ import annotations
 
@@ -16,15 +16,11 @@ import json
 import re
 import subprocess
 import sys
+import tomllib
 import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import List, Optional, Set, Tuple
-
-try:
-    import tomllib  # Python >= 3.11
-except ImportError:  # pragma: no cover
-    tomllib = None
 
 # Slug artefak di repo pengguna (`.claude/profile/<slug>/`, `<slug>/docs/`, `index.json` `plugin`),
 # sengaja tetap nama lama walau plugin kini bernama `backend`/`frontend`.
@@ -167,8 +163,6 @@ def cargo_deps(cargo: Path) -> Set[str]:
         text = cargo.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return set()
-    if tomllib is None:
-        return _cargo_deps_fallback(text)
     try:
         data = tomllib.loads(text)
     except tomllib.TOMLDecodeError:
@@ -180,24 +174,6 @@ def cargo_deps(cargo: Path) -> Set[str]:
         if isinstance(table, dict):
             for key, val in table.items():
                 names.add(val.get("package", key) if isinstance(val, dict) else key)
-    return names
-
-
-def _cargo_deps_fallback(text: str) -> Set[str]:  # Python < 3.11
-    names: Set[str] = set()
-    in_deps = False
-    for line in text.splitlines():
-        s = line.strip()
-        if s.startswith("["):
-            hdr = s.strip("[]").split("#", 1)[0].strip()
-            in_deps = hdr in ("dependencies", "workspace.dependencies") or (
-                hdr.startswith("target.") and hdr.endswith(".dependencies"))
-            if hdr.startswith("dependencies."):
-                names.add(hdr.split(".", 1)[1].strip('"'))
-            continue
-        m = re.match(r"([A-Za-z0-9_-]+)\s*=", s)
-        if in_deps and m:
-            names.add(m.group(1))
     return names
 
 
@@ -289,7 +265,7 @@ def _workspace_globs(root: Path) -> List[str]:
             globs += [ln.split("//", 1)[0].strip() for ln in blk.splitlines() if ln.strip()]
         globs += re.findall(r"^use\s+([^\s(]+)", text, flags=re.M)
     cargo = root / "Cargo.toml"
-    if tomllib is not None and cargo.is_file():
+    if cargo.is_file():
         try:
             members = tomllib.loads(cargo.read_text(encoding="utf-8")).get("workspace", {}).get("members", [])
             globs += [m for m in members if isinstance(m, str)]
