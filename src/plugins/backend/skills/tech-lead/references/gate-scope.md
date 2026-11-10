@@ -72,7 +72,7 @@ Dokumen taskdir (`backenddev/docs/<taskdir>/`) diabaikan git dan tidak pernah di
 
 *Aturan commit penulis kode*: `code-implementor` meng-commit kodenya sendiri dan `code-reviewer` meng-commit baris indeks issues-nya begitu pekerjaannya tuntas. `architect` memverifikasi commit unit itu mendarat, membawa kode, dan diff-nya tidak melewati `## File scope`.
 
-*Di luar matriks*: temuan `code-explorer` dikembalikan ke context pendispatch **dan** ditulis ke laci kerja `.explore/` — `backenddev/docs/.explore/<slug>.md` untuk dispatch gerbang, `<taskdir>/.explore/<slug>.md` untuk skill hilir. Laporan gerbang disalin ke laci taskdir sebagai `gate-<slug>.md` di Fase 3 (`gate-lifecycle.md` bagian 1). Isinya catatan penelusuran, bukan keputusan, dan seperti seluruh `backenddev/docs/` tidak pernah di-stage maupun dicerminkan.
+*Di luar matriks*: temuan `code-explorer` ditulis utuh ke laci kerja `.explore/` — `backenddev/docs/.explore/<slug>.md` untuk dispatch gerbang, `<taskdir>/.explore/<slug>.md` untuk skill hilir — dan hanya amplop ringkasnya yang kembali ke context pendispatch (Langkah 31). Laporan gerbang disalin ke laci taskdir sebagai `gate-<slug>.md` di Fase 3 (`gate-lifecycle.md` bagian 1). Isinya catatan penelusuran, bukan keputusan, dan seperti seluruh `backenddev/docs/` tidak pernah di-stage maupun dicerminkan.
 
 *Larangan*: `audit` dan `debug` dilarang menjalankan git commit — serahkan artefak ke gerbang untuk dikunci. `code-explorer` tidak memegang `Bash`, sehingga tidak dapat menjalankan git. `Write`-nya dibatasi pada satu path laporan `.explore/` yang ditentukan pendispatch: prompt (`agents/code-explorer.md`) mengunci path persisnya, dan hook PreToolUse `hooks/guard_bash.py` menolak mekanis tiap `Write`/`Edit` explorer di luar `backenddev/docs/[<taskdir>/].explore/*.md`. Seluruh pemilik commit dilarang staging wildcard (`git add .` / `-A`), `git add -f` atas path di bawah `backenddev/docs/`, `git push`, `git merge`, `git rebase`, maupun perpindahan branch.
 
@@ -125,7 +125,7 @@ Framing untuk `business-analysis`, `system-analysis`, `task`, dan `plan` tidak d
 
 ### E. Subagent Dispatch → `dispatcher/explorer.md` (`code-explorer`)
 
-> Telusuri alur pemanggilan method `calculateDiscount` pada `src/main/java/.../pricing/`. **Agent**: `code-explorer` via template `dispatcher/explorer.md`. **Objective**: Temukan entry point controller dan service pemanggil utama. **Acceptance Criteria**: Laporan empat seksi sesuai blok `Format laporan` template gerbang, ditulis ke `backenddev/docs/.explore/<slug>.md` sekaligus dikembalikan ke context, mencantumkan pointer `file:line` terverifikasi. **Stop Condition**: Berhenti begitu entry point teridentifikasi. Dilarang melakukan audit inline.
+> Telusuri alur pemanggilan method `calculateDiscount` pada `src/main/java/.../pricing/`. **Agent**: `code-explorer` via template `dispatcher/explorer.md`. **Objective**: Temukan entry point controller dan service pemanggil utama. **Acceptance Criteria**: Laporan empat seksi sesuai blok `Format laporan` template gerbang, ditulis utuh ke `backenddev/docs/.explore/<slug>.md` dengan amplop ringkas sebagai balikan, mencantumkan pointer `file:line` terverifikasi. **Stop Condition**: Berhenti begitu entry point teridentifikasi. Dilarang melakukan audit inline.
 
 **Pemicu Dispatch Wajib (`tech-lead` Fase 1 butir 2).** Empat kondisi mekanis; satu terpenuhi sudah cukup, dan sapuan main loop tidak boleh dicoba lebih dulu:
 
@@ -138,7 +138,7 @@ Framing untuk `business-analysis`, `system-analysis`, `task`, dan `plan` tidak d
 
 **Yang tidak dihitung kuota**: pembacaan `.claude/profile/backenddev/` (Fase 0), `ls backenddev/docs/` (Fase 3), serta perintah `git status`/`git branch` pada gerbang git.
 
-**Sesudah laporan diterima**: gunakan pointer `file:line` di laporan sebagai bukti Keputusan 1. Dilarang membaca ulang berkas yang sudah diringkas explorer hanya untuk memastikan.
+**Sesudah amplop diterima**: gunakan pointer `file:line` di seksi `### Key Pointers & Evidence` berkas laporan sebagai bukti Keputusan 1. Dilarang membaca ulang berkas yang sudah diringkas explorer hanya untuk memastikan.
 
 ______________________________________________________________________
 

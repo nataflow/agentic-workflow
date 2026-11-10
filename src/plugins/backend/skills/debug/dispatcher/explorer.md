@@ -68,7 +68,7 @@ menyebutnya menyisakan kandidat yang tak pernah masuk daftar>
 - **Not Found**: <jalur yang sudah disisir dan terbukti tidak menyentuh permukaan ini, beserta direktori yang disisir>
 ```
 
-Tulis laporan ke `Berkas laporan` lebih dulu, lalu kembalikan badan laporan yang sama ke context.
+Tulis laporan utuh ke `Berkas laporan` lebih dulu, lalu balas hanya dengan amplop ringkas (definisi agent-mu, bagian Pelaporan) — bukan badan laporan.
 ````
 
 ### Slot Hidrasi
@@ -96,7 +96,9 @@ Tulis laporan ke `Berkas laporan` lebih dulu, lalu kembalikan badan laporan yang
 
 ### Penanganan Balikan
 
-`debug` memetakan balikan sendiri; tidak ada amplop pembungkus pada jalur ini.
+`debug` memetakan balikan sendiri; tidak ada Universal Dispatch Envelope pada jalur ini.
+
+**Amplop, lalu seksi dari berkas (Langkah 31).** Balikan berisi amplop ringkas, bukan badan laporan. Vonis `confidence` dan angka cakupan dibaca dari amplop; isi dibaca dari berkas di baris `Berkas:` saat langkah pemakainya berjalan — per seksi (rentang baris atau heading), bukan berkas utuh bila hanya satu seksi dipakai: `### Candidate Locations` (kandidat Fase 2 butir 5), `### Flow & Trace`, `### Rules, Invariants & Config`, dan `### Risks, Gaps & Not Found`. Tiap baris tabel di bawah yang menyebut sebuah seksi berlaku atas seksi berkas itu. Dilarang menulis artefak dari `### Summary` amplop saja bila langkahnya menuntut seksi lain.
 
 | Balikan subagent | Penanganan `debug` |
 | --- | --- |
@@ -111,4 +113,4 @@ Tulis laporan ke `Berkas laporan` lebih dulu, lalu kembalikan badan laporan yang
 
 **Status berkas laporan.** `{taskdir}/.explore/` adalah zona kerja, bukan artefak rantai: tidak di-stage, tidak di-commit — `debug` memang dilarang menjalankan git commit — dan tidak dihitung sebagai working tree kotor oleh gerbang git mana pun. `RCA.md` mengutip `file:baris` kode, bukan path laporan explorer.
 
-**Subagent mengembalikan:** Badan laporan lima seksi sesuai blok `Format laporan` di atas, ditutup baris `confidence: high | medium | low` pada `### Summary`, plus path berkas yang ditulisnya.
+**Subagent mengembalikan:** Amplop ringkas `## Explorer Report — <slug>` (maksimal 15 baris, `agents/code-explorer.md` bagian Pelaporan): baris `confidence` beserta angka cakupan, `### Summary` berkas, daftar seksi, dan path berkas. Badan laporan lima seksi sesuai blok `Format laporan` di atas hanya ada di berkas dan dibaca per seksi menurut `### Penanganan Balikan`.

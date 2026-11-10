@@ -52,7 +52,7 @@ baris: `confidence: high | medium | low`>
 - **Not Found**: <simbol/komponen yang dicari tetapi TIDAK ditemukan beserta direktori yang sudah disisir>
 ```
 
-Tulis laporan ke `Berkas laporan` lebih dulu, lalu kembalikan badan laporan yang sama ke context.
+Tulis laporan utuh ke `Berkas laporan` lebih dulu, lalu balas hanya dengan amplop ringkas (definisi agent-mu, bagian Pelaporan) — bukan badan laporan.
 ````
 
 ### Slot Hidrasi
@@ -83,19 +83,21 @@ Tulis laporan ke `Berkas laporan` lebih dulu, lalu kembalikan badan laporan yang
 
 ### Penanganan Balikan
 
-`tech-lead` memetakan balikan sendiri; tidak ada amplop pembungkus pada jalur ini.
+`tech-lead` memetakan balikan sendiri; tidak ada Universal Dispatch Envelope pada jalur ini.
+
+**Amplop, lalu seksi dari berkas (Langkah 31).** Balikan berisi amplop ringkas, bukan badan laporan. Vonis `confidence` dan angka cakupan dibaca dari amplop; isi dibaca dari berkas di baris `Berkas:` saat langkah pemakainya berjalan — per seksi (rentang baris atau heading), bukan berkas utuh bila hanya satu seksi dipakai: `### Key Pointers & Evidence` (bukti Keputusan 1–2 dan slot `Bukti`), `### Layers & Surfaces Touched` (batas modul `File Scope`), dan `### Risks, Gaps & Not Found` (angka permukaan dan pertanyaan klarifikasi). Tiap baris tabel di bawah yang menyebut sebuah seksi berlaku atas seksi berkas itu. Dilarang menulis artefak dari `### Summary` amplop saja bila langkahnya menuntut seksi lain.
 
 | Balikan subagent | Penanganan `tech-lead` |
 | --- | --- |
-| Laporan terisi, `confidence: high` atau `medium` | Pakai pointer `file:line` sebagai bukti Keputusan 1 dan Keputusan 2. Dilarang membaca ulang berkas yang sudah diringkas explorer, termasuk membuka ulang berkas laporan yang isinya sudah ada di context |
+| Laporan terisi, `confidence: high` atau `medium` | Pakai pointer `file:line` sebagai bukti Keputusan 1 dan Keputusan 2. Dilarang membaca ulang berkas kode yang sudah diringkas explorer; pointer-nya dibaca dari seksi `### Key Pointers & Evidence` berkas laporan |
 | `confidence: low`, atau `{objective}` tidak terjawab | Pertajam `{objective}` agar menyebut simbol konkret dan dispatch ulang tepat sekali dengan `{slug}` baru agar laporan lama tidak tertimpa. Tetap gagal → turun ke sapuan manual berkuota Fase 1 dan catat penyimpangannya di slot `Bukti`. Dilarang mengarang temuan |
 | `### Not Found` terisi | Fakta negatif yang sah: simbol yang user sebut tidak ada di batas cakupan. Angkat sebagai pertanyaan klarifikasi ke user sebelum menetapkan rute; dilarang ditafsirkan sebagai izin membuat kode baru diam-diam |
 | Payload kosong, format rusak, atau subagent error | Kegagalan dispatch, bukan cacat kerja subagent — subagent belum tentu pernah berangkat. Ikuti `## Failure path` butir 4 |
 
-**Angka permukaan milik gerbang, bukan milik laporan.** Slot `Bukti` menuntut `Permukaan <n tertutup>/<n diminta>`, dan kedua angka itu diturunkan dari enumerasi Fase 1 butir 4 gerbang sendiri disandingkan dengan `### Key Pointers & Evidence`, `### Not Found`, dan `### Gaps` badan laporan. Frontmatter berkas laporan memuat angka serupa, tetapi ia tidak ikut kembali ke context — ia bahan panen Tahap 0 dispatch berikutnya — dan membuka berkasnya untuk memungutnya melanggar larangan membaca ulang di tabel atas.
+**Angka permukaan milik gerbang, bukan milik laporan.** Slot `Bukti` menuntut `Permukaan <n tertutup>/<n diminta>`, dan kedua angka itu diturunkan dari enumerasi Fase 1 butir 4 gerbang sendiri disandingkan dengan `### Key Pointers & Evidence`, `### Not Found`, dan `### Gaps` badan laporan. Baris kedua amplop menyalin angka frontmatter berkas laporan, tetapi angka itu milik explorer dan bahan panen Tahap 0 dispatch berikutnya — slot `Bukti` tetap memakai enumerasi gerbang sendiri.
 
 **Batas serap.** Laporan ini bukti rute, bukan rancangan. Slot `File Scope` di laporan rute diisi **batas modul** hasil `### Layers & Surfaces Touched`, bukan daftar berkas yang akan disentuh — penetapan berkas adalah wewenang `plan`.
 
 **Status berkas laporan.** `backenddev/docs/.explore/` adalah zona kerja gerbang, bukan artefak rantai: tidak di-stage, tidak di-commit, dan tidak dihitung sebagai working tree kotor oleh gerbang git mana pun. Ia dilarang dirujuk sebagai sumber dari `TASK.md`, `BRD.md`, `PRD.md`, maupun brief — dokumen rantai mengutip `file:line` kode, bukan path laporan explorer. Salinannya mendarat di `{taskdir}/.explore/gate-<slug>.md` saat Fase 3 memprovisi taskdir (`references/gate-lifecycle.md` bagian 1), supaya skill hilir memanennya lewat Tahap 0 tanpa menyisir laci gerbang; salinan itu berstatus laci kerja yang sama.
 
-**Subagent mengembalikan:** Badan laporan empat seksi sesuai blok `Format laporan` di atas, ditutup baris `confidence: high | medium | low` pada `### Summary`, plus path berkas yang ditulisnya.
+**Subagent mengembalikan:** Amplop ringkas `## Explorer Report — <slug>` (maksimal 15 baris, `agents/code-explorer.md` bagian Pelaporan): baris `confidence` beserta angka cakupan, `### Summary` berkas, daftar seksi, dan path berkas. Badan laporan empat seksi sesuai blok `Format laporan` di atas hanya ada di berkas dan dibaca per seksi menurut `### Penanganan Balikan`.

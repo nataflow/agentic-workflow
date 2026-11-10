@@ -46,12 +46,23 @@ Butir 6 dan 7 adalah kapasitas penelusuran, bukan kewajiban pelaporan: yang dila
 
 ## Pelaporan
 
-Laporan punya **dua muara dan satu isi**. Urutannya mengikat:
+Laporan lengkap hidup di **berkas**; balasan ke context hanya **amplop ringkas** yang menunjuk ke sana (Langkah 31). Urutannya mengikat:
 
-1. **Tulis ke disk lebih dulu** — `Write` berkas `Berkas laporan` (mis. `backenddev/docs/2609041530-order-cancel/.explore/order-cancel-01.md`). Direktori induknya dibuat sendiri oleh `Write`; dilarang mengecek atau menyiapkannya lewat tool lain.
-2. **Kembalikan isi yang sama ke context pendispatch** — tanpa teks pengantar, tanpa penutup obrolan, dan tanpa merangkum ulang. Sebutkan path berkas yang kau tulis pada baris terakhir balasanmu.
+1. **Tulis ke disk lebih dulu** — `Write` berkas `Berkas laporan` (mis. `backenddev/docs/2609041530-order-cancel/.explore/order-cancel-01.md`) berisi laporan utuh. Direktori induknya dibuat sendiri oleh `Write`; dilarang mengecek atau menyiapkannya lewat tool lain.
+2. **Balas dengan amplop ringkas**, tanpa teks pengantar dan tanpa penutup obrolan:
 
-Badan laporan yang identik dipakai keduanya. Ringkasan yang berbeda antara berkas dan balasan membuat pendispatch memutuskan di atas satu versi sementara sesi berikutnya membaca versi lain.
+   ```markdown
+   ## Explorer Report — <slug>
+   confidence: <high | medium | low> · permukaan <tertutup>/<diminta> · gaps <n>
+   ### Summary
+   <isi `### Summary` berkas apa adanya, maksimal 8 baris; kerangka tanpa seksi itu → 3–8 baris jawaban objective beserta pointer `file:line` terpenting>
+   Seksi di berkas: <judul `###` badan laporan, urut, dipisah ` · `>
+   Berkas: <path berkas laporan>
+   ```
+
+   Amplop maksimal 15 baris. Isi seksi lain — tabel, daftar bukti, blast map, error surface — **tidak** disalin ke balasan: pendispatch membaca seksi yang ia butuhkan langsung dari berkas. Menyalin badan laporan ke balasan membayar teks yang sama dua kali dan menetap di context pendispatch sampai sesinya berakhir.
+
+Berkas adalah sumber kebenaran tunggal. Angka di amplop dan `confidence`-nya wajib sama persis dengan frontmatter berkas; `### Summary` amplop wajib sama dengan seksi berkas, bukan rangkuman baru — ringkasan yang berbeda membuat pendispatch memutuskan di atas satu versi sementara sesi berikutnya membaca versi lain.
 
 **Kerangka berkas.** Berkas dibuka frontmatter tetap berikut, lalu badan laporan persis sesuai blok `Format laporan` prompt:
 
@@ -68,7 +79,7 @@ gaps_terbuka: <n>
 <badan laporan sesuai blok `Format laporan` pada prompt>
 ```
 
-Balasan ke context memuat **badan laporan saja**; frontmatter adalah identitas berkas, bukan bagian laporan. Frontmatter itu juga satu-satunya bahan panen Tahap 0 dispatch berikutnya: tulis `objective` satu baris apa adanya supaya irisannya terbaca tanpa membuka badan laporan, dan isi ketiga angka di bawahnya jujur supaya pendispatch tahu seberapa jauh laporan ini sampai tanpa membacanya.
+Frontmatter adalah identitas berkas, bukan bagian badan laporan; angkanya disalin ke baris kedua amplop. Frontmatter itu juga satu-satunya bahan panen Tahap 0 dispatch berikutnya: tulis `objective` satu baris apa adanya supaya irisannya terbaca tanpa membuka badan laporan, dan isi ketiga angka di bawahnya jujur supaya pendispatch tahu seberapa jauh laporan ini sampai tanpa membacanya.
 
 **Aturan Format Laporan** (berlaku di atas kerangka apa pun yang diminta pendispatch):
 
@@ -77,7 +88,7 @@ Balasan ke context memuat **badan laporan saja**; frontmatter adalah identitas b
 3. **Larangan Salinan Kode Utuh**: dilarang memuat salinan method panjang atau transkrip proses pencarian.
 4. **Fakta Negatif Wajib Dicatat**: simbol yang dicari dan tidak ditemukan wajib didokumentasikan beserta direktori yang disisir, pada seksi yang disediakan kerangka.
 5. **Kebersihan Seksi**: seluruh seksi yang diminta kerangka tetap hadir walau temuannya nihil — tulis keadaan sebenarnya ("tidak ditemukan", "belum disisir"), bukan placeholder `TBD`/`TODO`. Baris contoh dan komentar penjelas di dalam kerangka dibuang, bukan ikut disalin.
-6. **Confidence Marker**: nilai `confidence` wajib hadir di frontmatter berkas dan pada baris `confidence:` di badan laporan, dan **kedua nilai itu wajib sama**.
+6. **Confidence Marker**: nilai `confidence` wajib hadir di frontmatter berkas, pada baris `confidence:` di badan laporan, dan di baris kedua amplop — **ketiganya wajib sama**.
 7. **Berkas laporan bukan artefak rantai**: `.explore/` adalah zona kerja. Dilarang menulis path itu ke dalam dokumen rantai, dan dilarang meng-commit-nya — penguncian git bukan wewenangmu.
 8. **Tiga Angka Cakupan Wajib Dihitung, Bukan Ditaksir**: ketiga field angka frontmatter dihitung mekanis dari badan laporan yang baru kau tulis, sesudah badannya selesai — bukan diperkirakan di awal.
 

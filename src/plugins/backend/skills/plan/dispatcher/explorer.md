@@ -64,7 +64,7 @@ ditulis `belum disisir`, bukan dikosongkan>
 - **Not Found**: <simbol/berkas yang dicari tetapi TIDAK ditemukan beserta direktori yang sudah disisir>
 ```
 
-Tulis laporan ke `Berkas laporan` lebih dulu, lalu kembalikan badan laporan yang sama ke context.
+Tulis laporan utuh ke `Berkas laporan` lebih dulu, lalu balas hanya dengan amplop ringkas (definisi agent-mu, bagian Pelaporan) — bukan badan laporan.
 ````
 
 ### Slot Hidrasi
@@ -94,7 +94,9 @@ Tulis laporan ke `Berkas laporan` lebih dulu, lalu kembalikan badan laporan yang
 
 ### Penanganan Balikan
 
-`plan` memetakan balikan sendiri; tidak ada amplop pembungkus pada jalur ini.
+`plan` memetakan balikan sendiri; tidak ada Universal Dispatch Envelope pada jalur ini.
+
+**Amplop, lalu seksi dari berkas (Langkah 31).** Balikan berisi amplop ringkas, bukan badan laporan. Vonis `confidence` dan angka cakupan dibaca dari amplop; isi dibaca dari berkas di baris `Berkas:` saat langkah pemakainya berjalan — per seksi (rentang baris atau heading), bukan berkas utuh bila hanya satu seksi dipakai: `### File Map` (Fase 2, lalu sekali lagi di Fase 3 langkah 3 tepat sebelum brief unit diisi) dan `### Risks, Gaps & Not Found`. Tiap baris tabel di bawah yang menyebut sebuah seksi berlaku atas seksi berkas itu. Dilarang menulis artefak dari `### Summary` amplop saja bila langkahnya menuntut seksi lain.
 
 | Balikan subagent | Penanganan `plan` |
 | --- | --- |
@@ -114,4 +116,4 @@ Tulis laporan ke `Berkas laporan` lebih dulu, lalu kembalikan badan laporan yang
 
 **Panen ulang oleh penulis brief.** Laporan di laci ini dibaca dua kali: sekali saat balikannya datang di Fase 2, sekali lagi oleh Fase 3 langkah 3 tepat sebelum `## File scope` dan `## Steps` brief unit itu diisi. Larangan "membaca ulang berkas yang sudah diringkas explorer" pada tabel di atas menyasar **berkas sumber** yang diringkas, bukan laporan ringkasannya — laporan itu justru satu-satunya rumah bukti `file:baris` yang bertahan melewati batas sesi, dan penulis yang kehilangan keduanya akan mengarang anchor.
 
-**Subagent mengembalikan:** Badan laporan tiga seksi sesuai blok `Format laporan` di atas, ditutup baris `confidence: high | medium | low` pada `### Summary`, plus path berkas yang ditulisnya.
+**Subagent mengembalikan:** Amplop ringkas `## Explorer Report — <slug>` (maksimal 15 baris, `agents/code-explorer.md` bagian Pelaporan): baris `confidence` beserta angka cakupan, `### Summary` berkas, daftar seksi, dan path berkas. Badan laporan tiga seksi sesuai blok `Format laporan` di atas hanya ada di berkas dan dibaca per seksi menurut `### Penanganan Balikan`.

@@ -61,7 +61,7 @@ pun. Untuk memulai, melanjutkan, atau memulihkan rantai, panggil `/backend:tech-
 
 | Agent | Tools | Peran |
 |---|---|---|
-| `code-explorer` | Read, Grep, Glob, Write | penelusur bukti `file:line`; menulis hanya ke laci `.explore/`, dipagari hook `guard_bash.py` |
+| `code-explorer` | Read, Grep, Glob, Write | penelusur bukti `file:line`; menulis laporan utuh hanya ke laci `.explore/` dan membalas amplop ringkas ≤15 baris, dipagari hook `guard_bash.py` |
 | `code-implementor` | Read, Grep, Glob, Edit, Write, Bash | menerapkan satu brief READY, dipagari hook `guard_bash.py` |
 | `code-reviewer` | Read, Grep, Glob, Bash, Write | menilai diff merge-base terhadap kontrak gabungan brief; menulis `REVIEW.md`, dipagari hook `guard_bash.py` |
 | `brd-reviewer` | Read, Grep, Glob | vonis BRD `Approved`/`Issues Found` |
@@ -147,7 +147,7 @@ backenddev/
       report-01.md                   laporan brief yang gagal
       HALT.md  REVIEW.md  REPORT.md
       JOURNEY.md                     keputusan antar sesi (journey.py), bukan sumber status
-      .explore/                      scratch skill hilir
+      .explore/                      scratch skill hilir; laporan explorer utuh
   issues/
     README.md                        indeks temuan audit
     2026-09-23-001-issues.md
