@@ -22,7 +22,7 @@ Prasyarat:
   `{"mcp_key": "<MCP key>"}` — di repo git berkas key wajib diabaikan git. Server tidak perlu didaftarkan di
   Claude Code. Config lama ber-`mcp_server` ditolak: lihat `MIGRATION_v0.1.1_to_v0.2.0.md`. Dampaknya bagi plugin
   lain: README root, bagian "Server nataflow".
-- `python3` ≥ 3.9 (hanya stdlib) untuk `skills/create-artifact/scripts/artifact.py`.
+- `python3` ≥ 3.12 (hanya stdlib) untuk `skills/create-artifact/scripts/artifact.py`.
 - Repo git tidak wajib.
 
 ## `create-artifact`

@@ -15,7 +15,7 @@ DILARANG MELAPORKAN SATU TEMUAN PUN TANPA BUKTI PATH BERKAS DAN NOMOR BARIS NYAT
 3. Terdapat minimal satu berkas berubah di luar `<plan_dir>/` (direktori `plan_path`) dan `profile_path`, dihitung dari gabungan `git diff <BASE> --name-only` dan `git ls-files --others --exclude-standard` (berkas untracked); `<BASE>` ditetapkan di Fase 1 butir 2. Bila nol, hentikan review dan laporkan status `NO_CHANGES` (Failure path 2) tanpa menulis temuan rekaan.
 4. Dokumen rencana pada `plan_path` (misal `plan/<task-name>.md`) tersedia di filesystem sebagai kontrak pembanding; bila hilang, hentikan dan minta path yang benar kepada user.
 5. Berkas profil pada `profile_path` (atau fallback-nya) tersedia sebagai acuan konvensi layer, penamaan, dan baseline verifikasi.
-6. `python3` (3.9+) tersedia untuk `plan_lock.py` (hanya subperintah baca `verify` dan `status`).
+6. `python3` (3.12+) tersedia untuk `plan_lock.py` (hanya subperintah baca `verify` dan `status`).
 
 ## Koeksistensi [REQUIRED]
 

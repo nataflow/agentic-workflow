@@ -42,7 +42,7 @@ def main() -> None:
     root = (Path(args.root) if args.root else find_root()).resolve()
     c = Checker()
 
-    c.add(1, "Python", sys.version_info >= (3, 9), sys.version.split()[0], "Pasang python3 ≥ 3.9.")
+    c.add(1, "Python", sys.version_info >= (3, 12), sys.version.split()[0], "Pasang python3 ≥ 3.12.")
     missing = [f for f in NEEDED if not (PLUGIN_ROOT / "skills" / f).is_file()]
     c.add(2, "Berkas plugin", not missing, "lengkap" if not missing else ", ".join(missing),
           "Instalasi plugin rusak — pasang ulang plugin product.")

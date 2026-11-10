@@ -22,7 +22,7 @@ gerbang `backend:tech-lead` atau `frontend:lead`.
 /plugin install quickdev@nataflow
 ```
 
-Prasyarat: `git` (execute dan review menuntut repo git), `python3` (3.9+, hanya stdlib) untuk
+Prasyarat: `git` (execute dan review menuntut repo git), `python3` (3.12+, hanya stdlib) untuk
 `plan_lock.py`, dan toolchain repo sendiri untuk baseline dan verifikasi.
 
 ## Enam Skill

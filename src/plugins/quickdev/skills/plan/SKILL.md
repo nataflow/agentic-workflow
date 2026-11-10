@@ -14,7 +14,7 @@ DILARANG MEMULAI IMPLEMENTASI ATAU MENULIS KODE SUMBER SEBELUM DOKUMEN RENCANA D
 2. Spesifikasi kebutuhan fungsional, kontrak data API, skema payload, atau alur UI/UX telah terkunci tanpa ambiguitas yang tersisa.
 3. Direktori kerja repositori memiliki izin tulis aktif untuk membuat folder `plan/` dan berkas rencana implementasi markdown.
 4. Profil repositori pada `profile_path` tersedia sebagai panduan arsitektur dan baseline verifikasi; bila absen, hentikan dan arahkan pemanggil ke `quickdev:profile` (jangan `backend:profile`/`frontend:profile`) karena perintah baseline rencana wajib diambil dari profil.
-5. `python3` (3.9+) tersedia untuk `plan_lock.py`, yang mengunci rencana saat approval dan menyusun argumen sinkron nataflow.
+5. `python3` (3.12+) tersedia untuk `plan_lock.py`, yang mengunci rencana saat approval dan menyusun argumen sinkron nataflow.
 
 ## Koeksistensi [REQUIRED]
 

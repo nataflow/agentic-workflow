@@ -17,7 +17,7 @@ ARTIFACT HANYA HIDUP DI SERVER NATAFLOW DAN SELALU MENEMPEL KE PROJECT MILIK MCP
    mencetak, atau menyalin isinya. Key wajib terikat ke satu project.
 3. Server di `url` berjalan dan terjangkau, dan menyediakan `get_project_info`, `list_artifacts`, `get_artifact`,
    `upsert_artifact`, serta `get_document`.
-4. `python3` ≥ 3.9 untuk `${CLAUDE_PLUGIN_ROOT}/skills/create-artifact/scripts/artifact.py`.
+4. `python3` ≥ 3.12 untuk `${CLAUDE_PLUGIN_ROOT}/skills/create-artifact/scripts/artifact.py`.
 
 Repo git tidak wajib. Config lama ber-`mcp_server` ditolak dengan pesan migrasi: lihat `MIGRATION_v0.1.1_to_v0.2.0.md`
 di root plugin nataflow.

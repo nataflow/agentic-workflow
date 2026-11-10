@@ -162,7 +162,7 @@ Semua panah antar-skill adalah **tawaran**. Skill berikutnya baru jalan setelah 
   - Spesifikasi tanpa ambiguitas tersisa.
   - Izin tulis ke `plan/`.
   - **Profil wajib ada**. Bila tidak ada, berhenti dan arahkan ke `quickdev:profile`.
-  - `python3` 3.9+.
+  - `python3` 3.12+.
 - **Langkah**:
   1. **Fase 0.** Validasi `task_name` (kebab-case), buat `plan_dir`, lalu ambil urutan layer dan perintah baseline dari profil.
   2. **Fase 1: dekomposisi.** Pecah tugas jadi langkah atomik, hanya untuk layer yang benar-benar tersentuh. Urutan acuan:
@@ -209,7 +209,7 @@ flowchart TD
   - Pagar working tree sesuai mode, lihat tabel mode di bawah.
   - Runtime dan toolchain aktif.
   - Profil ada.
-  - Tool `Edit`/`Write`/`Bash` dan `python3` 3.9+.
+  - Tool `Edit`/`Write`/`Bash` dan `python3` 3.12+.
 - **Langkah**:
   1. **Fase 0.** Jalankan `plan_lock.py start --plan <plan_path>` (tambah `--findings --findings-text -` bila `review_findings` diisi; teks bebas selalu lewat stdin dengan heredoc berkutip) sebelum mengubah apa pun. `plan_path` kosong → diambil dari ringkasan quickdev terakhir di percakapan, atau dari `plan/*.md` lewat `status --json`. Skrip menjalankan `verify`, menurunkan mode, dan menulis blok `## Execution Status`.
 
@@ -293,7 +293,7 @@ flowchart TD
   - Direktori kerja adalah repo git yang valid.
   - Minimal satu berkas berubah di luar `plan/` dan profil. Bila nol, hasilnya `NO_CHANGES`.
   - Rencana dan profil ada.
-  - `python3` 3.9+.
+  - `python3` 3.12+.
 - **Langkah**:
   1. **Fase 1: diff.**
      - Tetapkan `<BASE>`: `base_ref`, lalu `Base-Commit`, lalu `HEAD`. Untuk `Base-Commit: none`, pakai tree kosong. `base_drift` ≠ `-` (base bukan leluhur HEAD) tanpa `base_ref` → berhenti dan tanyakan `base_ref` ke user.

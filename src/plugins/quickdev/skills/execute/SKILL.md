@@ -15,7 +15,7 @@ DILARANG MEMULAI EKSEKUSI JIKA DOKUMEN RENCANA IMPLEMENTASI BELUM BERSTATUS APPR
 3. Runtime, compiler, dan package manager yang dibutuhkan (seperti Node/TypeScript, Python, Go, dll.) aktif dan dapat menjalankan script verifikasi baseline.
 4. Profil repositori pada `profile_path` tersedia sebagai acuan baseline error yang diakui dan panduan layer; bila absen, hentikan dan arahkan pemanggil ke `quickdev:profile` (jangan `backend:profile`/`frontend:profile`).
 5. Tool `Edit`, `Write`, dan `Bash` tersedia untuk mutasi berkas dan eksekusi perintah verifikasi.
-6. `python3` (3.9+) tersedia untuk `plan_lock.py`, dan direktori kerja adalah repo git.
+6. `python3` (3.12+) tersedia untuk `plan_lock.py`, dan direktori kerja adalah repo git.
 
 ## Koeksistensi [REQUIRED]
 

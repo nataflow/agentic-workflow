@@ -415,7 +415,7 @@ ada di `hooks/gate_text.py`.
   dipisah spasi, koma, atau baris. Isi `quickdev` → hook `frontend` dan `backend` diam; isi
   `frontend, quickdev` → hanya hook `frontend` yang menyala. Berkas kosong → tidak ada plugin yang boleh;
   berkas tidak ada → perilaku normal.
-- **Prasyarat**: `python3` ≥ 3.9 di `PATH` (`tomllib` dipakai bila ≥ 3.11). Di Windows yang hanya
+- **Prasyarat**: `python3` ≥ 3.12 di `PATH`. Di Windows yang hanya
   punya `py`/`python`, hook tidak jalan.
 
 ## Upgrade dari 0.8.0

@@ -23,8 +23,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        # 3.9 = minimum pengguna (python3 bawaan macOS lama); tanpa tomllib, members workspace Cargo di-skip.
-        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        python: ["3.12", "3.13"]
         include:
           - os: macos-latest        # git/path BSD dan filesystem case-insensitive
             python: "3.13"

@@ -22,7 +22,7 @@ Charter disusun dari elisitasi terarah, dinilai subagent `charter-reviewer`, dan
 /plugin install product@nataflow
 ```
 
-Prasyarat: `python3` ≥ 3.9. `git` opsional: tanpa git, artefak tetap ditulis dan hanya commit yang dilewati.
+Prasyarat: `python3` ≥ 3.12. `git` opsional: tanpa git, artefak tetap ditulis dan hanya commit yang dilewati.
 
 ## Tiga Mode
 

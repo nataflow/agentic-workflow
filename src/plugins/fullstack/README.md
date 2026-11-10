@@ -33,7 +33,7 @@ atau `frontend:lead`.
 ```
 
 Jalankan Claude Code dari root multi-repo, lalu tanya langsung atau panggil `/fullstack:explore`. Prasyarat:
-`python3` ≥ 3.9 dan `git`. Repo aplikasi perlu sudah diprofilkan. Repo tanpa profil tetap tercatat di peta, tetapi
+`python3` ≥ 3.12 dan `git`. Repo aplikasi perlu sudah diprofilkan. Repo tanpa profil tetap tercatat di peta, tetapi
 tidak ditelusuri.
 
 ## Satu Skill, Tiga Subagent

@@ -58,8 +58,8 @@ def main() -> int:
     root = Path(args.root or ".").resolve()
     res: List[Dict[str, Any]] = []
 
-    _add(res, 1, "Python", "PASS" if sys.version_info >= (3, 9) else "FAIL", sys.version.split()[0],
-         "Pasang python3 ≥ 3.9.")
+    _add(res, 1, "Python", "PASS" if sys.version_info >= (3, 12) else "FAIL", sys.version.split()[0],
+         "Pasang python3 ≥ 3.12.")
     missing = [f for f in NEEDED if not (PLUGIN_ROOT / f).is_file()]
     _add(res, 2, "Berkas plugin", "FAIL" if missing else "PASS", ", ".join(missing) or "lengkap",
          "Instalasi plugin rusak — pasang ulang plugin fullstack.")

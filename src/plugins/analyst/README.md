@@ -21,7 +21,7 @@ penomoran, keterpikulan aturan oleh acceptance criteria, kebocoran istilah tekni
 /plugin install analyst@nataflow
 ```
 
-Prasyarat: `python3` ≥ 3.9. `git` opsional (lihat seksi Git). Lihat juga `README.md` di root repo.
+Prasyarat: `python3` ≥ 3.12. `git` opsional (lihat seksi Git). Lihat juga `README.md` di root repo.
 
 ## Empat Skill, Dua Subagent
 

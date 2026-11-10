@@ -22,19 +22,19 @@ available).
 uvx pytest                                         # full suite (testpaths = tests)
 uvx pytest tests/backend/test_12_guard.py          # one file
 uvx pytest tests/backend/test_12_guard.py -k j8    # tests matching a keyword
-uvx --python 3.9 pytest -q                         # check against the 3.9 minimum
+uvx --python 3.12 pytest -q                        # check against the 3.12 minimum
 python3 scripts/lint_plugins.py                    # static lint; --json, --strict, --ignore IDs, --base origin/main
 claude plugin validate .                           # before a release
 ```
 
-CI (`.github/workflows/ci.yml`) runs pytest on Python 3.9–3.13 plus macOS, validates every
+CI (`.github/workflows/ci.yml`) runs pytest on Python 3.12–3.13 (Linux) plus 3.13 on macOS, validates every
 `plugin.json`/`marketplace.json`/`hooks.json` as JSON, runs shellcheck on tracked `*.sh`, and runs
 `lint_plugins.py` with an empty `LINT_IGNORE` and `--base origin/<base>` on PRs.
 
 ## Hard constraints
 
-- **Python ≥ 3.9, stdlib only** for every script and hook. No `match`, no `X | Y` type unions, no
-  third-party imports. `tomllib` is optional (3.11+) and must degrade gracefully.
+- **Python ≥ 3.12, stdlib only** for every script and hook. No third-party imports. `tomllib` is always
+  available; the `tomllib is None` fallback in `hooks/detect.py` is legacy from the old 3.9 minimum.
 - **Version bump per PR.** `version` lives only in `src/plugins/<plugin>/.claude-plugin/plugin.json`,
   never in `marketplace.json`. Any change under `src/plugins/<plugin>/` requires bumping that plugin's
   version; lint M7 (`--base`) enforces it. Releases are usually a separate `chore(release)` commit.

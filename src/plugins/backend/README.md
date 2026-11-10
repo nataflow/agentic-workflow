@@ -30,8 +30,7 @@ sekali lewat skill `profile`. Pengetahuan spesifik-stack hidup di satu adapter
 Marketplace `nataflow` memuat keempat plugin repo ini. Lihat `README.md` di root repo untuk memilih
 plugin dan cara keempatnya hidup berdampingan.
 
-**Prasyarat**: `python3` ≥ 3.9 di `PATH` (3.11+ disarankan: anggota workspace Cargo hanya dibaca lewat
-`tomllib`), `git`, dan repo git dengan `base_branch` yang jelas. Semua skrip hanya memakai stdlib. Toolchain
+**Prasyarat**: `python3` ≥ 3.12 di `PATH`, `git`, dan repo git dengan `base_branch` yang jelas. Semua skrip hanya memakai stdlib. Toolchain
 stack repo sendiri (build, test) dibutuhkan untuk baseline profil.
 
 Lalu di tiap repo backend, sekali: `/backend:profile`, atau cukup ajukan permintaan kerja pertama.

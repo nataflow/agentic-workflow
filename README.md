@@ -36,8 +36,8 @@ Marketplace git memakai `version` di `plugin.json`: pengguna hanya mendapat peru
 
 ## Prasyarat
 
-- `python3` ≥ 3.9 di `PATH` untuk hook dan skrip `analyst`, `backend`, `frontend`, `nataflow`, `product`, dan `fullstack`. Semua skrip
-  hanya memakai stdlib. Python 3.11+ disarankan untuk repo Rust ber-workspace (`tomllib`).
+- `python3` ≥ 3.12 di `PATH` untuk hook dan skrip `analyst`, `backend`, `frontend`, `nataflow`, `product`, dan `fullstack`. Semua skrip
+  hanya memakai stdlib.
 - `git`. `backend` dan `frontend` mewajibkan repo git, sedangkan `analyst` dan `product` bisa berjalan di
   folder dokumen biasa atau folder kosong. `nataflow` tidak butuh repo, tetapi butuh server nataflow yang berjalan.
   `fullstack` justru berjalan di folder non-git yang menampung repo git (`<root>/<repo>` atau
@@ -139,13 +139,13 @@ src/plugins/<plugin>/             berkas yang tersalin ke cache plugin pengguna
   skills/  agents/  hooks/  README.md
 tests/                            pytest; di luar src/ supaya tidak ikut terpasang
 scripts/lint_plugins.py           lint statis manifest, frontmatter, rujukan, skrip, dan hook
-.github/workflows/ci.yml          pytest 3.9–3.13 + macOS, hooks, lint, claude plugin validate
+.github/workflows/ci.yml          pytest 3.12–3.13 + macOS 3.13, hooks, lint, claude plugin validate
 ```
 
 Menjalankan test dan lint dari root repo:
 
 ```sh
-python3 -m pytest                          # atau: uvx --python 3.9 pytest -q
+python3 -m pytest                          # atau: uvx --python 3.12 pytest -q
 python3 scripts/lint_plugins.py            # --json, --strict, --ignore R2, --base origin/main
 claude plugin validate .                   # sebelum rilis
 ```
