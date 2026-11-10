@@ -121,6 +121,8 @@ CASES = [
 
     ("quickdev/skills/_common/plan_lock.py", ["status", "--plan", "plan/smoke.md", "--json"], True, None),
     ("quickdev/skills/_common/plan_lock.py", ["sync-payload", "--plan", "plan/smoke.md", "--json"], True, None),
+    ("quickdev/skills/_common/plan_lock.py", ["sync-payload", "--plan", "plan/smoke.md", "--push", "--json"], True,
+     None),
     ("quickdev/skills/_common/plan_lock.py", ["sync-payload", "--repo-profile", "repo-profile.md", "--json"], True,
      None),
 ]

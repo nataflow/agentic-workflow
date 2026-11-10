@@ -17,8 +17,9 @@
 - `confirm` VERIFICATION_MANUAL_REQUIRED → COMPLETED (manual) dengan jawaban user apa adanya; segel basi → FAIL.
 - `status`  ringkasan untuk execute/review (`--json`); `consistent` menilai blok terhadap checklist dan segel.
 - `unlock`  APPROVED → DRAFT untuk revisi atas permintaan user; blok eksekusi dipertahankan.
-- `sync-payload` argumen tool MCP nataflow untuk rencana yang pernah dikunci (`--plan`) atau profil
-            (`--repo-profile`); read-only. Config `.claude/nataflow.json` absen → SKIP sebelum rencana dibaca (15 Q2).
+- `sync-payload` sinkron nataflow untuk rencana yang pernah dikunci (`--plan`) atau profil (`--repo-profile`);
+            tanpa menulis berkas. `--push` memanggil server langsung (MCP key `.claude/nataflow.local.json`) dan
+            mencetak satu baris segmen (29 S4). Config `.claude/nataflow.json` absen → SKIP sebelum rencana dibaca.
 
 Metadata rencana adalah baris polos `Kunci: nilai` di antara H1 dan `## 1.`. Sidik mencakup
 `## 1.` sampai sebelum `## Execution Status`: CRLF → LF, spasi ujung baris dibuang, `- [x]` dihitung
@@ -654,51 +655,54 @@ def _sync_emit(a, payload: dict, line: str) -> int:
 
 def _sync_documents(a, config: dict, docs: list, head: dict, line: str) -> int:
     """Fase 1 (tanpa `--remote`): argumen task/workdir/manifest tanpa isi. Fase 2: dokumen yang berbeda saja."""
-    problems = ns.check_documents(docs)
-    if problems:
-        return ns.emit_fail(a.json, SYNC, problems)
     base = {"status": "PASS", "enabled": True, "url": config["url"]}
     if a.remote is None:
         base.update(head, documents_total=len(docs))
         return _sync_emit(a, base, line + " — argumen tool lewat `--json`")
-    remote, problems = ns.read_remote(a.remote, a.remote_text)
+    result, problems = _diff(docs, a.remote_text) if a.remote == "-" else _diff_source(docs, a.remote)
     if problems:
         return ns.emit_fail(a.json, SYNC, problems)
+    base.update(result)
+    return _sync_emit(a, base, f"{len(result['documents'])} dokumen perlu didorong, {result['same']} sama — "
+                               f"argumen lewat `--json`")
+
+
+def _diff(docs: list, text: str):
+    """Teks balikan `list_document` → `(dokumen yang perlu didorong, masalah)` — fase `--remote` dan `--push`."""
+    if not text.strip():
+        return None, ["--remote kosong — serahkan teks balikan list_document (larik kosong `[]` bila tidak ada)"]
+    remote, problems = ns.parse_remote(text)
+    if problems:
+        return None, problems
     push, same = ns.split_remote(docs, remote)
-    base.update(documents=push, same=same, documents_total=len(docs))
-    return _sync_emit(a, base, f"{len(push)} dokumen perlu didorong, {same} sama — argumen lewat `--json`")
+    return {"documents": push, "same": same, "documents_total": len(docs)}, []
 
 
-def cmd_sync_payload(a) -> int:
-    """Argumen tool MCP nataflow; read-only, tanpa commit (D4, D5). Model mengirim nilainya apa adanya.
+def _diff_source(docs: list, source: str):
+    text, problems = ns.read_tool_text("--remote", source, "")
+    return (None, problems) if problems else _diff(docs, text)
+
+
+def sync_context(a, root: Path, config: dict):
+    """Rencana atau profil → `(konteks, masalah)`; konteks = `head` (argumen fase 1), `docs`, `line`, `kind`.
 
     Rencana: satu workdir `quickdev:<repo>:<path rencana>` bernama `<task_name>`, task baru ber-`workdir_key`
     (quickdev tidak mengenal tiket analyst), dan satu dokumen `quickdev.plan` berisi berkas di disk (skill tidak
     meng-commit). Rencana yang belum pernah `lock` (tanpa `Approved-At`) → FAIL: DRAFT tidak didorong (D2).
     Profil: dokumen `PROFILE` di bawah workspace, `key` = `<repo>/<path>` (T10).
-
-    Workspace (`--workspace <alias>`, dari `workspaces` config) hanya dibutuhkan untuk task baru dan induk profil:
-    `task.lookup` menjangkau seluruh project key dan workdir mengikuti workspace task induknya. Config berisi lebih
-    dari satu workspace tanpa `--workspace` → `workspace_choices`; user memilih, lalu skrip dijalankan ulang.
     """
-    root = sync_root()
-    config, problems = ns.load_config(root)
-    if problems:
-        return ns.emit_fail(a.json, SYNC, problems)
-    if config is None:
-        return ns.emit_skip(a.json, SYNC)
     workspace_id, choices, problems = ns.choose_workspace(config, a.workspace)
     if problems:
-        return ns.emit_fail(a.json, SYNC, problems)
+        return None, problems
     where = ("pilih: " + ", ".join(c["alias"] for c in choices)) if choices else workspace_id or "-"
     path, rel = root_relative(root, a.repo_profile or a.plan)
     if path is None:
-        return ns.emit_fail(a.json, SYNC, [rel])
+        return None, [rel]
     if not path.is_file():
-        return ns.emit_fail(a.json, SYNC, [f"{rel} tidak ada"])
+        return None, [f"{rel} tidak ada"]
     content, problem = ns.disk_text(path)
     if problem:
-        return ns.emit_fail(a.json, SYNC, [f"{rel}: {problem} — pulihkan dari git; jangan menebak isinya"])
+        return None, [f"{rel}: {problem} — pulihkan dari git; jangan menebak isinya"]
     repo = ns.repo_identity(root, config)
     commit = ns.last_commit(root, rel)
     if a.repo_profile:
@@ -706,25 +710,24 @@ def cmd_sync_payload(a) -> int:
         head = {"repo": repo, **ns.workspace_fields(workspace_id, choices),
                 "list_document": {"reference_table": "workspace", "include_content": False,
                                   "metadata": ns.compact({"source": "quickdev", "repo": repo})}}
-        return _sync_documents(a, config, [doc], head, f"{rel} → workspace {where}")
+        return {"kind": "profile", "head": head, "docs": [doc], "line": f"{rel} → workspace {where}"}, []
     try:
         p = Plan(path)
         m, b = p.meta(), p.block()
     except SystemExit as exc:           # kunci ganda: FAIL rapi dari pembaca
-        return ns.emit_fail(a.json, SYNC, [str(exc.code)[len("FAIL: "):] if str(exc.code).startswith("FAIL: ")
-                                           else str(exc.code)])
+        return None, [str(exc.code)[len("FAIL: "):] if str(exc.code).startswith("FAIL: ") else str(exc.code)]
     if (m.get("Approved-At") or "-") == "-":
-        return ns.emit_fail(a.json, SYNC, [f"{rel} belum pernah dikunci (`lock`) — rencana DRAFT tidak didorong"])
+        return None, [f"{rel} belum pernah dikunci (`lock`) — rencana DRAFT tidak didorong"]
     body, title = section_one(p), plan_title(p) or path.stem
     if p.body_start == len(p.lines) or not body:
-        return ns.emit_fail(a.json, SYNC, [f"{rel} tanpa `## 1.` — deskripsi task diambil dari Section 1"])
+        return None, [f"{rel} tanpa `## 1.` — deskripsi task diambil dari Section 1"]
     execution = b.get("Status", "")
     done = execution.startswith("COMPLETED")
     status = "done" if done else "blocked" if execution == "BLOCKED" else "active"
     key = f"quickdev:{repo}:{rel}"
     problems = ns.workdir_problems(key, path.stem, status)
     if problems:
-        return ns.emit_fail(a.json, SYNC, problems)
+        return None, problems
     task = ns.task_args(config, workspace_id, {"source": "quickdev", "workdir_key": key}, repo, title, body)
     task["status"] = ns.task_status("done" if done else "in_progress")       # workdir terbit → in_progress (28 T1)
     meta = {"source": "quickdev", "repo": repo, "path": rel, "plan_status": m.get("Status", ""),
@@ -734,8 +737,55 @@ def cmd_sync_payload(a) -> int:
                       ns.doc_meta("quickdev", repo, rel, m.get("Status", ""), commit, execution=execution))
     head = {"repo": repo, **ns.workspace_fields(workspace_id, choices), "task": task, "workdir": workdir,
             "list_document": {"reference_table": "workdir", "include_content": False}}
-    return _sync_documents(a, config, [doc], head,
-                           f"{rel} · workdir {path.stem} ({status}) · server {config['url']}")
+    return {"kind": "plan", "head": head, "docs": [doc],
+            "line": f"{rel} · workdir {path.stem} ({status}) · server {config['url']}"}, []
+
+
+def cmd_sync_payload(a) -> int:
+    """Sinkron nataflow; tanpa menulis berkas maupun commit (D5). `--push` memanggil server langsung lewat
+    `nataflow_client` dan mencetak satu baris segmen (29 S4); tanpa `--push` keluarannya argumen tool per fase.
+
+    Workspace (`--workspace <alias>`, dari `workspaces` config) hanya dibutuhkan untuk task baru dan induk profil:
+    `task.lookup` menjangkau seluruh project key dan workdir mengikuti workspace task induknya. Config berisi lebih
+    dari satu workspace tanpa `--workspace` → `workspace_choices`; user memilih, lalu skrip dijalankan ulang.
+    """
+    root = sync_root()
+    config, problems = ns.load_config(root)
+    if a.push:
+        return sync_push(a, root, config, problems)
+    if problems:
+        return ns.emit_fail(a.json, SYNC, problems)
+    if config is None:
+        return ns.emit_skip(a.json, SYNC)
+    ctx, problems = sync_context(a, root, config)
+    if problems:
+        return ns.emit_fail(a.json, SYNC, problems)
+    problems = ns.check_documents(ctx["docs"])
+    if problems:
+        return ns.emit_fail(a.json, SYNC, problems)
+    return _sync_documents(a, config, ctx["docs"], ctx["head"], ctx["line"])
+
+
+def sync_push(a, root: Path, config, problems) -> int:
+    """`--push`: task → workdir → dokumen (rencana) atau workspace → dokumen (profil), lalu satu baris segmen."""
+    ctx = None
+    if not problems and config is not None:
+        ctx, problems = sync_context(a, root, config)
+    if not problems and ctx is not None:
+        problems = ns.check_documents(ctx["docs"])
+    if problems:
+        result = ns.push_fail(problems)
+    elif config is None:
+        result = {"status": "SKIP"}
+    else:
+        diff = lambda text: _diff(ctx["docs"], text)  # noqa: E731
+        if ctx["kind"] == "plan":
+            result = ns.run_push(root, config, lambda s: ns.push_workdir(s, ctx["head"], diff,
+                                                                          dup_label="workdir_key"))
+        else:
+            result = ns.run_push(root, config, lambda s: ns.push_repo_docs(s, ctx["head"], diff))
+    what = "repo" if a.repo_profile else f"workdir {result.get('workdir', '')}"
+    return ns.emit_push(result, a.json, ns.push_segment(result, what))
 
 
 def main_sync(a) -> None:
@@ -778,7 +828,10 @@ def main() -> None:
     target.add_argument("--repo-profile", dest="repo_profile", help="profil repo (dokumen tingkat workspace)")
     s.add_argument("--workspace", default="", help="alias `workspaces` tujuan task baru atau induk profil; wajib "
                                                    "dipilih user bila config berisi lebih dari satu workspace")
-    s.add_argument("--remote", default=None, help="balikan list_document include_content=false (`-` = stdin)")
+    phase = s.add_mutually_exclusive_group()
+    phase.add_argument("--push", action="store_true", help="kirim langsung ke server lewat MCP key lokal; keluaran "
+                                                           "satu baris segmen")
+    phase.add_argument("--remote", default=None, help="balikan list_document include_content=false (`-` = stdin)")
     s.add_argument("--json", action="store_true")
     a = ap.parse_args()
     if a.cmd == "sync-payload":
