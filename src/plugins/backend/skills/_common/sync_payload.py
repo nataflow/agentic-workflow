@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Argumen tool MCP nataflow untuk satu taskdir backend atau dokumen tingkat repo (15 B2, B8–B10).
 
-Read-only: tidak menulis berkas dan tidak meng-commit (D5). Model mengirim nilai keluarannya apa adanya lewat
-prosedur `tech-lead/references/nataflow-sync.md` (D4); skrip ini satu-satunya penyusun isi dan pemilih berkas.
+Tidak menulis berkas dan tidak meng-commit (D5); skrip ini satu-satunya penyusun isi dan pemilih berkas. Prosedur
+`tech-lead/references/nataflow-sync.md` memakai `--push` (29 S3): skrip sendiri memanggil tool server lewat
+`nataflow_client` dengan MCP key `.claude/nataflow.local.json`, lalu mencetak satu baris segmen — isi dokumen tidak
+pernah lewat konteks model. Tanpa `--push` keluarannya argumen tool per fase (uji dan diagnosis).
 
 - `--taskdir <td>`: workdir `backenddev:<repo>:<td>` tertaut ke task tiket analyst (`ticket_source`) atau ke task
   baru ber-`workdir_key`. Dokumen taskdir tidak di-commit (Langkah 24), jadi isinya diambil dari disk (24 K14),
@@ -30,7 +32,8 @@ sudah dihapus dari git → versi terakhirnya dengan `removed: true`.
 `task.siblings` (task tiket, `REPORT.md` ada) → `task_status` pengganti `task.status`: `done` bila seluruh workdir di
 bawah task itu sudah `done`/`abandoned`, selain itu tetap `task.status` (28 T2).
 
-Keluaran `--json` selalu JSON: `SKIP` (config absen), `FAIL` (`problems`), atau `PASS`.
+Keluaran `--json` selalu JSON: `SKIP` (config absen), `FAIL` (`problems`), atau `PASS`; dengan `--push` juga
+`PILIH_WORKSPACE` (`workspace_choices`), selalu beserta `segment`. Exit 1 hanya untuk `FAIL`.
 
 Zero external dependencies (Python Standard Library only).
 """
@@ -185,36 +188,59 @@ def mirrored_extras(root: Path, table: str, remote: Dict[str, Dict[str, Any]], c
     return extras
 
 
-def diff_phase(args, config: Dict[str, Any], docs: List[Dict[str, Any]], extras_fn) -> int:
-    remote, problems = ns.read_remote(args.remote, sys.stdin.read() if args.remote == "-" else "")
+def diff_result(docs: List[Dict[str, Any]], extras_fn, text: str) -> Tuple[Optional[Dict[str, Any]], List[str]]:
+    """Teks balikan `list_document` → dokumen yang perlu didorong (fase `--remote`)."""
+    remote, problems = ns.parse_remote(text) if text.strip() else (None, [
+        "--remote kosong — serahkan teks balikan list_document (larik kosong `[]` bila tidak ada)"])
     if problems:
-        return ns.emit_fail(args.json, PREFIX, problems)
+        return None, problems
     docs = docs + extras_fn(remote)
     problems = ns.check_documents(docs)
     if problems:
-        return ns.emit_fail(args.json, PREFIX, problems)
+        return None, problems
     push, same = ns.split_remote(docs, remote)
-    payload = {"status": "PASS", "enabled": True, "url": config["url"], "documents": push,
-               "same": same, "documents_total": len(docs)}
-    ns.emit(payload, args.json, f"{PREFIX} PASS: {len(push)} dokumen perlu didorong, {same} sama — argumen lewat `--json`")
-    return 0
+    return {"documents": push, "same": same, "documents_total": len(docs)}, []
 
 
-def siblings_phase(args, config: Dict[str, Any], key: str, status: str, task: Dict[str, Any]) -> int:
-    """`--workdirs`: status task tiket dari seluruh workdir di bawahnya (28 T2). Tanpa `task.siblings` → `task.status`."""
-    workdirs, problems = ns.read_workdirs(args.workdirs, sys.stdin.read() if args.workdirs == "-" else "")
+def siblings_result(key: str, status: str, task: Dict[str, Any], text: str
+                    ) -> Tuple[Optional[Dict[str, Any]], List[str]]:
+    """Teks balikan `list_workdir` → status task tiket dari seluruh workdir di bawahnya (28 T2). Tanpa
+    `task.siblings` → `task.status`."""
+    workdirs, problems = ns.parse_workdirs(text) if text.strip() else (None, [
+        "--workdirs kosong — serahkan teks balikan list_workdir apa adanya"])
     if problems:
-        return ns.emit_fail(args.json, PREFIX, problems)
+        return None, problems
     target, problems = (ns.sibling_task_status(workdirs, key, status, task["status"]) if task.get("siblings")
                         else (task["status"], []))
     if problems:
-        return ns.emit_fail(args.json, PREFIX, problems)
+        return None, problems
     open_ = sum(1 for k, s in workdirs.items() if (status if k == key else s) not in ns.WORKDIR_FINAL)
-    payload = {"status": "PASS", "enabled": True, "url": config["url"], "task_status": target,
-               "workdirs_total": len(workdirs), "workdirs_open": open_}
-    ns.emit(payload, args.json, f"{PREFIX} PASS: {len(workdirs)} workdir di bawah task, {open_} belum tuntas → task "
-                                f"{target['status'] if target else 'tidak diubah'} — argumen lewat `--json`")
+    return {"task_status": target, "workdirs_total": len(workdirs), "workdirs_open": open_}, []
+
+
+def tool_text(flag: str, source: str) -> Tuple[Optional[str], List[str]]:
+    return ns.read_tool_text(flag, source, sys.stdin.read() if source == "-" else "")
+
+
+def emit_phase(args, config: Dict[str, Any], fn, flag: str, source: str, line) -> int:
+    """Jalur `--remote`/`--workdirs`: teks balikan tool dari stdin/berkas → payload fase."""
+    text, problems = tool_text(flag, source)
+    result, problems = (None, problems) if problems else fn(text)
+    if problems:
+        return ns.emit_fail(args.json, PREFIX, problems)
+    ns.emit(dict({"status": "PASS", "enabled": True, "url": config["url"]}, **result), args.json, line(result))
     return 0
+
+
+def diff_line(result: Dict[str, Any]) -> str:
+    return (f"{PREFIX} PASS: {len(result['documents'])} dokumen perlu didorong, {result['same']} sama — argumen "
+            f"lewat `--json`")
+
+
+def siblings_line(result: Dict[str, Any]) -> str:
+    target = result["task_status"]
+    return (f"{PREFIX} PASS: {result['workdirs_total']} workdir di bawah task, {result['workdirs_open']} belum tuntas "
+            f"→ task {target['status'] if target else 'tidak diubah'} — argumen lewat `--json`")
 
 
 def ticket_key(task_text: str) -> Tuple[Optional[str], str]:
@@ -228,53 +254,73 @@ def ticket_key(task_text: str) -> Tuple[Optional[str], str]:
     return posixpath.dirname(path), ""
 
 
-def run_taskdir(args, root: Path, config: Dict[str, Any]) -> int:
+def taskdir_plan(args, root: Path, config: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], List[str]]:
+    """Seluruh fase taskdir: `diff` (dokumen, tersedia lebih dulu) dan `phase1()` → `(payload, siblings, masalah)`."""
     verdict = check_taskdir(root, args.taskdir)
     if not verdict.ok:
-        return ns.emit_fail(args.json, PREFIX, [verdict.summary])
+        return None, [verdict.summary]
     td, repo, head = verdict.rel, ns.repo_identity(root, config), head_sha(root)
     docs, texts, problems = select_taskdir(root, td, repo, head)
     if problems:
-        return ns.emit_fail(args.json, PREFIX, problems)
+        return None, problems
     task_text = texts.get("TASK.md")
     if task_text is None or not ns.frontmatter_value(task_text, "base_commit"):
-        return ns.emit_fail(args.json, PREFIX, [f"{td}/TASK.md tanpa `base_commit` — akar belum terkunci"])
-    if args.remote is not None:
-        return diff_phase(args, config, docs, lambda remote: disk_extras(root, remote, docs, td, repo, head))
-    tkey, problem = ticket_key(task_text)
-    if problem:
-        return ns.emit_fail(args.json, PREFIX, [problem])
-    key, name = f"{SOURCE}:{repo}:{td}", posixpath.basename(td)
-    kinds = {d["key"]: d["type"] for d in docs}
-    briefs = [ns.frontmatter_value(texts[k], "status") for k, t in kinds.items() if t == "brief"]
-    done = "REPORT.md" in kinds
-    halted = "HALT.md" in kinds and ns.frontmatter_value(texts["HALT.md"], "status").upper() != HALT_REVOKED
-    blocked = halted or "BLOCKED" in briefs
-    status = "done" if done else "blocked" if blocked else "active"
-    problems = ns.workdir_problems(key, name, status)
+        return None, [f"{td}/TASK.md tanpa `base_commit` — akar belum terkunci"]
+
+    def diff(text: str):
+        return diff_result(docs, lambda remote: disk_extras(root, remote, docs, td, repo, head), text)
+
+    def phase1():
+        tkey, problem = ticket_key(task_text)
+        if problem:
+            return None, None, [problem]
+        key, name = f"{SOURCE}:{repo}:{td}", posixpath.basename(td)
+        kinds = {d["key"]: d["type"] for d in docs}
+        briefs = [ns.frontmatter_value(texts[k], "status") for k, t in kinds.items() if t == "brief"]
+        done = "REPORT.md" in kinds
+        halted = "HALT.md" in kinds and ns.frontmatter_value(texts["HALT.md"], "status").upper() != HALT_REVOKED
+        blocked = halted or "BLOCKED" in briefs
+        status = "done" if done else "blocked" if blocked else "active"
+        problems = ns.workdir_problems(key, name, status)
+        if problems:
+            return None, None, problems
+        ident = {"source": "analyst", "ticket_key": tkey} if tkey else {"source": SOURCE, "workdir_key": key}
+        title = ns.h1_title(task_text) or name
+        task = ns.task_args(config, args.workspace_id, ident, repo, title,
+                            ns.pick_sections(task_text, TASK_SECTIONS) or title)
+        # Workdir terbit → `in_progress` (28 T1). Task tiket bisa menaungi taskdir frontend juga (15 E8): ia baru
+        # `done` bila seluruh workdir di bawahnya tuntas, diputuskan dari balikan `list_workdir` (28 T2).
+        task["status"] = ns.task_status("done" if done and not tkey else "in_progress")
+        if tkey and done:
+            task["siblings"] = True
+        meta = {"source": SOURCE, "repo": repo, "path": td, "lane": ns.frontmatter_value(task_text, "lane"),
+                "chain": ns.frontmatter_value(task_text, "chain"), "risk": ns.frontmatter_value(task_text, "risk"),
+                "ticket_key": tkey or ""}
+        payload = {"status": "PASS", "enabled": True, "url": config["url"], "repo": repo,
+                   **ns.workspace_fields(args.workspace_id, args.workspace_choices), "task": task,
+                   "workdir": ns.workdir_args(key, name, status, {k: v for k, v in meta.items() if v}),
+                   "list_document": {"reference_table": "workdir", "include_content": False},
+                   "documents_total": len(docs)}
+        return payload, (lambda text: siblings_result(key, status, task, text)), []
+
+    return {"td": td, "diff": diff, "phase1": phase1}, []
+
+
+def run_taskdir(args, root: Path, config: Dict[str, Any]) -> int:
+    plan, problems = taskdir_plan(args, root, config)
     if problems:
         return ns.emit_fail(args.json, PREFIX, problems)
-    ident = {"source": "analyst", "ticket_key": tkey} if tkey else {"source": SOURCE, "workdir_key": key}
-    title = ns.h1_title(task_text) or name
-    task = ns.task_args(config, args.workspace_id, ident, repo, title,
-                        ns.pick_sections(task_text, TASK_SECTIONS) or title)
-    # Workdir terbit → `in_progress` (28 T1). Task tiket bisa menaungi taskdir frontend juga (15 E8): ia baru `done`
-    # bila seluruh workdir di bawahnya tuntas, diputuskan `--workdirs` atas balikan `list_workdir` (28 T2).
-    task["status"] = ns.task_status("done" if done and not tkey else "in_progress")
-    if tkey and done:
-        task["siblings"] = True
+    if args.remote is not None:
+        return emit_phase(args, config, plan["diff"], "--remote", args.remote, diff_line)
+    payload, siblings, problems = plan["phase1"]()
+    if problems:
+        return ns.emit_fail(args.json, PREFIX, problems)
     if args.workdirs is not None:
-        return siblings_phase(args, config, key, status, task)
-    meta = {"source": SOURCE, "repo": repo, "path": td, "lane": ns.frontmatter_value(task_text, "lane"),
-            "chain": ns.frontmatter_value(task_text, "chain"), "risk": ns.frontmatter_value(task_text, "risk"),
-            "ticket_key": tkey or ""}
-    payload = {"status": "PASS", "enabled": True, "url": config["url"], "repo": repo,
-               **ns.workspace_fields(args.workspace_id, args.workspace_choices), "task": task,
-               "workdir": ns.workdir_args(key, name, status, {k: v for k, v in meta.items() if v}),
-               "list_document": {"reference_table": "workdir", "include_content": False},
-               "documents_total": len(docs)}
-    ns.emit(payload, args.json, f"{PREFIX} PASS: {td} · workdir {name} ({status}) · {len(docs)} dokumen · server "
-                                f"{config['url']} — argumen tool lewat `--json`")
+        return emit_phase(args, config, siblings, "--workdirs", args.workdirs, siblings_line)
+    wd = payload["workdir"]
+    ns.emit(payload, args.json, f"{PREFIX} PASS: {plan['td']} · workdir {wd['name']} ({wd['status']}) · "
+                                f"{payload['documents_total']} dokumen · server {config['url']} — argumen tool lewat "
+                                f"`--json`")
     return 0
 
 
@@ -284,29 +330,57 @@ def workspace_label(args) -> str:
     return args.workspace_id or "-"
 
 
-def run_repo_docs(args, root: Path, config: Dict[str, Any]) -> int:
-    if args.workdirs is not None:
-        return ns.emit_fail(args.json, PREFIX, ["--workdirs hanya untuk --taskdir"])
+def repo_docs_plan(args, root: Path, config: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], List[str]]:
     repo = ns.repo_identity(root, config)
     rel_dir, docs, problems = select_repo_docs(root, args.repo_docs, repo)
     if problems:
-        return ns.emit_fail(args.json, PREFIX, problems)
+        return None, problems
     prefix = f"{repo}/{rel_dir}/"
-    if args.remote is not None:
-        return diff_phase(args, config, docs, lambda remote: mirrored_extras(
-            root, "workspace", remote, docs, lambda key: key[len(repo) + 1:] if key.startswith(prefix) else "", repo))
+
+    def diff(text: str):
+        return diff_result(docs, lambda remote: mirrored_extras(
+            root, "workspace", remote, docs, lambda key: key[len(repo) + 1:] if key.startswith(prefix) else "",
+            repo), text)
+
     payload = {"status": "PASS", "enabled": True, "url": config["url"], "repo": repo,
                **ns.workspace_fields(args.workspace_id, args.workspace_choices),
                "list_document": {"reference_table": "workspace", "include_content": False,
                                  "metadata": ns.compact({"source": SOURCE, "repo": repo})},
                "documents_total": len(docs)}
-    ns.emit(payload, args.json, f"{PREFIX} PASS: {rel_dir}/ · {len(docs)} dokumen → workspace "
-                                f"{workspace_label(args)} — argumen tool lewat `--json`")
+    return {"rel_dir": rel_dir, "diff": diff, "payload": payload}, []
+
+
+def run_repo_docs(args, root: Path, config: Dict[str, Any]) -> int:
+    if args.workdirs is not None:
+        return ns.emit_fail(args.json, PREFIX, ["--workdirs hanya untuk --taskdir"])
+    plan, problems = repo_docs_plan(args, root, config)
+    if problems:
+        return ns.emit_fail(args.json, PREFIX, problems)
+    if args.remote is not None:
+        return emit_phase(args, config, plan["diff"], "--remote", args.remote, diff_line)
+    ns.emit(plan["payload"], args.json, f"{PREFIX} PASS: {plan['rel_dir']}/ · {plan['payload']['documents_total']} "
+                                        f"dokumen → workspace {workspace_label(args)} — argumen tool lewat `--json`")
     return 0
 
 
+def push(args, root: Path, config: Dict[str, Any]) -> Dict[str, Any]:
+    """`--push`: seluruh fase dijalankan skrip ini sendiri terhadap server (29 S3)."""
+    if args.taskdir:
+        plan, problems = taskdir_plan(args, root, config)
+        if problems:
+            return ns.push_fail(problems)
+        payload, siblings, problems = plan["phase1"]()
+        if problems:
+            return ns.push_fail(problems)
+        return ns.run_push(root, config, lambda s: ns.push_workdir(s, payload, plan["diff"], siblings))
+    plan, problems = repo_docs_plan(args, root, config)
+    if problems:
+        return ns.push_fail(problems)
+    return ns.run_push(root, config, lambda s: ns.push_repo_docs(s, plan["payload"], plan["diff"]))
+
+
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Argumen tool MCP nataflow untuk artefak backend (read-only)")
+    ap = argparse.ArgumentParser(description="Sinkron nataflow untuk artefak backend (tanpa menulis berkas)")
     target = ap.add_mutually_exclusive_group(required=True)
     target.add_argument("--taskdir", help="backenddev/docs/<YYMMDDhhmm>-<slug>")
     target.add_argument("--repo-docs", dest="repo_docs", choices=sorted(REPO_DOCS),
@@ -314,6 +388,8 @@ def main() -> int:
     ap.add_argument("--workspace", default="", help="alias `workspaces` tujuan task baru atau induk dokumen repo; "
                                                     "wajib dipilih user bila config berisi lebih dari satu workspace")
     phase = ap.add_mutually_exclusive_group()
+    phase.add_argument("--push", action="store_true", help="kirim langsung ke server lewat MCP key lokal; keluaran "
+                                                           "satu baris segmen")
     phase.add_argument("--remote", default=None, help="teks balikan list_document include_content=false (`-` = stdin)")
     phase.add_argument("--workdirs", default=None, help="teks balikan list_workdir task_id (`-` = stdin), bila payload "
                                                         "membawa task.siblings")
@@ -321,13 +397,17 @@ def main() -> int:
     args = ap.parse_args()
     root = find_repo_root()
     config, problems = ns.load_config(root)
+    if not problems and config is not None:
+        args.workspace_id, args.workspace_choices, problems = ns.choose_workspace(config, args.workspace)
+    if args.push:
+        result = (ns.push_fail(problems) if problems else {"status": "SKIP"} if config is None
+                  else push(args, root, config))
+        return ns.emit_push(result, args.json, ns.push_segment(result, "repo" if args.repo_docs else
+                                                                 f"workdir {result.get('workdir', '')}"))
     if problems:
         return ns.emit_fail(args.json, PREFIX, problems)
     if config is None:
         return ns.emit_skip(args.json, PREFIX)
-    args.workspace_id, args.workspace_choices, problems = ns.choose_workspace(config, args.workspace)
-    if problems:
-        return ns.emit_fail(args.json, PREFIX, problems)
     return run_taskdir(args, root, config) if args.taskdir else run_repo_docs(args, root, config)
 
 

@@ -15,10 +15,13 @@ Isinya hanya primitif yang tidak bergantung pada artefak plugin mana pun:
   lebih dari satu → user memilih alias saat sinkron;
 - argumen tool MCP: task (`lookup`/`create`/`status`), workdir, dokumen (`upsert_document` tanpa `reference_id`);
 - diff dokumen terhadap manifest remote (balikan `list_document include_content=false`);
-- status penutup task tiket dari seluruh workdir di bawahnya (balikan `list_workdir task_id`, langkah 28).
+- status penutup task tiket dari seluruh workdir di bawahnya (balikan `list_workdir task_id`, langkah 28);
+- mesin `--push` (langkah 29): urutan panggilan tool workdir (`push_workdir`) dan dokumen repo (`push_repo_docs`)
+  lewat sesi `nataflow_client` (`run_push`), lalu satu baris segmen (`push_segment`).
 
-Sinkron tidak menulis berkas apa pun (D5). Semua `metadata` berupa teks JSON ringkas, karena tool MCP menerimanya
-sebagai string.
+Sinkron tidak menulis berkas apa pun (D5). Tanpa `--push` skrip hanya menyusun argumen tool; dengan `--push` skrip
+sendiri yang memanggil server, sehingga isi dokumen tidak pernah lewat konteks model. Semua `metadata` berupa teks
+JSON ringkas, karena tool MCP menerimanya sebagai string.
 
 Zero external dependencies (Python Standard Library only).
 """
@@ -28,7 +31,7 @@ import json
 import re
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from urllib.parse import urlsplit
 
 CONFIG_FILE = ".claude/nataflow.json"
@@ -612,3 +615,146 @@ def emit_skip(as_json: bool, prefix: str) -> int:
 def emit_fail(as_json: bool, prefix: str, problems: List[str]) -> int:
     emit({"status": "FAIL", "enabled": True, "problems": problems}, as_json, f"{prefix} FAIL: " + "; ".join(problems))
     return 1
+
+
+# ── Push (langkah 29) ─────────────────────────────────────────────────────────
+#
+# Hasil push adalah dict ber-`status`: `PASS` (beserta hitungan), `SKIP`, `FAIL` (`problems`), atau
+# `PILIH_WORKSPACE` (`workspace_choices`: user memilih alias, lalu skrip dijalankan ulang dengan `--workspace`).
+# Fungsi fase skrip pemanggil (`diff`, `siblings`) menerima teks balikan tool apa adanya dan mengembalikan
+# `(payload, masalah)` — fungsi yang sama dengan jalur `--remote -`/`--workdirs -`.
+
+PhaseFn = Callable[[str], Tuple[Optional[Dict[str, Any]], List[str]]]
+
+
+def push_fail(problems: List[str]) -> Dict[str, Any]:
+    return {"status": "FAIL", "problems": problems}
+
+
+def push_choose(choices: List[Dict[str, str]]) -> Dict[str, Any]:
+    return {"status": "PILIH_WORKSPACE", "workspace_choices": choices}
+
+
+def upsert_documents(session: Any, docs: List[Dict[str, Any]], reference_id: str) -> Dict[str, int]:
+    """`upsert_document` satu per satu (bukan batch: satu dokumen meleset tidak menggagalkan yang lain)."""
+    counts = {"created": 0, "updated": 0, "unchanged": 0}
+    for doc in docs:
+        out = session.call_json("upsert_document", dict(doc, reference_id=reference_id))
+        action = out.get("action") if isinstance(out, dict) else ""
+        counts[action if action in counts else "updated"] += 1
+    return counts
+
+
+def _documents(session: Any, list_args: Dict[str, Any], reference_id: str, diff: PhaseFn
+               ) -> Tuple[Optional[Dict[str, Any]], List[str]]:
+    text = session.call("list_document", dict(list_args, reference_id=reference_id), read=True)
+    result, problems = diff(text)
+    if problems:
+        return None, problems
+    counts = upsert_documents(session, result["documents"], reference_id)
+    return {"documents_total": result["documents_total"], "created": counts["created"],
+            "updated": counts["updated"], "same": result["same"] + counts["unchanged"]}, []
+
+
+def push_workdir(session: Any, payload: Dict[str, Any], diff: PhaseFn, siblings: Optional[PhaseFn] = None,
+                 dup_label: str = "identitas") -> Dict[str, Any]:
+    """Task → workdir → manifest → dokumen → status task, dari payload fase pertama skrip pemanggil.
+
+    Task kembar (lebih dari satu hasil `lookup`) menghentikan sinkron sebelum tool tulis mana pun. Task baru di config
+    berworkspace lebih dari satu tanpa `--workspace` → `PILIH_WORKSPACE`, juga sebelum tulisan apa pun. Workdir selalu
+    di workspace task induknya.
+    """
+    from nataflow_client import as_list
+    task = payload["task"]
+    found = as_list(session.call_json("list_task", task["lookup"], read=True), "tasks", "data")
+    if len(found) > 1:
+        return push_fail([f"{len(found)} task ber-{dup_label} sama ("
+                          + ", ".join(f"#{t.get('code') or t.get('id')}" for t in found) + ")"])
+    if found:
+        row = found[0]
+    elif payload.get("workspace_choices"):
+        return push_choose(payload["workspace_choices"])
+    else:
+        row = session.call_json("create_task", task["create"])
+    task_id = str(row.get("id") or "")
+    workspace_id = str((row.get("workspace") or {}).get("id") or row.get("workspace_id") or "")
+    if not task_id:
+        return push_fail(["balikan task tanpa `id`"])
+    wd_args = dict(payload["workdir"], task_id=task_id)
+    if workspace_id:
+        wd_args["workspace_id"] = workspace_id
+    workdir = session.call_json("upsert_workdir", wd_args)
+    workdir_id = str(workdir.get("id") or "") if isinstance(workdir, dict) else ""
+    if not workdir_id:
+        return push_fail(["balikan upsert_workdir tanpa `id`"])
+    docs, problems = _documents(session, payload["list_document"], workdir_id, diff)
+    if problems:
+        return push_fail(problems)
+    target = task.get("status")
+    if task.get("siblings") and siblings is not None:
+        args = {"task_id": task_id}
+        if workspace_id:
+            args["workspace_id"] = workspace_id
+        result, problems = siblings(session.call("list_workdir", args, read=True))
+        if problems:
+            return push_fail(problems)
+        target = result["task_status"]
+    status = str(row.get("status") or "")
+    if target and status in target["from"]:
+        session.call_json("update_task_status", {"task_id": task_id, "status": target["status"]})
+        status = target["status"]
+    return dict(docs, status="PASS", workdir=payload["workdir"]["name"], task_code=row.get("code") or task_id,
+                task_status=status)
+
+
+def push_repo_docs(session: Any, payload: Dict[str, Any], diff: PhaseFn) -> Dict[str, Any]:
+    """Induk workspace → manifest → dokumen. `workspace_choices` ditanyakan lebih dulu, sebelum panggilan apa pun;
+    tanpa `workspaces` di config, key yang menjangkau tepat satu workspace memakai workspace itu."""
+    from nataflow_client import as_list
+    if payload.get("workspace_choices"):
+        return push_choose(payload["workspace_choices"])
+    workspace_id = payload.get("workspace_id") or ""
+    if not workspace_id:
+        rows = as_list(session.call_json("list_workspace", {}, read=True), "workspaces", "data")
+        if len(rows) != 1:
+            return push_fail([f"key menjangkau {len(rows)} workspace — daftarkan di workspaces {CONFIG_FILE}"])
+        workspace_id = str(rows[0].get("id") or "")
+    docs, problems = _documents(session, payload["list_document"], workspace_id, diff)
+    if problems:
+        return push_fail(problems)
+    return dict(docs, status="PASS")
+
+
+def run_push(root: Path, config: Dict[str, Any], fn: Callable[[Any], Dict[str, Any]]) -> Dict[str, Any]:
+    """MCP key fail-closed → sesi `nataflow_client` → `fn(session)`; galat sesi/tool menjadi `FAIL`."""
+    import nataflow_client as nc
+    key, problems = load_key(root)
+    if problems:
+        return push_fail(problems)
+    try:
+        with nc.Session(config["url"], key) as session:
+            return fn(session)
+    except nc.NataflowError as exc:
+        return push_fail([exc.message])
+
+
+def push_segment(result: Dict[str, Any], what: str) -> str:
+    """Segmen baris penutup dari hasil push: `<what> · n dokumen (c baru, u diperbarui, s sama)`, `dilewati`,
+    `GAGAL: <sebab>`, atau instruksi `PILIH_WORKSPACE`."""
+    status = result["status"]
+    if status == "SKIP":
+        return "dilewati"
+    if status == "FAIL":
+        return "GAGAL: " + "; ".join(result["problems"])
+    if status == "PILIH_WORKSPACE":
+        return ("PILIH_WORKSPACE: " + ", ".join(f"{c['alias']} ({c['workspace_id']})" for c in
+                                                 result["workspace_choices"])
+                + " — tanyakan user, lalu jalankan ulang dengan --workspace <alias terpilih>")
+    return (f"{what} · {result['documents_total']} dokumen ({result['created']} baru, {result['updated']} diperbarui, "
+            f"{result['same']} sama)")
+
+
+def emit_push(result: Dict[str, Any], as_json: bool, segment: str) -> int:
+    """`--push`: satu baris segmen (atau JSON hasil + `segment`). Exit 1 hanya untuk `FAIL`."""
+    emit(dict(result, segment=segment), as_json, segment)
+    return 1 if result["status"] == "FAIL" else 0
