@@ -129,3 +129,20 @@ def test_u1_slug_dari_path():
     finally:
         sys.path.remove(str(SCRIPT.parent))
         sys.modules.pop("token_usage", None)
+
+
+@pytest.mark.parametrize("since,sesi", [
+    ("2026-11-05T01:00:00Z", 1),          # tepat di awal sesi: ikut
+    ("2026-11-05T08:00+07:00", 1),        # waktu yang sama dalam GMT+7
+    ("2026-11-05T01:30:00Z", 0),          # sesudah sesi mulai: dibuang
+    ("2026-11-05 08:30+07:00", 0),        # spasi sebagai pemisah tanggal-jam
+    ("2026-10-01", 2),                    # tanggal saja tetap didukung
+])
+def test_u1_since_menerima_jam_dan_zona(projects, since, sesi):
+    assert _run(projects, "ringkas", "--slug=-repo-api", "--turunan", "--since", since)["sesi"] == sesi
+
+
+def test_u1_since_tak_terbaca(projects):
+    proc = subprocess.run([sys.executable, str(SCRIPT), "ringkas", "--slug=-repo-api", "--since", "kemarin",
+                           "--projects-dir", str(projects), "--json"], capture_output=True, text=True, timeout=60)
+    assert proc.returncode == 2 and "--since tidak terbaca" in json.loads(proc.stdout)["error"]

@@ -16,6 +16,7 @@ bukan tagihan. Skrip tidak pernah mencetak isi prompt, isi dokumen, maupun isi b
 
     python3 scripts/token_usage.py ringkas --repo ~/work/hkm/wms --turunan
     python3 scripts/token_usage.py ringkas --slug=-home-me-work-app --since 2026-11-01 --json
+    python3 scripts/token_usage.py ringkas --repo ~/work/hkm/wms --turunan --since "2026-11-10 15:20+07:00"
     python3 scripts/token_usage.py explorer --repo ~/work/hkm/orderhub --turunan
 
 Dev-only: berkas ini tidak berada di `src/plugins/`, jadi tidak ikut terkirim ke cache plugin.
@@ -29,6 +30,7 @@ import re
 import statistics
 import sys
 from collections import Counter, defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple
 
@@ -48,6 +50,41 @@ def slug_of(path: str) -> str:
     Path dijadikan absolut tanpa resolve symlink, karena Claude Code menamai direktori dari cwd apa adanya
     (di macOS `resolve()` mengubah `/home` jadi `/System/Volumes/Data/home`)."""
     return re.sub(r"[^A-Za-z0-9]", "-", os.path.abspath(os.path.expanduser(path)))
+
+
+def parse_since(spec: str) -> Optional[datetime]:
+    """`YYYY-MM-DD`, `YYYY-MM-DD HH:MM[:SS]`, atau ISO 8601 ber-zona (`2026-11-10T15:20+07:00`, `…Z`).
+
+    Tanpa zona waktu → zona lokal mesin. Hasilnya selalu sadar zona (UTC) supaya bisa dibandingkan dengan
+    `timestamp` log yang ditulis dalam UTC.
+    """
+    spec = (spec or "").strip()
+    if not spec:
+        return None
+    try:
+        dt = datetime.fromisoformat(spec.replace("Z", "+00:00"))
+    except ValueError:
+        raise ValueError(f"--since tidak terbaca: {spec!r} (pakai YYYY-MM-DD, \"YYYY-MM-DD HH:MM\", "
+                         "atau ISO 8601 ber-zona seperti 2026-11-10T15:20+07:00)") from None
+    if dt.tzinfo is None:
+        dt = dt.astimezone()  # zona lokal
+    return dt.astimezone(timezone.utc)
+
+
+def session_start(recs: List[Dict[str, Any]]) -> Optional[datetime]:
+    ts = first_timestamp(recs)
+    try:
+        return datetime.fromisoformat(ts.replace("Z", "+00:00")) if ts else None
+    except ValueError:
+        return None
+
+
+def is_before(recs: List[Dict[str, Any]], since: Optional[datetime]) -> bool:
+    """Sesi dibuang bila mulainya sebelum `since`; sesi tanpa timestamp terbaca juga dibuang saat filter aktif."""
+    if since is None:
+        return False
+    start = session_start(recs)
+    return start is None or start < since
 
 
 def parse_bobot(spec: Optional[str]) -> Dict[str, float]:
@@ -174,7 +211,7 @@ def subagents(session: Path) -> List[Tuple[str, Path, Dict[str, Any]]]:
 
 # ============================================================ ringkas
 
-def analyze(files: List[Path], bobot: Dict[str, float], since: str = "") -> Dict[str, Any]:
+def analyze(files: List[Path], bobot: Dict[str, float], since: Optional[datetime] = None) -> Dict[str, Any]:
     main = Counter()
     ctx_all: List[int] = []
     peaks: List[int] = []
@@ -188,7 +225,7 @@ def analyze(files: List[Path], bobot: Dict[str, float], since: str = "") -> Dict
 
     for f in files:
         recs = read_jsonl(f)
-        if since and first_timestamp(recs)[:10] < since:
+        if is_before(recs, since):
             continue
         n_sessions += 1
         agents = subagents(f)
@@ -339,14 +376,14 @@ def render(r: Dict[str, Any], top: int) -> str:
 
 # ============================================================ explorer (Langkah 31 X4)
 
-def analyze_explorer(files: List[Path], bobot: Dict[str, float], since: str = "",
+def analyze_explorer(files: List[Path], bobot: Dict[str, float], since: Optional[datetime] = None,
                      agent: str = "backend:code-explorer") -> Dict[str, Any]:
     """Dispatch `agent` per fase/profil/kedalaman, biaya agentnya, dan ukuran balikannya."""
     rows: Dict[Tuple[str, str, str], Counter] = defaultdict(Counter)
     per_session: Dict[str, List[int]] = defaultdict(list)
     for f in files:
         recs = read_jsonl(f)
-        if since and first_timestamp(recs)[:10] < since:
+        if is_before(recs, since):
             continue
         # `meta.json` agent menyimpan `toolUseId` dispatch-nya: biaya dan balikan dipasangkan lewat id itu.
         cost_by_tool: Dict[str, float] = {}
@@ -419,7 +456,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--slug", action="append", default=[], help="Nama direktori di bawah --projects-dir; tulis --slug=<slug> karena slug diawali `-`")
     ap.add_argument("--turunan", action="store_true", help="Ikutkan slug turunan (sub-repo di bawah path itu)")
     ap.add_argument("--projects-dir", default=str(Path.home() / ".claude" / "projects"))
-    ap.add_argument("--since", default="", help="Hanya sesi yang mulai pada/sesudah YYYY-MM-DD")
+    ap.add_argument("--since", default="", help="Hanya sesi yang mulai pada/sesudah waktu ini: YYYY-MM-DD, \"YYYY-MM-DD HH:MM\" (zona lokal), "
+                    "atau ISO 8601 ber-zona (2026-11-10T15:20+07:00)")
     ap.add_argument("--bobot", default="", help="Mis. cr=0.1,cw=2,out=5 (relatif terhadap input)")
     ap.add_argument("--agent", default="backend:code-explorer", help="Tipe subagent untuk perintah explorer")
     ap.add_argument("--top", type=int, default=14)
@@ -428,6 +466,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     try:
         bobot = parse_bobot(args.bobot)
+        since = parse_since(args.since)
     except ValueError as exc:
         print(json.dumps({"status": "FAIL", "error": str(exc)}) if args.json else f"FAIL: {exc}")
         return 2
@@ -438,10 +477,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 2
     files = session_files(Path(args.projects_dir).expanduser(), slugs, args.turunan)
     if args.perintah == "ringkas":
-        result = analyze(files, bobot, args.since)
+        result = analyze(files, bobot, since)
         text = render(result, args.top)
     else:
-        result = analyze_explorer(files, bobot, args.since, args.agent)
+        result = analyze_explorer(files, bobot, since, args.agent)
         text = render_explorer(result)
     if args.json:
         print(json.dumps({"status": "PASS", "slug": slugs, **result}, ensure_ascii=False, indent=2))
