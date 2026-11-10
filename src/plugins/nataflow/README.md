@@ -1,6 +1,6 @@
 # nataflow
 
-Skill untuk kerja langsung dengan server nataflow lewat MCP. Berbeda dari sinkron di `analyst`, `backend`,
+Skill untuk kerja langsung dengan server nataflow lewat MCP, dipanggil skrip plugin sendiri (`python3` stdlib). Berbeda dari sinkron di `analyst`, `backend`,
 `frontend`, dan `quickdev` yang mencerminkan berkas repo ke nataflow, isi yang dibuat plugin ini hanya hidup di
 server: repo tidak disentuh dan tidak ada yang di-commit.
 
@@ -17,10 +17,11 @@ Prasyarat:
 
 - Akses ke server nataflow organisasi (`nataflow-api`, aplikasi terpisah yang tidak ikut marketplace ini): URL
   endpoint MCP `/mcp` dan MCP key dari admin nataflow. Tanpa akses itu plugin ini tidak dapat dipakai.
-- Server terdaftar di Claude Code user lewat `claude mcp add` beserta MCP key-nya (default bernama `nataflow-api`;
-  nama lain ditulis di `mcp_server` `.claude/nataflow.json`), dan backend-nya berjalan. Plugin tidak
-  mendeklarasikan server dan tidak menyimpan key. Langkah dan dampaknya bagi plugin lain: README root, bagian
-  "Server nataflow".
+- `.claude/nataflow.json` (root repo, atau cwd di luar git) berisi `url` endpoint MCP, mis.
+  `{"url": "https://api.flow.natakode.id/mcp"}`, dan `.claude/nataflow.local.json` berisi
+  `{"mcp_key": "<MCP key>"}` — di repo git berkas key wajib diabaikan git. Server tidak perlu didaftarkan di
+  Claude Code. Config lama ber-`mcp_server` ditolak: lihat `MIGRATION_v0.1.1_to_v0.2.0.md`. Dampaknya bagi plugin
+  lain: README root, bagian "Server nataflow".
 - `python3` ≥ 3.9 (hanya stdlib) untuk `skills/create-artifact/scripts/artifact.py`.
 - Repo git tidak wajib.
 
@@ -35,13 +36,13 @@ Skill boleh dipicu model (tanpa `disable-model-invocation`), jadi "buatkan artif
 Pemanggilan eksplisit: `/nataflow:create-artifact <apa yang ditampilkan>`.
 
 ```
-config (artifact.py)  →  get_project_info  →  [perbarui: list_artifacts / get_artifact]
-  →  draft HTML  →  check (artifact.py, maks 3 putaran)  →  cek tabrakan key  →  upsert_artifact
+artifact.py config (get_project_info)  →  [perbarui: artifact.py list / pull]
+  →  draft HTML  →  artifact.py check (maks 3 putaran)  →  artifact.py publish (cek tabrakan key → upsert_artifact)
   →  CREATED | UPDATED | UNCHANGED | DIBATALKAN | GAGAL
 ```
 
 - **Server sumber kebenaran.** Draft ditulis ke direktori scratchpad sesi (atau `<tmp>/nataflow-artifacts/`)
-  sebagai bahan kerja sementara. Pembaruan selalu berangkat dari `get_artifact`, bukan dari draft lama.
+  sebagai bahan kerja sementara. Pembaruan selalu berangkat dari `artifact.py pull` (isi `get_artifact` ditulis skrip ke berkas draft), bukan dari draft lama. Isi HTML tidak pernah lewat konteks model.
 - **Selalu project.** `reference_table` = `project` dan `reference_id` = `id` balikan `get_project_info`.
   Setiap MCP key terikat ke tepat satu project.
 - **Tidak menimpa diam-diam.** Sebelum artifact baru diterbitkan, key-nya dicek dengan `get_document`. Key milik
@@ -53,10 +54,13 @@ config (artifact.py)  →  get_project_info  →  [perbarui: list_artifacts / ge
 
 | Subperintah | Keluaran |
 |---|---|
-| `config [--json]` | `mcp_server` (dari `.claude/nataflow.json` root repo bila ada, default `nataflow-api`), `config_source`, `draft_dir` |
-| `check --file <draft> [--key <key>] [--json]` | `key` (dari `--key` atau slug `<title>`), `title`, `bytes`, `content_sha256`, `metadata` (`{"title","source"}`), `problems`, `warnings` |
+| `config [--json]` | `url`, `project_id`, `project_name` (project tunggal milik key), `draft_dir`; `FAIL` bila config/key belum disetel |
+| `check --file <draft> [--key <key>] [--json]` | tanpa jaringan: `key` (dari `--key` atau slug `<title>`), `title`, `bytes`, `content_sha256`, `metadata` (`{"title","source"}`), `problems`, `warnings` |
+| `list [--json]` | `artifacts` (`key`, `title`) project, tanpa isi |
+| `pull --key <key> --file <draft> [--json]` | menulis isi artifact ke berkas draft; `NOT_FOUND` bila tidak ada |
+| `publish --file <draft> [--key <key>] [--overwrite] [--json]` | `check`, cek tabrakan `get_document`, lalu `upsert_artifact`: `CREATED`/`UPDATED`/`UNCHANGED` + `id`, atau `TABRAKAN` (artifact lain, butuh `--overwrite`) / `TABRAKAN_DOKUMEN` (dokumen non-artifact, tidak pernah ditimpa) |
 
-Exit 0 = `PASS`, 1 = `FAIL`. `check` gagal bila salah satu berikut terjadi:
+Exit 1 hanya untuk `FAIL`; status lain exit 0. `check` gagal bila salah satu berikut terjadi:
 
 - berkas bukan UTF-8, ber-BOM, kosong, atau lebih dari 1 MiB;
 - tidak ada `<!doctype html>`, `<meta charset>`, `<meta name="viewport">`, atau `<title>` (maks 120 karakter);
@@ -75,7 +79,7 @@ lebih dari 6 kata. Kontrak lengkapnya ada di
 
 ### Kontrak tool MCP
 
-Tool artifact disediakan server `nataflow-api`. Yang dipakai skill:
+Tool artifact disediakan server `nataflow-api` dan dipanggil `artifact.py` lewat `nataflow_client` (bukan oleh model):
 
 | Tool | Argumen yang dikirim skill | Balikan yang dipakai |
 |---|---|---|

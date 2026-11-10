@@ -226,8 +226,9 @@ Tiap skill punya `skills/<skill>/scripts/check_preconditions.py` yang dijalankan
 | `_common/brief_status.py` | status brief dan penulis tunggalnya |
 | `_common/run_verification.py baseline\|closing` | verifikasi baseline dan penutup, log mesin di `.explore/` |
 | `_common/verify_scope.py` | diff commit/worktree terhadap `File scope` brief; kontrak brief wajib sama dengan `sidik_kontrak`-nya |
-| `_common/sync_payload.py` | argumen tool MCP nataflow untuk taskdir atau dokumen repo; read-only (lihat Sinkron nataflow) |
-| `_common/nataflow_sync.py` | pustaka sinkron nataflow, salinan identik di keempat plugin |
+| `_common/sync_payload.py` | sinkron nataflow taskdir atau dokumen repo; `--push` memanggil server dan mencetak satu baris segmen, tanpa `--push` argumen tool per fase (lihat Sinkron nataflow) |
+| `_common/nataflow_sync.py` | pustaka sinkron nataflow (config, key, mesin `--push`), salinan identik di lima lokasi |
+| `_common/nataflow_client.py` | klien MCP Streamable HTTP stdlib untuk `--push`, salinan identik di lima lokasi |
 | `plan/scripts/scaffold_brief.py` | kunci matriks alokasi, lalu kerangka brief |
 | `plan/scripts/validate_briefs.py` | validasi batch dan per-brief, ronde review brief |
 | `analyst/scripts/chain_counters.py` | plafon eskalasi, re-entry, amandemen akar, dan ronde reviewer; menolak tabel yang diturunkan tangan (log `.explore/counters-log.json`) |
@@ -254,10 +255,10 @@ di-commit), jadi nataflow satu-satunya salinannya di luar mesin ini; dokumen rep
 tidak menulis berkas dan tidak meng-commit, dan kegagalannya tidak menahan rantai.
 
 - **Aktif per repo** lewat `.claude/nataflow.json` (ter-commit, dibaca juga oleh `analyst`, `frontend`, dan
-  `quickdev`): `mcp_server` (default `nataflow-api`), `workspaces` (objek alias → UUID workspace;
+  `quickdev`): `url` endpoint MCP (wajib), `workspaces` (objek alias → UUID workspace;
   kosong → workspace milik key, satu entri → otomatis, lebih dari satu → user memilih saat task baru atau
   dokumen repo disinkron), `pic_id`, dan `repo` (default: remote `origin` ternormalisasi). Berkas absen → dilewati, dan prasyarat `task` mencetak `[PERINGATAN]` karena dokumen taskdir lalu
-  hanya ada di disk; ada tetapi rusak → `GAGAL`. Server MCP didaftarkan user di Claude Code; plugin tidak menyimpan key.
+  hanya ada di disk; ada tetapi rusak (termasuk `mcp_server` lama) → `GAGAL`. MCP key di `.claude/nataflow.local.json` (`{"mcp_key": "…"}`, tidak pernah di-commit; di repo git wajib diabaikan git, bila tidak sinkron menolak berjalan). Skrip memanggil server sendiri lewat `url`; server tidak perlu didaftarkan di Claude Code.
 - **Jangkar**: satu taskdir = satu workdir `backenddev:<repo>:<path taskdir>`, tertaut ke task tiket analyst
   bila `TASK.md` membawa `ticket_source` (taskdir frontend dari tiket yang sama bernaung di task itu juga),
   atau ke task baru dari `TASK.md`.
@@ -278,7 +279,7 @@ tidak menulis berkas dan tidak meng-commit, dan kegagalannya tidak menahan ranta
   `active`. Task naik ke `in_progress` sejak workdir terbit (akar terkunci); task milik taskdir ini menjadi `done`
   saat `REPORT.md` terbit, sedangkan task tiket baru `done` bila seluruh workdir di bawahnya (backend maupun
   frontend, dibaca lewat `list_workdir`) sudah `done`/`abandoned`. Status task tidak pernah diturunkan.
-- **Hemat token**: `sync_payload.py` menerbitkan isi hanya untuk dokumen yang berbeda dari manifest remote.
+- **Hemat token**: `sync_payload.py --push` memanggil server sendiri dan hanya mendorong dokumen yang berbeda dari manifest remote; isi dokumen tidak pernah lewat konteks model, model hanya membaca satu baris segmen.
 - **Gagal tidak memblokir**: slot **Nataflow** laporan `task`, `analyst`, `architect`, `report`, dan re-entry
   `tech-lead` memuat `dilewati` atau `GAGAL: <sebab>`. Ulangi lewat `/backend:tech-lead` ("sinkron ulang taskdir <slug>").
 

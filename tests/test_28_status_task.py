@@ -180,14 +180,13 @@ def test_fe_workdirs_hanya_untuk_taskdir(fe):
 # ── Prosedur ────────────────────────────────────────────────────────────────
 
 @pytest.mark.regression("28 T3")
+@pytest.mark.regression("29 S3")
 @pytest.mark.parametrize("ref", [BE_REF, FE_REF], ids=["backend", "frontend"])
-def test_prosedur_langkah_tujuh_memakai_list_workdir(ref):
+def test_prosedur_satu_perintah_push_dan_task_tiket_ditutup_skrip(ref):
+    """Langkah 1–8 lama (termasuk `list_workdir` saudara, 28 T3) kini dijalankan `sync_payload.py --push` (29 S3)."""
     text = ref.read_text(encoding="utf-8")
-    tool = text[text.index("2. **Tool.**"): text.index("3. **Task.**")]
-    assert "`…__list_workdir`" in tool and "Ketujuh tool" in tool
-    step = text[text.index("7. **Status task.**"): text.index("8. **Segmen.**")]
-    for needle in ("`task.siblings`", "`list_workdir` dengan `task_id` = `id` dan `workspace_id` = `workspace_id` task",
-                   "--taskdir <taskdir> --workdirs - --json", "`task_status` keluarannya", "`update_task_status`"):
+    step = text[text.index("## Langkah"): text.index("## Larangan")]
+    for needle in ("--taskdir <taskdir> --push", "Task tiket analyst baru ditutup `done` bila seluruh workdir",
+                   "PILIH_WORKSPACE", "AskUserQuestion", "--workspace <alias terpilih>"):
         assert needle in step, needle
-    rules = text[text.index("## Larangan"):]
-    assert "teksnya diserahkan ke `--workdirs` apa adanya" in rules
+    assert "ToolSearch" not in text and "--workdirs -" not in text

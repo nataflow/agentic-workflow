@@ -1,23 +1,26 @@
 ---
 name: create-artifact
-description: Gunakan ketika user meminta membuat atau memperbarui artifact nataflow — halaman HTML mandiri (laporan, dashboard, diagram, ringkasan, prototipe) yang disimpan ke project nataflow lewat tool MCP artifact dan dibuka anggota project di endpoint render — kontrak halaman satu berkas, gerbang artifact.py, dan upsert ke project milik MCP key, sebelum HTML disimpan ke repo atau dibagikan lewat jalur lain.
+description: Gunakan ketika user meminta membuat atau memperbarui artifact nataflow — halaman HTML mandiri (laporan, dashboard, diagram, ringkasan, prototipe) yang disimpan ke project nataflow lewat skrip artifact.py dan dibuka anggota project di endpoint render — kontrak halaman satu berkas, gerbang artifact.py, dan upsert ke project milik MCP key, sebelum HTML disimpan ke repo atau dibagikan lewat jalur lain.
 argument-hint: "[apa yang ingin ditampilkan | key artifact yang diperbarui]"
 ---
 
 ## THE IRON LAW
 
-ARTIFACT HANYA HIDUP DI SERVER NATAFLOW DAN SELALU MENEMPEL KE PROJECT MILIK MCP KEY. DILARANG MENERBITKAN DRAFT YANG BELUM `PASS` DI `artifact.py check`, DILARANG MENGIRIM ISI SELAIN BERKAS DRAFT APA ADANYA BERSAMA `content_sha256`-NYA, DAN DILARANG MENIMPA ARTIFACT YANG SUDAH ADA TANPA PERSETUJUAN EKSPLISIT USER. DILARANG MENULIS ARTIFACT KE REPO ATAU MENG-COMMIT APA PUN.
+ARTIFACT HANYA HIDUP DI SERVER NATAFLOW DAN SELALU MENEMPEL KE PROJECT MILIK MCP KEY. DILARANG MENERBITKAN DRAFT YANG BELUM `PASS` DI `artifact.py check`, DILARANG MENERBITKAN SELAIN LEWAT `artifact.py publish` ATAS BERKAS DRAFT APA ADANYA, DAN DILARANG MENIMPA ARTIFACT YANG SUDAH ADA TANPA PERSETUJUAN EKSPLISIT USER. DILARANG MENULIS ARTIFACT KE REPO ATAU MENG-COMMIT APA PUN.
 
 ## Precondition [REQUIRED]
 
-1. Server MCP nataflow terdaftar di Claude Code user beserta MCP key-nya, dan backend-nya berjalan. Plugin tidak
-   mendeklarasikan server dan tidak menyimpan key.
-2. Server itu menyediakan `get_project_info`, `list_artifacts`, `get_artifact`, `upsert_artifact`, dan
-   `get_document`.
-3. `python3` ≥ 3.9 untuk `${CLAUDE_PLUGIN_ROOT}/skills/create-artifact/scripts/artifact.py`.
+1. `.claude/nataflow.json` di root repo (atau cwd di luar git) berisi `url` endpoint MCP server nataflow, mis.
+   `{"url": "https://api.flow.natakode.id/mcp"}` — berkas yang sama dengan sinkron plugin lain.
+2. `.claude/nataflow.local.json` di tempat yang sama berisi `{"mcp_key": "<MCP key nataflow>"}`; di dalam repo git
+   berkas itu wajib diabaikan git (baris `.claude/nataflow.local.json` di `.gitignore`). Skill tidak pernah membaca,
+   mencetak, atau menyalin isinya. Key wajib terikat ke satu project.
+3. Server di `url` berjalan dan terjangkau, dan menyediakan `get_project_info`, `list_artifacts`, `get_artifact`,
+   `upsert_artifact`, serta `get_document`.
+4. `python3` ≥ 3.9 untuk `${CLAUDE_PLUGIN_ROOT}/skills/create-artifact/scripts/artifact.py`.
 
-Repo git tidak wajib. Bila skill dipanggil di dalam repo, `.claude/nataflow.json` di root repo (berkas yang sama
-dengan sinkron plugin lain) hanya dibaca untuk field `mcp_server`.
+Repo git tidak wajib. Config lama ber-`mcp_server` ditolak dengan pesan migrasi: lihat `MIGRATION_v0.1.1_to_v0.2.0.md`
+di root plugin nataflow.
 
 ## Koeksistensi [REQUIRED]
 
@@ -43,27 +46,23 @@ dengan sinkron plugin lain) hanya dibaca untuk field `mcp_server`.
 
 ### Fase 0 — Server dan project
 
-1. `<artifact.py> config --json`. `FAIL` → status `GAGAL: <isi problems apa adanya>`; selesai. `PASS` → pegang
-   `mcp_server` dan `draft_dir`.
-2. Muat lewat ToolSearch (`select:`) kelima tool `mcp__<mcp_server>__get_project_info`, `…__list_artifacts`,
-   `…__get_artifact`, `…__upsert_artifact`, dan `…__get_document`. Salah satu tidak tersedia → `GAGAL: tool
-   artifact tidak tersedia di server MCP <mcp_server>`; selesai.
-3. `get_project_info` tanpa argumen. Pegang `id` dan `name` project balikannya: `id` itulah `reference_id`
-   untuk setiap panggilan artifact, dengan `reference_table` = `project`. Tool galat → `GAGAL: <pesan tool apa
-   adanya>`; selesai.
+1. `<artifact.py> config --json`. `FAIL` → status `GAGAL: <isi problems apa adanya>`; selesai. Masalah setup (berkas
+   config atau key belum ada, key tidak diabaikan git, `mcp_server` lama) disampaikan ke user apa adanya bersama
+   Precondition. `PASS` → pegang `project_id`, `project_name`, dan `draft_dir`. Skrip sendiri yang memanggil
+   `get_project_info`; artifact selalu menempel ke project itu dengan `reference_table` = `project`.
 
 ### Fase 1 — Mode
 
 - **baru** → lanjut ke Fase 2 dengan draft kosong.
 - **perbarui** → tentukan artifact sasaran:
-  - `key` diketahui → `get_artifact` dengan `reference_table`, `reference_id`, dan `key`. Galat `document not
-    found` → tanyakan: *Buat artifact baru* · *Batal*.
-  - Hanya judul atau deskripsi → `list_artifacts` dengan `reference_table`, `reference_id`, dan
-    `include_content` = `false`; cocokkan dengan `key` dan `metadata.title` tiap entri. Tepat satu yang cocok →
-    `get_artifact` untuknya. Lebih dari satu → `AskUserQuestion` (satu opsi per kandidat, label `key`,
-    deskripsi `metadata.title`). Nol → tanyakan: *Buat artifact baru* · *Batal*.
-  - Tulis `content` balikan `get_artifact` apa adanya ke berkas draft (Fase 2 langkah 2), lalu pegang `key`-nya.
-    Server, bukan draft lama di disk, selalu menjadi titik awal pembaruan.
+  - Hanya judul atau deskripsi → `<artifact.py> list --json` (key dan judul tiap artifact project, tanpa isi);
+    cocokkan dengan `key` dan `title` tiap entri. Tepat satu yang cocok → pakai key-nya. Lebih dari satu →
+    `AskUserQuestion` (satu opsi per kandidat, label `key`, deskripsi `title`). Nol → tanyakan: *Buat artifact
+    baru* · *Batal*.
+  - Key diketahui → `<artifact.py> pull --key <key> --file <path draft Fase 2 langkah 2> --json`. Skrip menulis isi
+    artifact apa adanya ke berkas draft; isinya tidak pernah lewat chat. `NOT_FOUND` → tanyakan: *Buat artifact
+    baru* · *Batal*.
+  - Server, bukan draft lama di disk, selalu menjadi titik awal pembaruan.
 
 ### Fase 2 — Draft
 
@@ -85,35 +84,33 @@ dengan sinkron plugin lain) hanya dibaca untuk field `mcp_server`.
 
 ### Fase 4 — Terbit
 
-1. **Tabrakan key (mode `baru`).** `get_document` dengan `reference_table`, `reference_id`, dan `key`. Pakai
-   `get_document`, bukan `get_artifact`: `upsert_artifact` menimpa dokumen **apa pun** ber-key sama di induk itu
-   dan mengubahnya jadi artifact, sedangkan `get_artifact` menjawab `document not found` untuk dokumen
-   non-artifact.
-   - Galat `document not found` → lanjut.
-   - Ditemukan dengan `type` = `artifact` dan `mimetype` = `text/html` → `AskUserQuestion`: *Timpa artifact
-     `<key>` (<metadata.title lama>)* · *Pakai key `<key>-v2`* · *Batal*.
-   - Ditemukan dengan `type`/`mimetype` lain → jangan tawarkan timpa. `AskUserQuestion`: *Pakai key
-     `<key>-v2`* · *Batal*, dengan keterangan bahwa key itu sudah dipakai dokumen `<type>`.
+1. `<artifact.py> publish --file <draft> --json`, ditambah `--key <key>` bila Fase 3 memakainya, dan `--overwrite`
+   pada mode `perbarui` (artifact sasaran memang ditimpa). Skrip menjalankan ulang `check`, memeriksa tabrakan key
+   lewat `get_document` (bukan `get_artifact`: `upsert_artifact` menimpa dokumen **apa pun** ber-key sama di
+   induknya), lalu `upsert_artifact` berisi berkas draft apa adanya beserta `content_sha256`-nya; galat sha tidak
+   cocok dikirim ulang sekali oleh skrip.
+2. Baca `status` keluarannya:
+   - `CREATED`, `UPDATED`, `UNCHANGED` → pegang `id`; selesai. Balikan tidak memuat isi maupun URL.
+   - `TABRAKAN` (key sudah dipakai artifact lain, mode `baru`) → `AskUserQuestion`: *Timpa artifact `<key>`
+     (<existing_title>)* · *Pakai key `<key>-v2`* · *Batal*. Timpa → ulangi langkah 1 dengan `--overwrite`.
+   - `TABRAKAN_DOKUMEN` (key dipakai dokumen non-artifact `<existing_type>`) → jangan tawarkan timpa.
+     `AskUserQuestion`: *Pakai key `<key>-v2`* · *Batal*.
    - `-v2` → jalankan ulang Fase 3 dengan `--key <key>-v2` lalu langkah ini lagi (naikkan angkanya bila masih
-     bertabrakan). Batal → status `DIBATALKAN`; selesai. Galat tool lain → `GAGAL: <pesan tool apa adanya>`.
-2. `upsert_artifact` dengan `reference_table` = `project`, `reference_id` = `id` project Fase 0, `key`,
-   `content` = isi berkas draft apa adanya, `content_sha256`, dan `metadata` (teks JSON persis seperti tercetak).
-3. Galat `content_sha256 does not match content` → baca ulang berkas draft dan kirim sekali lagi tanpa mengubah
-   isinya. Gagal lagi, atau galat lain → `GAGAL: <pesan tool apa adanya>`.
-4. Pegang `action` (`created`, `updated`, `unchanged`) dan `id` balikan. Balikan tidak memuat isi maupun URL.
+     bertabrakan). Batal → status `DIBATALKAN`; selesai.
+   - `FAIL` → `GAGAL: <isi problems apa adanya>`.
 
 ## Larangan
 
-- Dilarang memakai `reference_table` selain `project` atau `reference_id` selain `id` dari `get_project_info`.
-- Dilarang memakai `upsert_document`/`create_document`/`create_artifact` untuk artifact (`create_artifact` tidak
-  ber-key dan memangkas spasi isi sehingga sha256 berubah), dan dilarang memanggil `delete_document`: skill ini
-  tidak pernah menghapus artifact. `get_document` hanya untuk cek tabrakan key di Fase 4.
+- Dilarang memanggil tool MCP nataflow (`mcp__…`) sendiri untuk skill ini: `artifact.py` satu-satunya jalur ke
+  server, sehingga isi HTML tidak pernah lewat konteks model.
+- Dilarang memakai `--overwrite` tanpa persetujuan eksplisit user, kecuali mode `perbarui` atas artifact yang
+  dipilih user. Skill ini tidak pernah menghapus artifact.
 - Dilarang menyunting `key`, `content_sha256`, atau `metadata` keluaran `check`, atau mengetik ulang isi HTML
-  dari ingatan saat memanggil `upsert_artifact`.
+  dari ingatan.
 - Dilarang menyalin draft ke repo, menambah berkas ke `.gitignore`, atau meng-commit. Bila user ingin salinan
   di repo, itu permintaan terpisah di luar skill ini.
 - Dilarang menyematkan rahasia (token, MCP key, password, isi `.env`) di halaman: artifact terbaca semua anggota
-  project.
+  project. Dilarang membaca, mencetak, atau menyunting `.claude/nataflow.local.json`.
 
 ## Output [REQUIRED]
 
@@ -133,12 +130,12 @@ Sesudah blok itu, satu kalimat tentang isi halaman. Jangan menempelkan HTML-nya 
 
 ## Failure path
 
-1. **Server MCP mati atau belum terdaftar** (`ECONNREFUSED`, tool tidak ditemukan) → `GAGAL`; sarankan user
-   menjalankan backend nataflow atau mendaftarkan server `<mcp_server>` beserta MCP key-nya. Draft tetap di
-   path Fase 2 untuk dicoba lagi.
-2. **Tool artifact belum ada, tetapi tool dokumen ada** → `GAGAL: server <mcp_server> belum menyediakan tool
-   artifact`. Jangan jatuh ke `upsert_document`.
-3. **`get_project_info` galat** (key tanpa project, key kedaluwarsa) → `GAGAL: <pesan tool>`; jangan menebak id
-   project.
-4. **Draft tidak lolos 3 putaran** → `GAGAL` dengan `problems` terakhir dan path draft, supaya user bisa
+1. **Server mati atau tak terjangkau** (`tidak dapat menghubungi <url>`) → `GAGAL`; sarankan user menjalankan
+   backend nataflow atau memeriksa `url`. Draft tetap di path Fase 2 untuk dicoba lagi.
+2. **Setup belum lengkap** (config/key tidak ada, key tidak diabaikan git, `mcp_server` lama) → `GAGAL` dengan
+   pesan skrip apa adanya; arahkan ke Precondition.
+3. **Key ditolak atau tidak terikat ke satu project** (`HTTP 401`, `key menjangkau <n> project`) → `GAGAL: <pesan
+   skrip>`; jangan menebak id project.
+4. **Tool artifact belum ada di server** (galat tool `not found`) → `GAGAL`. Jangan jatuh ke `upsert_document`.
+5. **Draft tidak lolos 3 putaran** → `GAGAL` dengan `problems` terakhir dan path draft, supaya user bisa
    memutuskan mengubah isi atau lingkup.

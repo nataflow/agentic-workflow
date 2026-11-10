@@ -39,7 +39,7 @@ Marketplace git memakai `version` di `plugin.json`: pengguna hanya mendapat peru
 - `python3` ≥ 3.9 di `PATH` untuk hook dan skrip `analyst`, `backend`, `frontend`, `nataflow`, `product`, dan `fullstack`. Semua skrip
   hanya memakai stdlib. Python 3.11+ disarankan untuk repo Rust ber-workspace (`tomllib`).
 - `git`. `backend` dan `frontend` mewajibkan repo git, sedangkan `analyst` dan `product` bisa berjalan di
-  folder dokumen biasa atau folder kosong. `nataflow` tidak butuh repo, tetapi butuh server MCP nataflow yang berjalan.
+  folder dokumen biasa atau folder kosong. `nataflow` tidak butuh repo, tetapi butuh server nataflow yang berjalan.
   `fullstack` justru berjalan di folder non-git yang menampung repo git (`<root>/<repo>` atau
   `<root>/<proyek>/<repo>`), dan butuh repo aplikasinya sudah diprofilkan `backend`/`frontend`.
 - Di Windows yang hanya punya `py`/`python` tanpa `python3`, hook SessionStart tidak jalan.
@@ -50,18 +50,23 @@ Marketplace git memakai `version` di `plugin.json`: pengguna hanya mendapat peru
 endpoint MCP `/mcp`. Marketplace ini tidak menyertakan server, URL, maupun MCP key-nya: keduanya didapat dari
 admin nataflow organisasi. Tanpa akses itu plugin `nataflow` tidak berguna, dan sinkron di plugin lain tidak aktif.
 
-**Pendaftaran.** Sekali per user, daftarkan server lewat `claude mcp add` dengan nama `nataflow-api` (atau nama
-lain yang lalu ditulis di field `mcp_server` `.claude/nataflow.json`), URL endpoint `/mcp` server, dan MCP key
-dengan cara autentikasi yang ditetapkan server. Plugin tidak mendeklarasikan server (tidak ada `.mcp.json`) dan
-tidak pernah menyimpan key. Server terhubung bila `/mcp` di Claude Code menampilkannya beserta tool seperti
-`get_project_info`. Tiap MCP key terikat ke tepat satu project; sinkron ke lebih dari satu workspace butuh key
-ber-scope project.
+**Setup per repo.** Skrip plugin berbicara MCP langsung ke server (`python3` stdlib), sehingga isi dokumen tidak
+pernah lewat konteks model dan server tidak perlu didaftarkan di Claude Code. Dua berkas di root repo:
+
+- `.claude/nataflow.json` (ter-commit, tanpa rahasia): `url` endpoint MCP (wajib, mis.
+  `https://api.flow.natakode.id/mcp`), ditambah `workspaces`, `pic_id`, dan `repo` opsional.
+- `.claude/nataflow.local.json` (tidak pernah di-commit): `{"mcp_key": "<MCP key>"}`. Di repo git berkas ini wajib
+  tercantum di `.gitignore`; bila tidak, atau bila sudah ter-track, sinkron menolak berjalan. Root non-git tidak dicek.
+
+Tiap MCP key terikat ke tepat satu project; sinkron ke lebih dari satu workspace butuh key ber-scope project. Repo
+yang masih memakai `mcp_server` (nama server MCP di Claude Code) gagal dengan pesan migrasi: lihat berkas
+`MIGRATION_v…` di root tiap plugin.
 
 **Siapa yang bergantung, dan apa yang terjadi tanpa server:**
 
 | Plugin | Pemakaian | Tanpa `.claude/nataflow.json` | Config ada, server tak terjangkau |
 |---|---|---|---|
-| `nataflow` | wajib — satu-satunya tujuan `create-artifact` | memakai default `nataflow-api` | `GAGAL`, draft tetap di disk, tanpa jalur cadangan |
+| `nataflow` | wajib — satu-satunya tujuan `create-artifact` | `GAGAL` dengan petunjuk setup | `GAGAL`, draft tetap di disk, tanpa jalur cadangan |
 | `analyst` | tiket → task, notulen → dokumen | sinkron dilewati | segmen `nataflow GAGAL`, alur tidak tertahan |
 | `backend`, `frontend` | taskdir → workdir beserta dokumennya | sinkron dilewati; gerbang `task` memperingatkan | segmen `nataflow GAGAL`, rantai tidak tertahan |
 | `quickdev` | rencana → workdir | sinkron dilewati | segmen `nataflow GAGAL`, alur tidak tertahan |

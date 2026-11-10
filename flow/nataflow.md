@@ -1,7 +1,8 @@
 # Alur Plugin `nataflow`
 
 Peta end-to-end plugin `nataflow`: skill yang bekerja langsung terhadap server nataflow lewat MCP, tanpa
-artefak di repo pengguna.
+artefak di repo pengguna. Semua panggilan server dijalankan `artifact.py` lewat `nataflow_client.py`
+(langkah 29); model tidak memanggil tool MCP dan isi HTML tidak lewat konteksnya.
 
 ## Peta Komponen
 
@@ -9,26 +10,24 @@ artefak di repo pengguna.
 |---|---|---|
 | Skill `create-artifact` | `src/plugins/nataflow/skills/create-artifact/SKILL.md` | tulis, nilai, dan terbitkan halaman HTML ke project MCP key |
 | Kontrak halaman | `skills/create-artifact/references/page-contract.md` | aturan kerangka, aset, tema, tata letak, sandbox render, dan larangan isi |
-| Gerbang | `skills/create-artifact/scripts/artifact.py` | `config` (server MCP, direktori draft) dan `check` (kontrak halaman, key, sha256, metadata) |
+| Gerbang | `skills/create-artifact/scripts/artifact.py` | `config` (url, key, project), `check` (kontrak halaman, key, sha256, metadata), `list`, `pull`, `publish` |
+| Pustaka bersama | `skills/create-artifact/scripts/nataflow_sync.py`, `nataflow_client.py` | config `url` + MCP key `.claude/nataflow.local.json`, klien MCP; salinan identik plugin sinkron |
 
-Tanpa subagent, tanpa hook, tanpa taskdir, dan tanpa `nataflow_sync.py`.
+Tanpa subagent, tanpa hook, dan tanpa taskdir.
 
 ## `nataflow:create-artifact`
 
 ```
-Fase 0  artifact.py config  ── FAIL ─────────────────────────────→ GAGAL
-        ToolSearch 5 tool   ── tidak ada ────────────────────────→ GAGAL
-        get_project_info    ── galat ────────────────────────────→ GAGAL
-Fase 1  mode perbarui: list_artifacts → get_artifact → isi ke draft
-                            ── not found → tanya: baru | batal
+Fase 0  artifact.py config (url, key, get_project_info) ── FAIL ──→ GAGAL
+Fase 1  mode perbarui: artifact.py list → artifact.py pull (isi ke draft)
+                            ── NOT_FOUND → tanya: baru | batal
 Fase 2  draft HTML (page-contract.md)
 Fase 3  artifact.py check  ── FAIL ×3 ───────────────────────────→ GAGAL
-Fase 4  mode baru: get_document(key)
-                            ── artifact     → tanya: timpa | -v2 | batal
-                            ── non-artifact → tanya: -v2 | batal
+Fase 4  artifact.py publish [--overwrite]: check → get_document(key) → upsert_artifact
+                            ── TABRAKAN          → tanya: timpa (--overwrite) | -v2 | batal
+                            ── TABRAKAN_DOKUMEN  → tanya: -v2 | batal
                             ── batal ──────────────────────────────→ DIBATALKAN
-        upsert_artifact(project, id, key, content, sha256, metadata)
-                            ── sha tidak cocok → kirim ulang sekali
+                            ── sha tidak cocok → skrip kirim ulang sekali
         → CREATED | UPDATED | UNCHANGED
 ```
 

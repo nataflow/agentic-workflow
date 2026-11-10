@@ -307,8 +307,17 @@ def test_skill_collision_check_uses_get_document():
     """upsert_artifact menimpa dokumen non-artifact ber-key sama; get_artifact tidak melihatnya."""
     text = _skill()
     fase4 = text.split("### Fase 4", 1)[1].split("## Larangan", 1)[0]
-    assert "`get_document` dengan `reference_table`, `reference_id`, dan `key`" in fase4
-    assert "jangan tawarkan timpa" in fase4
+    assert "`<artifact.py> publish" in fase4 and "lewat `get_document`" in fase4
+    assert "`TABRAKAN_DOKUMEN`" in fase4 and "jangan tawarkan timpa" in fase4
+
+
+@pytest.mark.regression("29 S6")
+def test_skill_tanpa_tool_mcp_langsung():
+    """Langkah server dijalankan artifact.py; skill tidak lagi memuat tool `mcp__…` lewat ToolSearch."""
+    text = _skill()
+    assert "ToolSearch" not in text and "mcp_server`." not in text
+    for cmd in ("config --json", "list --json", "pull --key", "publish --file"):
+        assert f"<artifact.py> {cmd}" in text, cmd
 
 
 def test_page_contract_hosts_match_script():

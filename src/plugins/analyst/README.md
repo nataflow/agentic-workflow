@@ -204,11 +204,11 @@ apa adanya. Kerangka dan aturan isinya: `skills/notulen/templates/notulen-templa
 | `_common/ticket.py commit --stage draft\|tertunda` | satu-satunya jalan commit draft `DRAFT`: `draft` (spec Phase 4, `TICKET.md` + `review.md`, subjek `draft TICKET <slug>` atau `revise TICKET <slug>` sesudah `revise`) dan `tertunda` (elisitasi tertahan, subjek `elisitasi <slug> (tertunda)`); tiket `READY` ditolak |
 | `_common/ticket.py revise` / `reopen` / `cancel` | plafon 3 revisi per basis fakta; buka ulang tiket `READY`; tutup ticketdir (direktori kosong dihapus; tiket `READY` hanya dengan `--force`; di-commit `docs(ticket): batalkan TICKET <slug>`) |
 | `_common/ticket.py ref` | isi `external_ref` pada `DRAFT`/`READY`; `DRIFT`/`RUSAK` ditolak (subjek `ref TICKET` dibaca penerima tiket lama sebagai tanda terkunci); `READY` di-commit `docs(ticket): ref TICKET <slug>`, `DRAFT` tidak di-commit |
-| `_common/ticket.py sync-payload` | argumen tool MCP nataflow untuk tiket `READY` (bukan `DRIFT`/`RUSAK`): `lookup` (`list_task`), `create`, `update` — judul dari H1, deskripsi = kartu tanpa catatan elisitasi, `metadata` teks JSON byte-stabil berkunci `ticket_key`; `documents` (`review.md`); tiket pernah-`READY` yang dibatalkan → `lookup` + `task_status` `cancelled`; `SKIP` tanpa `.claude/nataflow.json` maupun `analyst/nataflow.json`, `FAIL` bila config rusak atau keduanya berbeda isi; read-only, tanpa commit |
+| `_common/ticket.py sync-payload` | sinkron nataflow tiket (`--push`: panggil server, satu baris segmen; tanpa itu argumen tool) untuk tiket `READY` (bukan `DRIFT`/`RUSAK`): `lookup` (`list_task`), `create`, `update` — judul dari H1, deskripsi = kartu tanpa catatan elisitasi, `metadata` teks JSON byte-stabil berkunci `ticket_key`; `documents` (`review.md`); tiket pernah-`READY` yang dibatalkan → `lookup` + `task_status` `cancelled`; `SKIP` tanpa `.claude/nataflow.json` maupun `analyst/nataflow.json`, `FAIL` bila config rusak atau keduanya berbeda isi; read-only, tanpa commit |
 | `notulen/scripts/notulen.py state` / `new` | keadaan tiap notulendir (`DRAFT`, `FINAL`, `DRIFT`, `RUSAK`, `NAMA_TIDAK_SAH`); notulendir baru beserta kerangka persis bagian 1 `notulen-template.md`, catatan asli verbatim, `source_hash`, dan `analyst/notulen/.gitignore` |
 | `notulen/scripts/notulen.py check` | struktur dan urutan H2, catatan asli sama dengan `source_hash`, seksi isi terisi, `D-{n}`/`A-{n}`/`Q-{n}` berurutan, action item ber-PIC dan bertenggat `YYYY-MM-DD` atau `belum ditentukan`, nol placeholder, nol `` `path:baris` `` di luar `## Catatan Asli` (konteks `code-scout` bukan isi notulen); `--final` ⇒ nol `Asumsi:` |
 | `notulen/scripts/notulen.py final` | satu-satunya penulis `FINAL`: validator `PASS` dan jawaban user tidak kosong; menyegel `final_hash`; tanpa commit |
-| `notulen/scripts/notulen.py sync-payload` | argumen dokumen nataflow untuk notulen `FINAL` (bukan `DRAFT`/`DRIFT`): `lookup` (`list_document` bersaring `notulen_key`), `create` (`create_document`, judul `<H1> — <tanggal rapat>`), `update` (`upsert_document` dengan `content_sha256`); isi tanpa frontmatter dan tanpa `## Catatan Asli`; read-only |
+| `notulen/scripts/notulen.py sync-payload` | sinkron nataflow notulen (`--push`: panggil server, satu baris segmen; tanpa itu argumen tool) untuk notulen `FINAL` (bukan `DRAFT`/`DRIFT`): `lookup` (`list_document` bersaring `notulen_key`), `create` (`create_document`, judul `<H1> — <tanggal rapat>`), `update` (`upsert_document` dengan `content_sha256`); isi tanpa frontmatter dan tanpa `## Catatan Asli`; read-only |
 
 Kontrak exit `close`/`approve`/`ref`/`cancel`/`commit`: 0 = tertulis dan ter-commit (atau tanpa git, isinya sudah sama
 dengan HEAD, atau diabaikan `.gitignore`), 1 = ditolak, 3 = tertulis tetapi commit gagal (hook, gpg, index terkunci) — baris `COMMIT GAGAL` memuat sebab git dan perintah commit manualnya, lengkap dengan subjeknya.
@@ -299,18 +299,17 @@ kebenaran; task hanya cermin kartunya, dan tidak ada yang ditulis balik ke `TICK
 sinkron tidak meng-commit tiketnya (lihat Git), sehingga task inilah satu-satunya salinan kartu di luar disk lokal.
 
 - **Aktif per repo** lewat `.claude/nataflow.json` (ter-commit, dibaca juga oleh `backend`, `frontend`, dan
-  `quickdev`): `mcp_server` (default `nataflow-api`), `workspaces` (objek alias → UUID workspace;
+  `quickdev`): `url` endpoint MCP (wajib), `workspaces` (objek alias → UUID workspace;
   kosong → workspace milik key, satu entri → otomatis, lebih dari satu → user memilih saat tiket pertama kali
   disinkron), `pic_id` (UUID; kosong → pemilik key), dan `repo` (default: remote `origin` ternormalisasi). Berkas
   lama `analyst/nataflow.json` tetap diterima; bila keduanya ada dengan isi berbeda → `GAGAL`. Berkas absen →
-  sinkron dilewati; ada tetapi rusak (kunci asing termasuk `workspace_id` tunggal lama, nilai bukan string, alias atau UUID tidak
+  sinkron dilewati; ada tetapi rusak (kunci asing termasuk `mcp_server` dan `workspace_id` tunggal lama, nilai bukan string, alias atau UUID tidak
   sah) → `GAGAL`. Workspace pilihan tidak ditulis ke `TICKET.md`; task yang sudah ada ditemukan di workspace mana
   pun dalam jangkauan key, dan taskdir engineer dari tiket itu menaruh workdir-nya di workspace yang sama.
-- **Prasyarat di luar plugin**: server MCP nataflow terdaftar di Claude Code beserta MCP key-nya. Plugin tidak
-  mendeklarasikan server dan tidak menyimpan key.
+- **Prasyarat di luar plugin**: MCP key di `.claude/nataflow.local.json` (`{"mcp_key": "…"}`, tidak pernah di-commit; di repo git wajib diabaikan git, bila tidak sinkron menolak berjalan). Skrip memanggil server sendiri lewat `url`; server tidak perlu didaftarkan di Claude Code.
 - **Kapan**: `analyst:spec` sesudah `approve` (`READY` tertulis, termasuk bila commit-nya gagal). Prosedurnya
-  di `skills/spec/references/nataflow-sync.md`: `ticket.py sync-payload` menyusun seluruh argumen, lalu model
-  mencari task lewat `list_task` bersaring `{"source":"analyst","ticket_key":<ticketdir>}` — tidak ada →
+  di `skills/spec/references/nataflow-sync.md`: `ticket.py sync-payload --push` menyusun seluruh argumen lalu
+  memanggil server sendiri: mencari task lewat `list_task` bersaring `{"source":"analyst","ticket_key":<ticketdir>}` — tidak ada →
   `create_task`, satu → `update_task` (judul, kartu, dan metadata dikirim ulang utuh), lebih dari satu →
   berhenti tanpa menulis. Approve ulang sesudah `reopen` memperbarui task yang sama; tiket baru ber-slug sama
   menjadi task baru karena ticketdir-nya berbeda.

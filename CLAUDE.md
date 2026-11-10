@@ -104,7 +104,7 @@ skeletons), `dispatcher/` (prompts used to dispatch subagents), `scripts/`, and 
   guarded by `_common/plan_lock.py`.
 - **nataflow** — direct work against the nataflow server over MCP, no repo artifacts. `create-artifact`
   writes a self-contained HTML page, gates it with `skills/create-artifact/scripts/artifact.py check`, and
-  upserts it under the MCP key's project via the `nataflow-api` `*_artifact` MCP tools. Model-invocable.
+  `artifact.py publish` upserts it under the MCP key's project via the `*_artifact` tools. Model-invocable.
 - **product** — initiation of a new product (empty folder, mode `NEW_PRODUCT`), a new feature, or an
   improvement (codebase, `NEW_FEATURE`/`IMPROVEMENT`) into `product/<slug>/CHARTER.md` with six pillars
   (Purpose, Actors, Business Process, Business Rules, Success Criteria, Scope). Entry `product:init` runs a
@@ -130,6 +130,14 @@ skeletons), `dispatcher/` (prompts used to dispatch subagents), `scripts/`, and 
 Repo profiles are per plugin: `.claude/profile/backenddev/` and `.claude/profile/frontenddev/`
 (`index.json` + fixed set of `.md` files; see `BE_PROFILE_MD`/`FE_PROFILE_MD` in `tests/conftest.py`).
 The legacy flat `.claude/profile/` location is migrated by `migrate_profile.py`.
+
+Nataflow sync (step 29) never goes through model tool calls: every sync script takes `--push` and talks MCP
+Streamable HTTP itself through `skills/_common/nataflow_client.py`, printing one segment line, so document
+content never enters the model's context. `.claude/nataflow.json` (committed) carries the required `url`;
+the MCP key lives in `.claude/nataflow.local.json`, which `nataflow_sync.load_key` refuses unless git ignores
+it (non-git roots are allowed). `nataflow_sync.py` and `nataflow_client.py` are byte-identical in
+`analyst`/`backend`/`frontend`/`quickdev` `skills/_common/` and `nataflow/skills/create-artifact/scripts/`
+(tests assert it); `tests/nataflow_fake.py` is the fake MCP server the push tests run against.
 
 Taskdir docs live outside git (step 24): `skills/_common/docs_git.py` writes the self-ignoring marker
 `<prefix>/docs/.gitignore` (`*`) from the entry gates (backend `tech-lead` check 3, frontend `task` check 10)

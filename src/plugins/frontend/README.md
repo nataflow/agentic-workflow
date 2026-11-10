@@ -301,10 +301,10 @@ tidak menulis berkas, tidak meng-commit, dan tidak menjalankan `chain.py`, sehin
 tidak tersentuh. Kegagalannya tidak menahan gate maupun eksekusi.
 
 - **Aktif per repo** lewat `.claude/nataflow.json` (ter-commit, dibaca juga oleh `analyst`, `backend`, dan
-  `quickdev`): `mcp_server` (default `nataflow-api`), `workspaces` (objek alias → UUID workspace;
+  `quickdev`): `url` endpoint MCP (wajib), `workspaces` (objek alias → UUID workspace;
   kosong → workspace milik key, satu entri → otomatis, lebih dari satu → user memilih saat task baru atau
   dokumen repo disinkron), `pic_id`, dan `repo` (default: remote `origin` ternormalisasi). Berkas absen → dilewati, dan check 10 prasyarat `task` memberi `WARN` karena dokumen taskdir lalu
-  hanya ada di disk; ada tetapi rusak → `GAGAL`. Server MCP didaftarkan user di Claude Code; plugin tidak menyimpan key.
+  hanya ada di disk; ada tetapi rusak (termasuk `mcp_server` lama) → `GAGAL`. MCP key di `.claude/nataflow.local.json` (`{"mcp_key": "…"}`, tidak pernah di-commit; di repo git wajib diabaikan git, bila tidak sinkron menolak berjalan). Skrip memanggil server sendiri lewat `url`; server tidak perlu didaftarkan di Claude Code. `sync_payload.py --push` menjalankan seluruh langkah dan mencetak satu baris segmen.
 - **Jangkar**: satu taskdir = satu workdir `frontenddev:<repo>:<path taskdir>`, tertaut ke task tiket analyst
   bila `TASK.md` membawa `ticket_source` (taskdir backend dari tiket yang sama bernaung di task itu juga), atau
   ke task baru dari `TASK.md`.

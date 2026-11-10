@@ -9,7 +9,7 @@ description: Gunakan ketika user membawa catatan kasar rapat atau meeting (poin-
 - Butir dicatat sebagai **Keputusan** hanya bila catatan atau pencatat menyatakannya diputuskan. Selain itu butir masuk **Pembahasan**.
 - `status: FINAL` hanya ditulis `notulen.py final` sesudah jawaban eksplisit user. Skrip memvonis validator dan menyegel isi notulen.
 - Konteks utama tidak membaca kode. Pembacaan kode hanya lewat subagent `analyst:code-scout` mode `KONTEKS` (`dispatcher/scout.md`), maksimal 2 dispatch per notulen. Balikannya bahan bertanya ke pencatat, bukan isi notulen, dan `path:baris` ditolak `notulen.py check`.
-- Notulen tidak menghasilkan tiket dan tidak di-commit. `analyst/notulen/` selalu diabaikan git; salinannya di luar disk hanya dokumen nataflow, yang isinya disusun `notulen.py sync-payload`, bukan model.
+- Notulen tidak menghasilkan tiket dan tidak di-commit. `analyst/notulen/` selalu diabaikan git; salinannya di luar disk hanya dokumen nataflow, yang isinya disusun dan dikirim `notulen.py sync-payload --push`, bukan model.
 
 ## Precondition [REQUIRED]
 

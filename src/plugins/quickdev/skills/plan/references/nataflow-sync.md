@@ -6,60 +6,41 @@ Rencana dan profil di disk tetap satu-satunya sumber kebenaran; nataflow hanya c
 
 `<plan_lock.py>` di bawah adalah perintah `python3 …/skills/_common/plan_lock.py` yang sama dengan yang dipakai skill pemanggil.
 
-## Langkah — rencana
 
-1. **Payload.** `<plan_lock.py> sync-payload --plan <plan_path> --json`. Baca field `status` keluarannya:
-   - `SKIP` (`.claude/nataflow.json` tidak ada di repo) → segmen `dilewati`; selesai.
-   - `FAIL` → segmen `GAGAL: <isi problems apa adanya>`; selesai.
-   - `PASS` → pegang `mcp_server`, `task`, `workdir`, `list_document`, dan `documents_total` apa adanya. `workspace_choices` ikut ada bila `.claude/nataflow.json` berisi lebih dari satu workspace; baru dipakai di langkah 3.
-2. **Tool.** Keenam tool bernama `mcp__<mcp_server>__list_task`, `…__create_task`, `…__update_task_status`, `…__upsert_workdir`, `…__list_document`, dan `…__upsert_document`. Yang masih tertunda dimuat lebih dulu lewat ToolSearch (`select:` keenamnya). Salah satu tidak tersedia → segmen `GAGAL: server MCP <mcp_server> tidak tersedia`; selesai.
-3. **Task.** Panggil `list_task` dengan argumen `task.lookup` apa adanya, lalu hitung task di hasilnya:
-   - 0 → bila payload membawa `workspace_choices`, tanyakan dulu workspace tujuan lewat `AskUserQuestion` (satu opsi per entri: label `alias`, deskripsi `workspace_id`), lalu jalankan ulang langkah 1 dengan `--workspace <alias terpilih>` dan pakai `task` keluarannya. Lalu `create_task` dengan argumen `task.create` apa adanya; task balikannya dipakai di langkah berikut.
-   - 1 → pakai task itu.
-   - Lebih dari 1 → jangan memanggil tool tulis apa pun; segmen `GAGAL: <n> task ber-workdir_key sama`; selesai.
-4. **Workdir.** `upsert_workdir` dengan argumen `workdir` apa adanya ditambah `task_id` = `id` dan `workspace_id` = `workspace_id` task langkah 3, sehingga workdir selalu berada di workspace task induknya.
-5. **Manifest.** `list_document` dengan argumen `list_document` apa adanya ditambah `reference_id` = `id` workdir langkah 4. Serahkan teks balikannya apa adanya lewat stdin:
+## Langkah
 
-   ```
-   <plan_lock.py> sync-payload --plan <plan_path> --remote - --json <<'QD_EOF'
-   <teks balikan list_document apa adanya>
-   QD_EOF
-   ```
+Jalankan `<plan_lock.py> sync-payload --plan <plan_path> --push` untuk rencana, atau `<plan_lock.py> sync-payload --repo-profile <target_path> --push` untuk varian profil (`quickdev:profile`).
 
-   `FAIL` → segmen `GAGAL: <isi problems apa adanya>`; selesai. `PASS` → pegang `documents` dan `same`.
-6. **Dokumen.** Untuk tiap entri `documents`: `upsert_document` dengan entri itu apa adanya ditambah `reference_id` = `id` workdir. Catat `action` balikan (`created`, `updated`, `unchanged`).
-7. **Status task.** `task.status` terisi dan `status` task langkah 3 termasuk dalam `task.status.from` → `update_task_status` dengan `task_id` dan `status` = `task.status.status`. Selain itu lewati.
-8. **Segmen.** `workdir <workdir.name> · <documents_total> dokumen (<created> baru, <updated> diperbarui, <same + unchanged> sama)`. Tool galat di langkah mana pun → segmen `GAGAL: <pesan tool apa adanya>`, dan langkah sesudahnya tidak dijalankan.
+Skrip membaca config dan MCP key, lalu memanggil sendiri tool server nataflow. Rencana: cari task lewat `workdir_key` (buat bila belum ada), `upsert_workdir` di workspace task induknya, manifest, `upsert_document` hanya bila rencana berbeda, lalu status task (`in_progress` sejak workdir terbit, `done` saat eksekusi `COMPLETED`). Profil: dokumen `profile` di bawah workspace. Isi rencana dan profil tidak pernah lewat konteks model.
 
-## Langkah — profil
+Keluarannya tepat satu baris, yang disalin apa adanya sebagai segmen:
 
-Dipakai `quickdev:profile` sesudah profil tertulis. Urutannya sama dengan langkah rencana, dengan perbedaan berikut:
-
-- Langkah 1 memakai `<plan_lock.py> sync-payload --repo-profile <target_path> --json`. `PASS` membawa `workspace_id` (ditambah `workspace_choices` bila workspace lebih dari satu), bukan `task`/`workdir`.
-- Langkah 2 cukup memuat `list_workspace`, `list_document`, dan `upsert_document`.
-- Langkah 3–4 diganti penentuan induk: `workspace_choices` ada → tanyakan dulu workspace tujuan lewat `AskUserQuestion` (satu opsi per entri: label `alias`, deskripsi `workspace_id`), lalu jalankan ulang langkah 1 dengan `--workspace <alias terpilih>`; `workspace_id` keluarannya induknya. `workspace_id` terisi → itu induknya. Kosong tanpa pilihan (`workspaces` tidak diisi) → `list_workspace`, dan tepat satu workspace → `id`-nya; selain itu segmen `GAGAL: key menjangkau <n> workspace — daftarkan di workspaces .claude/nataflow.json`; selesai.
-- Langkah 5–6 memakai `reference_id` = workspace itu, dan perintah `--remote` memakai `--repo-profile <target_path>`. Langkah 7 tidak ada.
-- Segmen: `repo · <documents_total> dokumen (<created> baru, <updated> diperbarui, <same + unchanged> sama)`.
+- `workdir <nama> · <n> dokumen (<c> baru, <u> diperbarui, <s> sama)` atau `repo · <n> dokumen (…)` → selesai.
+- `dilewati` (`.claude/nataflow.json` tidak ada) → selesai.
+- `GAGAL: <sebab>` → selesai. Sebab setup (`.claude/nataflow.local.json` tidak ada, tidak diabaikan git, `url` belum diisi, atau `mcp_server` lama) disampaikan ke user apa adanya bersama bagian Prasyarat di bawah. Task kembar (`<n> task ber-workdir_key sama`) dan rencana DRAFT berhenti sebelum tulisan apa pun.
+- `PILIH_WORKSPACE: <alias> (<uuid>), …` → muncul hanya saat `workspaces` berisi lebih dari satu entri dan task harus dibuat baru (atau induk dokumen repo ditentukan), sebelum tulisan apa pun. Tanyakan workspace tujuan lewat `AskUserQuestion` (satu opsi per alias: label alias, deskripsi UUID), lalu jalankan ulang perintah yang sama dengan `--workspace <alias terpilih>` dan pakai segmen keluarannya.
 
 ## Larangan
 
-- Dilarang menyusun, menyunting, meringkas, atau menerjemahkan nilai argumen di luar keluaran `sync-payload`. Satu-satunya nilai dari balikan tool adalah `task_id`, `workspace_id` task untuk `upsert_workdir`, dan `reference_id`. `metadata` dikirim sebagai teks JSON persis seperti tercetak, bukan objek yang dirangkai ulang.
-- Dilarang memanggil `upsert_documents` (batch) atau `delete_document`: satu dokumen yang meleset tidak boleh menggagalkan dokumen lain, dan cermin tidak pernah dihapus dari sini.
-- Dilarang memilih workspace sendiri: `workspace_choices` selalu ditanyakan ke user, dan `--workspace` hanya menerima alias yang dipilih user.
-- Dilarang mengulang `create_task` sesudah tool galat tanpa `list_task` ulang. Tulisan yang ternyata sampai di server membuat task kembar.
+- Dilarang memanggil tool MCP nataflow (`mcp__…`) sendiri untuk sinkron ini, menyusun argumen tool, atau menyalin isi dokumen ke chat: `--push` satu-satunya jalur.
+- Dilarang mengulang `--push` di giliran yang sama sesudah `GAGAL`; sinkron diulang lewat rute sinkron ulang. Pengulangan aman: skrip selalu mencari lebih dulu, dan tulisan yang gagal tidak pernah diulang otomatis.
+- Dilarang membaca, mencetak, atau menyunting `.claude/nataflow.local.json`.
+- Dilarang memilih workspace sendiri: `--workspace` hanya menerima alias yang dipilih user.
 - Dilarang menulis rencana, profil, atau berkas lain, dan dilarang meng-commit sebagai bagian prosedur ini.
 - `GAGAL` tidak mengubah status terminal skill pemanggil. Sinkron diulang lewat `/quickdev:plan` ("sinkron ulang `<plan_path>`"), bukan lewat `unlock` atau eksekusi ulang.
 
 ## Prasyarat di luar plugin
 
-- Server MCP nataflow terdaftar di Claude Code user beserta MCP key-nya. Plugin tidak mendeklarasikan server dan tidak menyimpan key.
-- `.claude/nataflow.json` di root repo (ter-commit) mengaktifkan sinkron. Berkas ada tetapi rusak → `sync-payload` `FAIL`, bukan dilewati. Berkas yang sama dibaca plugin `analyst`, `backend`, dan `frontend`.
+- `.claude/nataflow.json` di root repo (ter-commit, tanpa rahasia) mengaktifkan sinkron. Berkas absen → `dilewati`; ada tetapi rusak → `GAGAL`, bukan dilewati. Berkas yang sama dibaca plugin `analyst`, `backend`, `frontend`, dan `nataflow`.
+- `.claude/nataflow.local.json` di root repo menyimpan MCP key: `{"mcp_key": "<MCP key nataflow>"}`. Berkas ini tidak pernah di-commit: di repo git ia wajib tercantum di `.gitignore` (baris `.claude/nataflow.local.json`). Berkas absen, tidak diabaikan git, atau sudah ter-track → `GAGAL` sebelum satu panggilan server pun; root non-git tidak dicek ignore. Skill tidak pernah membaca, mencetak, atau menyalin isinya.
+- Server nataflow di `url` terjangkau dari mesin ini (`python3` membuka koneksi HTTPS sendiri). Plugin tidak memakai server MCP yang terdaftar di Claude Code untuk sinkron ini.
+- Migrasi dari config lama ber-`mcp_server`: lihat `MIGRATION_v0.10.0_to_v0.11.0.md` di root plugin quickdev.
 
 | Field | Wajib | Aturan |
 |---|---|---|
-| `mcp_server` | tidak | nama server MCP di konfigurasi Claude Code user; default `nataflow-api` |
+| `url` | **ya** | endpoint MCP server nataflow, mis. `https://api.flow.natakode.id/mcp`: `https://` (http hanya untuk `localhost`/`127.0.0.1`), path berakhir di `/mcp`, tanpa kredensial |
 | `workspaces` | tidak | objek alias → UUID workspace, urutan entri dipertahankan. Kosong → workspace milik key. Satu entri → dipakai otomatis. Lebih dari satu → user memilih saat task baru dibuat atau dokumen repo disinkron; task yang sudah ada ditemukan di workspace mana pun dalam jangkauan key dan tidak bisa dipindah. Lebih dari satu workspace butuh MCP key ber-scope project |
 | `pic_id` | tidak | UUID; kosong → server memakai pemilik key |
-| `repo` | tidak | identitas repo di kunci workdir dan dokumen repo; kosong → remote `origin` ternormalisasi, lalu nama direktori root |
+| `repo` | tidak | identitas repo di kunci workdir, metadata task, dan dokumen repo; kosong → remote `origin` ternormalisasi, lalu nama direktori root |
 
-Kunci lain (termasuk `workspace_id` tunggal lama — ganti dengan `workspaces`), nilai bukan string, alias tidak sah, UUID tidak sah atau kembar, atau `repo` berspasi → `FAIL`.
+Kunci lain → `GAGAL`: `mcp_server` lama (nama server MCP di Claude Code, tidak dipakai lagi — ganti dengan `url`) dan `workspace_id` tunggal lama (ganti dengan `workspaces`) disebut beserta penggantinya. Nilai bukan string, `url` tidak sah, alias tidak sah, UUID tidak sah atau kembar, atau `repo` berspasi juga `GAGAL`.

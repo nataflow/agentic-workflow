@@ -74,7 +74,7 @@ flowchart TD
     ASK -->|"Kembali ke elisitasi"| ELICIT
     ASK -->|"Tahan"| HOLD2["Tetap DRAFT"]
     ASK -->|"Setujui, hanya bila review segar"| APPROVE["ticket.py approve: READY + commit"]
-    APPROVE --> SYNC["Sinkron nataflow: sync-payload, list_task, lalu create_task / update_task"]
+    APPROVE --> SYNC["Sinkron nataflow: sync-payload --push (list_task, lalu create_task / update_task)"]
     SYNC -->|"dibuat / diperbarui / dilewati / GAGAL, READY tetap"| HANDOFF["ticket_source ke backend:tech-lead / frontend:lead"]
 ```
 
@@ -277,12 +277,12 @@ flowchart TD
      `ticket.py approve --answer "<jawaban user>"`. *Revisi* menjalankan `ticket.py revise`, lalu Phase 2–4
      diulang.
      - **5.4 Sinkron nataflow**: sesudah `approve` exit 0 atau 3 (`READY` tertulis), sebelum baris penutup,
-       jalankan prosedur `references/nataflow-sync.md`. `ticket.py sync-payload --json` menyusun seluruh
-       argumen (`SKIP` tanpa `.claude/nataflow.json` maupun `analyst/nataflow.json`, `FAIL` bila config rusak,
-       keduanya berbeda isi, atau tiket bukan `READY`).
-       Model lalu memanggil `list_task` bersaring `{"source":"analyst","ticket_key":<ticketdir>}`: 0 hasil →
-       `create_task`, 1 → `update_task` dengan `task_id` hasil itu, lebih dari 1 → berhenti tanpa menulis.
-       Sesudahnya `review.md` di-`upsert_document` ke task itu (`ticket.review`). Hasilnya satu segmen `nataflow …` di baris penutup; `GAGAL` tidak menurunkan `READY`.
+       jalankan prosedur `references/nataflow-sync.md`: satu perintah `ticket.py sync-payload --push` (`dilewati`
+       tanpa `.claude/nataflow.json` maupun `analyst/nataflow.json`, `GAGAL` bila config/key rusak, keduanya
+       berbeda isi, atau tiket bukan `READY`). Skrip sendiri memanggil `list_task` bersaring
+       `{"source":"analyst","ticket_key":<ticketdir>}`: 0 hasil → `create_task`, 1 → `update_task`, lebih dari 1 →
+       berhenti tanpa menulis; sesudahnya `review.md` di-`upsert_document` ke task itu (`ticket.review`). Isi
+       kartu tidak pernah lewat konteks model. Hasilnya satu segmen `nataflow …` di baris penutup; `GAGAL` tidak menurunkan `READY`.
 - **Subagent yang didispatch**: `analyst:ticket-reviewer`, langsung tanpa skill pembungkus. Vonisnya
   `PASS`/`BLOCKED`. Balikan kosong atau rusak dicatat `DISPATCH_FAILED` (tidak dihitung ronde) dan diulang
   maksimal sekali.
@@ -323,17 +323,17 @@ sequenceDiagram
     alt Setujui
         S->>T: approve --answer jawaban user
         T-->>S: APPROVE PASS, READY dan commit kunci TICKET
-        S->>T: sync-payload --json
-        T-->>S: SKIP, FAIL, atau PASS (lookup, create, update)
-        opt PASS
-            S->>N: list_task (lookup apa adanya)
+        S->>T: sync-payload --push
+        opt config dan key sah
+            T->>N: list_task (lookup)
             alt 0 task
-                S->>N: create_task (create apa adanya)
+                T->>N: create_task (create)
             else 1 task
-                S->>N: update_task (task_id + update apa adanya)
+                T->>N: update_task (task_id + update)
             end
-            N-->>S: task (code) atau galat, READY tetap
+            N-->>T: task (code) atau galat
         end
+        T-->>S: satu baris segmen nataflow, READY tetap
     else Revisi
         S->>T: revise (plafon 3)
         S->>S: kembali ke Phase 2
@@ -393,7 +393,7 @@ flowchart TD
     N5 -->|"Koreksi"| N4
     N5 -->|"Tahan"| ND["NOTULEN — DRAFT"]
     N5 -->|"Final"| NF["notulen.py final: FINAL + final_hash, tanpa commit"]
-    NF --> N6["Phase 6: sync-payload, get_project_info, list_document, lalu create_document / upsert_document"]
+    NF --> N6["Phase 6: sync-payload --push (get_project_info, list_document, lalu create_document / upsert_document)"]
     N6 -->|"dibuat / diperbarui / tidak berubah / dilewati / GAGAL, FINAL tetap"| NE["NOTULEN — FINAL"]
 ```
 
@@ -432,10 +432,11 @@ nama plugin engineer (mis. berisi `analyst`) agar hook kedua plugin engineer dia
 ```
 
 `.claude/nataflow.json` (objek JSON, ter-commit; `analyst/nataflow.json` lama tetap diterima, dan dua berkas yang
-berbeda isi berarti `FAIL`) memuat `mcp_server` (default `nataflow-api`), `workspaces` (objek alias → UUID; lebih
-dari satu entri → user memilih saat task tiket pertama kali dibuat, lewat `sync-payload --workspace <alias>`),
+berbeda isi berarti `FAIL`) memuat `url` endpoint MCP (wajib), `workspaces` (objek alias → UUID; lebih
+dari satu entri → user memilih saat task tiket pertama kali dibuat, lewat `sync-payload --push --workspace <alias>`),
 `pic_id` (UUID, opsional), dan `repo` (identitas repo di metadata task). Berkas absen berarti sinkron dilewati; ada tetapi rusak
-berarti `sync-payload` `FAIL`. Plugin tidak pernah menulis berkas ini, dan sinkron tidak menulis apa pun ke `TICKET.md`: identitas
+berarti `sync-payload` `FAIL`; `mcp_server` lama juga `FAIL` dengan pesan migrasi. MCP key ada di
+`.claude/nataflow.local.json` (tidak pernah di-commit, wajib diabaikan git di dalam repo). Plugin tidak pernah menulis berkas ini, dan sinkron tidak menulis apa pun ke `TICKET.md`: identitas
 task di nataflow adalah metadata `ticket_key` = path ticketdir, bukan field frontmatter.
 
 Kehadiran config itu (sah maupun rusak) juga membuat `ticket.py new` menulis `analyst/tickets/.gitignore` berisi
@@ -594,4 +595,4 @@ frontmatter dan tanpa `## Catatan Asli`; judulnya `<H1> — <tanggal rapat>`, di
 | `notulen.py check` `FAIL` karena isi memang tidak diketahui | notulen | Ubah jadi `Q-{n}` atau `belum ditentukan`, bukan dikarang. `Catatan asli utuh` `FAIL` → salin ulang kutipan byte demi byte |
 | Notulen `FINAL` disunting (`DRIFT`) | notulen | Sajikan perubahannya ke user, lalu `notulen.py final` ulang. `sync-payload` menolak `DRIFT` |
 | Sinkron notulen `GAGAL` (server MCP tidak tersedia, `get_project_info` galat, judul bentrok, dokumen ber-`notulen_key` kembar) | notulen | Notulen tetap `FINAL`. Bereskan sebabnya, lalu `/analyst:notulen` "sinkron ulang notulen `<notulendir>`". Judul bentrok diputuskan user (sunting H1, `final` ulang). Dilarang mengulang `create_document` tanpa `list_document` ulang |
-| Sinkron nataflow `GAGAL` (server MCP tidak tersedia, tool galat, config rusak, task ber-`ticket_key` kembar) | spec, intake | Tiket tetap `READY` dan serah terima tetap berjalan. Bereskan sebabnya, lalu `/analyst:intake` "sinkron ulang tiket `<ticketdir>`". Dilarang `reopen` hanya demi sinkron, dan dilarang mengulang `create_task` tanpa `list_task` ulang |
+| Sinkron nataflow `GAGAL` (server tak terjangkau, key belum disetel atau tidak diabaikan git, tool galat, config rusak, task ber-`ticket_key` kembar) | spec, intake | Tiket tetap `READY` dan serah terima tetap berjalan. Bereskan sebabnya, lalu `/analyst:intake` "sinkron ulang tiket `<ticketdir>`". Dilarang `reopen` hanya demi sinkron, dan dilarang mengulang `create_task` tanpa `list_task` ulang |

@@ -5,7 +5,7 @@ description: Gunakan ketika ada permintaan, keluhan, atau laporan dari pengguna/
 
 ## THE IRON LAW
 
-- Gate ini tidak menulis berkas apa pun. Ticketdir dialokasikan `analyst:elicit`; tiket ditulis `analyst:spec`. Satu-satunya tulisan keluar dari gate adalah sinkron ulang tiket `READY` (atau pembatalannya) ke nataflow (Phase 2), dan isinya ditentukan `ticket.py sync-payload`, bukan gate. Pembatalan tiket sendiri dijalankan `analyst:spec`.
+- Gate ini tidak menulis berkas apa pun. Ticketdir dialokasikan `analyst:elicit`; tiket ditulis `analyst:spec`. Satu-satunya tulisan keluar dari gate adalah sinkron ulang tiket `READY` (atau pembatalannya) ke nataflow (Phase 2), dan isinya ditentukan serta dikirim `ticket.py sync-payload --push`, bukan gate. Pembatalan tiket sendiri dijalankan `analyst:spec`.
 - Keadaan ticketdir dibaca dari `ticket.py state`, bukan dari ingatan sesi atau pembacaan frontmatter satu per satu.
 - Satu tiket, satu tujuan pengguna. Permintaan yang memuat beberapa tujuan yang dapat dirilis terpisah dipecah **sebelum** elisitasi, bukan sesudahnya. 2–5 tujuan diproses sebagai **batch** berurutan, satu tiket penuh sebelum tiket berikutnya (`references/batch.md`).
 - Dilarang membaca, mencari, atau menilai kode — juga untuk tiket `TECH`. Gate memvonis dari kata-kata peminta; bukti kode tiket `TECH` dikumpulkan `analyst:elicit`, dan pertanyaan tentang letak atau perilaku kode milik engineer.

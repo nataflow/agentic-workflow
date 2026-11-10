@@ -380,7 +380,7 @@ Tidak ada. README menyebutkan "semua kerja berlangsung di percakapan utama", dan
 | `confirm` | `execute` mode `manual` | Semua `[x]`, blok `VERIFICATION_MANUAL_REQUIRED`, jawaban user tidak kosong, segel cocok | `COMPLETED (manual)` + `Manual-Confirmation` |
 | `status` | `review` (`--json`) | — | Ringkasan: `hash_ok`, `hash_scope`, jumlah langkah, `remediation_round`/`remediation_open`/`open_findings`, `base_drift`/`commits_since_base`, `baseline`, `consistent`/`inconsistency` (termasuk segel basi), blok eksekusi |
 | `unlock` | `plan` (revisi) | `APPROVED`, `--reason` tidak kosong | `Status: DRAFT`, `Plan-Hash: -`, `Unlock-Reason`. Blok eksekusi dipertahankan |
-| `sync-payload` | prosedur sinkron (`plan`, `execute`, `profile`) | `.claude/nataflow.json` ada dan sah (absen → `SKIP` sebelum rencana dibaca). `--plan`: rencana pernah dikunci (`Approved-At`). `--repo-profile`: berkas ada | Read-only. Tanpa `--remote`: argumen `task`/`workdir`/`list_document` tanpa isi. `--remote -`: dokumen yang sha, tipe, atau metadatanya berbeda dari manifest remote |
+| `sync-payload` | prosedur sinkron (`plan`, `execute`, `profile`) | `.claude/nataflow.json` ada dan sah (absen → `SKIP` sebelum rencana dibaca). `--plan`: rencana pernah dikunci (`Approved-At`). `--repo-profile`: berkas ada | Tidak menulis berkas. `--push` (prosedur): memanggil server sendiri dan mencetak satu baris segmen (29). Tanpa `--push`: argumen `task`/`workdir`/`list_document` tanpa isi; `--remote -`: dokumen yang sha, tipe, atau metadatanya berbeda dari manifest remote |
 
 **Keterbatasan yang diakui README**:
 

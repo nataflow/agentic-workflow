@@ -349,7 +349,9 @@ def test_r12_readme_mendokumentasikan_server_nataflow():
     """Ketergantungan ke server `nataflow-api` didokumentasikan untuk setiap plugin yang memakainya."""
     readme = (REPO / "README.md").read_text(encoding="utf-8")
     section = readme.split("## Server nataflow", 1)[1].split("\n## ", 1)[0]
-    assert "claude mcp add" in section and "/mcp" in section
+    assert "/mcp" in section and "`url`" in section and ".claude/nataflow.local.json" in section, \
+        "29 S7: setup url + key lokal, bukan pendaftaran server MCP di Claude Code"
+    assert "claude mcp add" not in section
     users = sorted(p.name for p in PLUGINS.iterdir() if (p / "skills/_common/nataflow_sync.py").is_file())
     users.append("nataflow")
     rows = [l for l in section.splitlines() if l.startswith("| `")]

@@ -218,10 +218,10 @@ Rencana dan profil dapat dicerminkan ke nataflow. Berkas di disk tetap satu-satu
 tidak menulis berkas apa pun, sehingga `Plan-Hash`, `Verified-Hash`, dan `Tree-Hash` tidak basi.
 
 - **Aktif per repo** lewat `.claude/nataflow.json` (ter-commit, dibaca juga oleh `analyst`, `backend`, dan
-  `frontend`): `mcp_server` (default `nataflow-api`), `workspaces` (objek alias → UUID workspace;
+  `frontend`): `url` endpoint MCP (wajib), `workspaces` (objek alias → UUID workspace;
   kosong → workspace milik key, satu entri → otomatis, lebih dari satu → user memilih saat task baru atau
   dokumen repo disinkron), `pic_id` (UUID), dan `repo` (default: remote `origin` ternormalisasi). Berkas absen → dilewati; ada
-  tetapi rusak → `GAGAL`. Server MCP nataflow didaftarkan user di Claude Code; plugin tidak menyimpan key.
+  tetapi rusak (termasuk `mcp_server` lama) → `GAGAL`. MCP key di `.claude/nataflow.local.json` (`{"mcp_key": "…"}`, tidak pernah di-commit; di repo git wajib diabaikan git, bila tidak sinkron menolak berjalan). Skrip memanggil server sendiri lewat `url`; server tidak perlu didaftarkan di Claude Code.
 - **Jangkar**: satu rencana = satu workdir `quickdev:<repo>:<path rencana>` bernama `<task_name>`, tertaut ke task
   yang dibuat dari H1 dan Section 1 rencana. Rencana didorong sebagai dokumen `quickdev.plan`; `repo-profile.md`
   sebagai dokumen `profile` di bawah workspace.
@@ -229,8 +229,8 @@ tidak menulis berkas apa pun, sehingga `Plan-Hash`, `Verified-Hash`, dan `Tree-H
   `close`/`confirm`; `profile` sesudah profil tertulis. Rencana yang belum pernah dikunci tidak didorong.
 - **Status**: workdir `active`, `blocked` (`BLOCKED`), atau `done` (`COMPLETED`, `COMPLETED (manual)`); task naik
   ke `in_progress` begitu rencana terkunci (workdir terbit) dan `done` saat selesai, tanpa pernah diturunkan.
-- **Hemat token**: `plan_lock.py sync-payload` menyusun seluruh argumen dalam dua fase. Isi dokumen hanya
-  diterbitkan bila sha, tipe, atau metadatanya berbeda dari manifest `list_document` remote.
+- **Hemat token**: `plan_lock.py sync-payload --push` memanggil server sendiri; isi dokumen hanya didorong bila
+  sha, tipe, atau metadatanya berbeda dari manifest remote, dan tidak pernah lewat konteks model.
 - **Gagal tidak memblokir**: ringkasan skill memuat baris `NATAFLOW: <… | dilewati | GAGAL: <sebab>>`, dan
   status terminal tidak berubah. Ulangi lewat `/quickdev:plan` ("sinkron ulang `plan/<task>.md`").
 - **Tidak didorong**: laporan terminal `explore`, `clarify`, dan `review`.
