@@ -1,4 +1,4 @@
-"""Langkah 31 X1–X3: balikan `code-explorer` berupa amplop ringkas; berkas laporan sumber kebenaran."""
+"""Langkah 31 X1–X3, X5: balikan `code-explorer` berupa amplop ringkas; berkas laporan sumber kebenaran."""
 import re
 
 import pytest
@@ -51,3 +51,23 @@ def test_x3_gate_scope_tidak_menuntut_laporan_di_context():
     assert "dikembalikan ke context" not in text and "sekaligus dikembalikan" not in text
     assert "amplop ringkas" in text and "### Key Pointers & Evidence` berkas laporan" in text
     assert "amplop pembungkus" not in "".join(_read(BE_SKILLS / r) for r in DISPATCHERS)
+
+
+@pytest.mark.regression("31 X5")
+@pytest.mark.parametrize("rel", ("system-analysis/references/analysis-protocol.md",
+                                 "system-analysis/dispatcher/explorer-blast.md",
+                                 "system-analysis/dispatcher/explorer-surface.md",
+                                 "system-analysis/SKILL.md"))
+def test_x5_profil_b_menunggu_amplop_profil_s(rel):
+    text = _read(BE_SKILLS / rel)
+    assert "Profil B menunggu Profil S" in text
+    assert "amplop seluruh" in text and "Async agent launched" in text and "satu pesan" in text
+
+
+@pytest.mark.regression("31 X5")
+def test_x5_prompt_blast_memanen_flow_trace_profil_s():
+    text = _read(BE_SKILLS / "system-analysis/dispatcher/explorer-blast.md")
+    prompt = text.split("````markdown", 1)[1].split("Format laporan:", 1)[0]
+    assert "Panen laporan Profil S" in prompt and "`### Flow & Trace`" in prompt
+    guard = _read(BE_SKILLS / "system-analysis/SKILL.md").split("- **DISPATCH RESMI**", 1)[1].split("\n", 1)[0]
+    assert "memberangkatkan Profil B sebelum amplop seluruh Profil S kembali" in guard

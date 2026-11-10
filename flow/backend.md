@@ -289,7 +289,7 @@ flowchart TD
 - **Prasyarat**: `scripts/check_preconditions.py --taskdir --risk-level --chain`, 8 check.
 - **Langkah**:
   1. **Fase 0**: kunci acuan hulu menurut `chain`, bukan menurut risk. Pada `BRD_PRD_BRIEF`, BRD wajib `APPROVED`. Pada `PRD_BRIEF`, BRD tidak boleh ada.
-  2. **Fase 1**: pemetaan as-is sesuai `references/analysis-protocol.md` bagian A. Laporan `gate-*.md` dipanen lebih dulu, lalu `code-explorer` Profil S (`dispatcher/explorer-surface.md`) dan Profil B (`dispatcher/explorer-blast.md`) didispatch dengan kedalaman `menyeluruh`.
+  2. **Fase 1**: pemetaan as-is sesuai `references/analysis-protocol.md` bagian A. Laporan `gate-*.md` dipanen lebih dulu, lalu `code-explorer` Profil S (`dispatcher/explorer-surface.md`) dan Profil B (`dispatcher/explorer-blast.md`) didispatch dengan kedalaman `menyeluruh`. Profil B menunggu amplop seluruh Profil S (tidak satu pesan, `Async agent launched` bukan balikan) supaya Tahap 0 blast memanen laporan Profil S dan memulai sapuan dari `### Flow & Trace`-nya (31 X5).
   3. **Fase 2**: klarifikasi 1–3 pertanyaan bila pilar belum konkret.
   4. **Fase 3**: kunci 4 pilar kontrak: API contract, status lifecycle, validation policy, dan permission & scope. Kolom `Pesan` error disalin literal dari `### Error Surface`. Pembacaan skema read-only maksimal 5 panggilan.
   5. **Fase 4**: impact map 16 dimensi dan `## Migration requirements` beserta rollback.

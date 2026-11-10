@@ -8,7 +8,8 @@ Membaca log sesi lokal `~/.claude/projects/<slug>/*.jsonl` beserta `<sesi>/subag
 - fase: skill terakhir yang dimuat (`Base directory for this skill: …/<plugin>/<versi>/skills/<skill>`);
 - subagent per tipe dan model, serta ukuran balikannya ke main loop;
 - compaction (konteks sebelum/sesudah) dan rangkaian skill per sesi;
-- subperintah `explorer`: dispatch `code-explorer` per fase, profil (surface/blast), dan kedalaman (Langkah 31 X4).
+- subperintah `explorer`: dispatch `code-explorer` per fase, profil (surface/blast), dan kedalaman (Langkah 31 X4),
+  serta blast yang berangkat sebelum dispatch surface sesi itu berbalik (Langkah 31 X5).
 
 Biaya dinyatakan dalam "token setara input" dengan bobot relatif (bawaan rasio harga Opus: cache read 0,1×,
 cache write 2×, output 5×) yang dapat diganti lewat `--bobot`. Angkanya untuk membandingkan sebelum/sesudah,
@@ -40,6 +41,7 @@ VERSI_RE = re.compile(r"^\d+(\.\d+)+$")
 HANDBACK_RE = re.compile(r'<agent-message from="([^"]+)"')
 KEDALAMAN_RE = re.compile(r"Kedalaman\W+(ringkas|menyeluruh)")
 PRA_SKILL = "(pra-skill)"
+ASYNC_ACK = "Async agent launched"
 
 
 # ============================================================ util
@@ -376,6 +378,11 @@ def render(r: Dict[str, Any], top: int) -> str:
 
 # ============================================================ explorer (Langkah 31 X4)
 
+def profil_of(block: Dict[str, Any]) -> str:
+    prompt = str((block.get("input") or {}).get("prompt") or "")
+    return "blast" if re.search(r"Blast Map|Profil B", prompt) else "surface"
+
+
 def analyze_explorer(files: List[Path], bobot: Dict[str, float], since: Optional[datetime] = None,
                      agent: str = "backend:code-explorer") -> Dict[str, Any]:
     """Dispatch `agent` per fase/profil/kedalaman, biaya agentnya, dan ukuran balikannya."""
@@ -397,6 +404,16 @@ def analyze_explorer(files: List[Path], bobot: Dict[str, float], since: Optional
         current = PRA_SKILL
         count = Counter()
         tool_key: Dict[str, Tuple[str, str, str]] = {}
+        # 31 X5: blast tumpang tindih = berangkat saat dispatch surface sesi ini belum berbalik (amplop
+        # handback, atau tool_result final untuk dispatch foreground), atau satu pesan dengan dispatch surface.
+        dispatches = [(rec, block) for rec in recs if rec.get("type") == "assistant"
+                      for block in ((rec.get("message") or {}).get("content") or [])
+                      if isinstance(block, dict) and block.get("type") == "tool_use"
+                      and block.get("name") in ("Agent", "Task")
+                      and (block.get("input") or {}).get("subagent_type") == agent]
+        surface_msgs = {(rec.get("message") or {}).get("id") for rec, block in dispatches
+                        if profil_of(block) == "surface"}
+        open_surface: set = set()
         for rec in recs:
             msg = rec.get("message") or {}
             if rec.get("type") == "user" and rec.get("isMeta"):
@@ -405,6 +422,7 @@ def analyze_explorer(files: List[Path], bobot: Dict[str, float], since: Optional
                 hb = HANDBACK_RE.search(text)
                 if hb and tool_by_agent.get(hb.group(1)) in tool_key:
                     rows[tool_key[tool_by_agent[hb.group(1)]]]["balikan"] += len(text)
+                    open_surface.discard(tool_by_agent[hb.group(1)])
             if rec.get("type") == "assistant" and isinstance(msg.get("content"), list):
                 for block in msg["content"]:
                     if not (isinstance(block, dict) and block.get("type") == "tool_use"
@@ -414,25 +432,32 @@ def analyze_explorer(files: List[Path], bobot: Dict[str, float], since: Optional
                     if inp.get("subagent_type") != agent:
                         continue
                     prompt = str(inp.get("prompt") or "")
-                    profil = "blast" if re.search(r"Blast Map|Profil B", prompt) else "surface"
+                    profil = profil_of(block)
                     kd = KEDALAMAN_RE.search(prompt)
                     key = (current, profil, kd.group(1) if kd else "?")
                     row = rows[key]
                     row["n"] += 1
                     row["biaya"] += cost_by_tool.get(block.get("id", ""), 0)
+                    if profil == "blast" and (open_surface or msg.get("id") in surface_msgs):
+                        row["tumpang_tindih"] += 1
+                    if profil == "surface":
+                        open_surface.add(block.get("id", ""))
                     count[current] += 1
                     tool_key[block.get("id", "")] = key
             if rec.get("type") == "user" and isinstance(msg.get("content"), list):
                 for block in msg["content"]:
                     if isinstance(block, dict) and block.get("type") == "tool_result" and block.get("tool_use_id") in tool_key:
                         rows[tool_key[block["tool_use_id"]]]["balikan"] += content_len(block.get("content"))
+                        if ASYNC_ACK not in str(block.get("content")):
+                            open_surface.discard(block["tool_use_id"])
         for ph, n in count.items():
             per_session[ph].append(n)
     return {
         "agent": agent,
         "baris": [{"fase": k[0], "profil": k[1], "kedalaman": k[2], "n": v["n"], "biaya": round(v["biaya"]),
                    "biaya_rata2": round(v["biaya"] / v["n"]) if v["n"] else 0,
-                   "balikan_rata2": int(v["balikan"] / v["n"]) if v["n"] else 0}
+                   "balikan_rata2": int(v["balikan"] / v["n"]) if v["n"] else 0,
+                   "tumpang_tindih": v["tumpang_tindih"]}
                   for k, v in sorted(rows.items(), key=lambda kv: -kv[1]["n"])],
         "per_sesi": {ph: {"sesi": len(v), "p50": pct(v, 0.5), "maks": max(v)} for ph, v in per_session.items()},
     }
@@ -441,7 +466,9 @@ def analyze_explorer(files: List[Path], bobot: Dict[str, float], since: Optional
 def render_explorer(r: Dict[str, Any]) -> str:
     lines = [f"Dispatch {r['agent']} (fase · profil · kedalaman):"]
     lines += [f"  {b['n']:4}× {b['fase']:28} {b['profil']:8} {b['kedalaman']:10} biaya/agent={b['biaya_rata2']:9,} "
-              f"balikan={b['balikan_rata2']:6,} karakter" for b in r["baris"]]
+              f"balikan={b['balikan_rata2']:6,} karakter"
+              + (f" tumpang-tindih-surface={b['tumpang_tindih']}" if b["profil"] == "blast" else "")
+              for b in r["baris"]]
     lines += ["", "Dispatch per sesi:"]
     lines += [f"  {ph:28} sesi={v['sesi']:4} p50={v['p50']} maks={v['maks']}" for ph, v in r["per_sesi"].items()]
     return "\n".join(lines)

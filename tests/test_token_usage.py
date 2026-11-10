@@ -1,4 +1,4 @@
-"""Alat ukur pemakaian token dev-only `scripts/token_usage.py` (Langkah 30 U1, Langkah 31 X4)."""
+"""Alat ukur pemakaian token dev-only `scripts/token_usage.py` (Langkah 30 U1, Langkah 31 X4–X5)."""
 import json
 import subprocess
 import sys
@@ -146,3 +146,51 @@ def test_u1_since_tak_terbaca(projects):
     proc = subprocess.run([sys.executable, str(SCRIPT), "ringkas", "--slug=-repo-api", "--since", "kemarin",
                            "--projects-dir", str(projects), "--json"], capture_output=True, text=True, timeout=60)
     assert proc.returncode == 2 and "--since tidak terbaca" in json.loads(proc.stdout)["error"]
+
+
+def _dispatch(tid, blast):
+    prompt = "Objective: x\nKedalaman: menyeluruh\n" + ("### Blast Map" if blast else "### Error Surface")
+    return {"type": "tool_use", "id": tid, "name": "Agent",
+            "input": {"subagent_type": "backend:code-explorer", "prompt": prompt}}
+
+
+def _ack(tid):
+    return {"type": "user", "message": {"role": "user", "content": [
+        {"type": "tool_result", "tool_use_id": tid,
+         "content": [{"type": "text", "text": "Async agent launched successfully."}]}]}}
+
+
+def _handback(aid):
+    return _meta(f'<agent-message from="{aid}">\n  ## Explorer Report — x')
+
+
+def _sesi_explorer(root, name, recs):
+    sesi = root / "-repo-sa" / f"{name}.jsonl"
+    _write(sesi, [{"type": "user", "timestamp": "2026-11-11T01:00:00Z", "message": {"role": "user", "content": "q"}},
+                  _meta(SKILL.format("system-analysis")), *recs])
+    for aid, tid in (("s", "t_s"), ("b", "t_b")):
+        _write(sesi.with_suffix("") / "subagents" / f"agent-{aid}{name}.jsonl", [_assistant(f"a{aid}", _usage(cr=10))])
+        (sesi.with_suffix("") / "subagents" / f"agent-{aid}{name}.meta.json").write_text(
+            json.dumps({"agentType": "backend:code-explorer", "toolUseId": f"{tid}{name}"}), encoding="utf-8")
+
+
+@pytest.mark.regression("31 X5")
+@pytest.mark.parametrize("pola, harap", [("satu_pesan", 1), ("sebelum_balik", 1), ("berurutan", 0)])
+def test_x5_blast_tumpang_tindih_surface(tmp_path, pola, harap):
+    n = pola
+    if pola == "satu_pesan":  # dua blok tool_use satu pesan API ditulis dua baris, blast lebih dulu
+        recs = [_assistant("m1", _usage(cr=1), [_dispatch(f"t_b{n}", True)]),
+                _assistant("m1", _usage(cr=1), [_dispatch(f"t_s{n}", False)]),
+                _ack(f"t_b{n}"), _ack(f"t_s{n}"), _handback(f"s{n}"), _handback(f"b{n}")]
+    elif pola == "sebelum_balik":  # pesan berbeda, tapi surface baru sebatas `Async agent launched`
+        recs = [_assistant("m1", _usage(cr=1), [_dispatch(f"t_s{n}", False)]), _ack(f"t_s{n}"),
+                _assistant("m2", _usage(cr=1), [_dispatch(f"t_b{n}", True)]), _ack(f"t_b{n}"),
+                _handback(f"s{n}"), _handback(f"b{n}")]
+    else:
+        recs = [_assistant("m1", _usage(cr=1), [_dispatch(f"t_s{n}", False)]), _ack(f"t_s{n}"), _handback(f"s{n}"),
+                _assistant("m2", _usage(cr=1), [_dispatch(f"t_b{n}", True)]), _ack(f"t_b{n}"), _handback(f"b{n}")]
+    _sesi_explorer(tmp_path, n, recs)
+    r = _run(tmp_path, "explorer", "--slug=-repo-sa")
+    rows = {b["profil"]: b for b in r["baris"]}
+    assert rows["blast"]["n"] == 1 and rows["surface"]["n"] == 1
+    assert rows["blast"]["tumpang_tindih"] == harap and rows["surface"]["tumpang_tindih"] == 0

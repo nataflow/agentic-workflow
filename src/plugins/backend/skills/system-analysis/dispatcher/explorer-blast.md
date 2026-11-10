@@ -2,6 +2,8 @@
 
 Dimuat `system-analysis` sebelum Fase 4, sesudah simbol berubah teridentifikasi: tepat satu dispatch per taskdir, laporan di `{taskdir}/.explore/{slug}-blast.md`, menutup lima dimensi rawan bocor (2, 4, 11, 13, 16) bagian B `references/analysis-protocol.md`. Aturan pendispatch, patokan `Kedalaman`, dan larangan menyalin isi berkas di `explorer-surface.md` berlaku penuh; berkas ini hanya memuat yang khas Profil B. Jangan mencampur kerangka laporannya dengan Profil S dalam satu prompt.
 
+**Profil B menunggu Profil S.** Berangkatkan template ini hanya sesudah amplop seluruh dispatch Profil S Fase 1 kembali — dilarang dalam satu pesan dengan dispatch Profil S, dan notifikasi `Async agent launched` dari dispatch background bukan balikan. Laporan Profil S yang sudah ada di laci dipanen blast lewat Tahap 0, sehingga simbol yang sudah terpetakan tidak dilokalisasi ulang dari nol. Tanpa dispatch Profil S (seluruh permukaan tertutup laporan gerbang), template ini langsung berangkat.
+
 ______________________________________________________________________
 
 ## Profil B — Blast-Sweep Lima Dimensi (sebelum Fase 4)
@@ -20,6 +22,11 @@ Slug penelusuran: {slug}-blast
 Kedalaman: menyeluruh
 
 Berkas laporan: {taskdir}/.explore/{slug}-blast.md
+
+Panen laporan Profil S: bila laci kerjamu memuat laporan pemetaan permukaan atas simbol yang sama,
+seksi bukti yang kau ambil darinya pada Tahap 0 adalah `### Flow & Trace`. Rantai pemanggil di sana
+adalah titik awal sapuanmu — simbol yang sudah terpetakan tidak dilokalisasi ulang, cukup fakta
+tumpuannya dibuktikan ulang sekali sesuai definisi agent-mu.
 
 Aturan pelaporan fakta negatif: jalur yang sudah kau sisir dan terbukti tidak menyentuh simbol itu
 dilaporkan eksplisit di `### Not Found` beserta direktori yang disisir. Jalur yang belum sempat kau

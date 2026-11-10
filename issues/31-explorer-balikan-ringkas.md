@@ -1,4 +1,4 @@
-# Langkah 31 — `backend`: balikan `code-explorer` ringkas, berkas laporan jadi sumber kebenaran, diagnosis dispatch ganda (X1–X4, D1)
+# Langkah 31 — `backend`: balikan `code-explorer` ringkas, berkas laporan jadi sumber kebenaran, diagnosis dispatch ganda (X1–X5, D1)
 
 Sumber: analisis pemakaian token 2026-11-10 (lihat Langkah 30, bagian Temuan dasar). Keputusan diambil di sesi yang
 sama. Basis kode: commit `53ea3f2` (backend 0.19.1). Bergantung pada alat ukur `scripts/token_usage.py` (Langkah 30
@@ -7,6 +7,8 @@ U1).
 **Status (2026-11-10):** SELESAI di branch `feat/hemat-konteks-30-31` (belum di-commit). X1–X3 dan D1 terpasang;
 X4 terdiagnosis, usulan kebijakannya menunggu keputusan user (K5, bagian Hasil X4). Test baru:
 `tests/backend/test_explorer_balikan_31.py`. Versi backend 0.20.0 bersama Langkah 30.
+
+**Status X5 (2026-11-10):** terpasang di `main`, backend 0.20.1 (bagian X5 di Kontrak).
 
 Selisih pelaksanaan terhadap Kontrak:
 
@@ -134,6 +136,32 @@ Perluas `scripts/token_usage.py` (atau subperintah terpisah) agar dapat melapork
 jumlah laporan gerbang yang terpanen, permukaan tertutup menurut frontmatter laporan gerbang, jumlah dispatch S/B,
 dan biaya per profil. Keluarannya ditulis ke bagian Status issue ini beserta usulan (K5).
 
+### X5 — Profil B menunggu amplop Profil S
+
+Temuan (compare pertama sesudah 0.20.0, `token_usage.py explorer` dibedah per tool call): di sesi wms-api
+`327ec83f` Profil S dan Profil B berangkat dalam **satu pesan** (keduanya background). Tahap 0 blast hanya
+menemukan laporan gerbang, lalu kedua explorer membaca 10 berkas yang sama (±28–39 rb karakter, 40–50% bacaan
+masing-masing). Biaya berbobot blast 664 rb vs surface 494 rb. Penanda tumpang tindih atas seluruh log: **51 dari 91**
+dispatch blast berangkat sebelum surface sesinya berbalik — pola, bukan kebetulan. Prosa lama hanya berbunyi "begitu
+simbol berubah teridentifikasi", jadi dispatch paralel sah menurut kontrak.
+
+Kontrak:
+
+- **Profil B menunggu Profil S**: blast berangkat hanya sesudah amplop seluruh dispatch Profil S Fase 1 kembali;
+  dilarang satu pesan dengan Profil S; `Async agent launched` bukan balikan. Tanpa dispatch Profil S, blast langsung
+  berangkat. Profil S antar-simbol tetap boleh paralel. Ditulis di `analysis-protocol.md` bagian A,
+  `explorer-surface.md` (Aturan untuk Pendispatch — template yang termuat saat Profil S berangkat), `explorer-blast.md`
+  (pembuka), dan `SKILL.md` (Fase 1 + guardrail DISPATCH RESMI).
+- **Prompt Profil B memanen `### Flow & Trace`** laporan Profil S di Tahap 0 sebagai titik awal sapuan. Kuota panen
+  dan kewajiban bukti ulang fakta tumpuan di `agents/code-explorer.md` tidak berubah.
+- **`token_usage.py explorer`** menghitung `tumpang_tindih` per baris blast: berangkat saat dispatch surface sesi itu
+  belum berbalik (handback, atau `tool_result` final untuk dispatch foreground), atau satu pesan dengannya.
+
+Trade-off: `system-analysis` bertambah ± durasi satu explorer surface (±4 menit di sesi temuan). Ditegakkan lewat
+prosa, bukan hook (hook backend hanya memeriksa `Bash|Edit|Write`); `tumpang_tindih` yang mengukur kepatuhannya.
+Verifikasi lapangan: sesudah 0.20.1 terpasang, `token_usage.py explorer --since <pasang>` harus menunjukkan
+`tumpang-tindih-surface=0` dan biaya per agent blast dibandingkan dengan 664 rb di atas.
+
 ## Peta blast radius (awal — diverifikasi ulang di tiap tahap)
 
 | Berkas | Item |
@@ -145,6 +173,7 @@ dan biaya per profil. Keluarannya ditulis ke bagian Status issue ini beserta usu
 | `tests/backend/test_explorer_balikan_31.py` (baru) | Patok K2: amplop ±15 baris, berkas = sumber kebenaran, dispatcher menyebut seksi wajib baca |
 | `scripts/token_usage.py`, `tests/test_token_usage.py` | X4 |
 | `README.md` backend, `flow/backend.md`, `MIGRATION_*`, `plugin.json` | D1 |
+| `system-analysis/` `references/analysis-protocol.md`, `dispatcher/explorer-surface.md`, `dispatcher/explorer-blast.md`, `SKILL.md`; `flow/backend.md`; `scripts/token_usage.py`; `tests/backend/test_explorer_balikan_31.py`, `tests/test_token_usage.py`; `plugin.json` 0.20.1 | X5. Tidak terdampak: `check_preconditions.py` cek 8 (hanya heading `## Profil B`), test X2 (paragraf Amplop tidak disentuh), `test_smoke` (skrip dev-only), README backend (tidak menyebut urutan S/B); patch release tanpa `MIGRATION_*` (preseden 0.19.1) |
 
 ## Urutan pengerjaan
 
