@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import PLUGINS, git, load_module, run_script, ticket_review
+from conftest import NF_URL, PLUGINS, git, load_module, run_script, ticket_review
 
 COMMON = PLUGINS / "analyst" / "skills" / "_common"
 TICKET = COMMON / "ticket.py"
@@ -46,7 +46,7 @@ def config(root, data):
     if isinstance(data, bytes):
         path.write_bytes(data)
     else:
-        path.write_text(data if isinstance(data, str) else json.dumps(data), encoding="utf-8")
+        path.write_text(data if isinstance(data, str) else json.dumps({"url": NF_URL, **data}), encoding="utf-8")
 
 
 def payload(root, ticketdir=TDIR):
@@ -81,7 +81,7 @@ def test_config_absen_berarti_tidak_aktif(tmp_path):
     ('{"workspaces": {"web app": "%s"}}' % WS, "alias workspace `web app`"),
     ('{"workspaces": {"a": "%s", "b": "%s"}}' % (WS, WS), "`workspaces.b` mengulang UUID"),
     ('{"pic_id": "bukan-uuid"}', "`pic_id` `bukan-uuid` bukan UUID"),
-    (b'{"mcp_server": "\xff"}', "bukan UTF-8"),
+    (b'{"url": "\xff"}', "bukan UTF-8"),
 ])
 def test_config_rusak_terlapor(tmp_path, raw, needle):
     config(tmp_path, raw)
@@ -93,10 +93,10 @@ def test_config_rusak_terlapor(tmp_path, raw, needle):
 def test_config_default_dan_nilai_eksplisit(tmp_path):
     config(tmp_path, {})
     assert lib.load_sync_config(tmp_path) == (
-        {"mcp_server": "nataflow-api", "workspaces": {}, "pic_id": "", "repo": ""}, [])
-    config(tmp_path, {"mcp_server": "nataflow-staging", "workspaces": {"utama": WS}, "pic_id": PIC})
+        {"url": NF_URL, "workspaces": {}, "pic_id": "", "repo": ""}, [])
+    config(tmp_path, {"url": "https://staging.test/mcp", "workspaces": {"utama": WS}, "pic_id": PIC})
     assert lib.load_sync_config(tmp_path) == (
-        {"mcp_server": "nataflow-staging", "workspaces": {"utama": WS}, "pic_id": PIC, "repo": ""}, [])
+        {"url": "https://staging.test/mcp", "workspaces": {"utama": WS}, "pic_id": PIC, "repo": ""}, [])
 
 
 # --- N2: sync-payload --------------------------------------------------------------------------
@@ -147,7 +147,7 @@ def test_pass_isi_payload_dari_kartu(repo):
     approve(repo)
     code, out = payload(repo)
     assert code == 0 and out["status"] == "PASS" and out["enabled"] is True, out
-    assert out["mcp_server"] == "nataflow-api" and out["ticket_key"] == TDIR
+    assert out["url"] == NF_URL and out["ticket_key"] == TDIR
 
     text = (repo / TDIR / "TICKET.md").read_text(encoding="utf-8")
     fm, body = lib.split_frontmatter(text)

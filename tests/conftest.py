@@ -22,6 +22,7 @@ os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 
 REPO = Path(__file__).resolve().parents[1]
 PLUGINS = REPO / "src" / "plugins"
+NF_URL = "https://nataflow.test/mcp"   # `url` sah di `.claude/nataflow.json` tes sinkron
 
 BE_PROFILE_MD = ("stack", "module-structure", "domain-map", "surface-map", "code-conventions",
                  "anti-patterns", "invariants", "commands")

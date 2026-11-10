@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import PLUGINS, commit, git, run_script, ticket_review, write_files
+from conftest import NF_URL, PLUGINS, commit, git, run_script, ticket_review, write_files
 
 TICKET = PLUGINS / "analyst" / "skills" / "_common" / "ticket.py"
 BE_SP = PLUGINS / "backend" / "skills" / "_common" / "sync_payload.py"
@@ -39,11 +39,11 @@ def approve(root):
 
 
 def shared(root, data):
-    write_files(root, {".claude/nataflow.json": json.dumps(data)})
+    write_files(root, {".claude/nataflow.json": json.dumps({"url": NF_URL, **data})})
 
 
 def legacy(root, data):
-    write_files(root, {"analyst/nataflow.json": json.dumps(data)})
+    write_files(root, {"analyst/nataflow.json": json.dumps({"url": NF_URL, **data})})
 
 
 def payload(root):
@@ -69,7 +69,7 @@ def test_config_lama_sama_isi_diterima_berbeda_ditolak(repo):
     legacy(repo, {"workspaces": {"utama": WS}})
     shared(repo, {"workspaces": {"utama": WS}})
     assert payload(repo)[0] == 0
-    shared(repo, {"workspaces": {"utama": WS}, "mcp_server": "nataflow-staging"})
+    shared(repo, {"workspaces": {"utama": WS}, "url": "https://staging.test/mcp"})
     code, out = payload(repo)
     assert code == 1 and "berbeda isi" in out["problems"][0]
 

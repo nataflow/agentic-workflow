@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from conftest import BE_SKILLS, TD, be_run, brief, commit, git, load_module, run_script, write_files
+from conftest import NF_URL, BE_SKILLS, TD, be_run, brief, commit, git, load_module, run_script, write_files
 
 SP = BE_SKILLS / "_common" / "sync_payload.py"
 PL = load_module(BE_SKILLS / "_common" / "precondition_lib.py", "be_precondition_lib_sync24")
@@ -13,7 +13,7 @@ TICKET = "analyst/tickets/2609231400-cicilan-pembayaran"
 
 @pytest.fixture
 def repo(chain_repo):
-    write_files(chain_repo, {".claude/nataflow.json": json.dumps({"workspaces": {"utama": WS}, "repo": "tim/api"})})
+    write_files(chain_repo, {".claude/nataflow.json": json.dumps({"url": NF_URL, "workspaces": {"utama": WS}, "repo": "tim/api"})})
     commit(chain_repo, "chore: aktifkan sinkron nataflow")
     return chain_repo
 

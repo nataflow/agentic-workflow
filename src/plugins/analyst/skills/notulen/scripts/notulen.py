@@ -502,7 +502,7 @@ def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:
     payload = {
         "status": "PASS",
         "enabled": True,
-        "mcp_server": config["mcp_server"],
+        "url": config["url"],
         "notulen_key": rel,
         "lookup": {"reference_table": "project", "type": DOC_TYPE, "include_content": False,
                    "metadata": ns.compact(key)},
@@ -511,7 +511,7 @@ def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:
         "update": {"reference_table": "project", "type": DOC_TYPE, "content": content,
                    "content_sha256": ns.sha256_text(content), "metadata": meta},
     }
-    ns.emit(payload, args.json, f"SYNC-PAYLOAD PASS: {rel} · server {config['mcp_server']} · judul `{title}` · "
+    ns.emit(payload, args.json, f"SYNC-PAYLOAD PASS: {rel} · server {config['url']} · judul `{title}` · "
                                 f"sha {payload['update']['content_sha256'][:12]} — argumen tool lewat `--json`")
     return 0
 

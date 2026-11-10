@@ -8,7 +8,7 @@ import json
 
 import pytest
 
-from conftest import PLUGINS, git, load_module, run_script, write_files
+from conftest import NF_URL, PLUGINS, git, load_module, run_script, write_files
 
 NOTULEN = PLUGINS / "analyst" / "skills" / "notulen" / "scripts" / "notulen.py"
 NOTES = "rapat sprint\n- budi: export csv minggu depan\n\nputus: rilis jumat\n"
@@ -307,7 +307,7 @@ def test_n7_config_rusak_draft_drift_dan_path_asing_gagal(plain):
     code, out = payload(plain, rel)
     assert code == 1 and json.loads(out)["status"] == "FAIL"
 
-    write_files(plain, {".claude/nataflow.json": '{"repo": "acme/notes"}'})
+    write_files(plain, {".claude/nataflow.json": json.dumps({"url": NF_URL, "repo": "acme/notes"})})
     edit(plain, rel, "Rilis dilakukan Jumat.", "Rilis dilakukan Kamis.")
     code, out = payload(plain, rel)
     assert code == 1 and "notulen DRIFT" in json.loads(out)["problems"][0]
@@ -322,12 +322,12 @@ def test_n7_config_rusak_draft_drift_dan_path_asing_gagal(plain):
 
 @pytest.mark.regression("18 N7")
 def test_n7_payload_dokumen_project_notes_meeting(plain):
-    write_files(plain, {".claude/nataflow.json": '{"mcp_server": "nf", "repo": "acme/notes"}'})
+    write_files(plain, {".claude/nataflow.json": json.dumps({"url": NF_URL, "repo": "acme/notes"})})
     rel = finalized(plain)
     code, out = payload(plain, rel)
     assert code == 0, out
     data = json.loads(out)
-    assert (data["status"], data["mcp_server"], data["notulen_key"]) == ("PASS", "nf", rel)
+    assert (data["status"], data["url"], data["notulen_key"]) == ("PASS", NF_URL, rel)
 
     lookup, create, update = data["lookup"], data["create"], data["update"]
     assert lookup == {"reference_table": "project", "type": "notes.meeting", "include_content": False,

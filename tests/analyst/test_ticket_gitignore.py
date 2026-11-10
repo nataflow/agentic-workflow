@@ -7,7 +7,7 @@ terima (`approved_seal`) dan working tree yang ditagih gerbang engineer tetap sa
 import json
 from pathlib import Path
 
-from conftest import PLUGINS, git, load_module, run_script, ticket_review, write_files
+from conftest import NF_URL, PLUGINS, git, load_module, run_script, ticket_review, write_files
 
 TICKET = PLUGINS / "analyst" / "skills" / "_common" / "ticket.py"
 TDIR = "analyst/tickets/2609231400-cicilan"
@@ -40,7 +40,7 @@ def committed(root, *files):
 
 def synced(make_repo):
     """Repo git bersinkron nataflow, config ter-commit, belum ada ticketdir."""
-    root = make_repo({".claude/nataflow.json": json.dumps({"workspaces": {"utama": WS}})})
+    root = make_repo({".claude/nataflow.json": json.dumps({"url": NF_URL, "workspaces": {"utama": WS}})})
     committed(root, ".claude/nataflow.json")
     return root
 

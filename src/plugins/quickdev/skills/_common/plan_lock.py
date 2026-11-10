@@ -657,7 +657,7 @@ def _sync_documents(a, config: dict, docs: list, head: dict, line: str) -> int:
     problems = ns.check_documents(docs)
     if problems:
         return ns.emit_fail(a.json, SYNC, problems)
-    base = {"status": "PASS", "enabled": True, "mcp_server": config["mcp_server"]}
+    base = {"status": "PASS", "enabled": True, "url": config["url"]}
     if a.remote is None:
         base.update(head, documents_total=len(docs))
         return _sync_emit(a, base, line + " — argumen tool lewat `--json`")
@@ -735,7 +735,7 @@ def cmd_sync_payload(a) -> int:
     head = {"repo": repo, **ns.workspace_fields(workspace_id, choices), "task": task, "workdir": workdir,
             "list_document": {"reference_table": "workdir", "include_content": False}}
     return _sync_documents(a, config, [doc], head,
-                           f"{rel} · workdir {path.stem} ({status}) · server {config['mcp_server']}")
+                           f"{rel} · workdir {path.stem} ({status}) · server {config['url']}")
 
 
 def main_sync(a) -> None:

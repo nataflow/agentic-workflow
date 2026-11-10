@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from conftest import BE_SKILLS, FE_SKILLS, FE_TD, TD, fe_run, load_module, run_script, write_files
+from conftest import NF_URL, BE_SKILLS, FE_SKILLS, FE_TD, TD, fe_run, load_module, run_script, write_files
 
 NS = load_module(BE_SKILLS / "_common" / "nataflow_sync.py", "nataflow_sync_28")
 BE_SP = BE_SKILLS / "_common" / "sync_payload.py"
@@ -98,7 +98,7 @@ def test_workdir_sendiri_wajib_ada_di_balikan():
 
 @pytest.fixture
 def be(chain_repo):
-    write_files(chain_repo, {".claude/nataflow.json": json.dumps({"repo": "tim/api"})})
+    write_files(chain_repo, {".claude/nataflow.json": json.dumps({"url": NF_URL, "repo": "tim/api"})})
     return chain_repo
 
 
@@ -148,7 +148,7 @@ def test_be_workdirs_hanya_untuk_taskdir(be):
 
 @pytest.fixture
 def fe(fe_chain_repo):
-    write_files(fe_chain_repo, {".claude/nataflow.json": json.dumps({"repo": "tim/web"})})
+    write_files(fe_chain_repo, {".claude/nataflow.json": json.dumps({"url": NF_URL, "repo": "tim/web"})})
     return fe_chain_repo
 
 

@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from conftest import PLUGINS, commit, git, run_script, write_files
+from conftest import NF_URL, PLUGINS, commit, git, run_script, write_files
 
 PL = PLUGINS / "quickdev" / "skills" / "_common" / "plan_lock.py"
 WS = "11111111-2222-3333-4444-555555555555"
@@ -25,7 +25,7 @@ Tambah validasi kuota.
 @pytest.fixture
 def repo(make_repo):
     root = make_repo({"app.js": "a\n", "repo-profile.md": "# profil\n",
-                      ".claude/nataflow.json": json.dumps({"workspaces": {"utama": WS}, "repo": "tim/app"})})
+                      ".claude/nataflow.json": json.dumps({"url": NF_URL, "workspaces": {"utama": WS}, "repo": "tim/app"})})
     commit(root, "init")
     write_files(root, {"plan/t.md": PLAN})
     return root
@@ -52,7 +52,7 @@ def test_skip_tanpa_config_walau_rencana_tidak_ada(make_repo):
 
 
 def test_config_rusak_fail(repo):
-    write_files(repo, {".claude/nataflow.json": '{"workspaces": {"utama": "x"}}'})
+    write_files(repo, {".claude/nataflow.json": json.dumps({"url": NF_URL, "workspaces": {"utama": "x"}})})
     code, out = payload(repo, "--plan", "plan/t.md")
     assert code == 1 and out["status"] == "FAIL" and "bukan UUID" in out["problems"][0]
 
@@ -73,7 +73,7 @@ def test_rencana_tidak_ada_dan_bukan_utf8(repo):
 def test_fase_satu_tanpa_isi(repo):
     locked(repo)
     code, out = payload(repo, "--plan", "plan/t.md")
-    assert code == 0 and out["status"] == "PASS" and out["mcp_server"] == "nataflow-api"
+    assert code == 0 and out["status"] == "PASS" and out["url"] == NF_URL
     key = "quickdev:tim/app:plan/t.md"
     assert out["task"]["lookup"] == {"metadata": json.dumps(
         {"source": "quickdev", "workdir_key": key}, separators=(",", ":"))}

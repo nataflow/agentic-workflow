@@ -5,13 +5,13 @@ import re
 
 import pytest
 
-from conftest import (FE_MINOR_TD, FE_SKILLS, FE_TD, commit, fe_approved_chain, fe_run, git, run_script,
+from conftest import (NF_URL, FE_MINOR_TD, FE_SKILLS, FE_TD, commit, fe_approved_chain, fe_run, git, run_script,
                       write_files)
 
 SP = FE_SKILLS / "_common" / "sync_payload.py"
 WS = "11111111-2222-3333-4444-555555555555"
 TICKET = "analyst/tickets/2609231400-cicilan-pembayaran"
-CONFIG = {".claude/nataflow.json": json.dumps({"workspaces": {"utama": WS}, "repo": "tim/web"})}
+CONFIG = {".claude/nataflow.json": json.dumps({"url": NF_URL, "workspaces": {"utama": WS}, "repo": "tim/web"})}
 
 
 def enable(repo):

@@ -194,7 +194,7 @@ def diff_phase(args, config: Dict[str, Any], docs: List[Dict[str, Any]], extras_
     if problems:
         return ns.emit_fail(args.json, PREFIX, problems)
     push, same = ns.split_remote(docs, remote)
-    payload = {"status": "PASS", "enabled": True, "mcp_server": config["mcp_server"], "documents": push,
+    payload = {"status": "PASS", "enabled": True, "url": config["url"], "documents": push,
                "same": same, "documents_total": len(docs)}
     ns.emit(payload, args.json, f"{PREFIX} PASS: {len(push)} dokumen perlu didorong, {same} sama — argumen lewat `--json`")
     return 0
@@ -210,7 +210,7 @@ def siblings_phase(args, config: Dict[str, Any], key: str, status: str, task: Di
     if problems:
         return ns.emit_fail(args.json, PREFIX, problems)
     open_ = sum(1 for k, s in workdirs.items() if (status if k == key else s) not in ns.WORKDIR_FINAL)
-    payload = {"status": "PASS", "enabled": True, "mcp_server": config["mcp_server"], "task_status": target,
+    payload = {"status": "PASS", "enabled": True, "url": config["url"], "task_status": target,
                "workdirs_total": len(workdirs), "workdirs_open": open_}
     ns.emit(payload, args.json, f"{PREFIX} PASS: {len(workdirs)} workdir di bawah task, {open_} belum tuntas → task "
                                 f"{target['status'] if target else 'tidak diubah'} — argumen lewat `--json`")
@@ -268,13 +268,13 @@ def run_taskdir(args, root: Path, config: Dict[str, Any]) -> int:
     meta = {"source": SOURCE, "repo": repo, "path": td, "lane": ns.frontmatter_value(task_text, "lane"),
             "chain": ns.frontmatter_value(task_text, "chain"), "risk": ns.frontmatter_value(task_text, "risk"),
             "ticket_key": tkey or ""}
-    payload = {"status": "PASS", "enabled": True, "mcp_server": config["mcp_server"], "repo": repo,
+    payload = {"status": "PASS", "enabled": True, "url": config["url"], "repo": repo,
                **ns.workspace_fields(args.workspace_id, args.workspace_choices), "task": task,
                "workdir": ns.workdir_args(key, name, status, {k: v for k, v in meta.items() if v}),
                "list_document": {"reference_table": "workdir", "include_content": False},
                "documents_total": len(docs)}
     ns.emit(payload, args.json, f"{PREFIX} PASS: {td} · workdir {name} ({status}) · {len(docs)} dokumen · server "
-                                f"{config['mcp_server']} — argumen tool lewat `--json`")
+                                f"{config['url']} — argumen tool lewat `--json`")
     return 0
 
 
@@ -295,7 +295,7 @@ def run_repo_docs(args, root: Path, config: Dict[str, Any]) -> int:
     if args.remote is not None:
         return diff_phase(args, config, docs, lambda remote: mirrored_extras(
             root, "workspace", remote, docs, lambda key: key[len(repo) + 1:] if key.startswith(prefix) else "", repo))
-    payload = {"status": "PASS", "enabled": True, "mcp_server": config["mcp_server"], "repo": repo,
+    payload = {"status": "PASS", "enabled": True, "url": config["url"], "repo": repo,
                **ns.workspace_fields(args.workspace_id, args.workspace_choices),
                "list_document": {"reference_table": "workspace", "include_content": False,
                                  "metadata": ns.compact({"source": SOURCE, "repo": repo})},

@@ -12,6 +12,7 @@ from conftest import PLUGINS, REPO, commit, git, load_module, write_files
 
 COPIES = {p: PLUGINS / p / "skills/_common/nataflow_sync.py" for p in ("analyst", "backend", "frontend", "quickdev")}
 WS = "11111111-2222-3333-4444-555555555555"
+URL = "https://nataflow.test/mcp"
 
 
 @pytest.fixture(scope="module")
@@ -38,10 +39,10 @@ def test_config_absen_berarti_nonaktif(ns, tmp_path):
 
 
 def test_config_sah_diisi_default(ns, tmp_path):
-    write_files(tmp_path, {".claude/nataflow.json": json.dumps({"workspaces": {"utama": WS}, "repo": "x/y"})})
+    write_files(tmp_path, {".claude/nataflow.json": json.dumps({"url": URL, "workspaces": {"utama": WS}, "repo": "x/y"})})
     config, problems = ns.load_config(tmp_path)
     assert problems == []
-    assert config == {"mcp_server": "nataflow-api", "workspaces": {"utama": WS}, "pic_id": "", "repo": "x/y"}
+    assert config == {"url": URL, "workspaces": {"utama": WS}, "pic_id": "", "repo": "x/y"}
 
 
 @pytest.mark.parametrize("raw,needle", [
@@ -49,11 +50,12 @@ def test_config_sah_diisi_default(ns, tmp_path):
     ("[]", "harus objek JSON"),
     ('{"workspace":"x"}', "kunci `workspace` tidak dikenal"),
     ('{"pic_id":"bukan-uuid"}', "bukan UUID"),
-    ('{"mcp_server":1}', "harus string"),
+    ('{"url":1}', "harus string"),
     ('{"repo":"a b"}', "memuat spasi"),
 ])
 def test_config_rusak_bukan_absen(ns, tmp_path, raw, needle):
-    write_files(tmp_path, {".claude/nataflow.json": raw})
+    data = raw if not raw.startswith("{\"") else json.dumps({"url": URL, **json.loads(raw)})
+    write_files(tmp_path, {".claude/nataflow.json": data})
     config, problems = ns.load_config(tmp_path)
     assert config is None and len(problems) == 1
     assert problems[0].startswith(".claude/nataflow.json rusak — ") and needle in problems[0]
@@ -67,15 +69,103 @@ def test_config_bukan_utf8(ns, tmp_path):
 
 def test_config_lama_diterima_dan_konflik_ditolak(ns, tmp_path):
     legacy = "analyst/nataflow.json"
-    write_files(tmp_path, {legacy: json.dumps({"workspaces": {"utama": WS}})})
+    write_files(tmp_path, {legacy: json.dumps({"url": URL, "workspaces": {"utama": WS}})})
     assert ns.load_config(tmp_path, legacy)[0]["workspaces"] == {"utama": WS}
-    write_files(tmp_path, {".claude/nataflow.json": json.dumps({"workspaces": {"utama": WS}, "mcp_server": "nataflow-api"})})
+    write_files(tmp_path, {".claude/nataflow.json": json.dumps({"workspaces": {"utama": WS}, "url": URL})})
     assert ns.load_config(tmp_path, legacy)[1] == [], "isi efektif sama → bukan konflik"
-    write_files(tmp_path, {".claude/nataflow.json": json.dumps({"mcp_server": "lain"})})
+    write_files(tmp_path, {".claude/nataflow.json": json.dumps({"url": "https://lain.test/mcp"})})
     config, problems = ns.load_config(tmp_path, legacy)
     assert config is None and "berbeda isi" in problems[0]
     write_files(tmp_path, {legacy: "{"})
     assert ns.load_config(tmp_path, legacy)[1][0].startswith("analyst/nataflow.json rusak — ")
+
+
+@pytest.mark.parametrize("raw,needle", [
+    ("{}", "`url` wajib diisi"),
+    ('{"url": ""}', "`url` kosong"),
+    ('{"url": "api.flow.natakode.id/mcp"}', "harus URL http(s) lengkap"),
+    ('{"url": "http://api.flow.natakode.id/mcp"}', "wajib `https://`"),
+    ('{"url": "https://u:p@api.flow.natakode.id/mcp"}', "tidak boleh memuat kredensial"),
+    ('{"url": "https://api.flow.natakode.id/api/v1"}', "berakhir di path endpoint `/mcp`"),
+    ('{"url": "https://api.flow.natakode.id/mcp?key=x"}', "berakhir di path endpoint `/mcp`"),
+    ('{"url": "https://api.flow.natakode.id/mcp", "mcp_server": "nataflow-api"}', "`mcp_server` sudah diganti `url`"),
+])
+def test_url_wajib_dan_tervalidasi(ns, tmp_path, raw, needle):
+    write_files(tmp_path, {".claude/nataflow.json": raw})
+    config, problems = ns.load_config(tmp_path)
+    assert config is None and any(needle in p for p in problems), problems
+
+
+@pytest.mark.parametrize("url", ["https://api.flow.natakode.id/mcp", "https://h.test/base/mcp/",
+                                 "http://localhost:8080/mcp", "http://127.0.0.1:8080/mcp"])
+def test_url_sah(ns, tmp_path, url):
+    write_files(tmp_path, {".claude/nataflow.json": json.dumps({"url": url})})
+    assert ns.load_config(tmp_path)[0]["url"] == url
+
+
+# ── MCP key `.claude/nataflow.local.json` (fail-closed) ─────────────────────
+
+KEY = "nfk_rahasia_123"
+LOCAL = ".claude/nataflow.local.json"
+
+
+def keyed(root, ignore=True, data=None):
+    write_files(root, {LOCAL: json.dumps({"mcp_key": KEY} if data is None else data)})
+    if ignore:
+        write_files(root, {".gitignore": LOCAL + "\n"})
+
+
+def test_key_absen_wajib_setup(ns, make_repo):
+    key, problems = ns.load_key(make_repo())
+    assert key == "" and "tidak ada" in problems[0] and "mcp_key" in problems[0] and ".gitignore" in problems[0]
+
+
+def test_key_diabaikan_git_dipakai(ns, make_repo):
+    root = make_repo()
+    keyed(root)
+    assert ns.load_key(root) == (KEY, [])
+
+
+def test_key_tidak_diabaikan_ditolak(ns, make_repo):
+    root = make_repo()
+    keyed(root, ignore=False)
+    key, problems = ns.load_key(root)
+    assert key == "" and "tidak diabaikan git" in problems[0] and KEY not in problems[0]
+
+
+def test_key_ter_track_ditolak_walau_diabaikan(ns, make_repo):
+    root = make_repo()
+    keyed(root, ignore=False)
+    git(root, "add", LOCAL)
+    write_files(root, {".gitignore": LOCAL + "\n"})
+    key, problems = ns.load_key(root)
+    assert key == "" and "ter-track" in problems[0] and "rotasi" in problems[0] and KEY not in problems[0]
+
+
+def test_key_root_non_git_diizinkan(ns, tmp_path):
+    keyed(tmp_path, ignore=False)
+    assert ns.load_key(tmp_path) == (KEY, [])
+
+
+@pytest.mark.parametrize("data,needle", [
+    ([], "harus objek JSON"),
+    ({"mcp_key": ""}, "`mcp_key` kosong"),
+    ({"mcp_key": 7}, "bukan string"),
+    ({"mcp_key": "Bearer abc"}, "memuat spasi"),
+    ({"mcp_key": KEY, "url": "x"}, "kunci `url` tidak dikenal"),
+])
+def test_key_rusak_ditolak_tanpa_membocorkan_nilai(ns, make_repo, data, needle):
+    root = make_repo()
+    keyed(root, data=data)
+    key, problems = ns.load_key(root)
+    assert key == "" and needle in problems[0] and KEY not in problems[0]
+
+
+def test_key_bukan_json(ns, make_repo):
+    root = make_repo()
+    keyed(root)
+    write_files(root, {LOCAL: "{rusak"})
+    assert "bukan JSON UTF-8 sah" in ns.load_key(root)[1][0]
 
 
 # ── Identitas repo ──────────────────────────────────────────────────────────
@@ -174,7 +264,7 @@ def test_doc_meta_removed_dan_commit_kosong(ns):
 
 
 def test_task_args_repo_hanya_di_create(ns):
-    config = {"mcp_server": "nataflow-api", "workspaces": {"utama": WS}, "pic_id": "", "repo": ""}
+    config = {"url": URL, "workspaces": {"utama": WS}, "pic_id": "", "repo": ""}
     args = ns.task_args(config, WS, {"source": "analyst", "ticket_key": "analyst/tickets/2609231400-x"}, "r", "T", "D")
     assert args["lookup"] == {"metadata": '{"source":"analyst","ticket_key":"analyst/tickets/2609231400-x"}'}
     assert list(args["create"]) == ["title", "description", "workspace_id", "metadata"]

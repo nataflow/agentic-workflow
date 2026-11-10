@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import PLUGINS, git, load_module, run_script, ticket_review
+from conftest import NF_URL, PLUGINS, git, load_module, run_script, ticket_review
 
 COMMON = PLUGINS / "analyst" / "skills" / "_common"
 TICKET = COMMON / "ticket.py"
@@ -207,7 +207,7 @@ def test_t5_siklus_close_review_approve_lalu_category_tersunting_drift(repo):
 @pytest.mark.regression("17 T6")
 def test_t6_metadata_sinkron_membawa_category(repo):
     cfg = repo / "analyst" / "nataflow.json"
-    cfg.write_text(json.dumps({"workspaces": {"utama": "a3e1d6c4-1f2b-4c3d-9e8f-7a6b5c4d3e2f"}}), encoding="utf-8")
+    cfg.write_text(json.dumps({"url": NF_URL, "workspaces": {"utama": "a3e1d6c4-1f2b-4c3d-9e8f-7a6b5c4d3e2f"}}), encoding="utf-8")
     assert tk(repo, "close", "--ticketdir", TDIR).code == 0
     assert ticket_review(repo, TDIR, "PASS").returncode == 0
     assert tk(repo, "approve", "--ticketdir", TDIR, "--answer", "Setujui").code == 0

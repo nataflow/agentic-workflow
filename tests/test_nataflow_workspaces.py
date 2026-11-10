@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import BE_SKILLS, FE_SKILLS, FE_TD, PLUGINS, TD, commit, git, load_module, run_script, ticket_review, \
+from conftest import NF_URL, BE_SKILLS, FE_SKILLS, FE_TD, PLUGINS, TD, commit, git, load_module, run_script, ticket_review, \
     write_files
 
 WEB = "11111111-2222-3333-4444-555555555555"
@@ -29,7 +29,7 @@ def ns():
 
 
 def config(root, data):
-    write_files(root, {".claude/nataflow.json": json.dumps(data)})
+    write_files(root, {".claude/nataflow.json": json.dumps({"url": NF_URL, **data})})
 
 
 def run_json(script, root, *args):
@@ -41,7 +41,7 @@ def run_json(script, root, *args):
 # ── Pustaka ─────────────────────────────────────────────────────────────────
 
 def test_choose_workspace_nol_satu_banyak(ns):
-    base = {"mcp_server": "nataflow-api", "pic_id": "", "repo": ""}
+    base = {"url": NF_URL, "pic_id": "", "repo": ""}
     assert ns.choose_workspace(dict(base, workspaces={}), "") == ("", [], [])
     assert ns.choose_workspace(dict(base, workspaces={"web": WEB}), "") == (WEB, [], [])
     assert ns.choose_workspace(dict(base, workspaces=TWO["workspaces"]), "") == ("", CHOICES, [])
@@ -49,7 +49,7 @@ def test_choose_workspace_nol_satu_banyak(ns):
 
 
 def test_alias_tidak_dikenal_ditolak(ns):
-    base = {"mcp_server": "nataflow-api", "pic_id": "", "repo": ""}
+    base = {"url": NF_URL, "pic_id": "", "repo": ""}
     _, _, problems = ns.choose_workspace(dict(base, workspaces=TWO["workspaces"]), "desktop")
     assert "`desktop` tidak ada" in problems[0] and "web, mobile" in problems[0]
     _, _, problems = ns.choose_workspace(dict(base, workspaces={}), "web")
@@ -57,7 +57,7 @@ def test_alias_tidak_dikenal_ditolak(ns):
 
 
 def test_urutan_entri_config_dipertahankan(ns, tmp_path):
-    write_files(tmp_path, {".claude/nataflow.json": '{"workspaces": {"zeta": "%s", "alfa": "%s"}}' % (WEB, MOBILE)})
+    write_files(tmp_path, {".claude/nataflow.json": '{"url": "%s", "workspaces": {"zeta": "%s", "alfa": "%s"}}' % (NF_URL, WEB, MOBILE)})
     assert list(ns.load_config(tmp_path)[0]["workspaces"]) == ["zeta", "alfa"]
 
 
@@ -143,7 +143,7 @@ def test_engineer_task_dan_dokumen_repo_memilih_workspace(plugin, request):
 # ── quickdev ────────────────────────────────────────────────────────────────
 
 def test_quickdev_profil_dan_rencana_memilih_workspace(make_repo):
-    root = make_repo({"repo-profile.md": "# profil\n", ".claude/nataflow.json": json.dumps(TWO)})
+    root = make_repo({"repo-profile.md": "# profil\n", ".claude/nataflow.json": json.dumps({"url": NF_URL, **TWO})})
     commit(root, "init")
     code, out = run_json(PL, root, "sync-payload", "--repo-profile", "repo-profile.md")
     assert code == 0 and out["workspace_choices"] == CHOICES and out["workspace_id"] == ""

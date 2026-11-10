@@ -6,7 +6,9 @@ plugin dipasang terpisah sehingga tidak bisa saling mengimpor. Ubah keempatnya b
 
 Isinya hanya primitif yang tidak bergantung pada artefak plugin mana pun:
 
-- config `.claude/nataflow.json` (plus berkas lama per plugin) → `load_config`;
+- config `.claude/nataflow.json` (plus berkas lama per plugin) → `load_config`; `url` endpoint MCP wajib diisi;
+- MCP key dari `.claude/nataflow.local.json` → `load_key`, fail-closed: di repo git berkasnya wajib diabaikan git
+  dan tidak ter-track, sehingga key tidak pernah ikut ter-commit;
 - identitas repo: `repo` config, `git remote origin` ternormalisasi, atau nama direktori root → `repo_identity`;
 - isi berkas di `HEAD`, commit terakhir, dan versi terakhir berkas yang sudah dihapus dari git;
 - workspace tujuan dari `workspaces` config (`choose_workspace`): nol entri → workspace key, satu → otomatis,
@@ -15,8 +17,8 @@ Isinya hanya primitif yang tidak bergantung pada artefak plugin mana pun:
 - diff dokumen terhadap manifest remote (balikan `list_document include_content=false`);
 - status penutup task tiket dari seluruh workdir di bawahnya (balikan `list_workdir task_id`, langkah 28).
 
-Sinkron tidak menulis berkas apa pun (D5) dan tidak membuka koneksi jaringan (D4): skrip hanya menyusun argumen
-yang dikirim model apa adanya. Semua `metadata` berupa teks JSON ringkas, karena tool MCP menerimanya sebagai string.
+Sinkron tidak menulis berkas apa pun (D5). Semua `metadata` berupa teks JSON ringkas, karena tool MCP menerimanya
+sebagai string.
 
 Zero external dependencies (Python Standard Library only).
 """
@@ -27,10 +29,14 @@ import re
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlsplit
 
 CONFIG_FILE = ".claude/nataflow.json"
-DEFAULT_SERVER = "nataflow-api"
-CONFIG_KEYS = ("mcp_server", "workspaces", "pic_id", "repo")
+LOCAL_FILE = ".claude/nataflow.local.json"
+CONFIG_KEYS = ("url", "workspaces", "pic_id", "repo")
+LOCAL_KEYS = ("mcp_key",)
+URL_EXAMPLE = "https://api.flow.natakode.id/mcp"
+LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1")    # satu-satunya host yang boleh `http://` (server dev lokal)
 ALIAS_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$")
 UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 BOM = "\ufeff"
@@ -51,6 +57,16 @@ def compact(obj: Any) -> str:
 
 
 # ── Config ────────────────────────────────────────────────────────────────────
+
+def unknown_key(key: str) -> str:
+    """Pesan kunci config yang tidak dikenal; kunci lama menyebut penggantinya."""
+    if key == "workspace_id":
+        return "kunci `workspace_id` sudah diganti `workspaces` — tulis `\"workspaces\": {\"<alias>\": \"<uuid>\"}`"
+    if key == "mcp_server":
+        return (f"kunci `mcp_server` sudah diganti `url` — tulis `\"url\": \"{URL_EXAMPLE}\"` dan simpan MCP key di "
+                f"{LOCAL_FILE} (lihat MIGRATION plugin)")
+    return f"kunci `{key}` tidak dikenal (sah: {', '.join(CONFIG_KEYS)})"
+
 
 def parse_workspaces(value: Any) -> Tuple[Dict[str, str], List[str]]:
     """Nilai `workspaces` → `({alias: UUID}, masalah)`, urutan entri berkas dipertahankan."""
@@ -73,12 +89,30 @@ def parse_workspaces(value: Any) -> Tuple[Dict[str, str], List[str]]:
     return workspaces, problems
 
 
+def url_problem(value: str) -> str:
+    """`url` endpoint MCP → masalah, atau kosong bila sah: `https://<host>/…/mcp`; `http://` hanya untuk host lokal."""
+    try:
+        parts = urlsplit(value)
+        host = (parts.hostname or "").lower()
+    except ValueError:
+        return f"`url` `{value}` bukan URL"
+    if parts.scheme not in ("http", "https") or not host:
+        return f"`url` `{value}` harus URL http(s) lengkap, mis. `{URL_EXAMPLE}`"
+    if parts.scheme == "http" and host not in LOCAL_HOSTS:
+        return f"`url` `{value}` wajib `https://` (http hanya untuk {', '.join(LOCAL_HOSTS)})"
+    if parts.username or parts.password:
+        return "`url` tidak boleh memuat kredensial — MCP key disimpan di " + LOCAL_FILE
+    if parts.query or parts.fragment or not parts.path.rstrip("/").endswith("/mcp"):
+        return f"`url` `{value}` harus berakhir di path endpoint `/mcp`, mis. `{URL_EXAMPLE}`"
+    return ""
+
+
 def parse_config(path: Path) -> Tuple[Optional[Dict[str, Any]], List[str]]:
     """Satu berkas config → `(config, masalah)`. Config sah selalu memuat keempat `CONFIG_KEYS`.
 
-    `mcp_server` default `nataflow-api`; `pic_id` dan `repo` string kosong, `workspaces` objek kosong bila tidak
-    diisi. `workspace_id` tunggal lama ditolak dengan petunjuk penggantinya. Pesan masalah tanpa nama berkas;
-    pemanggil yang menyebutnya.
+    `url` wajib diisi; `pic_id` dan `repo` string kosong, `workspaces` objek kosong bila tidak diisi. `mcp_server`
+    (nama server MCP di Claude Code) dan `workspace_id` tunggal lama ditolak dengan petunjuk penggantinya. Pesan
+    masalah tanpa nama berkas; pemanggil yang menyebutnya.
     """
     try:
         data = json.loads(path.read_text(encoding="utf-8").lstrip(BOM))
@@ -90,10 +124,10 @@ def parse_config(path: Path) -> Tuple[Optional[Dict[str, Any]], List[str]]:
         return None, [f"tidak terbaca ({exc.strerror or exc})"]
     if not isinstance(data, dict):
         return None, [f"harus objek JSON, bukan {type(data).__name__}"]
-    problems = [f"kunci `workspace_id` sudah diganti `workspaces` — tulis "
-                f"`\"workspaces\": {{\"<alias>\": \"<uuid>\"}}`" if k == "workspace_id"
-                else f"kunci `{k}` tidak dikenal (sah: {', '.join(CONFIG_KEYS)})" for k in data if k not in CONFIG_KEYS]
-    config: Dict[str, Any] = {"mcp_server": DEFAULT_SERVER, "workspaces": {}, "pic_id": "", "repo": ""}
+    problems = [unknown_key(k) for k in data if k not in CONFIG_KEYS]
+    if "url" not in data:
+        problems.append(f"`url` wajib diisi — endpoint MCP nataflow, mis. `\"url\": \"{URL_EXAMPLE}\"`")
+    config: Dict[str, Any] = {"url": "", "workspaces": {}, "pic_id": "", "repo": ""}
     for key in CONFIG_KEYS:
         if key not in data:
             continue
@@ -106,7 +140,13 @@ def parse_config(path: Path) -> Tuple[Optional[Dict[str, Any]], List[str]]:
             problems.append(f"`{key}` harus string, bukan {type(value).__name__}")
             continue
         value = value.strip()
-        if key == "pic_id" and value and not UUID_RE.match(value):
+        if key == "url":
+            problem = url_problem(value) if value else f"`url` kosong — isi endpoint MCP, mis. `{URL_EXAMPLE}`"
+            if problem:
+                problems.append(problem)
+            else:
+                config[key] = value
+        elif key == "pic_id" and value and not UUID_RE.match(value):
             problems.append(f"`{key}` `{value}` bukan UUID")
         elif key == "repo" and re.search(r"\s", value):
             problems.append(f"`repo` `{value}` memuat spasi")
@@ -135,6 +175,48 @@ def load_config(root: Path, legacy: str = "") -> Tuple[Optional[Dict[str, Any]],
     if len(found) == 2 and found[0][1] != found[1][1]:
         return None, [f"{CONFIG_FILE} dan {legacy} berbeda isi — pertahankan satu saja ({CONFIG_FILE})"]
     return found[0][1], []
+
+
+LOCAL_SETUP = (f"buat {LOCAL_FILE} berisi `{{\"mcp_key\": \"<MCP key nataflow>\"}}` lalu tambahkan baris "
+               f"`{LOCAL_FILE}` ke .gitignore")
+
+
+def load_key(root: Path) -> Tuple[str, List[str]]:
+    """MCP key dari `.claude/nataflow.local.json` → `(key, masalah)`; dipanggil hanya saat `--push`.
+
+    Fail-closed: berkas wajib ada, berisi objek `{"mcp_key": "<key>"}`. Di repo git berkas itu wajib tidak ter-track
+    dan diabaikan git — tanpa itu key ditolak, bukan dipakai sambil diperingatkan. Root non-git diizinkan tanpa cek
+    ignore: tidak ada yang bisa meng-commit-nya. Pesan masalah tidak pernah memuat nilai key.
+    """
+    path = root / LOCAL_FILE
+    if not path.is_file():
+        return "", [f"{LOCAL_FILE} tidak ada — sinkron aktif ({CONFIG_FILE} ada) tetapi MCP key belum disetel: "
+                    f"{LOCAL_SETUP}"]
+    code, out = _git(root, "rev-parse", "--is-inside-work-tree")
+    if code == 0 and out.strip() == b"true":
+        if _git(root, "ls-files", "--error-unmatch", "--", LOCAL_FILE)[0] == 0:
+            return "", [f"{LOCAL_FILE} ter-track git — MCP key bocor ke riwayat repo: keluarkan dengan "
+                        f"`git rm --cached {LOCAL_FILE}`, rotasi key-nya, lalu tambahkan `{LOCAL_FILE}` ke .gitignore"]
+        if _git(root, "check-ignore", "-q", "--", LOCAL_FILE)[0] != 0:
+            return "", [f"{LOCAL_FILE} tidak diabaikan git — tambahkan baris `{LOCAL_FILE}` ke .gitignore sebelum "
+                        f"sinkron, supaya MCP key tidak ikut ter-commit"]
+    try:
+        data = json.loads(path.read_text(encoding="utf-8").lstrip(BOM))
+    except (UnicodeDecodeError, ValueError):
+        return "", [f"{LOCAL_FILE} bukan JSON UTF-8 sah — {LOCAL_SETUP}"]
+    except OSError as exc:
+        return "", [f"{LOCAL_FILE} tidak terbaca ({exc.strerror or exc})"]
+    if not isinstance(data, dict):
+        return "", [f"{LOCAL_FILE} harus objek JSON — {LOCAL_SETUP}"]
+    extra = [k for k in data if k not in LOCAL_KEYS]
+    if extra:
+        return "", [f"{LOCAL_FILE}: kunci `{extra[0]}` tidak dikenal (sah: {', '.join(LOCAL_KEYS)})"]
+    key = data.get("mcp_key")
+    if not isinstance(key, str) or not key.strip():
+        return "", [f"{LOCAL_FILE}: `mcp_key` kosong atau bukan string — {LOCAL_SETUP}"]
+    if re.search(r"\s", key.strip()):
+        return "", [f"{LOCAL_FILE}: `mcp_key` memuat spasi — salin key tanpa awalan `Bearer `"]
+    return key.strip(), []
 
 
 # ── Git & identitas repo ──────────────────────────────────────────────────────

@@ -896,7 +896,7 @@ def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:
     state = classify(root, rel)          # non-UTF-8 → RUSAK, bukan traceback
     key = {"source": "analyst", "ticket_key": rel}
     if state["state"] == "DIBATALKAN" and _was_ready(read(root / rel / TICKET_FILE)):
-        payload = {"status": "PASS", "enabled": True, "mcp_server": config["mcp_server"], "ticket_key": rel,
+        payload = {"status": "PASS", "enabled": True, "url": config["url"], "ticket_key": rel,
                    "lookup": {"metadata": _compact(key)}, "task_status": ns.task_status("cancelled")}
         if args.json:
             print(json.dumps(payload, indent=2, ensure_ascii=False))
@@ -936,7 +936,7 @@ def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:
         create["pic_id"] = config["pic_id"]
     create["metadata"] = _compact(meta)
     payload = {
-        "status": "PASS", "enabled": True, "mcp_server": config["mcp_server"], "ticket_key": rel,
+        "status": "PASS", "enabled": True, "url": config["url"], "ticket_key": rel,
         **ns.workspace_fields(workspace_id, choices),
         "lookup": {"metadata": _compact(key)},
         "create": create,
@@ -947,7 +947,7 @@ def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:
         print(json.dumps(payload, indent=2, ensure_ascii=False))
     else:
         where = ("pilih: " + ", ".join(c["alias"] for c in choices)) if choices else workspace_id or "-"
-        print(f"SYNC-PAYLOAD PASS: {rel} · server {config['mcp_server']} · workspace {where} · pic "
+        print(f"SYNC-PAYLOAD PASS: {rel} · server {config['url']} · workspace {where} · pic "
               f"{config['pic_id'] or '-'} · {len(payload['documents'])} dokumen — argumen tool lewat `--json`")
     return 0
 
