@@ -109,6 +109,26 @@ tingkat.
 - `status: APPROVED` pada BRD/PRD hanya ditulis `backend:analyst`, sesudah reviewer `Approved` dan
   persetujuan user.
 
+## Serah Terima Eksekusi
+
+Vonis `READY_FOR_IMPLEMENTATION` tidak langsung memberangkatkan `architect`. Konteks sesi planning sudah
+menumpuk elisitasi, PRD, laporan explorer, dan brief, sedangkan `architect` bekerja mekanis di atas brief
+terkunci. `tech-lead` berhenti dan menawarkan pilihan ke user:
+
+```
+a. /clear  → /model sonnet (opsional) → /backend:tech-lead lanjutkan <taskdir>
+b. /compact fokus taskdir <taskdir> → /backend:tech-lead lanjutkan <taskdir>
+atau balas "lanjut" untuk mengeksekusi di sesi yang sama
+```
+
+Plugin tidak dapat menjalankan `/clear`, `/compact`, atau `/model`; pilihannya milik user. Jalur lanjutan
+membaca state dari disk dan langsung merutekan ke `architect` tanpa eksplorasi ulang.
+
+Nuansa percakapan yang tidak tertulis di dokumen rantai dibawa `{taskdir}/JOURNEY.md`, ditulis
+`skills/_common/journey.py`: satu baris per titik (`TECH_LEAD`, `BRD`/`PRD`, `READY`, `REVIEW`,
+`ARCHITECT`), maksimal dua kalimat dan 280 karakter, maksimal 40 entri. Isinya keputusan user dan alasannya,
+bukan status. Tidak ada skrip gerbang yang membacanya, dan bila bertentangan dengan disk, disk menang.
+
 ## Artefak di Repo Pengguna
 
 ```
@@ -126,6 +146,7 @@ backenddev/
       brief-01-<unit>.md             READY → DONE | BLOCKED | SUPERSEDED
       report-01.md                   laporan brief yang gagal
       HALT.md  REVIEW.md  REPORT.md
+      JOURNEY.md                     keputusan antar sesi (journey.py), bukan sumber status
       .explore/                      scratch skill hilir
   issues/
     README.md                        indeks temuan audit
