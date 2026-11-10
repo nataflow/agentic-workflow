@@ -24,7 +24,8 @@ Satu-satunya jalan mutasi status yang punya konsekuensi di luar penulisnya:
 - `ref`     — isi `external_ref` (kunci kartu Jira/Trello) pada DRAFT maupun READY.
 - `sync-payload` — isi argumen tool MCP nataflow untuk tiket READY (`list_task`/`create_task`/`update_task`
               beserta `upsert_document` `review.md`) atau tiket pernah-READY yang dibatalkan
-              (`update_task_status cancelled`); read-only, tanpa commit, dan tidak pernah menulis `TICKET.md`.
+              (`update_task_status cancelled`); tanpa commit, dan tidak pernah menulis `TICKET.md`. `--push`
+              memanggil server langsung (MCP key `.claude/nataflow.local.json`) dan mencetak satu baris segmen.
 
 `approve` menuntut kedua validator (`ticket`, `elicit`) `PASS`, `elicitation: CLOSED`, catatan elisitasi
 sama dengan segel `close`, **dan** vonis review `PASS` atas sidik `<kartu>/<catatan elisitasi>` yang sama
@@ -46,7 +47,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from analyst_lib import (  # noqa: E402
@@ -861,7 +862,8 @@ def _review_document(root: Path, rel: str, fm: Dict[str, Any], repo: str) -> Lis
     return [ns.document("task", REVIEW_FILE, "ticket.review", content, meta)]
 
 
-def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:
+def _sync_build(root: Path, args: argparse.Namespace, config: Dict[str, Any]
+                ) -> Tuple[Optional[Dict[str, Any]], List[str], str]:
     """Argumen tool MCP nataflow untuk satu tiket (14 N2, 15 A1–A4, A6) — read-only, tanpa commit.
 
     Model mengirim `lookup`, `create`, `update`, dan `documents` apa adanya; skrip ini satu-satunya penyusun isinya,
@@ -877,45 +879,31 @@ def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:
     task belum ada, lalu skrip dijalankan ulang dengan `--workspace`. Pilihan tidak ditulis ke `TICKET.md`: sesudah
     task dibuat, nataflow sendiri yang mencatat workspace-nya.
     """
-    config, problems = load_sync_config(root)
-    if problems:
-        return _sync_fail(args, problems)
-    if config is None:
-        if args.json:
-            print(json.dumps({"status": "SKIP", "enabled": False}, indent=2))
-        else:
-            print(f"SYNC-PAYLOAD SKIP: {ns.CONFIG_FILE} (atau {SYNC_CONFIG} lama) tidak ada — sinkron nataflow "
-                  f"tidak aktif di repo ini")
-        return 0
     rel = normalize_ticketdir(args.ticketdir, root)
     if not TICKETDIR_RE.match(rel) or not (root / rel).is_dir():
-        return _sync_fail(args, [f"`{rel}` bukan direktori {TICKETS_DIR}/<YYMMDDhhmm>-<slug>"])
+        return None, [f"`{rel}` bukan direktori {TICKETS_DIR}/<YYMMDDhhmm>-<slug>"], ""
     workspace_id, choices, problems = ns.choose_workspace(config, args.workspace)
     if problems:
-        return _sync_fail(args, problems)
+        return None, problems, ""
     state = classify(root, rel)          # non-UTF-8 → RUSAK, bukan traceback
     key = {"source": "analyst", "ticket_key": rel}
     if state["state"] == "DIBATALKAN" and _was_ready(read(root / rel / TICKET_FILE)):
         payload = {"status": "PASS", "enabled": True, "url": config["url"], "ticket_key": rel,
                    "lookup": {"metadata": _compact(key)}, "task_status": ns.task_status("cancelled")}
-        if args.json:
-            print(json.dumps(payload, indent=2, ensure_ascii=False))
-        else:
-            print(f"SYNC-PAYLOAD PASS: {rel} DIBATALKAN · task cermin menjadi cancelled — argumen tool lewat `--json`")
-        return 0
+        return payload, [], f"SYNC-PAYLOAD PASS: {rel} DIBATALKAN · task cermin menjadi cancelled — argumen tool lewat `--json`"
     if state["state"] != "READY":
-        return _sync_fail(args, [f"{rel} {state['state']} — hanya tiket READY (atau pernah READY lalu dibatalkan) "
-                                 f"yang disinkronkan ({state['route']})"])
+        return None, [f"{rel} {state['state']} — hanya tiket READY (atau pernah READY lalu dibatalkan) "
+                      f"yang disinkronkan ({state['route']})"], ""
     path = root / rel / TICKET_FILE
     text = text_of(path)
     fm, body = split_frontmatter(text)
     title = title_of(path)
     if title == "-":
-        return _sync_fail(args, [f"{rel}/{TICKET_FILE} tanpa H1 — judul task diambil dari H1 kartu"])
+        return None, [f"{rel}/{TICKET_FILE} tanpa H1 — judul task diambil dari H1 kartu"], ""
     reopened = str(fm.get("reopened", "0")).strip() or "0"
     if not reopened.isdigit():
-        return _sync_fail(args, [f"field `reopened: {reopened}` bukan bilangan — field ini hanya ditulis "
-                                 f"ticket.py; pulihkan nilainya dari riwayat git"])
+        return None, [f"field `reopened: {reopened}` bukan bilangan — field ini hanya ditulis "
+                      f"ticket.py; pulihkan nilainya dari riwayat git"], ""
     repo = ns.repo_identity(root, config)
     meta = dict(key, repo=repo, slug=str(fm.get("slug", "")).strip() or rel.split("-", 1)[-1],
                 type=str(fm.get("type", "-")), priority=str(fm.get("priority", "-")),
@@ -943,12 +931,68 @@ def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:
         "update": {"title": title, "description": card, "metadata": create["metadata"]},
         "documents": _review_document(root, rel, fm, repo),
     }
-    if args.json:
-        print(json.dumps(payload, indent=2, ensure_ascii=False))
+    where = ("pilih: " + ", ".join(c["alias"] for c in choices)) if choices else workspace_id or "-"
+    return payload, [], (f"SYNC-PAYLOAD PASS: {rel} · server {config['url']} · workspace {where} · pic "
+                         f"{config['pic_id'] or '-'} · {len(payload['documents'])} dokumen — argumen tool lewat `--json`")
+
+
+def _sync_push(session: Any, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Langkah prosedur sinkron tiket dijalankan skrip sendiri (29 S5): cari task lewat `lookup`, lalu buat,
+    perbarui, atau batalkan, dan dokumen `review.md` di bawahnya. Task kembar berhenti sebelum tool tulis apa pun."""
+    from nataflow_client import as_list
+    found = as_list(session.call_json("list_task", payload["lookup"], read=True), "tasks", "data")
+    if len(found) > 1:
+        return ns.push_fail([f"{len(found)} task ber-ticket_key sama ("
+                             + ", ".join(f"#{t.get('code') or t.get('id')}" for t in found) + ")"])
+    if "task_status" in payload:
+        if not found:
+            return {"status": "PASS", "outcome": "dilewati (task belum ada)"}
+        row, target = found[0], payload["task_status"]
+        code = row.get("code") or row.get("id")
+        if row.get("status") not in target["from"]:
+            return {"status": "PASS", "outcome": f"dilewati (task {row.get('status')} #{code})"}
+        session.call_json("update_task_status", {"task_id": row["id"], "status": target["status"]})
+        return {"status": "PASS", "outcome": f"dibatalkan #{code}"}
+    if found:
+        row, verb = session.call_json("update_task", dict(payload["update"], task_id=found[0]["id"])), "diperbarui"
+    elif payload.get("workspace_choices"):
+        return ns.push_choose(payload["workspace_choices"])
     else:
-        where = ("pilih: " + ", ".join(c["alias"] for c in choices)) if choices else workspace_id or "-"
-        print(f"SYNC-PAYLOAD PASS: {rel} · server {config['url']} · workspace {where} · pic "
-              f"{config['pic_id'] or '-'} · {len(payload['documents'])} dokumen — argumen tool lewat `--json`")
+        row, verb = session.call_json("create_task", payload["create"]), "dibuat"
+    outcome = f"{verb} #{row.get('code') or row.get('id')}"
+    if payload["documents"]:
+        counts = ns.upsert_documents(session, payload["documents"], row["id"])
+        outcome += " · review.md " + ("baru" if counts["created"] else "diperbarui" if counts["updated"] else "sama")
+    return {"status": "PASS", "outcome": outcome}
+
+
+def _sync_segment(result: Dict[str, Any]) -> str:
+    if result["status"] == "PASS":
+        return "nataflow " + result["outcome"]
+    return "nataflow " + ns.push_segment(result, "")
+
+
+def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:
+    """Sinkron satu tiket ke nataflow. `--push` memanggil server langsung lewat `nataflow_client` dengan MCP key
+    `.claude/nataflow.local.json` dan mencetak satu baris segmen (29 S5); tanpa `--push` keluarannya argumen tool."""
+    config, problems = load_sync_config(root)
+    payload, line = None, ""
+    if not problems and config is not None:
+        payload, problems, line = _sync_build(root, args, config)
+    if args.push:
+        result = (ns.push_fail(problems) if problems else {"status": "SKIP"} if config is None
+                  else ns.run_push(root, config, lambda s: _sync_push(s, payload)))
+        return ns.emit_push(result, args.json, _sync_segment(result))
+    if problems:
+        return _sync_fail(args, problems)
+    if config is None:
+        if args.json:
+            print(json.dumps({"status": "SKIP", "enabled": False}, indent=2))
+        else:
+            print(f"SYNC-PAYLOAD SKIP: {ns.CONFIG_FILE} (atau {SYNC_CONFIG} lama) tidak ada — sinkron nataflow "
+                  f"tidak aktif di repo ini")
+        return 0
+    print(json.dumps(payload, indent=2, ensure_ascii=False) if args.json else line)
     return 0
 
 
@@ -1006,6 +1050,8 @@ def main() -> None:
     s.add_argument("--no-commit", action="store_true", dest="no_commit")
     s = sub.add_parser("sync-payload")
     s.add_argument("--ticketdir", required=True)
+    s.add_argument("--push", action="store_true", help="kirim langsung ke server lewat MCP key lokal; keluaran "
+                                                       "satu baris segmen")
     s.add_argument("--workspace", default="", help="alias `workspaces` tujuan task baru; wajib dipilih user bila "
                                                    "config berisi lebih dari satu workspace")
     s.add_argument("--json", action="store_true")

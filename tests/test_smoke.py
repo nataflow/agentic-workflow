@@ -29,11 +29,14 @@ CASES = [
     ("analyst/skills/_common/ticket.py", ["state", "--all", "--json"], True, None),
     ("analyst/skills/_common/ticket.py", ["state", "--batch", "2609250000-smoke", "--json"], True, None),
     ("analyst/skills/_common/ticket.py", ["sync-payload", "--ticketdir", AN_TD, "--json"], True, None),
+    ("analyst/skills/_common/ticket.py", ["sync-payload", "--ticketdir", AN_TD, "--push", "--json"], True, None),
     ("analyst/skills/_common/ticket.py", ["commit", "--ticketdir", AN_TD, "--stage", "draft"], False, None),
     ("analyst/skills/_common/validate_doc.py", ["--kind", "elicit", "--ticketdir", AN_TD, "--json"], True, None),
     ("analyst/skills/notulen/scripts/notulen.py", ["state", "--json"], True, None),
     ("analyst/skills/notulen/scripts/notulen.py", ["check", "--notulendir", AN_NT, "--json"], True, None),
     ("analyst/skills/notulen/scripts/notulen.py", ["sync-payload", "--notulendir", AN_NT, "--json"], True, None),
+    ("analyst/skills/notulen/scripts/notulen.py", ["sync-payload", "--notulendir", AN_NT, "--push", "--json"], True,
+     None),
 
     ("nataflow/skills/create-artifact/scripts/artifact.py", ["config", "--json"], True, None),
 

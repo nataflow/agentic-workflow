@@ -13,7 +13,8 @@ ada di disk ini dan, bila sinkron aktif, di nataflow.
              notulen); `--final` ikut menagih nol `Asumsi:`.
 - `final`  — `status: FINAL` + segel `final_hash` sesudah validator `PASS` dan jawaban eksplisit user.
 - `sync-payload` — argumen tool MCP nataflow untuk notulen `FINAL`: dokumen `notes.meeting` di bawah project MCP key
-             (`list_document` → `create_document` / `upsert_document`); read-only, tanpa commit.
+             (`list_document` → `create_document` / `upsert_document`), tanpa commit. `--push` memanggil server
+             langsung (MCP key `.claude/nataflow.local.json`) dan mencetak satu baris segmen.
 
 `DRIFT` = notulen `FINAL` yang disunting sesudah disegel: `final` dijalankan ulang sesudah user mengonfirmasi isinya.
 
@@ -27,7 +28,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 import nataflow_sync as ns  # noqa: E402
@@ -465,28 +466,23 @@ def cmd_final(root: Path, args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:
-    """Argumen tool MCP nataflow untuk satu notulen `FINAL` (18 N7, K10–K13) — read-only, tanpa commit.
+def _sync_build(root: Path, args: argparse.Namespace, config: Dict[str, Any]
+                ) -> Tuple[Optional[Dict[str, Any]], List[str], str]:
+    """Argumen tool MCP nataflow untuk satu notulen `FINAL` (18 N7, K10–K13) → `(payload, masalah, baris)`.
 
-    Model mengirim `lookup`, `create`, dan `update` apa adanya; `reference_id` diisi dari `get_project_info` dan
-    `key` dari hasil `list_document`. Identitas dokumen adalah metadata `notulen_key` = path notulendir, bukan judul:
+    `lookup`, `create`, dan `update` disusun di sini; `reference_id` diisi dari `get_project_info` dan `key` dari
+    hasil `list_document`. Identitas dokumen adalah metadata `notulen_key` = path notulendir, bukan judul:
     `create_document` menurunkan key server dari slug judul, sehingga sinkron ulang wajib mencari dulu lalu
     `upsert_document` ke key itu. Judul dikunci saat dokumen pertama dibuat.
     """
-    config, problems = load_sync_config(root)
-    if problems:
-        return ns.emit_fail(args.json, "SYNC-PAYLOAD", problems)
-    if config is None:
-        return ns.emit_skip(args.json, "SYNC-PAYLOAD")
     rel = resolve(root, args.notulendir)
     if not NOTULENDIR_RE.match(rel) or not (root / rel).is_dir():
-        return ns.emit_fail(args.json, "SYNC-PAYLOAD", [f"`{rel}` bukan notulendir {NOTULEN_DIR}/<YYMMDDhhmm>-<slug>"])
+        return None, [f"`{rel}` bukan notulendir {NOTULEN_DIR}/<YYMMDDhhmm>-<slug>"], ""
     row = classify(root, rel)
     if row["state"] != "FINAL":
         why = {"DRAFT": "jalankan `final` sesudah user mengonfirmasi isinya",
                "DRIFT": "disunting sesudah final — konfirmasi ke user lalu `final` ulang"}
-        return ns.emit_fail(args.json, "SYNC-PAYLOAD", [f"notulen {row['state']}, bukan FINAL — "
-                                                         + why.get(row["state"], row["route"])])
+        return None, [f"notulen {row['state']}, bukan FINAL — " + why.get(row["state"], row["route"])], ""
     text = text_of(root / rel / NOTULEN_FILE)
     fm, _ = split_frontmatter(text)
     title = f"{title_of(text)} — {fm['meeting_date']}"
@@ -495,7 +491,7 @@ def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:
     if len(title) > TITLE_MAX:
         problems.append(f"judul dokumen lebih dari {TITLE_MAX} karakter — pendekkan H1 lalu `final` ulang")
     if problems:
-        return ns.emit_fail(args.json, "SYNC-PAYLOAD", problems)
+        return None, problems, ""
     key = {"source": "analyst", "notulen_key": rel}
     meta = ns.compact({**key, "slug": fm.get("slug", ""), "meeting_date": fm["meeting_date"],
                        "final_hash": fm.get("final_hash", ""), "repo": ns.repo_identity(root, config)})
@@ -511,8 +507,52 @@ def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:
         "update": {"reference_table": "project", "type": DOC_TYPE, "content": content,
                    "content_sha256": ns.sha256_text(content), "metadata": meta},
     }
-    ns.emit(payload, args.json, f"SYNC-PAYLOAD PASS: {rel} · server {config['url']} · judul `{title}` · "
-                                f"sha {payload['update']['content_sha256'][:12]} — argumen tool lewat `--json`")
+    return payload, [], (f"SYNC-PAYLOAD PASS: {rel} · server {config['url']} · judul `{title}` · "
+                         f"sha {payload['update']['content_sha256'][:12]} — argumen tool lewat `--json`")
+
+
+def _sync_push(session: Any, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Langkah prosedur sinkron notulen dijalankan skrip sendiri (29 S5): project key → cari dokumen lewat
+    `notulen_key` → buat, perbarui, atau biarkan. Dokumen kembar berhenti sebelum tool tulis apa pun."""
+    from nataflow_client import as_list
+    info = session.call_json("get_project_info", {}, read=True)
+    projects = info if isinstance(info, list) else [info]
+    if len(projects) != 1 or not isinstance(projects[0], dict) or not projects[0].get("id"):
+        return ns.push_fail([f"key menjangkau {len(projects)} project — notulen butuh MCP key yang terikat ke "
+                             f"satu project"])
+    ref = str(projects[0]["id"])
+    found = as_list(session.call_json("list_document", dict(payload["lookup"], reference_id=ref), read=True),
+                    "documents", "data")
+    if len(found) > 1:
+        return ns.push_fail([f"{len(found)} dokumen ber-notulen_key sama ("
+                             + ", ".join(str(d.get("key")) for d in found) + ")"])
+    if not found:
+        session.call_json("create_document", dict(payload["create"], reference_id=ref))
+        return {"status": "PASS", "outcome": "dibuat"}
+    if str(found[0].get("content_sha256") or "").lower() == payload["update"]["content_sha256"]:
+        return {"status": "PASS", "outcome": "tidak berubah"}
+    session.call_json("upsert_document", dict(payload["update"], reference_id=ref, key=found[0]["key"]))
+    return {"status": "PASS", "outcome": "diperbarui"}
+
+
+def cmd_sync_payload(root: Path, args: argparse.Namespace) -> int:
+    """Sinkron satu notulen `FINAL` ke nataflow, tanpa commit. `--push` memanggil server langsung lewat
+    `nataflow_client` dengan MCP key `.claude/nataflow.local.json` dan mencetak satu baris segmen (29 S5); tanpa
+    `--push` keluarannya argumen tool."""
+    config, problems = load_sync_config(root)
+    payload, line = None, ""
+    if not problems and config is not None:
+        payload, problems, line = _sync_build(root, args, config)
+    if args.push:
+        result = (ns.push_fail(problems) if problems else {"status": "SKIP"} if config is None
+                  else ns.run_push(root, config, lambda s: _sync_push(s, payload)))
+        segment = "nataflow " + (result["outcome"] if result["status"] == "PASS" else ns.push_segment(result, ""))
+        return ns.emit_push(result, args.json, segment)
+    if problems:
+        return ns.emit_fail(args.json, "SYNC-PAYLOAD", problems)
+    if config is None:
+        return ns.emit_skip(args.json, "SYNC-PAYLOAD")
+    ns.emit(payload, args.json, line)
     return 0
 
 
@@ -536,6 +576,8 @@ def main() -> None:
     s.add_argument("--answer", required=True, help="jawaban user apa adanya")
     s = sub.add_parser("sync-payload")
     s.add_argument("--notulendir", required=True)
+    s.add_argument("--push", action="store_true", help="kirim langsung ke server lewat MCP key lokal; keluaran "
+                                                       "satu baris segmen")
     s.add_argument("--json", action="store_true")
     args = p.parse_args()
     root = (Path(args.root) if args.root else find_root()).resolve()
