@@ -122,7 +122,13 @@ atau balas "lanjut" untuk mengeksekusi di sesi yang sama
 ```
 
 Plugin tidak dapat menjalankan `/clear`, `/compact`, atau `/model`; pilihannya milik user. Jalur lanjutan
-membaca state dari disk dan langsung merutekan ke `architect` tanpa eksplorasi ulang.
+membaca state dari disk dan langsung merutekan ke `architect` tanpa eksplorasi ulang. `/clear` paling hemat:
+`architect` mulai dari konteks dasar sesi, sedangkan ringkasan `/compact` tetap terbawa di tiap gilirannya.
+
+**Serah terima PRD (0.21.0).** Pada chain ber-PRD (`PRD_BRIEF`, `BRD_PRD_BRIEF`), PRD yang baru disetujui juga
+berhenti di gerbang (vonis `analyst` `PRD_APPROVED_SERAH_TERIMA`) dengan opsi yang sama sebelum `plan` berangkat:
+fase `plan` tidak membutuhkan prosa skill hulu dan proses penulisan PRD yang menumpuk di sesi itu. "lanjutkan
+<taskdir>" merutekan taskdir ber-hop ledger terbuka ke `analyst`, yang melanjutkan hop `BRIEF` lewat resume.
 
 Nuansa percakapan yang tidak tertulis di dokumen rantai dibawa `{taskdir}/JOURNEY.md`, ditulis
 `skills/_common/journey.py`: satu baris per titik (`TECH_LEAD`, `BRD`/`PRD`, `READY`, `REVIEW`,
@@ -252,12 +258,14 @@ Tiap skill punya `skills/<skill>/scripts/check_preconditions.py` yang dijalankan
 | `plan/scripts/scaffold_brief.py` | kunci matriks alokasi, lalu kerangka brief |
 | `plan/scripts/validate_briefs.py` | validasi batch dan per-brief, ronde review brief |
 | `analyst/scripts/chain_counters.py` | plafon eskalasi, re-entry, amandemen akar, dan ronde reviewer; menolak tabel yang diturunkan tangan (log `.explore/counters-log.json`) |
-| `architect/scripts/symbol_map.py` | peta simbol pada sha tertentu untuk ingest brief |
+| `architect/scripts/symbol_map.py` | peta simbol pada sha tertentu, dicocokkan dengan `Anchor` dan deklarasi baru di `## Steps` brief (`--brief`); mode anchor ringkas tanpa `lines` |
+| `architect/scripts/close_brief.py` | satu vonis penutup per brief: sisa berkas, scope, simbol, cabut lease |
+| `_common/render_prompt.py` | render template dispatcher ke `.explore/prompt/`; prompt subagent satu kalimat rujukan berkas |
 
 ## Pemulihan
 
 - **`tech-lead` Fase 3** memakai ulang taskdir yang belum tuntas. Brief BLOCKED atau `HALT.md` aktif (bukan `DICABUT`) → `PLANNING`
-  pada taskdir yang sama dengan `reentry_reason`; brief READY → `architect`; dokumen DRAFT → `analyst`.
+  pada taskdir yang sama dengan `reentry_reason`; brief READY → `architect`; dokumen DRAFT, atau hop ledger yang masih terbuka sesudah dokumen hulunya APPROVED → `analyst`.
   Taskdir tanpa ledger `## Chain` (lane `DEFECT_RCA`, backfill `EXEC_BRIEF`) dirutekan ke `plan` jalur RCA atau
   `debug`, bukan `PLANNING`. Taskdir baru hanya dibuat bila semua brief DONE/SUPERSEDED **dan** `REPORT.md`
   sudah terbit, atau bila plafon `analyst` tertembus dan user memilih merumuskan ulang permintaannya.

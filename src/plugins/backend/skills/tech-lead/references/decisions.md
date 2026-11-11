@@ -104,12 +104,13 @@ backenddev/
 | 3. Artefak DRAFT Ditemukan ──► Rutekan ke backend:analyst (gerbang dokumennya)  |
 | 4. Semua Brief DONE + REPORT.md / Baru ──► Buat taskdir baru untuk request baru   |
 | 5. REVIEW.md P1 ──► Taskdir sama, lane PLANNING + reentry_reason (bukan baru)     |
+| 6. Hop ledger terbuka, tanpa DRAFT ──► analyst resume hop (tanpa reentry_reason)  |
 +-----------------------------------------------------------------------------------+
 ```
 
 Butir 1 dan 5 berlaku untuk taskdir berledger `## Chain`. Taskdir tanpa ledger (lane `DEFECT_RCA`, backfill
 `EXEC_BRIEF`) dirutekan ke `backend:plan` jalur `RCA` bila `RCA.md` `ROOT_CAUSE_CONFIRMED` ada, selain itu ke
-`backend:debug` lebih dulu (`gate-lifecycle.md` bagian 1). Butir 4 juga berlaku bila plafon `analyst` tertembus
+`backend:debug` lebih dulu (`gate-lifecycle.md` bagian 1). Butir 6 menutup taskdir yang dokumen hulunya sudah `APPROVED` tetapi hop berikutnya belum berangkat — mis. sesudah serah terima PRD (`gate-lifecycle.md` bagian 6a butir 5); `lane`, `risk`, dan `chain` dibaca dari `TASK.md` (32 H4). Butir 4 juga berlaku bila plafon `analyst` tertembus
 dan user memilih rumuskan ulang (`SKILL.md` `## Failure path` butir 7).
 
 ### Aturan Penetapan Identitas Taskdir:

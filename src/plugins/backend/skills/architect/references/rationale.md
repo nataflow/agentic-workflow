@@ -12,4 +12,4 @@ Mengapa bukan hunk header: driver diff bawaan git mengambil konteks dari baris t
 
 ## R3 — Fase 3 butir 4 — bandingkan simbol, bukan hanya berkas
 
-Mengapa: perbandingan berkas saja meloloskan implementor yang menyunting simbol mana pun asalkan berkasnya terdaftar — bentuk kebocoran scope yang paling sering terjadi, karena satu berkas menampung banyak simbol.
+Mengapa: perbandingan berkas saja meloloskan implementor yang menyunting simbol mana pun asalkan berkasnya terdaftar — bentuk kebocoran scope yang paling sering terjadi, karena satu berkas menampung banyak simbol. Deklarasi baru dinilai terhadap `## Steps`, bukan `Anchor` (32 S1): `Anchor` menamai titik sisip yang sudah ada, sehingga method atau test baru selalu tampak di luar anchor dan memicu `HALT.md SYMBOL` palsu pada hampir tiap brief yang menambah test. Kebocoran yang dijaga — suntingan diam-diam pada simbol lama — tetap dinilai terhadap `Anchor`.

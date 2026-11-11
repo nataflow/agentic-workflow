@@ -30,6 +30,7 @@ Format wajib `backenddev/docs/<YYMMDDhhmm>-<slug>/` — timestamp dari `date +%y
 | Taskdir **tanpa ledger `## Chain`** (lane `DEFECT_RCA`, backfill `EXEC_BRIEF`) memuat brief `BLOCKED`, `HALT.md` aktif, atau `REVIEW.md` ber-`P1` | Bukan lane `PLANNING` — `analyst` tidak punya hop untuk dibuka dan prasyarat check 7-nya FAIL. `RCA.md` `ROOT_CAUSE_CONFIRMED` ada → `backend:plan` `entry_mode: RCA` dengan `reentry_reason` (`--write-matrix --append`, pengganti ber-`supersedes`/`repairs`); tidak ada → `backend:debug` lebih dulu, lalu jalur `RCA` |
 | Taskdir memuat brief `READY` | Rutekan ke `backend:architect` |
 | Taskdir memuat `BRD.md`/`PRD.md` berstatus `DRAFT` | Rutekan ke `backend:analyst`; gerbang dokumennya milik skill itu (bagian 4) |
+| Taskdir berledger `## Chain` dengan hop belum tercentang (`[ ]`/`[~]`) dan tak satu baris di atas cocok — mis. `PRD.md` `APPROVED` dengan hop `BRIEF` terbuka (serah terima bagian 6a butir 5), sisa brief `DRAFT` dari `plan` yang terputus, atau `BRD.md` `APPROVED` dengan hop `PRD` belum berangkat | Rutekan ke `backend:analyst` pada taskdir sama **tanpa** `reentry_reason` — hop terbuka bukan re-entry, dan prasyarat check 7 `analyst` (`Resume: hop <HOP>`) menetapkan titik masuknya. `lane`, `risk`, dan `chain` dibaca dari frontmatter `TASK.md`, bukan diturunkan ulang (32 H4) |
 | Seluruh brief `DONE`/`SUPERSEDED` **dan** `REPORT.md` terbit, atau permintaannya memang baru | Buat taskdir bertimestamp baru. `REVIEW.md` ber-`P1` bukan rantai selesai: perbaikannya berjalan di taskdir yang sama |
 | Plafon `analyst` tertembus dan user memilih **rumuskan ulang** (`SKILL.md` `## Failure path` butir 7) | Buat taskdir dan branch baru dari base untuk permintaan yang dirumuskan ulang. Taskdir lama dibiarkan apa adanya sebagai riwayat dan tidak dirutekan lagi kecuali user memintanya eksplisit |
 
@@ -101,7 +102,7 @@ ______________________________________________________________________
 
 Verifikasi anggaran `## Open questions`, penyajian ringkasan eksekutif, persetujuan user, dan materai approval `BRD.md`/`PRD.md` (`doc_seal.py approve`, satu-satunya jalur tulis `status: APPROVED`) seluruhnya milik `backend:analyst`. Rumah kanoniknya di `analyst/references/chain-rules.md` bagian 4, dan dilarang ditulis ulang di sini.
 
-Gerbang menyentuh dokumen rancangan hanya pada satu titik: taskdir eksisting yang memuat `BRD.md`/`PRD.md` berstatus `DRAFT` dirutekan kembali ke lane `PLANNING`, dan `analyst` melanjutkan rantainya dari hop yang belum tercentang di ledger `## Chain`. Dilarang membaca ulang, menyunting, atau menyetujui dokumen itu di gerbang.
+Gerbang menyentuh dokumen rancangan hanya pada satu titik: taskdir eksisting yang memuat `BRD.md`/`PRD.md` berstatus `DRAFT`, atau hop ledger yang masih terbuka sesudah dokumen hulunya `APPROVED` (bagian 1), dirutekan kembali ke lane `PLANNING`, dan `analyst` melanjutkan rantainya dari hop yang belum tercentang di ledger `## Chain`. Dilarang membaca ulang, menyunting, atau menyetujui dokumen itu di gerbang.
 
 ______________________________________________________________________
 
@@ -125,6 +126,7 @@ Dijalankan tiap kali skill hilir menutup dengan instruksi `kembali ke backend:te
    - Pengirim `backend:profile`: Ulangi Fase 0 dan lanjutkan rute tertunda.
    - Pengirim `analyst` menembus plafon (Failure path 4, 5, 7, 8, 9): `SKILL.md` `## Failure path` butir 7 — tanyakan ke user rumuskan ulang di taskdir baru atau hentikan; dilarang memberangkatkan ulang `PLANNING` atas taskdir itu.
    - Pengirim `analyst` bervonis `READY_FOR_IMPLEMENTATION`: **titik serah terima eksekusi** — jalankan bagian 6a; `backend:architect` berangkat di giliran ini hanya bila user memilih lanjut tanpa membersihkan konteks. Bervonis `NOT_READY_FOR_IMPLEMENTATION`: baca predikat yang gagal, selesaikan akar masalahnya lewat `SKILL.md` `## Failure path` butir 7, lalu berangkatkan ulang lane `PLANNING` pada taskdir yang sama **dengan `reentry_reason` terisi predikat yang gagal beserta ID-nya**; taskdir berledger tercentang penuh yang berangkat tanpa parameter itu tidak punya hop yang dapat dijalankan `analyst` dan berhenti seketika. Dilarang merutekan ke `architect` atas rantai bervonis itu, dan dilarang menyentuh artefak rancangannya sendiri. Menyerahkan rantai tertahan: perlakuan yang sama.
+   - Pengirim `analyst` bervonis `PRD_APPROVED_SERAH_TERIMA`: **titik serah terima PRD** — jalankan bagian 6a butir 5; `backend:analyst` berangkat ulang di giliran ini (hop `BRIEF`, rute bagian 1) hanya bila user memilih lanjut tanpa membersihkan konteks. Dilarang memanggil `backend:plan` langsung dari gerbang (32 H3).
    - Pengirim `analyst` membawa **amandemen akar** yang sudah disetujui user di Fase 4a-nya (`analyst/references/chain-rules.md` bagian 5): tulis ulang butir `## Success Criteria` / `## Out of Scope` `TASK.md` sesuai rumusan yang diserahkan, jalankan ulang `python3 «validate_doc.py» --kind task --taskdir <taskdir>` (bagian 1a) tanpa `--fresh` dan tanpa commit, lalu berangkatkan ulang lane `PLANNING` pada taskdir yang sama. Ini satu dari tiga pemicu amandemen gerbang (bagian 1a); dilarang menambah, menghapus, atau menafsirkan ulang butir di luar rumusan yang diserahkan `analyst`.
    - Pengirim `debug` menyerahkan `RCA.md` `ROOT_CAUSE_CONFIRMED`: Rutekan ke `plan` lewat Keputusan 2 (`decisions.md` bagian 7). Jika `INCONCLUSIVE`: kembalikan ke user dengan daftar bukti tambahan; dilarang merutekan ke `plan`.
    - Pengirim `plan` jalur `RCA` menyerahkan brief `READY` terkunci (`doc_seal.py lock-briefs`): Rutekan ke `backend:architect` pada taskdir yang sama. Brief belum terkunci (tanpa `sidik_kontrak`) atau self-review tidak tuntas: selesaikan akar masalahnya lewat `SKILL.md` `## Failure path` butir 5 lebih dulu; dilarang memberangkatkan `architect` di atas batch yang belum terkunci. Ini satu-satunya pengirim balik `plan` yang sampai ke gerbang — lane planning pulang ke `backend:analyst`.
@@ -149,10 +151,26 @@ Rantai planning dan eksekusi boleh berjalan di sesi berbeda. Fase `architect` be
    Rantai siap dieksekusi. Journey dicatat di <taskdir>/JOURNEY.md.
    Hemat konteks sebelum architect (pilih salah satu):
      a. /clear  → /model sonnet (opsional) → /backend:tech-lead lanjutkan <taskdir>
+        (paling hemat: architect mulai dari konteks dasar sesi)
      b. /compact fokus taskdir <taskdir>; state dari disk, keputusan di JOURNEY.md
         → /backend:tech-lead lanjutkan <taskdir>
+        (ringkasan compact tetap terbawa di tiap giliran architect)
    Atau balas "lanjut" untuk mengeksekusi di sesi ini tanpa membersihkan konteks.
    ```
 
    Plugin tidak dapat menjalankan `/clear`, `/compact`, atau `/model`; pilihannya milik user. Balasan "lanjut" di sesi yang sama → rutekan ke `backend:architect` seperti biasa.
-4. **Lanjutan serah terima** — `request` hanya meminta melanjutkan `taskdir` yang diberikan, dan entri journey terakhir ber-hop `READY`: Fase 0 (termasuk `journey.py show`), lalu prasyarat penuh `--re-entry` (Fase 5 butir 1), lalu rutekan langsung ke `backend:architect` dengan `taskdir` dan `base_branch` profil. Fase 1–4 dilewati: bukti rute adalah brief terkunci di disk, dan prasyarat `architect` menagihnya sendiri. Branch kerja taskdir sudah ada — checkout bila belum aktif, tanpa mencabangkan ulang dan tanpa baseline build gerbang (`architect` Fase 0 butir 3a mengukur baseline merge-base). `request` membawa permukaan baru di luar taskdir → gerbang biasa.
+4. **Lanjutan serah terima** — `request` hanya meminta melanjutkan `taskdir` yang diberikan, dan entri journey terakhir (`python3 «journey.py» show --taskdir <taskdir> --json`, unsur terakhir `entri`) ber-hop `READY` atau `PRD`: Fase 0 (termasuk `journey.py show`), lalu prasyarat penuh `--re-entry` (Fase 5 butir 1), lalu rutekan langsung menurut baris bagian 1 yang cocok dengan disk — brief `READY` → `backend:architect` dengan `taskdir` dan `base_branch` profil; hop ledger terbuka → `backend:analyst` dengan `taskdir` serta `lane`, `risk`, dan `chain` dari frontmatter `TASK.md` (32 H4). Fase 1–4 dilewati: bukti rute adalah artefak terkunci di disk (brief `sidik_kontrak`, materai `approved_seal`, ledger), dan prasyarat skill tujuan menagihnya sendiri. Disk menang atas journey: hop journey hanya membuka jalur cepat ini, tujuannya tetap baris bagian 1 — entri `PRD` dengan brief `READY` di disk berangkat ke `architect`, dan entri `READY` dengan hop ledger yang terbuka kembali berangkat ke `analyst`. Branch kerja taskdir sudah ada — checkout bila belum aktif, tanpa mencabangkan ulang dan tanpa baseline build gerbang (`architect` Fase 0 butir 3a mengukur baseline merge-base). `request` membawa permukaan baru di luar taskdir → gerbang biasa.
+5. **Titik serah terima PRD** (32 H3) — pengirim `analyst` bervonis `PRD_APPROVED_SERAH_TERIMA` (bagian 6 butir 3): pastikan entri journey terakhir ber-hop `PRD` (tulisan `analyst` Fase 4 butir 6; tidak ada → tulis satu dari laporan `analyst`), tulis `### TECH-LEAD RE-ENTRY DECISION` dengan **Status Rantai** `TERTAHAN (serah terima PRD)` dan **Langkah Lanjut** berisi blok di bawah apa adanya, lalu berhenti. Pengecualian IRON LAW yang sama dengan butir 3 berlaku di titik ini. Fase `plan` menulis brief dari disk (`PRD.md` termaterai, laci `.explore/`, `JOURNEY.md`); konteks sesi planning — prosa skill hulu, penulisan PRD, laporan explorer yang sudah dipanen — tidak ia butuhkan, tetapi tanpa pembersihan ia dibawa di tiap giliran `plan`.
+
+   ```
+   PRD disetujui. Journey dicatat di <taskdir>/JOURNEY.md.
+   Hemat konteks sebelum plan (pilih salah satu):
+     a. /clear → /backend:tech-lead lanjutkan <taskdir>
+        (paling hemat: plan mulai dari konteks dasar sesi)
+     b. /compact fokus taskdir <taskdir>; state dari disk, keputusan di JOURNEY.md
+        → /backend:tech-lead lanjutkan <taskdir>
+        (ringkasan compact tetap terbawa di tiap giliran plan)
+   Atau balas "lanjut" untuk menulis brief di sesi ini tanpa membersihkan konteks.
+   ```
+
+   Balasan "lanjut" di sesi yang sama → rutekan ke `backend:analyst` lewat baris hop terbuka bagian 1. Tidak ada state baru: "sudah berhenti di serah terima PRD" hanya tercatat di journey.

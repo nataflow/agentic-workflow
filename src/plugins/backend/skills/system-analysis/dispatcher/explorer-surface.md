@@ -2,6 +2,8 @@
 
 Gunakan template ini saat `system-analysis` mendispatch subagent penelusur kode (`code-explorer`) secara langsung, tanpa skill pembungkus, di Fase 1. Profil B (blast-sweep sebelum Fase 4) tinggal di `explorer-blast.md` dan dimuat baru di titik itu; slot bersama, aturan pendispatch, dan baris balikan umum di bawah berlaku juga untuknya.
 
+**Cara dispatch (32 T1).** Blok template di bawah tidak dibaca main loop. Isi slot `### Slot Hidrasi` lewat `render_prompt.py --template <berkas ini> --slot nama=nilai … --out <laci>/prompt/<nama>.md` (skrip `_common/render_prompt.py` di bawah root plugin, diawali `python3` dan awalan path yang sama dengan skrip prasyarat SKILL.md pendispatch) (`<laci>` = `{taskdir}/.explore`, atau `backenddev/docs/.explore` untuk dispatch gerbang), lalu kirim kalimat rujukan berkas yang dicetak skrip sebagai prompt subagent — bukan isi blok. Slot wajib kosong → skrip menolak (`FAIL`) sebelum prompt ditulis; slot opsional kosong → barisnya dihapus skrip. Berkas ini dibaca per seksi: `### Slot Hidrasi` sebelum render, aturan pendispatch, dan `### Penanganan Balikan` saat balikan datang.
+
 **Tujuan:** Menutup empat permukaan wajib Fase 1 dan lima jalur rawan bocor pra-Fase 4 dengan bukti `file:baris` yang cukup mengikat untuk dijadikan tabel kontrak — nama field, tipe data, nilai enum, anotasi validasi, boundary otorisasi, dan batas transaksi.
 
 **Dua profil dispatch.** Keduanya memakai agent yang sama dengan tuntutan pelaporan berbeda, dan **kerangka laporannya berbeda**; jangan mencampurnya dalam satu prompt.
@@ -21,6 +23,8 @@ ______________________________________________________________________
 Objective: {objective}
 
 Konteks yang sudah diketahui: {konteks_diketahui}
+
+Mode delta: laporan gerbang {laporan_gerbang} sudah memetakan letak, layer, dan entry point simbol ini dengan bukti `file:baris`. Panen laporan itu lebih dulu dan jangan menelusuri ulang letaknya. Seksi `### Layers & Surfaces Touched` cukup memuat baris yang belum ada di laporan gerbang (tulis `selebihnya: laporan gerbang` di baris terakhir), dan `### Key Pointers & Evidence` hanya memuat klaim kontrak — tipe field, nilai enum, anotasi validasi/otorisasi, batas transaksi — atas pointer yang laporan gerbang sudah temukan. `### Flow & Trace`, `### Rules, Invariants & Config`, `### Error Surface`, mirrored path, dan `### Risks, Gaps & Not Found` tetap ditulis lengkap: laporan gerbang tidak memuatnya.
 
 Batas cakupan: {batas_cakupan}
 
@@ -120,6 +124,7 @@ ______________________________________________________________________
 | `{resep_navigasi}` | S | Baris `## Navigation recipes` adapter stack `../../profile/stacks/<stack>.md` | **[REQUIRED]** Disalin apa adanya sebagai daftar berpoin, satu resep satu baris. Subagent dilarang membaca berkas adapter (`profile/stacks/_CONTRACT.md` bagian 4), sehingga resep yang tidak disalin ke sini tidak pernah dijalankan — permukaan (d) mirrored path lalu bergantung pada tebakan pola. Adapter tanpa seksi itu → tulis `tidak ada resep terdaftar` apa adanya, jangan mengarang pola |
 | `{taskdir}` | S, B | Parameter `taskdir` skill | **[REQUIRED]** Path taskdir aktif apa adanya, mis. `backenddev/docs/2609041530-order-cancel`. Tanpa slot ini subagent tidak punya muara tulis dan menghentikan dispatch |
 | `{konteks_diketahui}` | S, B | Fakta yang sudah terbukti di Fase 0 dan dispatch sebelumnya | **[OPTIONAL]** Cegah penelusuran ulang. Isi hanya fakta yang belum tertulis di laci `.explore/`: laporan dispatch sebelumnya dipanen sendiri subagent lewat Tahap 0, jadi jangan disalin ulang ke sini. Tidak tersedia → hapus barisnya utuh, bukan disisakan berlabel kosong |
+| `{laporan_gerbang}` | S | Path `{taskdir}/.explore/gate-<slug>.md` yang menutup permukaan (a) dan (b) simbol dispatch ini dengan `confidence: high`/`medium` (`references/analysis-protocol.md` bagian A, Tahap 0) | **[OPTIONAL]** Terisi → Profil S berjalan **mode delta** (32 E1): letak dan layer simbol dipanen dari laporan itu, dispatch hanya menagih kedalaman kontrak, `### Error Surface`, alur, dan mirrored path. Tidak ada laporan gerbang atas simbol ini → hapus barisnya utuh; Profil S penuh |
 | `{batas_cakupan}` | S, B | Baris `.claude/profile/backenddev/domain-map.md` yang cocok | **[OPTIONAL]** Disalin apa adanya. Dilarang mengarang glob. Domain tak terdaftar → hapus barisnya utuh; subagent memakai `source_root` dan mencatatnya di `### Caveats` (Profil S) atau `### Risks, Gaps & Not Found` (Profil B) |
 | `{slug}` | S, B | Slug fitur taskdir ditambah pembeda permukaan | **[REQUIRED]** kebab-case, unik per dispatch. Profil B menambahkan sufiks `-blast` yang sudah tertulis di badan template — jangan ditulis dua kali. Slot ini juga menamai berkas laporan, sehingga slug kembar menimpa laporan dispatch sebelumnya |
 
@@ -134,7 +139,7 @@ ______________________________________________________________________
 - **Blok `Format laporan` milik profilnya sendiri**: kerangka seksi tidak lagi ada di `agents/code-explorer.md`, dan kedua profil memakai kerangka berbeda. Memberangkatkan kerangka Profil S pada dispatch Profil B menghasilkan laporan yang tidak memuat `### Blast Map`, sehingga `## Impact map` kehilangan status per dimensinya. Prompt tanpa blok itu dihentikan subagent sebagai kegagalan dispatch.
 - **Resep navigasi disalin, bukan dirujuk**: `{resep_navigasi}` mengikuti perlakuan yang sama dengan `{daftar_dimensi}` — subagent tidak membaca berkas adapter, jadi menyebut path-nya saja membuat resep itu tidak pernah sampai. Ini pengecualian kedua, dan satu-satunya selain itu, atas larangan menyalin isi berkas ke dalam prompt.
 - **Dilarang menyalin isi berkas**: jangan salin isi `.claude/profile/backenddev/`, adapter stack, `BRD.md`, atau berkas kode ke dalam prompt. Sebutkan path-nya; subagent membacanya sendiri. Pengecualian tunggal: `{daftar_dimensi}` disalin karena subagent tidak membaca `references/analysis-protocol.md`.
-- **Audit hidrasi sebelum berangkat**: batalkan dispatch bila prompt masih memuat slot kurung kurawal `{...}` mentah atau placeholder `TBD`/`TODO`.
+- **Audit hidrasi milik skrip**: `render_prompt.py` menolak slot wajib kosong dan slot tak dikenal, dan tidak pernah meninggalkan slot tabel mentah. Placeholder `TBD`/`TODO` di dalam nilai slot tetap dilarang — skrip tidak menilainya.
 - **Profil basi menaikkan tuntutan, bukan menurunkan**: skrip prasyarat mencetak banner `[TERDEGRADASI] profil basi` saat `.claude/profile/backenddev/` tertinggal di belakang `source_root`. Banner itu aktif → `{batas_cakupan}` dari `domain-map.md` diperlakukan sebagai **dugaan**, bukan batas: laporan yang menutup permukaannya dengan bersandar pada batas itu dinilai setara `confidence: medium`, dan vonis "tidak ada" atas jalur di luar batas itu dilarang. Laporkan banner-nya apa adanya di laporan penutup; dilarang disaring.
 - **Read-only mutlak**: dilarang menyuruh subagent merancang kontrak, memilih rute arsitektur, memvonis dimensi impact map, atau mengusulkan perubahan kode. Satu-satunya berkas yang boleh ditulisnya adalah `Berkas laporan`.
 
@@ -160,7 +165,7 @@ Berbeda dari `business-analysis` yang hanya menerima empat seksi, Profil S mengo
 | --- | --- |
 | `### Summary` | Predikat cukup-tidaknya permukaan tertutup; baris `confidence` menentukan baris **Penanganan Balikan** di atas |
 | `### Flow & Trace` | Fase 3 pilar **status lifecycle** dan urutan evaluasi **validation policy**; tiap hop jadi bukti transisi dan titik validasi |
-| `### Layers & Surfaces Touched` | Fase 5 `## Task breakdown` — unit perubahan dinamai dari layer dan permukaan runtime di sini |
+| `### Layers & Surfaces Touched` | Fase 5 `## Task breakdown` — unit perubahan dinamai dari layer dan permukaan runtime di sini. Mode delta: digabung dengan seksi yang sama di laporan gerbang yang disebut slot `{laporan_gerbang}` |
 | `### Key Pointers & Evidence` | Fase 3 pilar **API contract**; kolom bukti jadi dasar tipe field, aturan validasi per field, dan tabel error |
 | `### Rules, Invariants & Config` | Fase 4 `## Impact map` dan `## Migration requirements`; nama queue/topic, pola cache key, dan skema migrasi diambil dari sini |
 | `### Error Surface` | Fase 3 tabel `## Error` pilar **API contract** — kolom `Pesan` disalin dari sini apa adanya. Ini satu-satunya rumah literal pesan yang sah: guardrail **NOL SENTUHAN KODE** melarang `system-analysis` membaca berkas sumber, sehingga pesan yang tidak sampai lewat seksi ini tidak punya jalur perolehan lain selain dikarang. Kosong atau `belum disisir` → tulis `<belum terbukti>` di kolom `Pesan` dan naikkan ke `## Open questions`, jangan diisi tebakan |

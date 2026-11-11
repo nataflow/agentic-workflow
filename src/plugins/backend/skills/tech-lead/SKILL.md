@@ -6,9 +6,9 @@ description: Gunakan ketika ada permintaan kerja baru atau susulan di repo backe
 ## THE IRON LAW
 
 - Lewatkan setiap permintaan kerja baru melalui gerbang ini sebelum kode di `src/` disentuh.
-- Tetapkan rute dan risk level, lalu jalankan langkah pertama di giliran yang sama — kecuali serah terima eksekusi (Fase 5 butir 3).
+- Tetapkan rute dan risk level, lalu jalankan langkah pertama di giliran yang sama — kecuali serah terima eksekusi/PRD (Fase 5 butir 3).
 - Dilarang membuat, mengedit, atau menghapus berkas kode secara langsung.
-- Buktikan setiap keputusan rute dari kode aktual; **isi prompt** dispatch gerbang hanya dari `dispatcher/explorer.md` terhidrasi penuh.
+- Buktikan setiap keputusan rute dari kode aktual; prompt dispatch gerbang hanya hasil render `dispatcher/explorer.md`.
 - Inisialisasi taskdir dan branch sebelum delegasi ke hilir.
 
 ## Precondition [REQUIRED]
@@ -21,7 +21,7 @@ description: Gunakan ketika ada permintaan kerja baru atau susulan di repo backe
 - `request` — string — `[REQUIRED]` — Permintaan kerja baru atau susulan; kosong → tolak.
 - `taskdir` — string — `[OPTIONAL]` — Taskdir eksisting `backenddev/docs/<YYMMDDhhmm>-<slug>/`.
 - `base_branch` — string — `[OPTIONAL]` — Acuan pencabangan; default dari profil; keduanya kosong → hentikan.
-- `strict_mode` — boolean — default `false` — Naikkan risk level 1 tingkat pada Keputusan 2 jika bernilai `true`.
+- `strict_mode` — boolean — default `false` — `true` → naikkan risk level 1 tingkat (Keputusan 2).
 - `feature_slug` — string — `[OPTIONAL]` — Slug `<domain>-<jenis-kerja>`; default 2–4 kata dari `request`.
 - `ticket_source` — string — default `""` — Path `TICKET.md` `READY` analyst (`references/gate-scope.md` bagian 4 B-2); jangan ditebak dari `request`.
 
@@ -30,8 +30,8 @@ description: Gunakan ketika ada permintaan kerja baru atau susulan di repo backe
 ### Protokol Dispatch — Satu-satunya Jalur ke Subagent
 
 1. **Satu titik sah**: dispatch hanya `code-explorer` di Fase 1 butir 2.
-2. **Predikat pra-panggil**: muat `dispatcher/explorer.md`, hidrasi seluruh slotnya; prompt bersisa slot `{...}` mentah atau tanpa blok `Format laporan` dibatalkan.
-3. **Template adalah teks, bukan peluncur**: gagal dimuat → sapuan manual berkuota; jangan mengarang prompt.
+2. **Render, bukan salin**: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/render_prompt.py --template <dispatcher/explorer.md> --slot … --out backenddev/docs/.explore/prompt/<slug>.md`; prompt subagent = kalimat cetakannya. Dispatcher dibaca per seksi.
+3. `FAIL` → lengkapi slot; `ERROR` → sapuan manual berkuota; jangan mengarang prompt.
 
 ### Gerbang Masuk — Evaluasi Pemicu & Pengecualian
 
@@ -47,12 +47,12 @@ Evaluasi setiap pesan user, termasuk susulan di tengah sesi:
 1. Jalankan `check_preconditions.py --read-only`. Tree kotor, HEAD detached, izin tulis, dan `commands.md` dinilai di Fase 3 butir 0.
 2. Check 1 **TERDEGRADASI** (profil absen): pertanyaan baca-kode dijawab lewat `references/explore-fact.md` tanpa profil, lalu tawarkan `backend:profile`. Rute yang mengubah kode → rute `PROFILE` (Keputusan 1) lebih dulu, lalu ulangi Fase 0 dan lanjutkan rute tertunda.
 3. Profil ada: baca `index.json` dan `invariants.md` di `.claude/profile/backenddev/`. Lokasi lama `.claude/profile/` → `PROFILE` mode MIGRATE lebih dulu. Profil plugin lain jangan dibaca atau ditimpa.
-4. `taskdir` diberikan → baca journey-nya; lanjutan serah terima: `gate-lifecycle.md` bagian 6a.
+4. `taskdir` diberikan → baca journey-nya; lanjutan serah terima: `gate-lifecycle.md` 6a.
 
 ### Fase 1 — Eksplorasi Kode Aktual Sebelum Memutuskan Rute
 
 1. **Kuota sapuan main loop**: maksimal 3 panggilan gabungan `Glob`+`Grep`, potongan tertarget ≤40 baris, 0 berkas dibaca penuh, 0 query database, 0 `Bash` penelusuran.
-2. **Dispatch wajib**: satu pemicu mekanis `references/gate-scope.md` bagian 4E aktif → berangkatkan `code-explorer` tanpa sapuan pendahulu: hidrasi `dispatcher/explorer.md` (Protokol Dispatch), petakan balikan lewat `### Penanganan Balikan`-nya; gagal → `## Failure path` butir 4.
+2. **Dispatch wajib**: satu pemicu mekanis `references/gate-scope.md` bagian 4E aktif → berangkatkan `code-explorer` tanpa sapuan pendahulu: render `dispatcher/explorer.md` (Protokol Dispatch), petakan balikan lewat `### Penanganan Balikan`-nya; gagal → `## Failure path` butir 4.
 3. **Fast-path**: tanpa pemicu dispatch — satu `Glob` domain di bawah `source_root`, sisa kuota untuk `Grep` simbol.
 4. **Stop condition**: enumerasi tiap permukaan yang disebut `request` — endpoint, modul, aturan, status, artefak — dan berhenti setelah masing-masing **terbukti** (`file:line`) atau **tercatat belum terbukti**. Permukaan tanpa status tidak pernah mendapat `SC-{n}` pemikul.
 5. Pertanyaan faktual murni → jawab dengan format `references/explore-fact.md` bagian 3 dan selesai; dilarang membuat taskdir.
@@ -63,7 +63,7 @@ Tepat 1 kali per pemicu, hanya bila tersisa ambiguitas rute atau batas modul (`r
 
 ### Keputusan 1 — Pemilihan Jalur Kerja (Routing Lane)
 
-Baca `references/decisions.md` bagian 6 (kondisi masuk, rute awal, artefak, presedensi) **sebelum** memilih lane. Dilarang mengarang lane baru. Lane `PLANNING` menampung seluruh kerja perancangan, termasuk perbaikan temuan; panjang rantainya diputuskan `backend:analyst`.
+Baca `references/decisions.md` bagian 6 **sebelum** memilih lane. Dilarang mengarang lane baru. Lane `PLANNING` menampung seluruh kerja perancangan, termasuk perbaikan temuan; panjang rantainya diputuskan `backend:analyst`.
 
 ### Keputusan 2 — Klasifikasi Tingkat Risiko (Risk Level)
 
@@ -74,7 +74,7 @@ Klasifikasikan permintaan pengubah kode menurut `references/decisions.md` bagian
 Jalankan untuk rute yang menghasilkan artefak rancangan atau kode; lewati lane `EXPLORE_FACT` dan `PROFILE`. `AUDIT_SWEEP` (di `base_branch`) dan `API_DOCS` (di branch aktif): butir 0 saja, tanpa branch baru (`decisions.md` bagian 5).
 
 0. **Prasyarat penuh**: jalankan `check_preconditions.py` tanpa `--read-only` sebelum provisi apa pun. `FAIL` → `## Failure path` butir 1–2.
-1. **Provisi taskdir** `backenddev/docs/<YYMMDDhhmm>-<slug>/` menurut tabel `references/gate-lifecycle.md` bagian 1 dan `references/decisions.md` bagian 4: pakai ulang taskdir yang ada; brief `BLOCKED` atau `HALT.md` aktif (bukan `status: DICABUT`) → lane `PLANNING` taskdir sama dengan `reentry_reason` — kecuali taskdir **tanpa ledger `## Chain`** (rute `plan` jalur `RCA`/`debug`, bagian 1); brief `READY` → `architect`; `BRD.md`/`PRD.md` `DRAFT` → `analyst`; taskdir baru hanya untuk permintaan baru, bila seluruh brief `DONE`/`SUPERSEDED` **dan** `REPORT.md` terbit, atau lewat `## Failure path` butir 7. Salin laporan explorer ke `<taskdir>/.explore/gate-<slug>.md`.
+1. **Provisi taskdir** `backenddev/docs/<YYMMDDhhmm>-<slug>/` menurut tabel `references/gate-lifecycle.md` bagian 1 dan `references/decisions.md` bagian 4: pakai ulang taskdir yang ada; brief `BLOCKED` atau `HALT.md` aktif (bukan `status: DICABUT`) → lane `PLANNING` taskdir sama dengan `reentry_reason` — kecuali taskdir **tanpa ledger `## Chain`** (rute `plan` jalur `RCA`/`debug`, bagian 1); brief `READY` → `architect`; `BRD.md`/`PRD.md` `DRAFT` atau hop ledger terbuka → `analyst`; taskdir baru hanya untuk permintaan baru, bila seluruh brief `DONE`/`SUPERSEDED` **dan** `REPORT.md` terbit, atau lewat `## Failure path` butir 7. Salin laporan explorer ke `<taskdir>/.explore/gate-<slug>.md`.
 2. **Isolasi branch**: cabangkan dari `base_branch`, bukan dari `HEAD` aktif (`references/gate-lifecycle.md` bagian 2).
    - 2a. **Akar `DEFECT_RCA`**, sesudah branch aktif: panggil `backend:task` (`chain` kosong, `risk` Keputusan 2, `evidence` Fase 1) kecuali `TASK.md` sudah ada (bagian 1a).
 3. **Baseline build**: lane `PLANNING`/`EXEC_BRIEF` yang menyentuh `src/` → jalankan `build` profil sesudah branch aktif; merah → minta keputusan user; toolchain tidak tersedia → catat `tidak dijalankan` (`gate-lifecycle.md` bagian 3).
@@ -89,14 +89,14 @@ Jalankan untuk rute yang menghasilkan artefak rancangan atau kode; lewati lane `
 
 1. Jalankan prasyarat penuh dengan `--re-entry` (zona artefak yang boleh kotor: `references/gate-lifecycle.md` bagian 6 butir 1).
 2. Commit artefak repo yang menunggu (profil, laporan `audit`, `docs/api/`) dengan staging path eksplisit tiap path slot `Menunggu commit` pengirim (`references/gate-scope.md` bagian 3), lalu sinkron nataflow (`gate-lifecycle.md` bagian 6 butir 2a).
-3. Tentukan langkah lanjut dari tabel pengirim balik `references/gate-lifecycle.md` bagian 6 butir 3 (mis. `architect` `COMPLETED (WARNING)` = selesai; `READY_FOR_IMPLEMENTATION` = serah terima bagian 6a).
+3. Tentukan langkah lanjut dari tabel pengirim balik `references/gate-lifecycle.md` bagian 6 butir 3 (`architect` `COMPLETED (WARNING)` = selesai; vonis serah terima `analyst` → bagian 6a).
 4. Perlakukan severity `P1` dari `architect` sebagai kerja lanjutan pada **taskdir yang sama**; dilarang memperbaiki di gerbang atau memprovisi taskdir baru. Klasifikasikan ulang lewat Keputusan 2, seleksi temuan lewat `references/gate-scope.md` bagian 6, lalu berangkatkan lane `PLANNING` dengan `finding_source` `{taskdir}/REVIEW.md` **dan** `reentry_reason` `REVIEW P1: <ID temuan terpilih>` (taskdir tanpa ledger: Fase 3 butir 1); catat journey `REVIEW`.
 5. Skill hilir menutup `BLOCKED` atau rantai terputus → selesaikan akar masalah sesuai `## Failure path`; jangan menutupinya dengan taskdir baru.
 
 ## Guardrails
 
 - **FASE PLANNING MILIK `analyst`**: gerbang berhenti pada provisi taskdir, branch, dan `risk`. Dilarang memanggil `task`, `business-analysis`, `system-analysis`, atau `plan` langsung pada lane `PLANNING`, dan dilarang memutuskan temuan cukup dikerjakan tanpa `PRD.md`.
-- **PENCABANGAN HANYA DARI BASE BRANCH**: dilarang mencabangkan di atas branch kerja lain.
+- **PENCABANGAN HANYA DARI BASE BRANCH**: dilarang bercabang di atas branch kerja lain.
 - **COMMIT ARTEFAK MILIK PENULISNYA**: gerbang meng-commit hanya artefak `profile`, `audit`, `document-api` di Fase 5; dokumen taskdir tidak pernah di-commit. Dilarang staging wildcard.
 - **LARANGAN GIT DESTRUKTIF**: dilarang `git push`, `git merge`, `git rebase`, `gh pr create`, atau `git branch -D` tanpa otorisasi eksplisit user.
 - **RATIONALIZATION PREVENTION**: dilarang menganggap perubahan field response MINOR; menutupi taskdir `BLOCKED` dengan direktori baru; mendispatch implementor tanpa `architect`; berasumsi user setuju breaking tanpa PRD; melanjutkan sapuan setelah kuota habis; atau meminta stash/commit untuk pertanyaan baca-kode.

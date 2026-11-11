@@ -169,6 +169,8 @@ Berlaku atas `BRD.md` dan `PRD.md`. Brief dikecualikan **dari approval**, bukan 
    > **Kenapa materai, bukan commit.** Prasyarat hilir (`plan`, `system-analysis`) menagih `approved_seal` sama dengan isi dokumen sekarang: `APPROVED` tulisan tangan tidak bermaterai, dan suntingan sesudah approval mengubah sidik — keduanya ditolak hilir dan wajib melewati gerbang dokumen lagi.
 6. **Penolakan.** Pertahankan `DRAFT`, teruskan poin penolakan user apa adanya ke skill hop, ulangi hop itu. Bump `reject:<HOP>` sekaligus menolkan `review_round:<HOP>`, sehingga revisinya mendapat ronde reviewer baru. Penolakan kedua pada hop yang sama menghentikan rantai (`## Failure path` butir 4).
 
+Persetujuan `PRD.md` yang hop berikutnya `BRIEF` tidak langsung memberangkatkan `plan`: `analyst` mengembalikan vonis `PRD_APPROVED_SERAH_TERIMA` ke gerbang supaya user dapat membersihkan konteks lebih dulu (`analyst/SKILL.md` Fase 4 butir 7, `tech-lead/references/gate-lifecycle.md` bagian 6a butir 5; 32 H3). Ledger dan materai tidak berbeda dari persetujuan biasa; jalan masuk kembali adalah resume hop `BRIEF`.
+
 ## 5. Kanal Amandemen Akar (Fase 4a)
 
 `## Success Criteria` dan `## Out of Scope` `TASK.md` adalah plafon ruang lingkup yang ditegakkan `business-analysis`, `system-analysis`, dan `plan`. Ketiganya karena itu rutin menemukan aturan atau kontrak yang **menyentuh** plafon itu, dan menghadapi dua pilihan: membuang butirnya, atau mengamandemen akar. Rumah kanonik rutenya ada di sini.

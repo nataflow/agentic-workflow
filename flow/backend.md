@@ -43,7 +43,9 @@ Semua path berkas di dokumen ini relatif terhadap `src/plugins/backend/`.
 | `chain_counters.py` | script | Plafon loop rantai di `## Counters` `TASK.md`, dengan log tulisan skrip `.explore/counters-log.json` | `skills/analyst/scripts/chain_counters.py` |
 | `scaffold_brief.py` | script | Mengunci matriks alokasi, lalu menulis kerangka brief | `skills/plan/scripts/scaffold_brief.py` |
 | `validate_briefs.py` | script | Validasi batch dan per-brief, serta state ronde review brief | `skills/plan/scripts/validate_briefs.py` |
-| `symbol_map.py` | script | Peta simbol yang disunting satu commit, dicocokkan dengan kolom `Anchor` | `skills/architect/scripts/symbol_map.py` |
+| `symbol_map.py` | script | Peta simbol yang disunting satu commit, dicocokkan dengan kolom `Anchor` dan deklarasi baru di `## Steps` (`--brief`) | `skills/architect/scripts/symbol_map.py` |
+| `close_brief.py` | script | Satu vonis penutup per brief: sisa berkas, scope, simbol, cabut lease (32 C1) | `skills/architect/scripts/close_brief.py` |
+| `render_prompt.py` | script | Render template dispatcher ke `.explore/prompt/`; prompt subagent = satu kalimat rujukan berkas (32 T1) | `skills/_common/render_prompt.py` |
 | `migrate_profile.py` | script | Memindah profil lama `.claude/profile/` ke `.claude/profile/backenddev/` via `git mv` | `skills/profile/scripts/migrate_profile.py` |
 | Adapter stack | referensi | `java-spring`, `go`, `node`, `bun`, `rust`, `php`, `php-codeigniter`. Masing-masing memuat 7 seksi wajib: `## Detection`, `## Commands`, `## Layer taxonomy`, `## Navigation recipes`, `## Audit checklist`, `## API surface`, `## Failure signatures` | `skills/profile/stacks/*.md`, kontrak di `_CONTRACT.md` |
 
@@ -81,7 +83,8 @@ flowchart TD
     CH -->|PRD_BRIEF| SA["system-analysis → PRD.md DRAFT (prd-reviewer)"]
     SA --> DG2{"Gerbang dokumen analyst: user setuju?"}
     DG2 -->|"tolak / OQ memblokir"| SA
-    DG2 -->|"APPROVED"| PL
+    DG2 -->|"APPROVED"| HP["analyst → PRD_APPROVED_SERAH_TERIMA → tech-lead 6a butir 5: opsi /clear · /compact, berhenti (32 H3)"]
+    HP -->|"lanjutkan taskdir / lanjut → baris hop terbuka → analyst resume hop BRIEF (32 H4)"| PL
     CH -->|BRIEF| PL["backend:plan → brief-NN-unit.md READY (brief-reviewer)"]
     PL -->|"pemicu eskalasi"| ESC["analyst Fase 5: naikkan chain"]
     ESC --> SA
@@ -102,7 +105,7 @@ flowchart TD
     RE -->|"temuan audit terpilih (≤7)"| AN
     RE -->|"NOT_READY / BLOCKED / HALT / P1 — taskdir sama + reentry_reason"| AN
 
-    ARC --> LOOP["Per brief: lease → code-implementor → commit kode → gerbang kompilasi → verify_scope → symbol_map"]
+    ARC --> LOOP["Per brief: lease → code-implementor → commit kode → gerbang kompilasi → close_brief (git status + verify_scope + symbol_map --brief + cabut lease)"]
     LOOP -->|"BLOCKED / HALT.md"| RE
     LOOP -->|"semua brief DONE"| CLOSE["Verifikasi penutup build+test (relatif baseline)"]
     CLOSE -->|"merah"| RE
@@ -122,9 +125,10 @@ flowchart TD
 3. Untuk lane yang mengubah repo (`PLANNING`, `DEFECT_RCA`, `EXEC_BRIEF`, `AUDIT_SWEEP`, `API_DOCS`), gerbang menjalankan prasyarat penuh. Tiga lane pertama lalu memakai ulang atau membuat taskdir `backenddev/docs/<YYMMDDhhmm>-<slug>/`, mencabangkan branch dari `base_branch`, dan menjalankan baseline build. `AUDIT_SWEEP` berjalan di `base_branch` dan `API_DOCS` di branch aktif, keduanya tanpa taskdir dan tanpa branch baru.
 4. Lane `PLANNING` diserahkan ke `backend:analyst`. Analyst menurunkan panjang rantai (`chain`) dari dua sumbu, yaitu sumbu bisnis (butuh BRD) dan sumbu kontrak (butuh PRD). Ia lalu menjalankan hop satu per satu dengan gerbang approval user untuk BRD dan PRD, dan menutup dengan 15 predikat `READY_FOR_IMPLEMENTATION`.
 5. `backend:architect` mengeksekusi brief secara sekuensial. Tiap brief dikerjakan satu `code-implementor` yang meng-commit kodenya sendiri dan dipagari lease hook. Sesudah semua brief DONE, architect menjalankan verifikasi penutup sekali, mendispatch satu `code-reviewer`, lalu memanggil `backend:report`.
-6. **Serah terima eksekusi (Langkah 30).** Vonis `READY_FOR_IMPLEMENTATION` tidak langsung memberangkatkan `architect`. Gerbang memastikan entri journey `READY` ada, menawarkan `/clear` atau `/compact` (plus `/model sonnet` opsional) supaya fase eksekusi tidak membaca ulang konteks planning yang sudah menumpuk, lalu berhenti. `/backend:tech-lead lanjutkan <taskdir>` di sesi bersih membaca journey, menjalankan prasyarat `--re-entry`, dan langsung merutekan ke `architect` tanpa eksplorasi ulang; balasan "lanjut" di sesi yang sama juga sah. `{taskdir}/JOURNEY.md` (`_common/journey.py`) mencatat keputusan dan alasannya, satu baris per titik (`TECH_LEAD`, `BRD`/`PRD`, `READY`, `REVIEW`, `ARCHITECT`); ia bukan sumber status, dan bila bertentangan dengan disk, disk menang.
-7. Tiap skill hilir pulang ke `tech-lead` Fase 5 (re-entry). Di sana gerbang meng-commit artefak repo yang menunggu (profil, laporan audit, `docs/api/`), menyapu cermin nataflow yang belum dijalankan pengirimnya, dan menentukan langkah berikutnya dari tabel "pengirim balik". Dokumen yang disetujui atau tuntas (`TASK.md`, BRD/PRD `APPROVED`, batch brief terkunci, `REVIEW.md`, `REPORT.md`) sudah dicerminkan skill pemiliknya seketika. Kegagalan selalu dikerjakan ulang **di taskdir yang sama** lewat lane `PLANNING` dengan `reentry_reason`.
-8. **Dokumen taskdir di luar git.** Prasyarat penuh `tech-lead` menulis penanda `backenddev/docs/.gitignore` (berisi `*`, ikut mengabaikan dirinya sendiri). Repo yang masih menyimpan dokumen taskdir ter-track dirutekan ke migrasi sekali jalan lebih dulu. Setiap titik yang dulu dikunci commit dokumen kini dikunci materai `doc_seal.py`: akar (`base_commit`), approval BRD/PRD (`approved_seal`), batch brief (`sidik_kontrak`), dan penutupan ledger. Bukti `DONE` brief dan kesegaran review dibaca dari commit kode.
+6. **Serah terima eksekusi (Langkah 30) dan serah terima PRD (32 H3–H4).** Vonis `READY_FOR_IMPLEMENTATION` tidak langsung memberangkatkan `architect`. Gerbang memastikan entri journey `READY` ada, menawarkan `/clear` atau `/compact` (plus `/model sonnet` opsional) supaya fase eksekusi tidak membaca ulang konteks planning yang sudah menumpuk, lalu berhenti. `/backend:tech-lead lanjutkan <taskdir>` di sesi bersih membaca journey, menjalankan prasyarat `--re-entry`, dan langsung merutekan ke `architect` tanpa eksplorasi ulang; balasan "lanjut" di sesi yang sama juga sah. `{taskdir}/JOURNEY.md` (`_common/journey.py`) mencatat keputusan dan alasannya, satu baris per titik (`TECH_LEAD`, `BRD`/`PRD`, `READY`, `REVIEW`, `ARCHITECT`); ia bukan sumber status, dan bila bertentangan dengan disk, disk menang. Pada chain ber-PRD ada titik henti kedua: PRD yang disetujui di pemanggilan `analyst` itu mengembalikan vonis `PRD_APPROVED_SERAH_TERIMA`, dan gerbang menawarkan opsi yang sama sebelum `plan` berangkat, karena fase `plan` dulu membawa seluruh konteks tech-lead, analyst, task, dan system-analysis di tiap gilirannya. Lanjutannya ("lanjutkan <taskdir>" dengan journey terakhir `PRD`, atau "lanjut") dirutekan baris tabel "hop ledger terbuka" ke `analyst` tanpa `reentry_reason`, dan `analyst` masuk hop `BRIEF` lewat resume Fase 0; resume itu tidak memicu serah terima lagi.
+7. **Dispatch lewat berkas (32 T1).** Main loop tidak lagi memuat badan template dispatcher. `_common/render_prompt.py` mengisi slot `### Slot Hidrasi` (slot wajib kosong ditolak, baris slot opsional kosong dihapus) dan menulis prompt jadi ke `<laci>/.explore/prompt/<nama>.md`; prompt subagent cukup satu kalimat rujukan berkas yang dicetak skrip, dan tiap agent membaca berkas itu sebagai prompt utuhnya.
+8. Tiap skill hilir pulang ke `tech-lead` Fase 5 (re-entry). Di sana gerbang meng-commit artefak repo yang menunggu (profil, laporan audit, `docs/api/`), menyapu cermin nataflow yang belum dijalankan pengirimnya, dan menentukan langkah berikutnya dari tabel "pengirim balik". Dokumen yang disetujui atau tuntas (`TASK.md`, BRD/PRD `APPROVED`, batch brief terkunci, `REVIEW.md`, `REPORT.md`) sudah dicerminkan skill pemiliknya seketika. Kegagalan selalu dikerjakan ulang **di taskdir yang sama** lewat lane `PLANNING` dengan `reentry_reason`.
+9. **Dokumen taskdir di luar git.** Prasyarat penuh `tech-lead` menulis penanda `backenddev/docs/.gitignore` (berisi `*`, ikut mengabaikan dirinya sendiri). Repo yang masih menyimpan dokumen taskdir ter-track dirutekan ke migrasi sekali jalan lebih dulu. Setiap titik yang dulu dikunci commit dokumen kini dikunci materai `doc_seal.py`: akar (`base_commit`), approval BRD/PRD (`approved_seal`), batch brief (`sidik_kontrak`), dan penutupan ledger. Bukti `DONE` brief dan kesegaran review dibaca dari commit kode.
 
 ## Alur per Skill
 
@@ -289,7 +293,7 @@ flowchart TD
 - **Prasyarat**: `scripts/check_preconditions.py --taskdir --risk-level --chain`, 8 check.
 - **Langkah**:
   1. **Fase 0**: kunci acuan hulu menurut `chain`, bukan menurut risk. Pada `BRD_PRD_BRIEF`, BRD wajib `APPROVED`. Pada `PRD_BRIEF`, BRD tidak boleh ada.
-  2. **Fase 1**: pemetaan as-is sesuai `references/analysis-protocol.md` bagian A. Laporan `gate-*.md` dipanen lebih dulu, lalu `code-explorer` Profil S (`dispatcher/explorer-surface.md`) dan Profil B (`dispatcher/explorer-blast.md`) didispatch dengan kedalaman `menyeluruh`. Profil B menunggu amplop seluruh Profil S (tidak satu pesan, `Async agent launched` bukan balikan) supaya Tahap 0 blast memanen laporan Profil S dan memulai sapuan dari `### Flow & Trace`-nya (31 X5).
+  2. **Fase 1**: pemetaan as-is sesuai `references/analysis-protocol.md` bagian A. Laporan `gate-*.md` dipanen lebih dulu, lalu `code-explorer` Profil S (`dispatcher/explorer-surface.md`) dan Profil B (`dispatcher/explorer-blast.md`) didispatch dengan kedalaman `menyeluruh`. Simbol yang letaknya sudah dibuktikan laporan gerbang (`confidence` high/medium) berangkat Profil S **mode delta** (slot `{laporan_gerbang}`, 32 E1): letak dan layer dipanen, dispatch hanya menagih tipe kontrak, `### Error Surface`, alur, dan mirrored path. Profil B menunggu amplop seluruh Profil S (tidak satu pesan, `Async agent launched` bukan balikan) supaya Tahap 0 blast memanen laporan Profil S dan memulai sapuan dari `### Flow & Trace`-nya (31 X5).
   3. **Fase 2**: klarifikasi 1–3 pertanyaan bila pilar belum konkret.
   4. **Fase 3**: kunci 4 pilar kontrak: API contract, status lifecycle, validation policy, dan permission & scope. Kolom `Pesan` error disalin literal dari `### Error Surface`. Pembacaan skema read-only maksimal 5 panggilan.
   5. **Fase 4**: impact map 16 dimensi dan `## Migration requirements` beserta rollback.
@@ -308,8 +312,8 @@ flowchart TD
 - **Prasyarat**: `scripts/check_preconditions.py --taskdir --entry-mode [--chain] [--risk] [--file-scope]`, 8 check. Check 3 menolak `entry_mode` kosong. Check 8 menolak jalur RCA tanpa `risk`/`file_scope`.
 - **Langkah**:
   1. **Fase 1**: tetapkan jalur masuk dari `entry_mode` apa adanya (`references/entry-rules.md` bagian 1). Jalur `LANGSUNG` berhenti bila menyentuh salah satu dari 5 pemicu eskalasi: kontrak API, transisi status, validation policy, permission/scope, atau side-effect lintas modul.
-  2. **Fase 2**: pemetaan 12 dimensi per unit (`references/slicing-and-scan.md`). Unit yang melebihi kuota didelegasikan ke fan-out `code-explorer` (≤4 serentak). Jalur non-PRD juga menjalankan sapuan 7 dimensi residual.
-  3. **Fase 3**: tulis `brief-spec.json`, lalu jalankan `scaffold_brief.py --write-matrix` (atau `--append` untuk taskdir ber-brief lama) yang mengunci matriks alokasi `covers`/`fulfills`. Sesudah itu `scaffold_brief.py --nn <NN>` menulis kerangka 10 seksi: Objective, Interfaces, File scope, Out of scope, Steps, Migration, Mirrored paths, Risk & rollback, Work status, dan Analysis trace. Tiap kerangka diisi, lalu `validate_briefs.py --brief <NN>` dijalankan per brief.
+  2. **Fase 2**: pemetaan 12 dimensi per unit (`references/slicing-and-scan.md`). Pada jalur `PRD`, laporan Profil S/B di laci dipanen lebih dulu: unit yang anchor-nya ada di laporan Profil S dan berkas test-nya di dimensi 11 Profil B tidak didispatch, dan celah yang tercatat didispatch delta (32 E2). Unit yang melebihi kuota didelegasikan ke fan-out `code-explorer` (≤4 serentak). Jalur non-PRD juga menjalankan sapuan 7 dimensi residual.
+  3. **Fase 3**: tulis `brief-spec.json`, lalu jalankan `scaffold_brief.py --write-matrix` (atau `--append` untuk taskdir ber-brief lama) yang mengunci matriks alokasi `covers`/`fulfills`. Sesudah itu `scaffold_brief.py --nn <NN>` menulis kerangka 10 seksi: Objective, Interfaces, File scope, Out of scope, Steps, Migration, Mirrored paths, Risk & rollback, Work status, dan Analysis trace. Tiap kerangka diisi, lalu `validate_briefs.py --brief <NN>` dijalankan per brief. Langit-langit slicing: 5 langkah **produksi** dan 4 berkas kode per brief; langkah yang hanya menyebut berkas test tidak dihitung (32 L1), plafon 120 baris `## Steps` tetap berlaku.
   4. **Fase 4**: `validate_briefs.py` atas seluruh batch (predikat mekanis). Check A (source coverage) dan arah baliknya (kecukupan unit) dinilai main loop.
   5. **Fase 5**: `--review-state` → `--open-round` → `brief-reviewer` → `--record-round`, dengan plafon 2 ronde per generasi batch dan 4 per taskdir. Balikan tiap ronde ditulis apa adanya ke `{taskdir}/.explore/review/brief.md`. Lalu `doc_seal.py lock-briefs` (`sidik_kontrak` tiap brief `READY`) dan laporan satu baris; tabel per brief tidak dicetak karena `architect` Fase 2 menyajikannya sebelum eksekusi.
 - **Subagent yang didispatch**: `code-explorer` (Fase 2) dan `brief-reviewer` (vonis `Approved`/`Issues Found`, temuan `BLOCKER [MEKANIS|SEMANTIK]` atau `ADVISORY`. Hanya `BLOCKER` yang menahan penguncian).
@@ -352,7 +356,7 @@ flowchart TD
   4. **Fase 3 (per brief, sekuensial)**:
      1. Tulis lease dengan `guard_bash.py lease --brief`, dispatch `code-implementor` via `dispatcher/implementor.md` tepat sekali, lalu triase `DONE`/`BLOCKED` memakai matriks bukti disk.
      2. **Gerbang kompilasi**: `run_verification.py closing --cmd typecheck` (relatif baseline) bila `typecheck-per-brief: ya`. Galat baru ditulis ke `HALT.md` dengan `verdict: COMPILE`.
-     3. **Pemeriksaan diff**: `git status` bersih (berkas sisa → `HALT.md STRAY`), `verify_scope.py --commit` (berkas di luar scope → `HALT.md SCOPE`, P1), dan `symbol_map.py --anchor` (simbol di luar anchor → `HALT.md SYMBOL`, P1).
+     3. **Pemeriksaan diff**: `git status` bersih (berkas sisa → `HALT.md STRAY`), `verify_scope.py --commit` (berkas di luar scope → `HALT.md SCOPE`, P1), dan `symbol_map.py --brief` — ketiganya dijalankan satu perintah `close_brief.py --brief --sha` yang juga mencabut lease dan mencetak satu baris vonis `PASS`/`STRAY`/`SCOPE`/`SYMBOL` (32 C1) — (simbol eksisting di luar anchor → `HALT.md SYMBOL`, P1; deklarasi baru yang ditulis `## Steps` → `new_declared`, sah, 32 S1; keluaran ringkas tanpa daftar baris, 32 S2).
      4. Berkas yatim (di luar union File scope) dicatat sebagai P1 lalu dikembalikan ke gerbang.
      5. Cabut lease dengan `lease --clear`.
   5. **Fase 4**: sesudah brief NN tertinggi DONE, jalankan `run_verification.py closing --cmd build --cmd test` sekali. Exit 1 diklasifikasi sebagai 4a (cacat eksekusi) atau 4b (cacat perencanaan / berkas yatim). Bila hijau, dispatch `code-reviewer` via `dispatcher/reviewer.md` tepat sekali. `REVIEW.md` terbit → sinkron nataflow seketika, apa pun severity-nya.
@@ -374,7 +378,7 @@ flowchart TD
     TR -->|"BLOCKED (HENTIKAN)"| F5B["Fase 5: BLOCKED — review dilewati"]
     TR -->|DONE| CG{"Gerbang kompilasi (typecheck-per-brief)"}
     CG -->|"galat baru"| HALT["Tulis HALT.md COMPILE → hentikan"]
-    CG -->|"lolos / SKIP"| VS{"git status + verify_scope + symbol_map"}
+    CG -->|"lolos / SKIP"| VS{"close_brief: git status + verify_scope + symbol_map --brief"}
     VS -->|"sisa berkas"| HS["HALT.md STRAY"]
     VS -->|"luar scope"| HSC["HALT.md SCOPE (P1)"]
     VS -->|"simbol luar anchor"| HSY["HALT.md SYMBOL (P1)"]
@@ -465,7 +469,7 @@ flowchart TD
 | `prd-reviewer` | `system-analysis` Fase 8 via `dispatcher/reviewer.md` | Read, Grep, Glob | `taskdir`, `chain`, `ronde` | `## PRD Review`: `Approved — nol temuan` / `Approved` / `Issues Found`, ditulis pemanggil ke `.explore/review/prd.md` | Sama dengan `brd-reviewer`; tidak boleh menuntut path berkas `src/` di breakdown |
 | `brief-reviewer` | `plan` Fase 5 via `dispatcher/reviewer.md` | Read, Grep, Glob | `taskdir`, `chain`, `ronde`, `target`, `previous_report` | `## Brief Review`: `Approved`/`Issues Found`, dengan `BLOCKER [MEKANIS|SEMANTIK]` dan `ADVISORY`, ditulis pemanggil ke `.explore/review/brief.md` | Menghitung ulang predikat mekanis `validate_briefs.py`, advisory yang menambah kerja |
 
-Semua dispatch memakai template `skills/<skill>/dispatcher/*.md` yang dihidrasi penuh. Prompt yang masih memuat slot `{...}` mentah atau tidak punya blok `Format laporan` dibatalkan.
+Semua dispatch memakai template `skills/<skill>/dispatcher/*.md` yang dirender `_common/render_prompt.py` ke `.explore/prompt/` dan dikirim sebagai satu kalimat rujukan berkas (32 T1). Prompt yang masih memuat slot `{...}` mentah atau tidak punya blok `Format laporan` dibatalkan.
 
 ## Hooks & Guard
 

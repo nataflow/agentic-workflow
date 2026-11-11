@@ -2,6 +2,8 @@
 
 Gunakan template ini saat mendispatch subagent reviewer dokumen brief (`brief-reviewer`).
 
+**Cara dispatch (32 T1).** Blok template di bawah tidak dibaca main loop. Isi slot `### Slot Hidrasi` lewat `render_prompt.py --template <berkas ini> --slot nama=nilai … --out <laci>/prompt/<nama>.md` (skrip `_common/render_prompt.py` di bawah root plugin, diawali `python3` dan awalan path yang sama dengan skrip prasyarat SKILL.md pendispatch) (`<laci>` = `{taskdir}/.explore`, atau `backenddev/docs/.explore` untuk dispatch gerbang), lalu kirim kalimat rujukan berkas yang dicetak skrip sebagai prompt subagent — bukan isi blok. Slot wajib kosong → skrip menolak (`FAIL`) sebelum prompt ditulis; slot opsional kosong → barisnya dihapus skrip. Berkas ini dibaca per seksi: `### Slot Hidrasi` sebelum render, aturan pendispatch, dan `### Penanganan Balikan` saat balikan datang.
+
 **Tujuan:** Mengambil sudut pandang helikopter (helicopter view) dengan memverifikasi seluruh dokumen brief (`brief-*.md`) selaras secara utuh terhadap `TASK.md`, `BRD.md`, dan `PRD.md`, lengkap, konsisten, deterministik, mematuhi kaidah slicing & zero-tolerance red flags, serta siap untuk dieksekusi oleh `code-implementor`.
 
 **Dispatch setelah:** Seluruh rangkaian brief selesai ditulis ke `backenddev/docs/<taskdir>/brief-*.md` dan `scripts/validate_briefs.py` memvonis `PASS`.

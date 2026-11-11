@@ -44,9 +44,10 @@ class OrderService
 """
 
 
-def _map(repo, path, anchor=None):
+def _map(repo, path, anchor=None, verbose=False):
     sha = commit(repo, "edit")
     args = ["--root", str(repo), "--sha", sha, "--path", path] + (["--anchor", anchor] if anchor is not None else [])
+    args += ["--verbose"] if verbose else []
     proc = run_script(SCRIPT, *args)
     return proc.returncode, json.loads(proc.stdout)
 
@@ -83,7 +84,7 @@ def test_signature_change_maps_to_own_method(make_repo):
     repo = _base(make_repo, {"src/OrderService.java": JAVA})
     write_files(repo, {"src/OrderService.java": JAVA.replace("public void cancel(Order o) {",
                                                              "public void cancel(Order o, String reason) {")})
-    code, out = _map(repo, "src/OrderService.java", anchor="cancel")
+    code, out = _map(repo, "src/OrderService.java", anchor="cancel", verbose=True)
     assert [(l["line"], l["symbol"]) for l in out["lines"]] == [(15, "cancel")]
     assert code == 0
 

@@ -2,6 +2,8 @@
 
 Gunakan template ini saat `business-analysis` mendispatch subagent penelusur kode (`code-explorer`) secara langsung, tanpa skill pembungkus.
 
+**Cara dispatch (32 T1).** Blok template di bawah tidak dibaca main loop. Isi slot `### Slot Hidrasi` lewat `render_prompt.py --template <berkas ini> --slot nama=nilai … --out <laci>/prompt/<nama>.md` (skrip `_common/render_prompt.py` di bawah root plugin, diawali `python3` dan awalan path yang sama dengan skrip prasyarat SKILL.md pendispatch) (`<laci>` = `{taskdir}/.explore`, atau `backenddev/docs/.explore` untuk dispatch gerbang), lalu kirim kalimat rujukan berkas yang dicetak skrip sebagai prompt subagent — bukan isi blok. Slot wajib kosong → skrip menolak (`FAIL`) sebelum prompt ditulis; slot opsional kosong → barisnya dihapus skrip. Berkas ini dibaca per seksi: `### Slot Hidrasi` sebelum render, aturan pendispatch, dan `### Penanganan Balikan` saat balikan datang.
+
 **Tujuan:** Memotret perilaku as-is satu domain sebagai observasi kode berbukti `file:baris` untuk bahan mentah elisitasi Fase 2 — bukan sebagai aturan target, dan bukan sebagai desain teknis.
 
 **Dispatch setelah:** Fase 1 butir 2 menemui salah satu kondisi: alur menyentuh >1 modul, target luput pada `Grep` pertama, atau kuota sapuan main loop (3 panggilan `Glob`+`Grep`) habis.
@@ -69,7 +71,7 @@ Tulis laporan utuh ke `Berkas laporan` lebih dulu, lalu balas hanya dengan amplo
 - **Satu pertanyaan per dispatch**: satu dispatch memuat tepat satu `{objective}`. Dua pertanyaan berangkat sebagai dua dispatch ber-`{slug}` berbeda, bukan satu prompt bercabang.
 - **Framing domain, bukan teknis**: `{objective}` menanyakan perilaku yang dialami aktor ("kondisi apa yang membuat order ditolak sistem hari ini"), bukan rantai pemanggil ("bagaimana alur order create sampai kirim event queue"). Framing kedua milik `system-analysis`.
 - **Dilarang menyalin isi berkas**: jangan salin isi `.claude/profile/backenddev/` atau berkas kode ke dalam prompt. Sebutkan path-nya; subagent membacanya sendiri secara terisolasi.
-- **Audit hidrasi sebelum berangkat**: batalkan dispatch bila prompt masih memuat slot kurung kurawal `{...}` mentah atau placeholder `TBD`/`TODO`.
+- **Audit hidrasi milik skrip**: `render_prompt.py` menolak slot wajib kosong dan slot tak dikenal, dan tidak pernah meninggalkan slot tabel mentah. Placeholder `TBD`/`TODO` di dalam nilai slot tetap dilarang — skrip tidak menilainya.
 - **Profil basi menaikkan tuntutan, bukan menurunkan**: skrip prasyarat mencetak banner `[TERDEGRADASI] profil basi` saat `.claude/profile/backenddev/` tertinggal di belakang `source_root`. Banner itu aktif → `{batas_cakupan}` dari `domain-map.md` diperlakukan sebagai **dugaan**, bukan batas: laporan yang menutup permukaannya dengan bersandar pada batas itu dinilai setara `confidence: medium`, dan vonis "tidak ada" atas jalur di luar batas itu dilarang. Laporkan banner-nya apa adanya di laporan penutup; dilarang disaring.
 - **Blok `Format laporan` ikut berangkat utuh**: kerangka seksi tidak lagi ada di `agents/code-explorer.md`. Prompt yang diberangkatkan tanpa blok itu dihentikan subagent sebagai kegagalan dispatch.
 - **Read-only mutlak**: dilarang menyuruh subagent mengubah kode, memilih rute arsitektur, atau merumuskan aturan target. Satu-satunya berkas yang boleh ditulisnya adalah `Berkas laporan`.

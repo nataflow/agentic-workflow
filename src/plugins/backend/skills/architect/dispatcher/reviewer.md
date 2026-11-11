@@ -2,6 +2,8 @@
 
 Gunakan template ini saat `architect` mendispatch subagent penilai diff (`code-reviewer`) secara langsung.
 
+**Cara dispatch (32 T1).** Blok template di bawah tidak dibaca main loop. Isi slot `### Slot Hidrasi` lewat `render_prompt.py --template <berkas ini> --slot nama=nilai … --out <laci>/prompt/<nama>.md` (skrip `_common/render_prompt.py` di bawah root plugin, diawali `python3` dan awalan path yang sama dengan skrip prasyarat SKILL.md pendispatch) (`<laci>` = `{taskdir}/.explore`, atau `backenddev/docs/.explore` untuk dispatch gerbang), lalu kirim kalimat rujukan berkas yang dicetak skrip sebagai prompt subagent — bukan isi blok. Slot wajib kosong → skrip menolak (`FAIL`) sebelum prompt ditulis; slot opsional kosong → barisnya dihapus skrip. Berkas ini dibaca per seksi: `### Slot Hidrasi` sebelum render, aturan pendispatch, dan `### Penanganan Balikan` saat balikan datang.
+
 **Tujuan:** Menilai seluruh diff branch satu taskdir terhadap kontrak gabungan briefnya, tepat satu kali di akhir tiap putaran rantai, dan menuliskan hasilnya sebagai `{taskdir}/REVIEW.md`.
 
 **Dispatch setelah:** Fase 4 butir 1 hijau — build dan test penutup lulus dan tiap brief taskdir sudah tertutup — `DONE` dengan commitnya mendarat, atau `SUPERSEDED` bertaut ke penggantinya.
@@ -45,7 +47,7 @@ Review seluruh branch pekerjaan untuk satu direktori tugas.
 - **Tepat satu kali di akhir tiap putaran**: reviewer berangkat sekali atas seluruh diff branch gabungan, sesudah brief terakhir `DONE`. Dilarang mendispatch per brief. Review ulang sah tepat sekali per putaran, yaitu saat check 3 skrip prasyarat menyatakan `REVIEW.md` basi.
 - **Sesudah verifikasi penutup hijau**: build dan test Fase 4 butir 1 lulus lebih dulu. Mendispatch reviewer di atas branch yang buildnya merah menghasilkan temuan yang tak dapat dipisahkan dari kegagalan build.
 - **Dilarang menyalin isi berkas**: jangan salin isi brief, diff, atau `.claude/profile/backenddev/` ke dalam prompt. Sebutkan path-nya; subagent membacanya sendiri secara terisolasi.
-- **Audit hidrasi sebelum berangkat**: batalkan dispatch bila prompt masih memuat slot kurung kurawal `{...}` mentah atau placeholder `TBD`/`TODO`.
+- **Audit hidrasi milik skrip**: `render_prompt.py` menolak slot wajib kosong dan slot tak dikenal, dan tidak pernah meninggalkan slot tabel mentah. Placeholder `TBD`/`TODO` di dalam nilai slot tetap dilarang — skrip tidak menilainya.
 - **Read-only terhadap `src/`**: reviewer tidak pernah memperbaiki kode atau menjalankan build/test; ia hanya menulis laporannya sendiri dan meng-commit baris indeks `backenddev/issues/README.md`.
 - **Dispatch langsung tanpa skill pembungkus**: seluruh doktrin review — gerbang masuk, lima pemeriksaan, kontrak `REVIEW.md`, dan amplop balikan — duduk di `agents/code-reviewer.md`. Dilarang memanggil skill perantara atau menyalin potongan doktrin itu ke dalam prompt.
 

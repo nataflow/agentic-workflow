@@ -2,6 +2,8 @@
 
 Gunakan template ini saat `debug` mendispatch subagent penelusur kode (`code-explorer`) secara langsung.
 
+**Cara dispatch (32 T1).** Blok template di bawah tidak dibaca main loop. Isi slot `### Slot Hidrasi` lewat `render_prompt.py --template <berkas ini> --slot nama=nilai … --out <laci>/prompt/<nama>.md` (skrip `_common/render_prompt.py` di bawah root plugin, diawali `python3` dan awalan path yang sama dengan skrip prasyarat SKILL.md pendispatch) (`<laci>` = `{taskdir}/.explore`, atau `backenddev/docs/.explore` untuk dispatch gerbang), lalu kirim kalimat rujukan berkas yang dicetak skrip sebagai prompt subagent — bukan isi blok. Slot wajib kosong → skrip menolak (`FAIL`) sebelum prompt ditulis; slot opsional kosong → barisnya dihapus skrip. Berkas ini dibaca per seksi: `### Slot Hidrasi` sebelum render, aturan pendispatch, dan `### Penanganan Balikan` saat balikan datang.
+
 **Tujuan:** Mempersempit permukaan kegagalan jadi daftar kandidat lokasi bertanda `file:line` sebagai bahan siklus hipotesis Fase 3 — bukan untuk menebak sebabnya.
 
 **Dispatch setelah:** Fase 2 butir 2: permukaan menyentuh lebih dari satu package, rantai pemanggil belum jelas, atau batas transaksi perlu ditelusuri. Permukaan yang terlokalisasi dalam satu berkas dan alurnya terbaca jelas dibaca langsung tanpa dispatch (Fase 2 butir 3).
@@ -90,7 +92,7 @@ Tulis laporan utuh ke `Berkas laporan` lebih dulu, lalu balas hanya dengan amplo
 - **Dispatch hanya untuk pertanyaan rantai**: permukaan yang terbaca jelas dalam satu berkas dibaca sendiri. Mendispatch untuk berkas tunggal membakar giliran tanpa menambah jangkauan.
 - **Framing lokasi, bukan sebab**: `{objective}` menanyakan lintasan dan letak (`siapa yang membuka transaksi sebelum OrderService.cancel dipanggil`), bukan diagnosis (`kenapa order gagal dibatalkan`). Diagnosis milik siklus hipotesis Fase 3.
 - **Dilarang menyalin isi berkas**: jangan salin isi `.claude/profile/backenddev/`, berkas kode, atau log mentah panjang ke dalam prompt. Sebutkan path-nya; subagent membacanya sendiri secara terisolasi.
-- **Audit hidrasi sebelum berangkat**: batalkan dispatch bila prompt masih memuat slot kurung kurawal `{...}` mentah atau placeholder `TBD`/`TODO`.
+- **Audit hidrasi milik skrip**: `render_prompt.py` menolak slot wajib kosong dan slot tak dikenal, dan tidak pernah meninggalkan slot tabel mentah. Placeholder `TBD`/`TODO` di dalam nilai slot tetap dilarang — skrip tidak menilainya.
 - **Blok `Format laporan` ikut berangkat utuh**: kerangka seksi tidak lagi ada di `agents/code-explorer.md`. Prompt yang diberangkatkan tanpa blok itu dihentikan subagent sebagai kegagalan dispatch.
 - **Read-only mutlak**: dilarang menyuruh subagent mengubah kode, menjalankan reproduksi, atau menambal cacat yang ia temukan. Satu-satunya berkas yang boleh ditulisnya adalah `Berkas laporan`.
 

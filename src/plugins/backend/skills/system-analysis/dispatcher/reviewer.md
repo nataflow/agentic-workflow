@@ -2,6 +2,8 @@
 
 Gunakan template ini saat mendispatch subagent reviewer dokumen PRD (`prd-reviewer`).
 
+**Cara dispatch (32 T1).** Blok template di bawah tidak dibaca main loop. Isi slot `### Slot Hidrasi` lewat `render_prompt.py --template <berkas ini> --slot nama=nilai … --out <laci>/prompt/<nama>.md` (skrip `_common/render_prompt.py` di bawah root plugin, diawali `python3` dan awalan path yang sama dengan skrip prasyarat SKILL.md pendispatch) (`<laci>` = `{taskdir}/.explore`, atau `backenddev/docs/.explore` untuk dispatch gerbang), lalu kirim kalimat rujukan berkas yang dicetak skrip sebagai prompt subagent — bukan isi blok. Slot wajib kosong → skrip menolak (`FAIL`) sebelum prompt ditulis; slot opsional kosong → barisnya dihapus skrip. Berkas ini dibaca per seksi: `### Slot Hidrasi` sebelum render, aturan pendispatch, dan `### Penanganan Balikan` saat balikan datang.
+
 **Tujuan:** Memverifikasi dokumen PRD lengkap, konsisten, deterministik, menutup 4 pilar kontrak dan 16 dimensi impact map, serta siap untuk dekomposisi brief (`plan`).
 
 **Dispatch setelah:** Dokumen PRD selesai ditulis ke `backenddev/docs/<taskdir>/PRD.md`.

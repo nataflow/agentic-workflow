@@ -2,6 +2,8 @@
 
 Gunakan template ini saat mendispatch subagent eksekutor brief (`code-implementor`).
 
+**Cara dispatch (32 T1).** Blok template di bawah tidak dibaca main loop. Isi slot `### Slot Hidrasi` lewat `render_prompt.py --template <berkas ini> --slot nama=nilai … --out <laci>/prompt/<nama>.md` (skrip `_common/render_prompt.py` di bawah root plugin, diawali `python3` dan awalan path yang sama dengan skrip prasyarat SKILL.md pendispatch) (`<laci>` = `{taskdir}/.explore`, atau `backenddev/docs/.explore` untuk dispatch gerbang), lalu kirim kalimat rujukan berkas yang dicetak skrip sebagai prompt subagent — bukan isi blok. Slot wajib kosong → skrip menolak (`FAIL`) sebelum prompt ditulis; slot opsional kosong → barisnya dihapus skrip. Berkas ini dibaca per seksi: `### Slot Hidrasi` sebelum render, aturan pendispatch, dan `### Penanganan Balikan` saat balikan datang.
+
 **Tujuan:** Mengubah satu brief berstatus `READY` menjadi perubahan `src/**` yang terkunci di commit atomik sendiri, tanpa build maupun test.
 
 **Dispatch setelah:** Brief `NN` terpilih sebagai titik mulai rantai di Fase 1 dan working tree bersih.
@@ -50,4 +52,4 @@ Eksekusi satu brief implementasi.
 
 **Subagent mengembalikan:** Amplop `## Implementor Report — brief-{NN}-{unit}` dengan status `DONE` atau `BLOCKED`, memuat baris `Commit:` dan baris `Simbol Tersentuh:`.
 
-Baris `Simbol Tersentuh:` mengenumerasi simbol yang benar-benar diubah, termasuk yang **tidak** disebut kolom `Anchor` brief. `architect` Fase 3 butir 4 membandingkannya dengan peta simbol `scripts/symbol_map.py`, dan selisih di antara keduanya dicatat apa adanya. Batas scope brief mengikat berkas **dan** simbol: berkas yang sama menampung banyak simbol, sehingga perbandingan tingkat berkas saja meloloskan penyuntingan simbol mana pun asalkan berkasnya kebetulan terdaftar.
+Baris `Simbol Tersentuh:` mengenumerasi simbol yang benar-benar diubah, termasuk yang **tidak** disebut kolom `Anchor` brief. Method, test, atau tipe baru yang deklarasinya ditulis `## Steps` brief sah tanpa disebut `Anchor`; suntingan simbol eksisting di luar `Anchor` tidak. `architect` Fase 3 butir 4 membandingkannya dengan peta simbol `scripts/symbol_map.py`, dan selisih di antara keduanya dicatat apa adanya. Batas scope brief mengikat berkas **dan** simbol: berkas yang sama menampung banyak simbol, sehingga perbandingan tingkat berkas saja meloloskan penyuntingan simbol mana pun asalkan berkasnya kebetulan terdaftar.

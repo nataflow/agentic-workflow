@@ -78,8 +78,9 @@ SECTIONS = [
                    "anchor itu wajib disebut minimal satu langkah `## Steps`. Baris berkas "
                    "test pemikul AC bertanda `test otomatis` wajib menyebut `AC-{n}`-nya"),
     ("Out of scope", "modul/file/alur yang sengaja TIDAK disentuh beserta alasan teknisnya"),
-    ("Steps", "maksimal 5 langkah bernomor, snippet lengkap dan valid, tiap langkah bertitik "
-              "sisip konkret. Nol perintah build/test"),
+    ("Steps", "maksimal 5 langkah produksi bernomor (langkah yang hanya menyebut berkas test tidak "
+              "dihitung), snippet lengkap dan valid, tiap langkah bertitik sisip konkret dan menyebut "
+              "berkasnya. Nol perintah build/test"),
     ("Migration", "nama berkas migrasi beserta DDL-nya dan urutan deploy bernomor, atau "
                   "\"tidak perlu\" beserta alasannya"),
     ("Mirrored paths", "consumer queue, scheduler, websocket, changelog dengan bukti file:line, "

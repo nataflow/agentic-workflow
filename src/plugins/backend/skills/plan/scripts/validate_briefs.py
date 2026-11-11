@@ -692,21 +692,41 @@ class BriefValidator:
             })
         return rows
 
-    def _count_steps(self, brief: Dict[str, Any]) -> int:
-        """Hitung langkah bernomor tingkat atas di `## Steps`.
+    def _step_texts(self, brief: Dict[str, Any]) -> List[str]:
+        """Teks tiap langkah bernomor tingkat atas di `## Steps`, beserta lanjutan dan snippet-nya.
 
-        Baris bernomor di dalam pagar kode tidak dihitung: ia isi snippet, bukan
+        Baris bernomor di dalam pagar kode tidak membuka langkah baru: ia isi snippet, bukan
         langkah.
         """
-        count = 0
+        steps: List[List[str]] = []
         fenced = False
         for _, line in self._section_body(brief, "Steps"):
             if line.lstrip().startswith("```"):
                 fenced = not fenced
-                continue
-            if fenced:
-                continue
-            if re.match(r"^\d+\.\s+\S", line):
+            elif not fenced and re.match(r"^\d+\.\s+\S", line):
+                steps.append([])
+            if steps:
+                steps[-1].append(line)
+        return ["\n".join(chunk) for chunk in steps]
+
+    def _count_steps(self, brief: Dict[str, Any]) -> int:
+        """Hitung langkah bernomor tingkat atas di `## Steps`."""
+        return len(self._step_texts(brief))
+
+    def _count_test_steps(self, brief: Dict[str, Any]) -> int:
+        """Langkah yang hanya menyentuh berkas test (32 L1).
+
+        Berkas disebut lewat path lengkap atau nama berkas tanpa ekstensi
+        (`RecallOrderServiceTest`). Langkah dihitung langkah test bila seluruh baris
+        `## File scope` yang disebutnya berkas test; langkah yang tidak menyebut satu baris
+        pun tetap dihitung langkah produksi (fail-closed).
+        """
+        rows = [r["path"] for r in brief["file_rows"] if r.get("path")]
+        count = 0
+        for text in self._step_texts(brief):
+            named = [p for p in rows
+                     if p in text or re.search(rf"\b{re.escape(Path(p).stem)}\b", text)]
+            if named and all(_is_test_path(p, self.test_hint) for p in named):
                 count += 1
         return count
 
@@ -1018,9 +1038,12 @@ class BriefValidator:
                 r for r in b["file_rows"]
                 if not _is_test_path(r["path"], self.test_hint)
             ]
-            if b["steps"] > MAX_STEPS:
+            test_steps = self._count_test_steps(b)
+            prod_steps = b["steps"] - test_steps
+            if prod_steps > MAX_STEPS:
                 problems.append(
-                    f"{b['name']}: {b['steps']} langkah `## Steps` (langit-langit {MAX_STEPS})"
+                    f"{b['name']}: {b['steps']} langkah `## Steps` ({prod_steps} produksi, {test_steps} test; "
+                    f"langit-langit {MAX_STEPS} produksi — langkah yang hanya menyentuh berkas test tidak dihitung)"
                 )
             if len(code_files) > MAX_CODE_FILES:
                 problems.append(

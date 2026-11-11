@@ -16,6 +16,15 @@ Keluaran (`--json` bawaan): tiap baris berubah dengan `side`, `line`, `symbol`,
 `kind` (`fn` | `type` | `top`), `decl_line`. Dengan `--anchor`, simbol `fn` yang
 tidak disebut kolom `Anchor` dilaporkan di `outside_anchor` (exit 1).
 
+Dengan `--brief` (32 S1), kolom `Anchor` baris `--path` dan teks `## Steps` dibaca
+dari brief itu. Simbol yang deklarasinya tidak ada di `sha^:path` (deklarasi baru)
+dan namanya disebut `## Steps` dilaporkan di `new_declared`, bukan `outside_anchor`:
+brief berisi kode lengkap, jadi nama barunya tertulis di sana. Suntingan atas simbol
+yang sudah ada tetap dinilai terhadap `Anchor`.
+
+Mode anchor (`--anchor`/`--brief`) mencetak keluaran ringkas tanpa daftar `lines`
+(32 S2); `--verbose` mengembalikannya.
+
 Exit 2 = mode terdegradasi (ekstensi tak dikenal, kurawal tak seimbang, git
 gagal): pemanggil jatuh ke hunk header ber-driver dan mencatat
 `Cek simbol: TERDEGRADASI (hunk header)`.
@@ -180,34 +189,95 @@ def changed(root: Path, sha: str, path: str) -> List[Dict]:
     return result
 
 
+def brief_row(text: str, path: str) -> Tuple[Optional[str], str]:
+    """(isi kolom `Anchor` baris `path` di `## File scope`, teks `## Steps`) dari isi brief."""
+    def section(name: str) -> str:
+        m = re.search(rf"^## {name}[ \t]*$", text, re.M | re.I)
+        if not m:
+            return ""
+        sec = text[m.end():]
+        nxt = re.search(r"^## ", sec, re.M)
+        return sec[:nxt.start()] if nxt else sec
+
+    anchor = None
+    for line in section("File scope").splitlines():
+        if not line.strip().startswith("|"):
+            continue
+        cols = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cols) >= 4 and cols[0].strip("`").lower() in ("modify", "create") \
+                and cols[1].strip("`").strip() == path:
+            anchor = cols[2]
+            break
+    return anchor, section("Steps")
+
+
+def old_declarations(root: Path, sha: str, path: str, ext: str) -> set:
+    """Nama deklarasi di `sha^:path`; berkas yang belum ada di induk tidak punya deklarasi lama."""
+    try:
+        text = _git(root, "show", f"{sha}^:{path}")
+    except Degraded:
+        return set()
+    return {b["symbol"] for b in blocks(text, ext)}
+
+
 def main():
     parser = argparse.ArgumentParser(description="Peta simbol yang disunting satu commit")
     parser.add_argument("--sha", required=True, help="Commit brief")
     parser.add_argument("--path", required=True, help="Berkas beraksi `modify`")
     parser.add_argument("--anchor", help="Isi kolom `Anchor` baris berkas itu di `## File scope`")
+    parser.add_argument("--brief", help="Brief pemilik commit: Anchor dan `## Steps` dibaca dari sini (32 S1)")
+    parser.add_argument("--verbose", action="store_true", help="Cetak `lines` juga pada mode anchor (32 S2)")
     parser.add_argument("--root", default=".", help="Root repositori")
     args = parser.parse_args()
 
-    try:
-        lines = changed(Path(args.root), args.sha, args.path)
-    except Exception as exc:   # noqa: BLE001 — exit 1 berarti `outside_anchor`; galat apa pun wajib exit 2
-        print(json.dumps({"status": "DEGRADED", "path": args.path, "reason": str(exc),
+    def degraded(reason: str):
+        print(json.dumps({"status": "DEGRADED", "path": args.path, "reason": reason,
                           "fallback": "git -c core.attributesFile=<tmp> show -U0 (hunk header ber-driver)"},
                          ensure_ascii=False))
         sys.exit(2)
 
+    root = Path(args.root)
+    anchor, steps = args.anchor, None
+    if args.brief:
+        try:
+            brief_text = Path(args.brief).read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            degraded(f"brief tak terbaca: {exc}")
+        row_anchor, steps = brief_row(brief_text, args.path)
+        if anchor is None:
+            if row_anchor is None:
+                degraded(f"baris `## File scope` untuk `{args.path}` tidak ditemukan di brief")
+            anchor = row_anchor
+
+    try:
+        lines = changed(root, args.sha, args.path)
+        old_decl = old_declarations(root, args.sha, args.path, Path(args.path).suffix) if steps is not None else set()
+    except Exception as exc:   # noqa: BLE001 — exit 1 berarti `outside_anchor`; galat apa pun wajib exit 2
+        degraded(str(exc))
+
     symbols = sorted({(l["symbol"], l["kind"]) for l in lines if l["symbol"]})
     payload = {"status": "PASS", "path": args.path, "sha": args.sha,
-               "symbols": [{"symbol": s, "kind": k} for s, k in symbols], "lines": lines}
+               "symbols": [{"symbol": s, "kind": k} for s, k in symbols]}
     exit_code = 0
-    if args.anchor is not None:
-        named = set(re.findall(r"[A-Za-z_]\w*", args.anchor))
-        outside = sorted({l["symbol"] for l in lines if l["kind"] == "fn" and l["symbol"] not in named})
+    if anchor is None:
+        payload["lines"] = lines
+    else:
+        named = set(re.findall(r"[A-Za-z_]\w*", anchor))
+
+        def declared_new(symbol: str) -> bool:
+            return (steps is not None and symbol not in old_decl
+                    and re.search(rf"\b{re.escape(symbol)}\b", steps) is not None)
+
+        unanchored_fn = sorted({l["symbol"] for l in lines if l["kind"] == "fn" and l["symbol"] not in named})
+        unanchored_type = sorted({l["symbol"] for l in lines if l["kind"] == "type" and l["symbol"] not in named})
+        payload["new_declared"] = sorted({s for s in unanchored_fn + unanchored_type if declared_new(s)})
         payload["outside_anchor"] = [
-            {"symbol": s, "lines": [l["line"] for l in lines if l["symbol"] == s]} for s in outside]
-        payload["type_level_unanchored"] = sorted(
-            {l["symbol"] for l in lines if l["kind"] == "type" and l["symbol"] not in named})
-        if outside:
+            {"symbol": s, "lines": [l["line"] for l in lines if l["symbol"] == s]}
+            for s in unanchored_fn if not declared_new(s)]
+        payload["type_level_unanchored"] = [s for s in unanchored_type if not declared_new(s)]
+        if args.verbose:
+            payload["lines"] = lines
+        if payload["outside_anchor"]:
             payload["status"] = "FAIL"
             exit_code = 1
     print(json.dumps(payload, ensure_ascii=False))

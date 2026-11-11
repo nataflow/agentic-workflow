@@ -21,7 +21,7 @@ Permintaan yang ternyata menuntut mutasi keluar dari jalur ini ke Keputusan 1; p
 Aturan Fase 1 `SKILL.md` berlaku apa adanya:
 
 1. **Kuota sapuan main loop**: maksimal 3 panggilan gabungan `Glob`+`Grep`, potongan tertarget ≤40 baris, 0 berkas dibaca penuh, 0 query database, 0 `Bash` penelusuran.
-2. **Dispatch wajib**: satu pemicu mekanis `gate-scope.md` bagian 4E aktif → berangkatkan `code-explorer` lewat `dispatcher/explorer.md` terhidrasi penuh, tanpa sapuan pendahulu.
+2. **Dispatch wajib**: satu pemicu mekanis `gate-scope.md` bagian 4E aktif → berangkatkan `code-explorer` lewat `dispatcher/explorer.md` yang dirender `render_prompt.py` (Protokol Dispatch `SKILL.md`), tanpa sapuan pendahulu.
 3. **Fast-path**: tanpa pemicu dispatch — satu `Glob` domain di bawah `source_root` profil (atau root repo bila profil absen), sisa kuota untuk `Grep` simbol.
 4. **Stop condition**: tiap permukaan yang ditanyakan berstatus **terbukti** (`file:line`) atau **tercatat belum terbukti**.
 
