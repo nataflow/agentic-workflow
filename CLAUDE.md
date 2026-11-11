@@ -99,7 +99,12 @@ skeletons), `dispatcher/` (prompts used to dispatch subagents), `scripts/`, and 
   (`base_commit` + root sidik), `draft` records presented content, `amend` re-seals a root amendment; no
   subcommand runs git commit. Reviewer rounds are tracked by `_common/review_round.py` with a "sidik"
   (content fingerprint) that the reviewer must echo. Only code commits remain
-  (`feat(<slug>): implement unit NN - …`), and `REVIEW.md` carries `head:` for freshness.
+  (`feat(<slug>): implement unit NN - …`), and `REVIEW.md` carries `head:` for freshness. The chain stops at two
+  context hand-off points (step 33): after CONTRACT approval and after BRIEF approval, the owning gate prints a
+  `/clear`/`/compact`/"lanjut" block (single home: `lead/references/lane-routing-matrix.md` §4a), and
+  `/frontend:lead lanjutkan <taskdir>` skips the sweep and routes by `taskdir_state.py --taskdir`. Decisions cross
+  sessions in `{taskdir}/JOURNEY.md` (`_common/journey.py`, adapted from backend — `entries`/`teks_problem` are
+  test-pinned identical), never read by any gate script; free text never goes into `## Riwayat Rantai`.
 - **quickdev** — lightweight, no taskdir and no subagents: `repo-profile.md` + one `plan/<task>.md`
   guarded by `_common/plan_lock.py`.
 - **nataflow** — direct work against the nataflow server over MCP, no repo artifacts. `create-artifact`

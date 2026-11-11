@@ -17,7 +17,7 @@ description: Gunakan ketika ada permintaan kerja baru atau susulan di repo front
 1. Repositori target adalah proyek frontend dari stack adapter `skills/profile/stacks/<stack-id>.md`: React + Vite SPA, React Native/Expo, SvelteKit, atau Svelte + Vite. Next.js tidak dilayani.
 2. Profil `.claude/profile/frontenddev/` ada dan `index.json`-nya ber-field `stack`; tidak ada → Failure path 1 (kecuali `EXPLORE_FACT`, yang berangkat tanpa profil).
 3. Git repo lokal, working tree bersih di luar laci `.explore/`/`.frontenddev/`. Dokumen taskdir `frontenddev/docs/` tidak di-commit: diabaikan git (penanda `frontenddev/docs/.gitignore` tulisan prasyarat `task`) dan dicerminkan ke nataflow. Masih ter-track git → Failure path 7 (migrasi).
-4. `python3` tersedia. Skrip: `taskdir_state.py` = `${CLAUDE_PLUGIN_ROOT}/skills/lead/scripts/taskdir_state.py`; `chain.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py`.
+4. `python3` tersedia. Skrip: `taskdir_state.py` = `${CLAUDE_PLUGIN_ROOT}/skills/lead/scripts/taskdir_state.py`; `chain.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/chain.py`; `journey.py` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/journey.py`.
 
 ## Parameter [REQUIRED]
 
@@ -32,6 +32,7 @@ description: Gunakan ketika ada permintaan kerja baru atau susulan di repo front
 
 ### Phase 1 — Sapuan Lokasi Fitur
 
+- **Lanjutan serah terima** — `prompt` hanya meminta melanjutkan satu taskdir yang disebut (mis. sesudah `/clear` di titik serah terima): lewati fase ini dan Phase 3–7; jalankan Phase 2 dengan `--taskdir <taskdir>` ditambah `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/journey.py show --taskdir <taskdir>`, lalu rutekan menurut tabelnya (`references/lane-routing-matrix.md` bagian 4a butir 4).
 - Glob nama path dari kata kunci prompt (maks 2 pola; feature root dari `structure.md` profil): `src/features/*<kw>*/**`, `src/lib/features/*<kw>*/**`, `apps/*/src/features/*<kw>*/**`.
 - Tepat satu cocok → slug dari nama folder aktual. Lebih dari satu (monorepo) → pakai `target_app`, atau tanyakan lewat `AskUserQuestion`. Nol → fitur baru, slug kebab-case baru.
 - **Kuota sapuan main loop** per pemicu: maksimal 3 panggilan `Glob`+`Grep`, nol berkas dibaca isinya, nol `Bash` penelusuran (tidak dihitung: berkas `.claude/profile/frontenddev/` dan skrip Phase 2).
@@ -93,7 +94,7 @@ Invarian pasangan ditegakkan skrip di setiap gate: `HOTFIX_MINOR` ⇔ sections k
 - Slug `<feature>-<jenis-kerja>` kebab-case dari path feature root profil; taskdir `./frontenddev/docs/<YYMMDDhhmm>-<slug>/` (`date +%y%m%d%H%M`).
 - Slug unik per repo: commit rantai dikenali dari `(<slug>)`, dan prasyarat `task` menolak slug yang sudah dipakai taskdir lain, termasuk yang `TUNTAS`/`DITUTUP`. Slug kembar → tambah sufiks `-2` (`-3`, …) sampai unik.
 - Buat `<taskdir>/.explore/` bersamaan; salin laporan explorer Phase 1 dari `.frontenddev/explore/` ke `<taskdir>/.explore/gate-<slug>.md`. Laci itu gitignored dan dilarang di-stage.
-- Nama berkas taskdir tetap: `TASK.md`, `FLOW.md`, `UI.md`, `CONTRACT.md`, `brief-<NN>-<unit>.md`, `REVIEW-PLAN.md`, `report-<NN>.md`, `REVIEW.md`, `REPORT.md`.
+- Nama berkas taskdir tetap: `TASK.md`, `FLOW.md`, `UI.md`, `CONTRACT.md`, `brief-<NN>-<unit>.md`, `REVIEW-PLAN.md`, `report-<NN>.md`, `REVIEW.md`, `REPORT.md`, `JOURNEY.md`.
 
 ### Phase 6 — Gate & Pemiliknya
 
@@ -113,6 +114,7 @@ Dokumen gate lahir `DRAFT` dan dicatat `chain.py draft` sebelum diajukan (tanpa 
 
 - Ketidakjelasan intent atau cakupan → maksimal 3 pertanyaan lewat `AskUserQuestion` dengan opsi konkret beserta trade-off; dilarang menanyakan yang sudah ada di profil.
 - **Penguncian akar** — selalu pada lane berakar: panggil `frontend:task` dengan `{ taskdir, lane, sections, request, evidence, clarification, finding_source, finding_ids, ticket_source }`. `evidence` diisi `file:baris` sapuan Phase 1 atau laporan explorer; fitur baru memakai titik sambungnya dari `surface-map.md`. Gate pertama berangkat hanya sesudah `TASK ROOT LOCKED` tanpa `TERTAHAN`.
+- **Journey** — sesudah akar terkunci, catat alasan lane dan sections yang tidak tertulis di `TASK.md`: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/journey.py add --taskdir <taskdir> --hop LEAD --teks "<keputusan dan alasannya>"`, lalu berangkatkan gate pertama di giliran yang sama. Aturan journey dan dua titik serah terima rantai (`CONTRACT` → `plan`, `BRIEF` → `architect`): `references/lane-routing-matrix.md` bagian 4a.
 
 ### Phase 8 — Kanal Eskalasi & Re-entry
 
@@ -123,7 +125,7 @@ Dijalankan ketika gate hilir mengembalikan kendali dengan temuan yang menggeser 
 | MINOR menemukan endpoint, DTO, query key, atau cabang state baru | `chain.py escalate --lane FAST_FORWARD --sections architecture --reason <...>` (atau `FULL_PIPELINE` bila alur/layout ikut berubah); BRIEF sudah `[x]` → `reopen --row BRIEF` dulu, karena escalate menolak hop tercentang di bawah hop baru |
 | Contract menyadari alur atau layar baru | `chain.py escalate --lane FULL_PIPELINE --sections <...> --reason <...>` — hop baru disisipkan di atas CONTRACT; hop di bawahnya yang sudah `[x]` wajib di-`reopen` lebih dulu |
 | Brief `BLOCKED` (`TERHENTI`) | `chain.py reopen --row BRIEF --reason <unit NN BLOCKED — ringkas>` → `plan` APPEND brief remedi (`remedies: "NN"`) |
-| `REVIEW.md` `BLOCKED` (`TEMUAN`) atau verifikasi penutup merah karena cacat eksekusi | `chain.py reopen --row BRIEF --reason <REVIEW BLOCKED — ringkas>` → `plan` APPEND brief perbaikan (tanpa `remedies`) → `architect` eksekusi → review ulang menimpa `REVIEW.md` |
+| `REVIEW.md` `BLOCKED` (`TEMUAN`) atau verifikasi penutup merah karena cacat eksekusi | `chain.py reopen --row BRIEF --reason <REVIEW BLOCKED — ringkas>` → `plan` APPEND brief perbaikan (tanpa `remedies`) → `architect` eksekusi → review ulang menimpa `REVIEW.md`; catat temuan yang diperbaiki beserta alasannya lewat `journey.py add --hop REVIEW` |
 | Berkas yatim, remedi ketiga atas unit yang sama, atau DTO baru ditemukan | non-MINOR: `chain.py reopen --row CONTRACT --reason <...>` (kaskade membuka BRIEF) → `contract` melengkapi Files Touched/DTO → approve → `plan` APPEND. MINOR (tanpa hop CONTRACT): `reopen --row BRIEF` → `escalate --lane FAST_FORWARD --sections architecture` → `contract` → `plan` APPEND |
 | `DRIFT` | `chain.py reopen --row <ROW>` atau user memulihkan isi yang disetujui |
 | `SC-{n}` berubah (amandemen akar) | atas persetujuan user, sunting `## Success Criteria`: SC baru ditambah di akhir tanpa menomori ulang; SC aktif maksimal 7 (butir gugur tidak dihitung); SC gugur tetap bernomor, ditulis `- [ ] **SC-n**: ~~<teks lama beserta — verifikasi: ...>~~ — gugur: <alasan>` (SC gugur tidak ditagih hilir: tanpa AC, tanpa `fulfills` brief aktif, tanpa vonis `REVIEW.md`, tanpa baris Catatan REPORT; brief `DONE` yang dulu memikulnya tetap sah; `CONTRACT.md` yang masih menyebut token SC gugur di Sumber AC gagal `validate_doc.py` → kontrak direvisi). Jalankan `chain.py amend --taskdir <taskdir> --reason <keputusan user>` — skrip menjalankan `validate_task.py --amend` dan mencatat sidik akar baru di `## Riwayat Rantai` — lalu `chain.py reopen --row <hop tercentang teratas>` — perubahan SC membuat tiap hop tercentang drift, kaskade membuka sisanya; tiap hop di-approve ulang oleh gate pemiliknya (BRIEF tanpa brief `READY` baru sah tanpa Plan Review baru) |

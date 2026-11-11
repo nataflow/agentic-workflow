@@ -240,6 +240,30 @@ Hijau → prasyarat dijalankan ulang, sehingga jejak perintah verifikasi di tree
 rantai (`chain.py files`) terhadap union `files_touched`, sembilan dimensi, CONTRACT, dan SC; `REVIEW.md`
 sah hanya sesudah `validate_review.py` `PASS`, dan basi begitu commit kode mendarat sesudah `head`-nya.
 
+## Serah Terima Konteks
+
+Rantai berhenti di dua titik dan menawarkan pembersihan konteks ke user: sesudah `CONTRACT` disetujui (lane
+ber-CONTRACT) dan sesudah `BRIEF` disetujui (semua lane, termasuk `HOTFIX_MINOR`). Fase `plan` dan `architect`
+bekerja di atas dokumen yang sudah dimateraikan, sedangkan sesi yang menyetujuinya sudah menumpuk prosa gate
+hulu, draft, ronde reviewer, dan laporan explorer — di log sesi, `plan` + `architect` memakan 54–59% biaya
+main loop. Gate pemilik mencetak:
+
+```
+a. /clear  → /model sonnet (opsional) → /frontend:lead lanjutkan <taskdir>
+b. /compact fokus taskdir <taskdir>; state dari disk, keputusan di JOURNEY.md
+c. balas "lanjut" untuk meneruskan di sesi ini
+```
+
+Plugin tidak dapat menjalankan `/clear`, `/compact`, atau `/model`; pilihannya milik user. "lanjutkan
+<taskdir>" melewati sapuan lokasi lead dan langsung merutekan menurut `taskdir_state.py --taskdir` (`plan`
+atau `architect`). `/clear` paling hemat: gate berikutnya mulai dari konteks dasar sesi.
+
+Nuansa percakapan yang tidak tertulis di dokumen rantai dibawa `{taskdir}/JOURNEY.md`, ditulis
+`skills/_common/journey.py`: satu baris per titik (`LEAD`, `FLOW`/`UI`/`CONTRACT`/`BRIEF`, `ARCHITECT`,
+`REVIEW`), maksimal dua kalimat dan 280 karakter, maksimal 40 entri. Isinya keputusan user dan alasannya,
+bukan status — jawaban approve sudah tercatat di `## Riwayat Rantai`. Tidak ada skrip gerbang yang
+membacanya, ia tidak disinkron ke nataflow, dan bila bertentangan dengan disk, disk menang.
+
 ## Artifacts
 
 ```
@@ -256,6 +280,7 @@ sah hanya sesudah `validate_review.py` `PASS`, dan basi begitu commit kode menda
       report-01.md       laporan unit      → code-implementor (+ ## Triase architect)
       REVIEW.md          review penutup    → code-reviewer
       REPORT.md          laporan hasil     → report — penanda tuntas
+      JOURNEY.md         keputusan antar sesi → journey.py — bukan sumber status, tidak disinkron
   reviews/
     2609261000-cart-audit.md   temuan review ad-hoc → finding_source taskdir perbaikan
 ```

@@ -3,6 +3,7 @@ name: code-explorer
 description: Subagent read-only penelusur kode frontend. Gunakan ketika perlu menemukan bukti file:baris, rantai pemanggil unit logika (hook/store), atau letak layer DTO dari satu pertanyaan spesifik sebelum penentuan rute. Dilarang mengedit kode, merancang solusi, atau berdialog dengan user.
 tools: Read, Grep, Glob, Write
 model: sonnet
+effort: medium
 ---
 
 ## Peran

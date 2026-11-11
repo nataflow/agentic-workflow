@@ -91,6 +91,31 @@ Keadaan tiap taskdir divonis `taskdir_state.py` (path di peta **Skrip:** `lead/S
 
 ---
 
+## 4a. Serah Terima Konteks & Journey (Langkah 33)
+
+Rantai boleh dipisah sesi. Fase `plan` dan `architect` bekerja di atas dokumen yang sudah dimateraikan, sedangkan konteks sesi yang menyetujuinya sudah menumpuk prosa gate hulu, draft, ronde reviewer, dan laporan explorer. State rantai dipulihkan dari disk (`taskdir_state.py`, ledger, `## Riwayat Rantai`, status brief, commit); nuansa percakapan dibawa `{taskdir}/JOURNEY.md` yang ditulis `«journey.py»` (path di peta **Skrip:** `lead/SKILL.md`).
+
+1. **Journey bukan sumber kebenaran.** Tidak ada skrip gerbang yang membacanya; bila isinya bertentangan dengan ledger, Riwayat Rantai, status brief, atau commit, disk menang dan pertentangannya disebut di laporan. Satu entri = satu atau dua kalimat keputusan dan alasannya (opsi yang ditolak, permintaan khusus user, asumsi yang dipilih), bukan aktivitas dan bukan status — jawaban approve sudah tercatat di Riwayat, jangan disalin. Taskdir wajib berakar (`TASK.md` ada). `FAIL` skrip (teks terlalu panjang, lebih dari dua kalimat, plafon entri) diperbaiki sekali; masih `FAIL` → lanjut tanpa entri dan sebut di Output, journey tidak pernah menahan rantai.
+2. **Penulis.** `python3 «journey.py» add --taskdir <taskdir> --hop <HOP> --teks "<keputusan dan alasannya>"`, dengan hop: `LEAD` (lead Phase 7 sesudah `TASK ROOT LOCKED` — alasan lane dan sections yang tidak tertulis di `TASK.md`), `FLOW`/`UI`/`CONTRACT`/`BRIEF` (gate pemiliknya sesudah approve), `ARCHITECT` (architect Phase 5), `REVIEW` (lead Phase 8 atas `TEMUAN` — temuan yang diperbaiki beserta alasannya).
+3. **Titik serah terima** — dua, dan hanya dua:
+   - `CONTRACT` disetujui (seluruh lane ber-CONTRACT; `HOTFIX_MINOR` tidak punya hop ini) → sebelum `plan`.
+   - `BRIEF` disetujui (seluruh lane, termasuk `HOTFIX_MINOR`) → sebelum `architect`.
+
+   Sesudah approve, sinkron nataflow, dan entri journey, gate pemilik menyajikan blok berikut apa adanya (isi `<…>`) lalu **berhenti** — gate tidak memanggil gate berikutnya di giliran itu:
+
+   ```
+   <Kontrak | Breakdown> disetujui. Journey dicatat di <taskdir>/JOURNEY.md.
+   Hemat konteks sebelum <plan | architect> (pilih salah satu):
+     a. /clear  → /model sonnet (opsional) → /frontend:lead lanjutkan <taskdir>
+     b. /compact fokus taskdir <taskdir>; state dari disk, keputusan di JOURNEY.md
+     c. balas "lanjut" untuk meneruskan di sesi ini
+   ```
+
+   Pilihannya milik user; plugin tidak dapat menjalankan `/clear`, `/compact`, atau `/model`. Balasan "lanjut" (atau padanannya) di sesi yang sama → panggil gate berikutnya langsung (`frontend:plan` dengan mode sesuai `taskdir_state.py`, atau `frontend:architect`); prasyarat gate itu menagih keabsahan hop hulunya sendiri. Tidak ada state baru: "sudah berhenti di serah terima" hanya terbaca dari blok ini.
+4. **Lanjutan serah terima** — `prompt` hanya meminta melanjutkan satu taskdir yang disebut (mis. "lanjutkan `<taskdir>`"): lead melewati Phase 1 (sapuan dan dispatch explorer) serta Phase 3–7, menjalankan `taskdir_state.py --taskdir <taskdir>` dan `python3 «journey.py» show --taskdir <taskdir>`, lalu merutekan menurut baris tabel Phase 2 yang cocok dengan vonis skrip — `GATE` ke pemilik hop (mis. `plan` mode `CONTRACT`), `EKSEKUSI` ke `architect`, keadaan lain menurut barisnya. Disk menentukan tujuan, bukan journey. `prompt` yang membawa permukaan atau permintaan baru di luar taskdir itu → lead biasa dari Phase 1.
+
+---
+
 ## 5. Plafon Loop
 
 Loop yang berujung ke skill yang sama dapat berputar tanpa henti; plafonnya numerik dan ditegakkan skrip, bukan ingatan. Putaran ronde dimulai sesudah dokumen yang lolos ronde `PASS` dicatat `chain.py draft`, sesudah `reopen` yang membuka hop itu atau hop di atasnya, atau sesudah `chain.py escalate` — dokumen hulu yang berubah membatalkan vonis ronde hilir; tiap putaran berhak 2 ronde; `DISPATCH_FAILED` tidak dihitung, maksimal 2. Revisi dihitung dari kejadian `draft` di `## Riwayat Rantai` sejak reopen atau approve hop itu: `draft` pertama adalah draft, tiap `draft` berikutnya revisi; amandemen akar tidak me-reset hitungan, dan `chain.py draft` menolak revisi ketiga. Melampauinya menandakan cacat satu lapis di atas tempat putaran itu bekerja.
