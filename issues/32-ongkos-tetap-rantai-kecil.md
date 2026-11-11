@@ -22,6 +22,12 @@ rantai `PRD_BRIEF` di repo nyata dan compare `token_usage.py` sesudah 0.21.0 ter
 - Belum: rantai `PRD_BRIEF` utuh dengan plugin 0.21.0 terpasang (H3/H4/E1/E2/T1 berjalan di main loop dan butuh
   persetujuan user di gerbang dokumen) dan compare `token_usage.py`; keduanya menunggu plugin 0.21.0 dipasang.
 
+**Keputusan uji lapangan (2026-11-11, user):** branch di-push dan dibuka sebagai PR #7; user memasang 0.21.0
+sendiri. Uji lapangan menumpang tiket backend nyata berikutnya yang butuh PRD (bukan kode tiruan atau ulang #80).
+Sesudah sesi itu: cek berhenti di serah terima PRD → `/clear` → "lanjutkan" sampai `plan`, Profil S mode delta,
+`plan` tanpa dispatch untuk unit tertutup laci, dispatch lewat `.explore/prompt/`, `close_brief.py` per brief, lalu
+`token_usage.py ringkas`/`explorer` `--since <waktu 0.21.0 terpasang>` dibanding baseline Tahap 0.
+
 Test baru: `tests/backend/test_symbol_map_32.py` (S1–S2), `test_serah_terima_32.py` (H3–H4),
 `test_explorer_delta_32.py` (E1–E2, patok prosa), `test_slicing_steps_32.py` (L1), `test_close_brief_32.py` (C1),
 `test_render_prompt_32.py` (T1); `tests/test_smoke.py` mendapat `close_brief.py`, `render_prompt.py`, dan
