@@ -57,7 +57,8 @@ User meminta sinkron ulang rencana yang sudah ada ("sinkron ulang `<plan_path>`"
    - **standar**: selain itu → `trace_depth` (default 2): rantai pemanggil per layer (backend: route → middleware → service → data access/ORM → skema; frontend: page/route → komponen → hook/state → API client → DTO/type), konsumen setiap simbol yang signature atau kontraknya berubah (reverse search lintas repo), skema dan relasi DB, env yang dibutuhkan, dan test terkait.
 2. Cari nama berkas dengan pola entitas domain + peran layer (contoh: `*order*service*`, `use*Order*`); pola peran tanpa entitas hanya dipakai di direktori yang sudah sempit. Cari teks deklarasi simbol, definisi route, dan query ORM yang relevan, lalu `Read` baris pentingnya.
 3. Setiap path dan simbol yang akan masuk rencana wajib terbukti dari pencarian atau `Read` (`path:baris`). Topik tidak ditemukan → perluas direktori dan coba sinonim sekali; tetap nol → Failure path 3. Simbol muncul di lebih dari 10 modul → tanyakan modul target sebelum lanjut.
-4. Hasil telusur tidak dilaporkan tersendiri: ia menjadi bahan Fase 2, Section 2, dan Section 3. Catat celah spesifikasi yang ditemukan.
+4. Sebelum merencanakan simbol atau berkas baru, cari kemampuan serupa yang sudah ada (helper, service, validator, komponen, hook); ditemukan → rencana memakai atau memperluasnya, bukan menduplikasi. Bugfix → buktikan **akar masalah** (`path:baris` tempat perilaku salah bermula), bukan hanya titik gejalanya; akar belum terbukti → catat sebagai celah Fase 2.
+5. Hasil telusur tidak dilaporkan tersendiri: ia menjadi bahan Fase 2, Section 2, dan Section 3. Catat celah spesifikasi yang ditemukan.
 
 ### Fase 2 — Klarifikasi
 
@@ -78,15 +79,15 @@ User meminta sinkron ulang rencana yang sudah ada ("sinkron ulang `<plan_path>`"
 3. Konsumen terdampak dari Fase 1 → tambahkan langkah "sesuaikan konsumen" beserta berkasnya. `quickdev:execute` hanya boleh memperbaiki galat verifikasi di berkas Section 3, jadi konsumen yang tidak direncanakan membuat eksekusi `BLOCKED`.
 4. Tulis `<plan_dir>/<task_name>.md` (buat `plan_dir` bila belum ada):
    - Header `# Implementation Plan — <task_name>`, lalu metadata baris polos `Kunci: nilai` tepat di bawah H1 (tanpa butir/tebal): `Status: DRAFT`, `Author: quickdev:plan`, `Date: <ISO>`. Baris `Approved-At`, `Approval`, `Hash-Scope`, dan `Plan-Hash` hanya ditulis `plan_lock.py lock`. Sidik mencakup Section 1–5.
-   - `## 1. Overview & Objectives` — tujuan, masalah, keputusan Fase 2, asumsi yang dipilih user, dan out of scope, supaya spesifikasi tidak bergantung pada riwayat percakapan.
-   - `## 2. Architecture & Layer Impact` — tipe repo, tabel modul yang disentuh dengan bukti `path:baris` dan dampaknya, konsumen terdampak, dan berkas acuan konvensi yang diikuti (berkas sejenis yang sudah ada).
+   - `## 1. Overview & Objectives` — tujuan, masalah (bugfix: akar masalah berbukti `path:baris`), keputusan Fase 2, asumsi yang dipilih user, acceptance criteria bernomor `AC-<n>` yang dapat diverifikasi objektif (perilaku teramati, bukan "berjalan baik"), dan out of scope, supaya spesifikasi tidak bergantung pada riwayat percakapan. Lebih dari satu pendekatan layak → baris `Alternatif ditolak: <pendekatan> — <alasan>`; satu pendekatan → baris itu tidak ditulis.
+   - `## 2. Architecture & Layer Impact` — tipe repo, tabel modul yang disentuh dengan bukti `path:baris` dan dampaknya, konsumen terdampak, kemampuan existing yang dipakai ulang (Fase 1 butir 4), berkas acuan konvensi yang diikuti (berkas sejenis yang sudah ada), lalu daftar risiko `Kompatibilitas mundur` · `Data existing` · `Konkurensi` · `Keamanan` · `Performa`, masing-masing satu kalimat berbukti atau `-` bila tidak relevan.
    - `## 3. Atomic Implementation Steps` — langkah bernomor dengan checkbox `- [ ]`.
-   - `## 4. Verification & Testing Strategy` — tabel `| Jenis | Perintah | Cwd | Risiko |` dari Fase 0 (typecheck, lint, test, build; `TIDAK_ADA` bila tanpa runner), lalu skenario happy path dan edge case bila `require_test_plan: true`. Repo tanpa test runner: tulis `Tests: repo tanpa test runner — verifikasi: typecheck/lint/build + langkah QA manual`. Menambah framework test hanya sebagai langkah eksplisit Section 3 yang disetujui user.
+   - `## 4. Verification & Testing Strategy` — tabel `| Jenis | Perintah | Cwd | Risiko |` dari Fase 0 (typecheck, lint, test, build; `TIDAK_ADA` bila tanpa runner), lalu bila `require_test_plan: true` skenario happy path, error/validasi, batas nilai, dan edge case, masing-masing menyebut `AC-<n>` Section 1 yang dibuktikannya dan berkas test Section 3 tempatnya; setiap `AC-<n>` punya minimal satu skenario atau langkah QA manual. Repo tanpa test runner: tulis `Tests: repo tanpa test runner — verifikasi: typecheck/lint/build + langkah QA manual`. Menambah framework test hanya sebagai langkah eksplisit Section 3 yang disetujui user.
    - `## 5. Rollback & Contingency Strategy` — langkah mitigasi dan pemulihan; hanya bila `include_rollback: true`.
 
 ### Fase 4 — Presentasi Draf & Approval Gate
 
-1. Sajikan **ringkasan gerbang**, bukan isi rencana: baris `PLAN — DRAFT · <plan_dir>/<task_name>.md · <n> langkah · <n> berkas`, lalu 3–4 kalimat — pendekatan, keputusan desain kunci, perubahan skema atau dependensi baru bila ada, dan risiko terbesarnya. Sebut dalam satu frasa: `task_name` hasil turunan, asumsi yang dipilih user, dan perintah verifikasi bertanda `menyentuh DB/jaringan`. Daftar langkah dan path berkas tetap di rencana; dilarang menyalinnya ke chat. User meminta rincian → sajikan section yang diminta saja, lalu ajukan ulang butir 2.
+1. Sajikan **ringkasan gerbang**, bukan isi rencana: baris `PLAN — DRAFT · <plan_dir>/<task_name>.md · <n> langkah · <n> berkas`, lalu 3–4 kalimat — pendekatan, keputusan desain kunci, perubahan skema atau dependensi baru bila ada, dan risiko terbesarnya. Sebut dalam satu frasa: `task_name` hasil turunan, asumsi yang dipilih user, alternatif yang ditolak, dan perintah verifikasi bertanda `menyentuh DB/jaringan`. Daftar langkah dan path berkas tetap di rencana; dilarang menyalinnya ke chat. Tutup ringkasan dengan baris `Baca rencana lengkap sebelum menyetujui: <plan_dir>/<task_name>.md (<n> AC, <n> langkah)`. User meminta rincian → sajikan section yang diminta saja, lalu ajukan ulang butir 2.
 2. Minta persetujuan eksplisit lewat `AskUserQuestion`: *Setujui rencana* · *Revisi (sebut poinnya)*. Persetujuan mencakup izin menjalankan perintah Section 4; perintah bertanda `menyentuh DB/jaringan` tetap ditanyakan `quickdev:execute` sebelum dijalankan. Diam atau jawaban ambigu bukan persetujuan.
 3. Tangani respons:
    - **Revisi**: perbarui rencana, pertahankan `Status: DRAFT`, ajukan ulang. Rencana yang sudah memuat `## Execution Status`: revisi hanya Section 1–5 lewat Edit terarah; blok itu dan checkbox langkah yang teksnya tidak berubah dipertahankan, sedangkan langkah yang teksnya berubah dikembalikan ke `- [ ]` supaya `quickdev:execute` mengerjakannya ulang.
@@ -124,7 +125,7 @@ User meminta sinkron ulang rencana yang sudah ada ("sinkron ulang `<plan_path>`"
    PLAN: <plan_dir>/<task_name>.md
    STATUS: PLAN_APPROVED
    TIPE: <backend | frontend | fullstack> — skala <kecil | standar>
-   LANGKAH: <n> langkah atomik, <n> berkas target
+   LANGKAH: <n> langkah atomik, <n> berkas target, <n> AC
    LAYER: <daftar layer tersentuh>
    KLARIFIKASI: <n> pertanyaan dalam <n> batch | fast-path — asumsi: <n> | -
    RISIKO: <migrasi skema | dependensi baru | perubahan kontrak publik | ->

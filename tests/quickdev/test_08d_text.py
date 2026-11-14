@@ -124,3 +124,56 @@ def test_d8_predikat_git_baru(make_repo):
     git(empty, "add", "a.js")
     r = _sh(empty, 'git diff "$(git hash-object -t tree /dev/null)" --name-only')
     assert r.returncode == 0 and r.stdout.split() == ["a.js"]  # kasus 3: tanpa fatal
+
+
+def _section(text, start, end):
+    return text.split(start, 1)[1].split(end, 1)[0]
+
+
+@pytest.mark.regression("34 P3")
+def test_p3_telusur_menagih_kemampuan_existing_dan_akar_masalah():
+    fase1 = _section(skill("plan"), "### Fase 1", "### Fase 2")
+    assert "cari kemampuan serupa yang sudah ada" in fase1
+    assert "**akar masalah**" in fase1 and "akar belum terbukti → catat sebagai celah Fase 2" in fase1
+
+
+@pytest.mark.regression("34 P4")
+def test_p4_section1_ac_dan_alternatif():
+    fase3 = _section(skill("plan"), "### Fase 3", "### Fase 4")
+    assert "acceptance criteria bernomor `AC-<n>`" in fase3
+    assert "`Alternatif ditolak: <pendekatan> — <alasan>`" in fase3
+
+
+@pytest.mark.regression("34 P5")
+def test_p5_section2_risiko_non_fungsional():
+    fase3 = _section(skill("plan"), "### Fase 3", "### Fase 4")
+    for risiko in ("Kompatibilitas mundur", "Data existing", "Konkurensi", "Keamanan", "Performa"):
+        assert f"`{risiko}`" in fase3, risiko
+
+
+@pytest.mark.regression("34 P6")
+def test_p6_section4_skenario_dipetakan_ke_ac():
+    fase3 = _section(skill("plan"), "### Fase 3", "### Fase 4")
+    assert "happy path, error/validasi, batas nilai, dan edge case" in fase3
+    assert "setiap `AC-<n>` punya minimal satu skenario atau langkah QA manual" in fase3
+
+
+@pytest.mark.regression("34 P7")
+def test_p7_ringkasan_gerbang_menunjuk_rencana():
+    plan = skill("plan")
+    fase4 = _section(plan, "### Fase 4", "### Fase 5")
+    assert "Baca rencana lengkap sebelum menyetujui:" in fase4 and "alternatif yang ditolak" in fase4
+    assert "LANGKAH: <n> langkah atomik, <n> berkas target, <n> AC" in plan
+
+
+@pytest.mark.regression("34 E2")
+def test_e2_execute_skenario_selaras_section4():
+    assert "(happy path, error/validasi, batas nilai, edge case)" in skill("execute")
+
+
+@pytest.mark.regression("34 R2")
+def test_r2_review_menagih_ac():
+    review = skill("review")
+    fase2 = _section(review, "### Fase 2", "### Fase 3")
+    assert "acceptance criteria `AC-<n>` Section 1 bila rencana memuatnya" in fase2
+    assert "`AC-<n>` rencana tanpa skenario test atau langkah QA" in review

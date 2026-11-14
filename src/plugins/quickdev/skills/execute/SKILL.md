@@ -100,7 +100,7 @@ QD_EOF
 
 ### Fase 2 — Kelengkapan Test Suite
 
-1. Cocokkan skenario Section 4 rencana (happy path, edge case, validation error) dengan test yang ditulis pada langkah Fase 1; skenario tanpa test ditulis hanya pada berkas test yang tercantum di rencana. Skenario tanpa berkas test di rencana dicatat sebagai celah rencana di laporan, bukan dibuatkan berkas baru.
+1. Cocokkan skenario Section 4 rencana (happy path, error/validasi, batas nilai, edge case) dengan test yang ditulis pada langkah Fase 1; skenario tanpa test ditulis hanya pada berkas test yang tercantum di rencana. Skenario tanpa berkas test di rencana dicatat sebagai celah rencana di laporan, bukan dibuatkan berkas baru.
 2. Bila rencana tidak memuat skenario test (`require_test_plan: false` di `quickdev:plan`), lewati fase ini dan catat `Tests: tidak direncanakan` di laporan. Dilarang memasang framework atau dependensi test yang tidak tercantum di Section 3.
 3. Pastikan test assertions memverifikasi data contract, status code HTTP, dan exception mapping secara tepat.
 

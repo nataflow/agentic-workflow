@@ -46,7 +46,7 @@ DILARANG MELAPORKAN SATU TEMUAN PUN TANPA BUKTI PATH BERKAS DAN NOMOR BARIS NYAT
 
 ### Fase 2 — Rekonstruksi Kontrak Pembanding
 
-1. Baca `plan_path` dan ekstrak kontrak yang mengikat: daftar langkah atomik, path berkas target yang direncanakan, strategi verifikasi, dan definisi selesai per langkah. Kontrak = isi `plan_path` yang lolos `verify` (sidik = yang disetujui user; kutipan persetujuan di baris `Approval:`). Temuan putaran sebelumnya ada di baris `Findings-<n>` blok `## Execution Status`.
+1. Baca `plan_path` dan ekstrak kontrak yang mengikat: daftar langkah atomik, path berkas target yang direncanakan, strategi verifikasi, definisi selesai per langkah, dan acceptance criteria `AC-<n>` Section 1 bila rencana memuatnya (rencana format lama tanpa `AC-<n>` dinilai tanpanya). Kontrak = isi `plan_path` yang lolos `verify` (sidik = yang disetujui user; kutipan persetujuan di baris `Approval:`). Temuan putaran sebelumnya ada di baris `Findings-<n>` blok `## Execution Status`.
 2. Rekonstruksi konvensi yang mengikat dari kode, bukan dari ingatan: berkas acuan konvensi dan tabel modul Section 2 rencana, ditambah berkas sejenis yang sudah ada di direktori yang sama dengan berkas berubah (struktur layer, penamaan berkas dan simbol, pola error handling, lokasi test). Setiap konvensi yang dipakai menilai wajib punya satu bukti `path:baris` di luar diff.
 3. Susun dua himpunan pembanding secara eksplisit: himpunan berkas yang direncanakan (dari `plan_path`) dan himpunan berkas yang benar-benar berubah (dari Fase 1).
 4. Hitung selisih dua arah: berkas berubah tetapi tidak direncanakan (indikasi scope creep) dan berkas direncanakan tetapi tidak berubah (indikasi langkah terlewat).
@@ -61,7 +61,7 @@ Nilai seluruh berkas dalam cakupan terhadap tujuh dimensi berikut secara berurut
 3. **Konvensi Repo & Layer** — pelanggaran batas layer arsitektur, penamaan simbol menyimpang, dan penempatan berkas di direktori yang salah dibanding konvensi Fase 2 butir 2; temuan wajib mengutip bukti pembanding `path:baris` di luar diff.
 4. **Keamanan** — kredensial atau token terhardcode, input eksternal tanpa validasi, konkatenasi kueri berpotensi injeksi, data sensitif tercetak di log, dan pemeriksaan otorisasi yang hilang.
 5. **Error Handling** — blok catch kosong, error tertelan tanpa propagasi, pesan error tanpa konteks aktionable, dan jalur kegagalan yang tidak memiliki penanganan sama sekali.
-6. **Kualitas Test** — perubahan perilaku tanpa test pendamping, assertion yang selalu bernilai benar, test bergantung pada state global, dan penghapusan test tanpa penggantian setara.
+6. **Kualitas Test** — perubahan perilaku tanpa test pendamping, `AC-<n>` rencana tanpa skenario test atau langkah QA yang membuktikannya, assertion yang selalu bernilai benar, test bergantung pada state global, dan penghapusan test tanpa penggantian setara.
 7. **Regresi Cakupan** — pemanggil simbol yang diubah tetapi tidak ikut disesuaikan, perubahan signature publik yang memutus kontrak konsumen, dan penghapusan kode yang masih dirujuk modul lain.
 
 Untuk dimensi 7, telusuri pemanggil setiap simbol yang diubah menggunakan pencarian teks pada repositori; dilarang menyimpulkan aman tanpa hasil pencarian nyata.

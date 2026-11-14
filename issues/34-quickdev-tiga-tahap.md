@@ -1,4 +1,4 @@
-# Langkah 34 — `quickdev`: tiga tahap plan → execute → review, tanpa profil (P1–P2, L1–L3, E1, R1, D1)
+# Langkah 34 — `quickdev`: tiga tahap plan → execute → review, tanpa profil (P1–P7, L1–L3, E1–E2, R1–R2, D1)
 
 Sumber: permintaan user 2026-11-14 — quickdev untuk repo kecil yang masih awal development, supaya tidak overkill:
 skill `profile` dihapus, `explore` dan `clarify` digabung ke fase planning, tersisa `plan → execute → review`.
@@ -8,6 +8,12 @@ Basis kode: commit `325fba9` (quickdev 0.11.1).
 terpasang; versi quickdev 0.12.0 (commit rilis terpisah). Test regresi baru bertanda `34 L1`–`L3`, `34 P1`–`P2`, `34 E1`, `34 D1` di
 `tests/quickdev/`; entri `--repo-profile` dihapus dari `CASES` `tests/test_smoke.py`. Suite penuh 2946 lulus,
 `lint_plugins.py --base origin/main` 0 FAIL/0 WARN, `claude plugin validate .` lulus.
+
+**Susulan (2026-11-14):** P3–P7, E2, dan R2 dari perbandingan `plan` dengan prompt generik "Pre-Execution
+Review": prompt itu lebih kaya daftar periksa analisis (akar masalah, alternatif, kemampuan existing, risiko
+non-fungsional, skenario error/batas, acceptance criteria), sedangkan `plan` lebih kokoh secara proses (segel,
+bukti `path:baris`, klarifikasi berbatas). Daftar periksa itu diserap tanpa fase baru; judul section, `plan_lock.py`,
+dan versi (0.12.0 belum dirilis) tidak berubah. Test regresi bertanda `34 P3`–`P7`, `34 E2`, `34 R2`.
 
 ## Temuan dasar
 
@@ -87,15 +93,49 @@ sekitar yang diubah, dengan bukti `file:baris` pembanding.
 README, `flow/quickdev.md`, `CLAUDE.md`, description `plugin.json`/`marketplace.json` (sama, M4),
 `MIGRATION_v0.11.x_to_v0.12.0.md`. Versi quickdev 0.12.0.
 
+### P3 — Kemampuan existing dan akar masalah (Fase 1 butir 4)
+
+Sebelum merencanakan simbol baru, cari kemampuan serupa dan pakai ulang. Bugfix wajib membuktikan akar masalah
+`path:baris`, bukan titik gejala; belum terbukti → celah Fase 2.
+
+### P4 — Section 1: acceptance criteria dan alternatif
+
+`AC-<n>` bernomor yang dapat diverifikasi objektif. `Alternatif ditolak: <pendekatan> — <alasan>` hanya bila ada lebih
+dari satu pendekatan layak.
+
+### P5 — Section 2: risiko non-fungsional
+
+Kemampuan existing yang dipakai ulang, lalu risiko `Kompatibilitas mundur` · `Data existing` · `Konkurensi` ·
+`Keamanan` · `Performa`, satu kalimat berbukti atau `-`.
+
+### P6 — Section 4: skenario dipetakan ke AC
+
+Skenario happy path, error/validasi, batas nilai, edge case; tiap skenario menyebut `AC-<n>` dan berkas test Section 3;
+tiap `AC-<n>` punya minimal satu skenario atau langkah QA manual.
+
+### P7 — Ringkasan gerbang menunjuk rencana
+
+Ringkasan Fase 4 menyebut alternatif yang ditolak dan ditutup baris `Baca rencana lengkap sebelum menyetujui: …`,
+supaya approval tidak diberikan atas ringkasan saja. Ringkasan akhir `LANGKAH:` memuat jumlah AC.
+
+### E2 — `execute` Fase 2
+
+Daftar skenario yang dicocokkan selaras P6.
+
+### R2 — `review` menagih AC
+
+Fase 2 memasukkan `AC-<n>` ke kontrak pembanding (rencana tanpa `AC-<n>` dinilai tanpanya); dimensi 6 menagih
+`AC-<n>` tanpa skenario test atau langkah QA.
+
 ## Peta blast radius
 
 | Berkas | Perubahan |
 |---|---|
 | `src/plugins/quickdev/skills/profile/`, `skills/explore/`, `skills/clarify/` | dihapus |
-| `src/plugins/quickdev/skills/plan/SKILL.md` | ditulis ulang (P1, P2) |
+| `src/plugins/quickdev/skills/plan/SKILL.md` | ditulis ulang (P1, P2); susulan P3–P7 |
 | `src/plugins/quickdev/skills/plan/references/nataflow-sync.md` | varian profil dihapus |
-| `src/plugins/quickdev/skills/execute/SKILL.md` | E1 |
-| `src/plugins/quickdev/skills/review/SKILL.md` | R1 |
+| `src/plugins/quickdev/skills/execute/SKILL.md` | E1, E2 |
+| `src/plugins/quickdev/skills/review/SKILL.md` | R1, R2 |
 | `src/plugins/quickdev/skills/_common/plan_lock.py` | L1–L3 |
 | `src/plugins/quickdev/README.md`, `MIGRATION_v0.11.x_to_v0.12.0.md`, `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` | D1 |
 | `flow/quickdev.md`, `CLAUDE.md` | D1 |
