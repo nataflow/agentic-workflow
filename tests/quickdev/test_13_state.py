@@ -221,43 +221,30 @@ def test_q6_baseline_ditolak_sesudah_mutasi_atau_head_bergeser(repo, pl):
     assert r.returncode == 1 and "Base-Commit" in r.stdout
 
 
-# --- 25 R9: baseline profil di tree kotor bukan pembanding -------------------------------------
+# --- 34 L2: profil bukan lagi pembanding maupun artefak gate bawaan -------------------------------
 
-def _profil(repo, line):
-    (repo / "repo-profile.md").write_text(f"# profil\n\n## 5. Baseline\n\n{line}\n\n| Jenis | Perintah |\n",
+@pytest.mark.regression("34 L2")
+def test_l2_mode_awal_tidak_membaca_profil(repo, pl):
+    head = git(repo, "rev-parse", "HEAD").strip()
+    # Profil 0.11 yang dulu menjadi pembanding (`PEMBANDING: profil @…`) kini diabaikan.
+    (repo / "repo-profile.md").write_text(f"# profil\n\nBaseline-Commit: `{head}` — tree bersih: `ya`\n",
                                           encoding="utf-8")
-    commit(repo, "docs: profil", "repo-profile.md")
-    return git(repo, "rev-parse", "HEAD").strip()
-
-
-@pytest.mark.regression("25 R9")
-def test_r9_baseline_profil_di_commit_lain_diukur_ulang(repo, pl):
-    head = git(repo, "rev-parse", "HEAD").strip()
-    _profil(repo, f"Baseline-Commit: `{head}` — tree bersih: `ya`")
-    # Profil di-commit sesudah diukur; baseline-nya diukur di commit sebelumnya → beda dari Base-Commit.
     pl("lock", "--answer", "ok")
     out = pl("start").stdout
-    assert "mode=awal" in out and "PEMBANDING: baseline segar" in out and "≠ Base-Commit" in out
+    assert "mode=awal" in out and "PEMBANDING" not in out and "profil" not in out, out
 
 
-@pytest.mark.regression("25 R9")
-@pytest.mark.parametrize("tail, want", [
-    ("— tree bersih: `ya`", "PEMBANDING: profil @"),
-    ("— tree bersih: `tidak: src/a.ts`", "PEMBANDING: baseline segar — baseline profil diukur di tree kotor"),
-    ("", "PEMBANDING: baseline segar — profil tidak mencatat `tree bersih`"),
-])
-def test_r9_pembanding_mode_awal(repo, pl, tail, want):
-    # Baseline-Commit = HEAD sesudah profil di-commit tidak mungkin; tulis profil tanpa commit (dikecualikan dari
-    # predikat tree bersih karena berkas profil adalah artefak gate) dengan sha HEAD sekarang.
-    head = git(repo, "rev-parse", "HEAD").strip()
-    (repo / "repo-profile.md").write_text(f"# profil\n\nBaseline-Commit: `{head}` {tail}\n", encoding="utf-8")
+@pytest.mark.regression("34 L2")
+def test_l2_rencana_tanpa_profile_tidak_mengecualikan_repo_profile(repo, pl):
+    edit(repo, "Profile: repo-profile.md\n", "")
+    (repo / "repo-profile.md").write_text("# profil diubah\n", encoding="utf-8")
     pl("lock", "--answer", "ok")
-    out = pl("start").stdout
-    assert "mode=awal" in out and want in out, out
+    r = pl("start")
+    assert r.returncode == 1 and "START FAIL" in r.stdout and "repo-profile.md" in r.stdout
 
 
-@pytest.mark.regression("25 R9")
-def test_r9_profil_tanpa_baseline_commit(repo, pl):
+@pytest.mark.regression("34 L2")
+def test_l2_rencana_lama_ber_profile_tetap_dikecualikan(repo, pl):
+    (repo / "repo-profile.md").write_text("# profil diubah\n", encoding="utf-8")
     pl("lock", "--answer", "ok")
-    out = pl("start").stdout
-    assert "PEMBANDING: baseline segar — profil tanpa baris `Baseline-Commit`" in out, out
+    assert "mode=awal" in pl("start").stdout

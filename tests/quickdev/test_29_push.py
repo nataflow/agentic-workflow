@@ -66,11 +66,11 @@ def test_task_kembar_berlabel_workdir_key(repo, fake):
     assert code == 1 and out["segment"].startswith("GAGAL: 2 task ber-workdir_key sama") and f.writes() == []
 
 
-def test_profil_ke_workspace(repo, fake):
-    f, nf = fake
-    code, out = push(repo, "--repo-profile", "repo-profile.md")
-    assert code == 0 and out["segment"] == "repo · 1 dokumen (1 baru, 0 diperbarui, 0 sama)"
-    assert nf.docs[0]["reference_table"] == "workspace" and nf.docs[0]["reference_id"] == WS
+@pytest.mark.regression("34 L3")
+def test_push_profil_dihapus(repo, fake):
+    f, _ = fake
+    r = run_script(PL, "sync-payload", "--repo-profile", "repo-profile.md", "--push", "--json", cwd=repo)
+    assert r.returncode == 2 and f.writes() == []
 
 
 def test_tanpa_config_dilewati(make_repo):

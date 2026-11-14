@@ -15,8 +15,9 @@ def _frontmatter(path):
     return dict(line.split(": ", 1) for line in block.splitlines() if ": " in line and not line.startswith(" "))
 
 
-def test_six_skills_present():
-    assert IDS == ["clarify", "execute", "explore", "plan", "profile", "review"]
+@pytest.mark.regression("34 D1")
+def test_three_skills_present():
+    assert IDS == ["execute", "plan", "review"]
 
 
 @pytest.mark.parametrize("path", SKILLS, ids=IDS)
@@ -43,20 +44,24 @@ def test_koeksistensi_section_present(path):
 
 @pytest.mark.parametrize("path", SKILLS, ids=IDS)
 def test_disable_model_invocation(path):
-    """K7: keenam skill quickdev hanya dipanggil eksplisit lewat /quickdev:<skill>."""
+    """K7: ketiga skill quickdev hanya dipanggil eksplisit lewat /quickdev:<skill>."""
     assert _frontmatter(path).get("disable-model-invocation") == "true"
 
 
-def test_profile_baseline_needs_permission_and_timeout():
-    """L3.5 — baseline quickdev:profile dijalankan hanya sesudah izin, bertimeout, tanpa migrasi."""
-    root = PLUGINS / "quickdev" / "skills" / "profile"
-    text = (root / "SKILL.md").read_text(encoding="utf-8")
-    fase2 = text.split("### Fase 2", 1)[1].split("\n### ", 1)[0]
-    assert "AskUserQuestion" in fase2 and "TIMEOUT" in fase2 and "timeout" in fase2
-    assert fase2.index("AskUserQuestion") < fase2.index("3. Jalankan perintah yang disetujui")
-    assert "git status --porcelain" in fase2
-    assert "`TIMEOUT`" in text.split("## Output", 1)[1]
-    tpl = (root / "references" / "backend-profile-template.md").read_text(encoding="utf-8")
-    for line in tpl.splitlines():
-        if re.search(r"migrate (dev|deploy)|upgrade head", line):
-            assert "Migration Apply Command" in line, line
+@pytest.mark.regression("34 E1")
+def test_execute_baseline_needs_permission_and_timeout():
+    """L3.5/34 E1 — baseline dipindah ke execute: perintah berisiko ditanya dulu, bertimeout, tanpa migrasi."""
+    text = (PLUGINS / "quickdev" / "skills" / "execute" / "SKILL.md").read_text(encoding="utf-8")
+    fase0 = text.split("### Fase 0", 1)[1].split("\n### ", 1)[0]
+    butir6 = fase0.split("6. Mode `awal`", 1)[1]
+    assert "AskUserQuestion" in butir6 and "menyentuh DB/jaringan" in butir6
+    assert butir6.index("AskUserQuestion") < butir6.index("plan_lock.py baseline")
+    fase3 = text.split("### Fase 3", 1)[1].split("\n### ", 1)[0]
+    assert "300000" in fase3 and "TIMEOUT" in fase3 and "pengubah skema/data tidak pernah dijalankan" in fase3
+
+
+@pytest.mark.regression("34 P2")
+def test_plan_tidak_menjalankan_perintah():
+    text = (PLUGINS / "quickdev" / "skills" / "plan" / "SKILL.md").read_text(encoding="utf-8")
+    assert "MUST NOT menjalankan perintah verifikasi, build, test, atau migrasi di skill ini" in text
+    assert "| Jenis | Perintah | Cwd | Risiko |" in text

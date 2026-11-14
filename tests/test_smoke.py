@@ -140,8 +140,6 @@ CASES = [
     ("quickdev/skills/_common/plan_lock.py", ["sync-payload", "--plan", "plan/smoke.md", "--json"], True, None),
     ("quickdev/skills/_common/plan_lock.py", ["sync-payload", "--plan", "plan/smoke.md", "--push", "--json"], True,
      None),
-    ("quickdev/skills/_common/plan_lock.py", ["sync-payload", "--repo-profile", "repo-profile.md", "--json"], True,
-     None),
 ]
 
 STATES = ["commit", "tanpa-commit", "detached", "bukan-git", "rusak"]
@@ -155,7 +153,7 @@ CORRUPT = [f"{td}/{doc}" for td in (BE_TD, FE_TD) for doc in
     f"{FE_TD}/FLOW.md", f"{FE_TD}/UI.md", f"{FE_TD}/CONTRACT.md", f"{AN_TD}/TICKET.md", f"{AN_NT}/NOTULEN.md", "analyst/nataflow.json",
     f"{PR_TD}/CHARTER.md",
     ".claude/nataflow.json",
-    "frontenddev/reviews/2609250000-smoke.md", "plan/smoke.md", "repo-profile.md",
+    "frontenddev/reviews/2609250000-smoke.md", "plan/smoke.md",
     ".claude/profile/backenddev/index.json", ".claude/profile/backenddev/commands.md",
     ".claude/profile/frontenddev/index.json", ".claude/profile/frontenddev/commands.md",
     "go.mod", "package.json", "Cargo.toml", "build.gradle", ".claude/workflow",

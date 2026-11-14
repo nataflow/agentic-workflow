@@ -149,15 +149,10 @@ def test_commit_terisi_bila_rencana_ter_commit(repo):
     assert json.loads(doc["metadata"])["commit"].startswith(sha)
 
 
-@pytest.mark.regression("15 Q11")
-def test_profil_ke_workspace(repo):
-    code, out = payload(repo, "--repo-profile", "repo-profile.md")
-    assert code == 0 and out["workspace_id"] == WS
-    assert out["list_document"]["reference_table"] == "workspace"
-    assert json.loads(out["list_document"]["metadata"]) == {"source": "quickdev", "repo": "tim/app"}
-    (doc,) = payload(repo, "--repo-profile", "repo-profile.md", "--remote", "-", stdin="[]")[1]["documents"]
-    assert (doc["reference_table"], doc["key"], doc["type"]) == ("workspace", "tim/app/repo-profile.md", "profile")
-    assert doc["content"] == "# profil\n"
+@pytest.mark.regression("34 L3")
+def test_sinkron_profil_dihapus(repo):
+    r = run_script(PL, "sync-payload", "--repo-profile", "repo-profile.md", "--json", cwd=repo)
+    assert r.returncode == 2 and "--plan" in r.stderr
 
 
 def test_remote_rusak_dan_path_di_luar_root(repo, tmp_path):

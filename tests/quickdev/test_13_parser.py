@@ -5,7 +5,7 @@ import stat
 
 import pytest
 
-from conftest import PLUGINS, commit, run_script
+from conftest import PLUGINS, commit, load_module, run_script
 
 PL = PLUGINS / "quickdev" / "skills" / "_common" / "plan_lock.py"
 PLAN = """# Implementation Plan — t
@@ -179,23 +179,50 @@ def test_q10_kunci_baru_disisip_di_dalam_seksi_blok(repo, pl):
     assert "- Verification:" in block and "- Verification:" not in catatan
 
 
-def test_q10_profile_berkarakter_kontrol_ditolak(repo, pl):
-    r = pl("lock", "--answer", "ok", "--profile", "a.md\nStatus: APPROVED")
-    assert r.returncode == 1 and "Status: DRAFT" in text(repo)
+@pytest.mark.regression("34 L1")
+def test_l1_lock_menolak_argumen_profile(repo, pl):
+    r = pl("lock", "--answer", "ok", "--profile", "repo-profile.md")
+    assert r.returncode != 0 and "Status: DRAFT" in text(repo)
 
 
-# --- Q11: `Profile:` di dalam sidik ----------------------------------------------------------
+@pytest.mark.regression("34 L1")
+def test_l1_lock_baru_tidak_menyidik_profile(repo, pl):
+    pl("lock", "--answer", "ok")
+    assert "Hash-Scope: body" in text(repo)
+    edit(repo, "Profile: repo-profile.md", "Profile: apps/lain/repo-profile.md")
+    assert pl("verify").returncode == 0
+    edit(repo, "Hash-Scope: body\n", "")             # rumus sama dengan 0.4.0: penanda hilang tidak mengubah sidik
+    assert pl("verify").returncode == 0
+    edit(repo, "Tambah validasi kuota.", "Tambah validasi kuota dan audit.")
+    assert pl("verify").returncode == 1
+
+
+# --- Q11: `Profile:` di dalam sidik rencana 0.5–0.11 (`Hash-Scope: profile+body`) -----------------
+
+def lock_v2(repo):
+    """Kunci seperti `plan_lock.py` 0.11: sidik Section 1–5 + baris `Profile:` (13 Q11)."""
+    mod = load_module(PL, "plan_lock_q11")
+    edit(repo, "Status: DRAFT", "Status: APPROVED\nHash-Scope: profile+body")
+    digest = mod.Plan(repo / "plan" / "t.md").digest(mod.SCOPE_V2)
+    edit(repo, "Hash-Scope: profile+body", f"Hash-Scope: profile+body\nPlan-Hash: {digest}")
+
+
+@pytest.mark.regression("34 L1")
+def test_q11_rencana_011_tetap_lolos_verify(repo, pl):
+    lock_v2(repo)
+    assert pl("verify").returncode == 0
+    assert status(pl)["hash_scope"] == "profile+body"
+
 
 def test_q11_profile_diganti_sesudah_lock_terdeteksi(repo, pl):
-    pl("lock", "--answer", "ok")
-    assert "Hash-Scope: profile+body" in text(repo)
+    lock_v2(repo)
     edit(repo, "Profile: repo-profile.md", "Profile: apps/lain/repo-profile.md")
     r = pl("verify")
     assert r.returncode == 1 and "berubah sesudah APPROVED" in r.stdout
 
 
 def test_q11_penanda_scope_dihapus_terdeteksi(repo, pl):
-    pl("lock", "--answer", "ok")
+    lock_v2(repo)
     edit(repo, "Hash-Scope: profile+body\n", "")
     assert pl("verify").returncode == 1
 
@@ -209,7 +236,7 @@ def test_q11_rencana_lama_tanpa_scope_tidak_menilai_profile(repo, pl):
 
 def test_q11_scope_asing_ditolak(repo, pl):
     pl("lock", "--answer", "ok")
-    edit(repo, "Hash-Scope: profile+body", "Hash-Scope: semua")
+    edit(repo, "Hash-Scope: body", "Hash-Scope: semua")
     r = pl("verify")
     assert r.returncode == 1 and "Hash-Scope" in r.stdout
 

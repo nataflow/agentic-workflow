@@ -146,8 +146,9 @@ def test_e5_lock_tanpa_profile_mempertahankan_metadata(repo, pl):
     assert json.loads(pl("status", "--json").stdout)["profile"] == "apps/web/repo-profile.md"
 
 
-def test_e5_lock_tanpa_profile_dan_metadata_memakai_default(make_repo):
+@pytest.mark.regression("34 L1")
+def test_e5_lock_tanpa_profile_tidak_mengarang_default(make_repo):
     root = make_repo({"plan/t.md": PLAN})
     run_script(PL, "lock", "--answer", "ok", "--plan", "plan/t.md", cwd=root)
     st = json.loads(run_script(PL, "status", "--json", "--plan", "plan/t.md", cwd=root).stdout)
-    assert st["profile"] == "repo-profile.md"
+    assert st["profile"] == "-"

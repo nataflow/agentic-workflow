@@ -1,30 +1,29 @@
 #!/usr/bin/env python3
 """Kunci rencana quickdev: sidik Section 1–5, blok `## Execution Status`, dan commit dasar.
 
-- `lock`    DRAFT → APPROVED: tulis `Approved-At`, `Approval`, `Plan-Hash`, `Profile`.
+- `lock`    DRAFT → APPROVED: tulis `Approved-At`, `Approval`, `Plan-Hash`, `Hash-Scope: body`.
 - `verify`  APPROVED dan sidik Section 1–5 sekarang = `Plan-Hash` (checkbox dinormalkan).
 - `start`   vonis mode eksekusi (awal | resume | remediasi | manual | selesai); tulis blok
             `## Execution Status` (IN_PROGRESS + Base-Commit) bila belum ada. Mode `awal` menolak tree
-            kotor di luar direktori rencana dan profil **sebelum** menulis (13 Q1). Blok terminal dengan
+            kotor di luar direktori rencana **sebelum** menulis (13 Q1). Blok terminal dengan
             langkah `[ ]` tersisa (rencana direvisi) atau segel basi (13 Q9/Q14) → `resume`; ronde
             remediasi yang masih `OPEN` → `remediasi` lanjutan (13 Q3).
 - `baseline` kunci ringkasan baseline segar (`Baseline`, `Baseline-Commit`); sah hanya di HEAD = Base-Commit
-            dengan tree bersih, yaitu sebelum mutasi pertama (13 Q6). `start` mode `awal` mencetak `PEMBANDING:`:
-            profil hanya bila `Baseline-Commit`-nya = Base-Commit dan `tree bersih: ya` (25 R9).
+            dengan tree bersih, yaitu sebelum mutasi pertama (13 Q6). Satu-satunya pembanding regresi (34 L2).
 - `close`   tulis status terminal execute ke blok (COMPLETED | BLOCKED | VERIFICATION_MANUAL_REQUIRED);
             dari IN_PROGRESS, atau BLOCKED dari VERIFICATION_MANUAL_REQUIRED (verifikasi manual gagal).
             COMPLETED/VERIFICATION_MANUAL_REQUIRED menyegel `Verified-Hash` (= Plan-Hash) dan `Tree-Hash`.
 - `confirm` VERIFICATION_MANUAL_REQUIRED → COMPLETED (manual) dengan jawaban user apa adanya; segel basi → FAIL.
 - `status`  ringkasan untuk execute/review (`--json`); `consistent` menilai blok terhadap checklist dan segel.
 - `unlock`  APPROVED → DRAFT untuk revisi atas permintaan user; blok eksekusi dipertahankan.
-- `sync-payload` sinkron nataflow untuk rencana yang pernah dikunci (`--plan`) atau profil (`--repo-profile`);
-            tanpa menulis berkas. `--push` memanggil server langsung (MCP key `.claude/nataflow.local.json`) dan
+- `sync-payload` sinkron nataflow untuk rencana yang pernah dikunci (`--plan`); tanpa menulis berkas. `--push` memanggil server langsung (MCP key `.claude/nataflow.local.json`) dan
             mencetak satu baris segmen (29 S4). Config `.claude/nataflow.json` absen → SKIP sebelum rencana dibaca.
 
 Metadata rencana adalah baris polos `Kunci: nilai` di antara H1 dan `## 1.`. Sidik mencakup
 `## 1.` sampai sebelum `## Execution Status`: CRLF → LF, spasi ujung baris dibuang, `- [x]` dihitung
-sebagai `- [ ]`. Checkbox dan blok penutup boleh berubah; teks Section 1–5 tidak. Rencana yang dikunci
-dengan `Hash-Scope: profile+body` juga menyidik baris `Profile:` (13 Q11); tanpa penanda = rumus lama.
+sebagai `- [ ]`. Checkbox dan blok penutup boleh berubah; teks Section 1–5 tidak. `Hash-Scope: body` (0.12,
+34 L1) dan rencana tanpa penanda (0.4.0) menyidik Section 1–5 saja; rencana 0.5–0.11 ber-`Hash-Scope:
+profile+body` juga menyidik baris `Profile:` (13 Q11) dan tetap diverifikasi dengan rumus itu.
 Heading, langkah, dan blok di dalam code fence diabaikan (13 Q7).
 
 Teks bebas (`--answer`, `--reason`, `--verification`, `--findings-text`, `--summary`) bernilai `-` dibaca dari stdin,
@@ -56,7 +55,9 @@ ITEM = re.compile(r"^- ([A-Z][A-Za-z0-9-]+): ?(.*)$")
 FENCE = re.compile(r"^\s*(`{3,}|~{3,})(.*)$")
 META_KEYS = ("Status", "Author", "Date", "Profile", "Gates", "Approved-At", "Approval", "Plan-Hash",
              "Hash-Scope", "Unlock-Reason")
-SCOPE_V2 = "profile+body"
+SCOPE_V2 = "profile+body"           # 0.5–0.11: rencana lama yang masih berjalan
+SCOPE_BODY = "body"                 # 0.12: Section 1–5 saja, sama dengan rumus 0.4.0 tanpa penanda (34 L1)
+SCOPES = (SCOPE_V2, SCOPE_BODY)
 TEXT_ARGS = ("answer", "reason", "verification", "findings_text", "summary")
 DONE_STATES = ("COMPLETED", "VERIFICATION_MANUAL_REQUIRED")      # close yang menyegel verifikasi
 MANUAL = "VERIFICATION_MANUAL_REQUIRED"
@@ -243,37 +244,9 @@ def repo_top(p: "Plan") -> Optional[Path]:
     return Path(top) if top else None
 
 
-_BASELINE_LINE = re.compile(r"^Baseline-Commit:\s*`?(?P<sha>[0-9a-f]{7,40}|none)`?(?P<rest>.*)$", re.M)
-
-
-def profile_comparator(p: "Plan", top: Path, base: str) -> str:
-    """Pembanding baseline mode `awal` dari baris `Baseline-Commit` Section 5 profil (25 R9).
-
-    Profil adalah pembanding hanya bila diukur di `Base-Commit` **dan** di tree bersih: baseline tree kotor tidak
-    mewakili commit mana pun, jadi galat di berkas yang dulu kotor tidak boleh terbaca sebagai bawaan.
-    """
-    prof = top / posixpath.normpath(p.meta().get("Profile") or "repo-profile.md")
-    try:
-        text = prof.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
-        return f"baseline segar — profil `{prof.name}` tak terbaca"
-    m = _BASELINE_LINE.search(text)
-    if not m:
-        return "baseline segar — profil tanpa baris `Baseline-Commit`"
-    sha, rest = m.group("sha"), m.group("rest")
-    same = sha == base if "none" in (sha, base) else base.startswith(sha) or sha.startswith(base)
-    if not same:
-        return f"baseline segar — `Baseline-Commit` profil {sha[:12]} ≠ Base-Commit {base[:12]}"
-    clean = re.search(r"tree bersih:\s*`?\s*(ya|tidak)", rest)
-    if not clean:
-        return "baseline segar — profil tidak mencatat `tree bersih` (format lama)"
-    if clean.group(1) != "ya":
-        return "baseline segar — baseline profil diukur di tree kotor"
-    return f"profil @{sha[:12]}"
-
-
 def gate_paths(p: "Plan", top: Path) -> list:
-    """Artefak gate relatif root repo: direktori rencana (berkas rencana bila di root) dan `Profile:`."""
+    """Artefak gate relatif root repo: direktori rencana (berkas rencana bila di root), ditambah `Profile:` hanya
+    bila rencana lama (≤ 0.11) masih mencatatnya — tanpa default `repo-profile.md` (34 L2)."""
     out = []
     try:
         rel = p.path.resolve().relative_to(top.resolve()).as_posix()
@@ -281,8 +254,9 @@ def gate_paths(p: "Plan", top: Path) -> list:
         rel = ""
     if rel:
         out.append(posixpath.dirname(rel) or rel)
-    prof = posixpath.normpath(p.meta().get("Profile") or "repo-profile.md")
-    if not prof.startswith("..") and not posixpath.isabs(prof):
+    raw = (p.meta().get("Profile") or "").strip()
+    prof = posixpath.normpath(raw) if raw and raw != "-" else ""
+    if prof and not prof.startswith("..") and not posixpath.isabs(prof):
         out.append(prof)
     return out
 
@@ -391,7 +365,8 @@ def inconsistency(p: "Plan") -> str:
 
 
 def plan_digest(p: "Plan") -> str:
-    """Sidik sesuai `Hash-Scope` rencana: tanpa penanda = rumus 0.4.0 (Section 1–5 saja)."""
+    """Sidik sesuai `Hash-Scope` rencana: `body` atau tanpa penanda = Section 1–5 saja; `profile+body` = ditambah
+    baris `Profile:` (rencana 0.5–0.11)."""
     return p.digest(p.meta().get("Hash-Scope", ""))
 
 
@@ -405,15 +380,13 @@ def cmd_lock(p: Plan, a) -> int:
         return fail(f"LOCK FAIL: {problem}")
     if not p.steps():
         return fail("LOCK FAIL: Section 3 tanpa langkah checkbox `- [ ]`")
-    # `--profile` absen → pertahankan `Profile:` yang ditulis plan Fase 2, bukan menimpanya dengan default.
-    profile = (a.profile or p.meta().get("Profile") or "repo-profile.md").strip()
-    if re.search(r"[\x00-\x1f\x7f]", profile):
-        return fail("LOCK FAIL: `--profile` memuat baris baru atau karakter kontrol")
-    # Profil dan penanda scope ditulis lebih dulu karena ikut disidik (13 Q11).
-    p.set_meta(Profile=profile, Hash_Scope=SCOPE_V2)
-    p.set_meta(Status="APPROVED", Approved_At=now(), Approval=quote(a.answer), Plan_Hash=p.digest(SCOPE_V2))
+    # Rencana baru tidak lagi mengikat profil (34 L1); `Profile:` rencana lama yang dikunci ulang dibiarkan
+    # sebagai catatan (pengecualian tree kotor), tetapi tidak lagi ikut disidik.
+    digest = p.digest(SCOPE_BODY)
+    p.set_meta(Status="APPROVED", Approved_At=now(), Approval=quote(a.answer), Hash_Scope=SCOPE_BODY,
+               Plan_Hash=digest)
     p.save()
-    print(f"LOCK PASS: {p.path} APPROVED @{p.digest(SCOPE_V2)[7:19]}")
+    print(f"LOCK PASS: {p.path} APPROVED @{digest[7:19]}")
     return 0
 
 
@@ -427,12 +400,12 @@ def cmd_verify(p: Plan, a) -> int:
     if not m.get("Plan-Hash", "").startswith("sha256:"):
         return fail("VERIFY FAIL: rencana APPROVED tanpa `Plan-Hash` (format lama atau ditulis tangan) — "
                     "`unlock` lalu minta user menyetujui ulang di quickdev:plan (`lock`)")
-    if m.get("Hash-Scope", SCOPE_V2) != SCOPE_V2:
+    if m.get("Hash-Scope", SCOPE_BODY) not in SCOPES:
         return fail(f"VERIFY FAIL: `Hash-Scope: {m['Hash-Scope']}` tidak dikenal — disunting tangan; `unlock` "
                     f"lalu approval ulang di quickdev:plan")
     now_hash = plan_digest(p)
     if m["Plan-Hash"] != now_hash:
-        what = "Section 1–5 atau `Profile:`" if m.get("Hash-Scope") else "Section 1–5"
+        what = "Section 1–5 atau `Profile:`" if m.get("Hash-Scope") == SCOPE_V2 else "Section 1–5"
         return fail(f"VERIFY FAIL: {what} berubah sesudah APPROVED (tercatat {m['Plan-Hash'][7:19]}, "
                     f"sekarang {now_hash[7:19]}) — pulihkan teksnya, atau `unlock` lalu approval ulang di quickdev:plan")
     print(f"VERIFY PASS: {p.path} @{now_hash[7:19]}")
@@ -491,7 +464,7 @@ def cmd_start(p: Plan, a) -> int:
             return fail(f"START FAIL: {err} — tree yang tak terbaca tidak pernah bersih")
         if dirty:
             more = f" … (+{len(dirty) - 10})" if len(dirty) > 10 else ""
-            return fail(f"START FAIL: mode awal menuntut tree bersih di luar direktori rencana dan profil — "
+            return fail(f"START FAIL: mode awal menuntut tree bersih di luar direktori rencana — "
                         f"minta user meng-commit atau men-stash dulu: {', '.join(dirty[:10])}{more}")
         mode = "awal"
         p.set_block(Status="IN_PROGRESS", Base_Commit=head_commit(top), Remediation_Round="0", Timestamp=now())
@@ -509,8 +482,6 @@ def cmd_start(p: Plan, a) -> int:
         print(f"INFO: HEAD maju {ahead} commit sejak Base-Commit — review menilainya sebagai bagian tugas")
     if b.get("Baseline"):
         print(f"BASELINE: {b['Baseline']} @{b.get('Baseline-Commit', '-')[:12]}")
-    elif mode == "awal":
-        print(f"PEMBANDING: {profile_comparator(p, top, b.get('Base-Commit', ''))}")
     return 0
 
 
@@ -527,11 +498,11 @@ def cmd_baseline(p: Plan, a) -> int:
     base, head = b.get("Base-Commit", ""), head_commit(top)
     if head != base:
         return fail(f"BASELINE FAIL: HEAD {head[:12]} ≠ Base-Commit {base[:12]} — baseline segar hanya sah di "
-                    f"Base-Commit; pakai baseline profil")
+                    f"Base-Commit; lanjut tanpa pembanding")
     dirty, err = dirty_outside(p, top)
     if err or dirty:
         return fail(f"BASELINE FAIL: tree tidak bersih ({err or ', '.join(dirty[:10])}) — baseline segar diukur "
-                    f"sebelum mutasi pertama; pakai baseline profil")
+                    f"sebelum mutasi pertama; lanjut tanpa pembanding")
     if not a.summary.strip():
         return fail("BASELINE FAIL: ringkasan kosong")
     p.set_block(Baseline=quote(a.summary, 600), Baseline_Commit=head)
@@ -684,18 +655,17 @@ def _diff_source(docs: list, source: str):
 
 
 def sync_context(a, root: Path, config: dict):
-    """Rencana atau profil → `(konteks, masalah)`; konteks = `head` (argumen fase 1), `docs`, `line`, `kind`.
+    """Rencana → `(konteks, masalah)`; konteks = `head` (argumen fase 1), `docs`, `line`.
 
-    Rencana: satu workdir `quickdev:<repo>:<path rencana>` bernama `<task_name>`, task baru ber-`workdir_key`
+    Satu workdir `quickdev:<repo>:<path rencana>` bernama `<task_name>`, task baru ber-`workdir_key`
     (quickdev tidak mengenal tiket analyst), dan satu dokumen `quickdev.plan` berisi berkas di disk (skill tidak
     meng-commit). Rencana yang belum pernah `lock` (tanpa `Approved-At`) → FAIL: DRAFT tidak didorong (D2).
-    Profil: dokumen `PROFILE` di bawah workspace, `key` = `<repo>/<path>` (T10).
+    Sinkron profil (`--repo-profile`) dihapus bersama skill `profile` (34 L3).
     """
     workspace_id, choices, problems = ns.choose_workspace(config, a.workspace)
     if problems:
         return None, problems
-    where = ("pilih: " + ", ".join(c["alias"] for c in choices)) if choices else workspace_id or "-"
-    path, rel = root_relative(root, a.repo_profile or a.plan)
+    path, rel = root_relative(root, a.plan)
     if path is None:
         return None, [rel]
     if not path.is_file():
@@ -705,12 +675,6 @@ def sync_context(a, root: Path, config: dict):
         return None, [f"{rel}: {problem} — pulihkan dari git; jangan menebak isinya"]
     repo = ns.repo_identity(root, config)
     commit = ns.last_commit(root, rel)
-    if a.repo_profile:
-        doc = ns.document("workspace", f"{repo}/{rel}", "profile", content, ns.doc_meta("quickdev", repo, rel, "", commit))
-        head = {"repo": repo, **ns.workspace_fields(workspace_id, choices),
-                "list_document": {"reference_table": "workspace", "include_content": False,
-                                  "metadata": ns.compact({"source": "quickdev", "repo": repo})}}
-        return {"kind": "profile", "head": head, "docs": [doc], "line": f"{rel} → workspace {where}"}, []
     try:
         p = Plan(path)
         m, b = p.meta(), p.block()
@@ -737,7 +701,7 @@ def sync_context(a, root: Path, config: dict):
                       ns.doc_meta("quickdev", repo, rel, m.get("Status", ""), commit, execution=execution))
     head = {"repo": repo, **ns.workspace_fields(workspace_id, choices), "task": task, "workdir": workdir,
             "list_document": {"reference_table": "workdir", "include_content": False}}
-    return {"kind": "plan", "head": head, "docs": [doc],
+    return {"head": head, "docs": [doc],
             "line": f"{rel} · workdir {path.stem} ({status}) · server {config['url']}"}, []
 
 
@@ -745,7 +709,7 @@ def cmd_sync_payload(a) -> int:
     """Sinkron nataflow; tanpa menulis berkas maupun commit (D5). `--push` memanggil server langsung lewat
     `nataflow_client` dan mencetak satu baris segmen (29 S4); tanpa `--push` keluarannya argumen tool per fase.
 
-    Workspace (`--workspace <alias>`, dari `workspaces` config) hanya dibutuhkan untuk task baru dan induk profil:
+    Workspace (`--workspace <alias>`, dari `workspaces` config) hanya dibutuhkan untuk task baru:
     `task.lookup` menjangkau seluruh project key dan workdir mengikuti workspace task induknya. Config berisi lebih
     dari satu workspace tanpa `--workspace` → `workspace_choices`; user memilih, lalu skrip dijalankan ulang.
     """
@@ -767,7 +731,7 @@ def cmd_sync_payload(a) -> int:
 
 
 def sync_push(a, root: Path, config, problems) -> int:
-    """`--push`: task → workdir → dokumen (rencana) atau workspace → dokumen (profil), lalu satu baris segmen."""
+    """`--push`: task → workdir → dokumen rencana, lalu satu baris segmen."""
     ctx = None
     if not problems and config is not None:
         ctx, problems = sync_context(a, root, config)
@@ -779,13 +743,8 @@ def sync_push(a, root: Path, config, problems) -> int:
         result = {"status": "SKIP"}
     else:
         diff = lambda text: _diff(ctx["docs"], text)  # noqa: E731
-        if ctx["kind"] == "plan":
-            result = ns.run_push(root, config, lambda s: ns.push_workdir(s, ctx["head"], diff,
-                                                                          dup_label="workdir_key"))
-        else:
-            result = ns.run_push(root, config, lambda s: ns.push_repo_docs(s, ctx["head"], diff))
-    what = "repo" if a.repo_profile else f"workdir {result.get('workdir', '')}"
-    return ns.emit_push(result, a.json, ns.push_segment(result, what))
+        result = ns.run_push(root, config, lambda s: ns.push_workdir(s, ctx["head"], diff, dup_label="workdir_key"))
+    return ns.emit_push(result, a.json, ns.push_segment(result, f"workdir {result.get('workdir', '')}"))
 
 
 def main_sync(a) -> None:
@@ -809,8 +768,6 @@ def main() -> None:
             s.add_argument("--summary", required=True, help="ringkasan baseline segar per perintah (`-` = stdin)")
         if name in ("lock", "confirm"):
             s.add_argument("--answer", required=True)
-        if name == "lock":
-            s.add_argument("--profile", default=None, help="default: `Profile:` yang sudah ada, lalu repo-profile.md")
         if name == "start":
             s.add_argument("--findings", action="store_true", help="putaran remediasi dari review CHANGES_REQUIRED")
             s.add_argument("--findings-text", default="", help="temuan ringkas yang dicatat ke blok (Findings-<n>)")
@@ -823,11 +780,9 @@ def main() -> None:
         if name == "status":
             s.add_argument("--json", action="store_true")
     s = sub.add_parser("sync-payload")
-    target = s.add_mutually_exclusive_group(required=True)
-    target.add_argument("--plan", help="rencana yang pernah dikunci")
-    target.add_argument("--repo-profile", dest="repo_profile", help="profil repo (dokumen tingkat workspace)")
-    s.add_argument("--workspace", default="", help="alias `workspaces` tujuan task baru atau induk profil; wajib "
-                                                   "dipilih user bila config berisi lebih dari satu workspace")
+    s.add_argument("--plan", required=True, help="rencana yang pernah dikunci")
+    s.add_argument("--workspace", default="", help="alias `workspaces` tujuan task baru; wajib dipilih user bila "
+                                                   "config berisi lebih dari satu workspace")
     phase = s.add_mutually_exclusive_group()
     phase.add_argument("--push", action="store_true", help="kirim langsung ke server lewat MCP key lokal; keluaran "
                                                            "satu baris segmen")
@@ -845,7 +800,7 @@ def main() -> None:
         sys.exit(f"FAIL: {msg}")
 
     # Nilai `-` = teks dari stdin (heredoc berkutip di SKILL); stdin hanya dapat dibaca sekali (13 Q4).
-    from_stdin = [k for k in TEXT_ARGS + ("blocked_step", "profile") if getattr(a, k, None) == "-"]
+    from_stdin = [k for k in TEXT_ARGS + ("blocked_step",) if getattr(a, k, None) == "-"]
     if len(from_stdin) > 1:
         die(f"hanya satu argumen boleh bernilai `-` (stdin) per panggilan: {', '.join(from_stdin)}")
     if from_stdin:

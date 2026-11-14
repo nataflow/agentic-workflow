@@ -105,8 +105,11 @@ skeletons), `dispatcher/` (prompts used to dispatch subagents), `scripts/`, and 
   `/frontend:lead lanjutkan <taskdir>` skips the sweep and routes by `taskdir_state.py --taskdir`. Decisions cross
   sessions in `{taskdir}/JOURNEY.md` (`_common/journey.py`, adapted from backend — `entries`/`teks_problem` are
   test-pinned identical), never read by any gate script; free text never goes into `## Riwayat Rantai`.
-- **quickdev** — lightweight, no taskdir and no subagents: `repo-profile.md` + one `plan/<task>.md`
-  guarded by `_common/plan_lock.py`.
+- **quickdev** — lightweight for small, early-stage repos: three user-invoked skills `plan → execute → review`,
+  no taskdir, no subagents, no repo profile. `plan` absorbs code tracing and clarification (scale `kecil`/`standar`,
+  fast-path skip) and writes verification commands from the manifest into the plan's Section 4 table, which the seal
+  covers; `execute` always measures a fresh baseline at `Base-Commit`. One `plan/<task>.md` guarded by
+  `_common/plan_lock.py` (`Hash-Scope: body`; 0.11 plans with `profile+body` still verify). Step 34.
 - **nataflow** — direct work against the nataflow server over MCP, no repo artifacts. `create-artifact`
   writes a self-contained HTML page, gates it with `skills/create-artifact/scripts/artifact.py check`, and
   `artifact.py publish` upserts it under the MCP key's project via the `*_artifact` tools. Model-invocable.

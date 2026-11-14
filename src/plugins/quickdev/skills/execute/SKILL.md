@@ -1,27 +1,26 @@
 ---
 name: execute
-description: Alur ringan quickdev (repo-profile.md, plan/<task>.md, tanpa taskdir) — menerapkan plan/<task>.md berstatus APPROVED ke kode dan menjalankan verifikasi baseline repo-profile.md; dipanggil eksplisit lewat /quickdev:execute.
+description: Alur ringan quickdev (plan/<task>.md, tanpa taskdir dan tanpa profil repo) — menerapkan plan/<task>.md berstatus APPROVED ke kode dan menjalankan perintah verifikasi Section 4 rencana terhadap baseline segar; dipanggil eksplisit lewat /quickdev:execute.
 disable-model-invocation: true
 ---
 
 ## THE IRON LAW
 
-DILARANG MEMULAI EKSEKUSI JIKA DOKUMEN RENCANA IMPLEMENTASI BELUM BERSTATUS APPROVED SECARA EKSPLISIT. SETIAP PERUBAHAN KODE SUMBER WAJIB MENGIKUTI URUTAN LANGKAH ATOMIK PADA DOKUMEN RENCANA — ATAU TEMUAN `review_findings` YANG BERADA DI DALAM CAKUPAN RENCANA — TANPA MENAMBAHKAN PERUBAHAN DI LUAR CAKUPAN; PERBAIKAN GALAT VERIFIKASI TUNDUK PADA BATAS YANG SAMA. SETELAH SELURUH LANGKAH SELESAI, PERINTAH VERIFIKASI BASELINE (TYPECHECK, LINTER, TEST) WAJIB DIJALANKAN ULANG SECARA LENGKAP DAN MERAIH STATUS LOLOS TANPA REGRESI BARU. DILARANG MENANDAI TUGAS SELESAI TANPA BUKTI LOG VERIFIKASI NYATA. DILARANG MENJALANKAN PERINTAH MIGRASI ATAU PERINTAH APA PUN YANG MENGUBAH SKEMA ATAU DATA, WALAU TERCANTUM DI RENCANA ATAU PROFIL; PERINTAH YANG DITOLAK USER DI PROFILE TIDAK DIJALANKAN TANPA IZIN BARU.
+DILARANG MEMULAI EKSEKUSI JIKA DOKUMEN RENCANA IMPLEMENTASI BELUM BERSTATUS APPROVED SECARA EKSPLISIT. SETIAP PERUBAHAN KODE SUMBER WAJIB MENGIKUTI URUTAN LANGKAH ATOMIK PADA DOKUMEN RENCANA — ATAU TEMUAN `review_findings` YANG BERADA DI DALAM CAKUPAN RENCANA — TANPA MENAMBAHKAN PERUBAHAN DI LUAR CAKUPAN; PERBAIKAN GALAT VERIFIKASI TUNDUK PADA BATAS YANG SAMA. SETELAH SELURUH LANGKAH SELESAI, PERINTAH VERIFIKASI BASELINE (TYPECHECK, LINTER, TEST) WAJIB DIJALANKAN ULANG SECARA LENGKAP DAN MERAIH STATUS LOLOS TANPA REGRESI BARU. DILARANG MENANDAI TUGAS SELESAI TANPA BUKTI LOG VERIFIKASI NYATA. DILARANG MENJALANKAN PERINTAH MIGRASI ATAU PERINTAH APA PUN YANG MENGUBAH SKEMA ATAU DATA, WALAU TERCANTUM DI RENCANA; PERINTAH BERTANDA `menyentuh DB/jaringan` DI SECTION 4 TIDAK DIJALANKAN TANPA IZIN USER.
 
 ## Precondition [REQUIRED]
 
-1. `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py verify --plan <plan_path>` → `VERIFY PASS`. `FAIL` (bukan APPROVED, tanpa `Plan-Hash`, atau Section 1–5/`Profile:` berubah sesudah disetujui) → hentikan, arahkan ke `quickdev:plan`.
-2. Mode dari `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py start` (Fase 0 butir 1). `awal`: skrip sendiri menilai `git status --porcelain -uall` dan menolak dengan `START FAIL` **tanpa menulis blok** bila ada berkas di luar direktori `plan_path` dan `Profile:` rencana; sajikan daftarnya, user meng-commit atau men-stash, lalu memanggil `/quickdev:execute` lagi, agar diff `quickdev:review` hanya berisi hasil eksekusi. `resume`/`remediasi`: perubahan uncommitted diizinkan hanya pada berkas target Section 3, `<plan_dir>/`, dan `profile_path`; berkas lain → hentikan dan tanyakan user. Dilarang meminta user meng-commit atau men-stash kerja parsial: `quickdev:review` membandingkan terhadap `Base-Commit`, bukan `HEAD`.
-3. Runtime, compiler, dan package manager yang dibutuhkan (seperti Node/TypeScript, Python, Go, dll.) aktif dan dapat menjalankan script verifikasi baseline.
-4. Profil repositori pada `profile_path` tersedia sebagai acuan baseline error yang diakui dan panduan layer; bila absen, hentikan dan arahkan pemanggil ke `quickdev:profile` (jangan `backend:profile`/`frontend:profile`).
-5. Tool `Edit`, `Write`, dan `Bash` tersedia untuk mutasi berkas dan eksekusi perintah verifikasi.
-6. `python3` (3.12+) tersedia untuk `plan_lock.py`, dan direktori kerja adalah repo git.
+1. `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py verify --plan <plan_path>` → `VERIFY PASS`. `FAIL` (bukan APPROVED, tanpa `Plan-Hash`, atau Section 1–5 berubah sesudah disetujui) → hentikan, arahkan ke `quickdev:plan`.
+2. Mode dari `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py start` (Fase 0 butir 1). `awal`: skrip sendiri menilai `git status --porcelain -uall` dan menolak dengan `START FAIL` **tanpa menulis blok** bila ada berkas di luar direktori `plan_path` (dan `Profile:` rencana 0.11 bila tercatat); sajikan daftarnya, user meng-commit atau men-stash, lalu memanggil `/quickdev:execute` lagi, agar diff `quickdev:review` hanya berisi hasil eksekusi. `resume`/`remediasi`: perubahan uncommitted diizinkan hanya pada berkas target Section 3 dan `<plan_dir>/`; berkas lain → hentikan dan tanyakan user. Dilarang meminta user meng-commit atau men-stash kerja parsial: `quickdev:review` membandingkan terhadap `Base-Commit`, bukan `HEAD`.
+3. Runtime, compiler, dan package manager yang dibutuhkan (seperti Node/TypeScript, Python, Go, dll.) aktif dan dapat menjalankan perintah verifikasi Section 4 rencana.
+4. Tool `Edit`, `Write`, dan `Bash` tersedia untuk mutasi berkas dan eksekusi perintah verifikasi.
+5. `python3` (3.12+) tersedia untuk `plan_lock.py`, dan direktori kerja adalah repo git.
 
 ## Koeksistensi [REQUIRED]
 
-- Skill ini bagian dari alur ringan `quickdev` (`repo-profile.md`, `plan/<task>.md`, tanpa taskdir). Setiap rujukan skill di berkas ini berarti `quickdev:*`. Dilarang memakai `backend:*` atau `frontend:*` sebagai pengganti: `backend:profile`/`frontend:profile` menulis `.claude/profile/<plugin>/`, bukan `repo-profile.md`, dan tidak memenuhi precondition skill ini.
+- Skill ini bagian dari alur ringan `quickdev` (`plan/<task>.md`, tanpa taskdir). Setiap rujukan skill di berkas ini berarti `quickdev:*`. Dilarang memakai `backend:*` atau `frontend:*` sebagai pengganti langkahnya.
 - Bila konteks sesi memuat blok `<backend-tech-lead-gate>` atau `<frontend-lead-gate>`:
-  - User memanggil `/quickdev:<skill>` secara eksplisit, atau melanjutkan artefak quickdev (`plan/<task>.md`, `repo-profile.md`) → lanjutkan skill ini. Blok gerbang itu mengecualikan alur plugin lain yang dipanggil eksplisit.
+  - User memanggil `/quickdev:<skill>` secara eksplisit, atau melanjutkan artefak quickdev (`plan/<task>.md`) → lanjutkan skill ini. Blok gerbang itu mengecualikan alur plugin lain yang dipanggil eksplisit.
   - Permintaan kerja baru tanpa pilihan alur → tanyakan sekali lewat `AskUserQuestion`: "Alur ringan quickdev (`plan/<task>.md`)" atau "Gerbang `<backend:tech-lead | frontend:lead>` (taskdir + brief)". Jangan memilih sendiri.
 - `.claude/workflow` ada dan tidak memuat kata `quickdev` → repo ini memilih alur lain; laporkan dan tanyakan dulu sebelum lanjut.
 - Penanda opt-out `.claude/workflow` (nama plugin yang boleh menggerbangi repo, dipisah spasi, koma, atau baris): isi `quickdev` membuat hook SessionStart `backend`/`frontend` diam; isi `frontend quickdev` hanya menyalakan hook `frontend`.
@@ -29,10 +28,8 @@ DILARANG MEMULAI EKSEKUSI JIKA DOKUMEN RENCANA IMPLEMENTASI BELUM BERSTATUS APPR
 ## Parameter [REQUIRED]
 
 - `plan_path` — string — `[REQUIRED]` — path berkas rencana implementasi yang berstatus `APPROVED` (contoh: `plan/user-auth-jwt.md`). Kosong → ambil dari ringkasan quickdev terakhir di percakapan (`HANDOFF: execute (plan_path=…)`, `EXECUTE:`, atau `REVIEW:`); tidak ada → jalankan `plan_lock.py status --json --plan <berkas>` untuk tiap `plan/*.md`, pakai otomatis bila tepat satu berstatus `APPROVED` dengan eksekusi belum `COMPLETED`, selain itu tanyakan lewat `AskUserQuestion`.
-- `profile_path` — string — default: nilai `Profile:` di metadata `plan_path`; bila absen, `repo-profile.md`, lalu `.dev/profile.md`.
 - `auto_verify` — boolean — default `true` — bila `true`, menjalankan otomatis perintah verifikasi baseline setelah langkah implementasi tuntas; bila `false`, status akhir `VERIFICATION_MANUAL_REQUIRED`.
 - `strict_baseline` — boolean — default `true` — bila `true`, warning lint baru ikut diperlakukan sebagai regresi yang wajib diperbaiki; bila `false`, hanya error typecheck, lint, dan test baru yang memblokir.
-- `fresh_baseline` — boolean — default `true` — mode `awal`: bila `start` mencetak `PEMBANDING: baseline segar` (`Baseline-Commit` profil ≠ `Base-Commit`, absen, atau diukur di tree kotor), jalankan baseline segar sebelum mutasi pertama (Fase 0 butir 6). `false` → pakai profil dengan aturan `UNVERIFIED` Fase 3 butir 2.
 - `stop_on_error` — boolean — default `true` — bila `true`, menghentikan eksekusi langkah berikutnya segera saat salah satu langkah atomik mengalami error. Bila `false`, langkah yang gagal tetap `[ ]` dan dicatat; langkah berikutnya yang tidak bergantung padanya (berkas berbeda, tidak memakai simbol dari langkah gagal) tetap dikerjakan, Fase 3 dijalankan untuk laporan, lalu tutup `BLOCKED` dengan `--blocked-step` = langkah gagal pertama (`COMPLETED` mustahil selama ada `[ ]`).
 - `update_plan_checklist` — boolean — default `true` — bila `true`, memperbarui tanda checkbox (`- [x]`) pada berkas `plan_path` secara real-time.
 - `max_fix_iterations` — integer — default `3` — batas maksimal iterasi perbaikan mandiri saat terjadi kegagalan pada tahap verifikasi baseline.
@@ -59,7 +56,7 @@ QD_EOF
    | Keadaan `plan_path` | Mode | Tindakan |
    |---|---|---|
    | `verify` FAIL | — | hentikan, ke `quickdev:plan` (Failure path 1) |
-   | tanpa blok, nol `[x]`, tree bersih di luar direktori rencana dan profil | `awal` | `Base-Commit` = HEAD atau `none` (repo tanpa commit); lanjut butir 6 |
+   | tanpa blok, nol `[x]`, tree bersih di luar direktori rencana | `awal` | `Base-Commit` = HEAD atau `none` (repo tanpa commit); lanjut butir 6 |
    | tanpa blok, nol `[x]`, tree kotor, atau bukan repo git | — (`START FAIL`, blok tidak ditulis) | sajikan daftar berkas dari pesan skrip; user commit/stash lalu memanggil `/quickdev:execute` lagi. Bukan repo git → laporkan blocker environment |
    | blok `IN_PROGRESS`/`BLOCKED`, tanpa blok tetapi ada `[x]`, blok `COMPLETED`/`VERIFICATION_MANUAL_REQUIRED` dengan langkah `[ ]` baru (`resume (rencana direvisi sesudah selesai)`), atau segel penutup basi (`resume (verifikasi basi: …)` — kode atau rencana berubah sesudah `close`) | `resume` | butir 2 di bawah; semua langkah `[x]` → langsung Fase 3. `Base-Note` menandai base yang diisi sesudah sesi putus; `Base-Commit` tetap, sehingga review berikutnya menilai seluruh hasil sejak base itu |
    | blok `IN_PROGRESS`/`BLOCKED` dengan `Remediation-State: OPEN` (ronde terputus: sesi putus atau `BLOCKED` Failure path 5) | `remediasi` lanjutan | butir 5 dengan temuan dari baris `TEMUAN:`; ronde tidak bertambah. Langkah `[ ]` baru (rencana direvisi) dikerjakan lebih dulu |
@@ -69,18 +66,18 @@ QD_EOF
 
    Baris tambahan keluaran `start`: `PERINGATAN:` (`Base-Commit` bukan leluhur HEAD karena rebase/amend/pindah branch) → sajikan ke user sebelum mutasi dengan pilihan lanjut (review nanti memakai `base_ref`) atau hentikan; `INFO:` (HEAD maju n commit) → sebut di laporan; `BASELINE:` → pembanding Fase 3 butir 2.
 2. Mode `resume`:
-   - Pagar tree: `git status --porcelain -uall`; setiap berkas berubah wajib termasuk berkas target Section 3, `<plan_dir>/`, atau `profile_path`. Berkas lain → hentikan dan tanyakan user; jangan ikut di-review sebagai hasil eksekusi.
+   - Pagar tree: `git status --porcelain -uall`; setiap berkas berubah wajib termasuk berkas target Section 3 atau `<plan_dir>/`. Berkas lain → hentikan dan tanyakan user; jangan ikut di-review sebagai hasil eksekusi.
    - Periksa langkah `[x]` terakhir: berkas targetnya wajib berubah terhadap base (`git diff --stat <Base-Commit> -- <berkas>`, atau `git ls-files --others --exclude-standard -- <berkas>` untuk berkas baru; `Base-Commit: none` → berkas cukup ada). Tidak berubah → centangnya tidak sah: kembalikan ke `[ ]` dan catat di laporan.
    - Lanjutkan Fase 1 dari langkah `[ ]` pertama. Baca ulang berkas target sebelum mengedit karena langkah bisa setengah jadi; edit harus idempoten (jangan menambah blok yang sudah ada).
 3. Mode `manual`: tampilkan perintah verifikasi manual dari `Verification` blok, lalu `AskUserQuestion`: *Sudah dijalankan, lolos* · *Gagal (sebut galatnya)* · *Belum*. Hanya opsi pertama yang menjalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py confirm --plan <plan_path> --answer -` dengan jawaban user apa adanya lewat stdin. `CONFIRM FAIL` karena segel basi (kode diubah selama uji manual) → jangan mencatat konfirmasi; panggil `quickdev:execute` lagi (mode `resume` → Fase 3). Opsi kedua menjalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py close --plan <plan_path> --status BLOCKED --blocked-step verifikasi --verification -` dengan galat dari user lewat stdin, lalu user memilih: panggil `quickdev:execute` lagi (mode `resume` → langsung Fase 3 dengan galat itu) atau revisi rencana. Tanpa mutasi kode di mode ini.
 4. Ekstrak seluruh daftar langkah implementasi atomik dari Section `## 3. Atomic Implementation Steps`:
    - Petakan setiap langkah ke berkas target, tipe mutasi kode (membuat berkas baru, mengedit fungsi/metode, menambahkan tipe DTO, memperbarui query database), dan kriteria selesai.
    - Identifikasi urutan dependensi langkah (contoh: skema database dan DTO wajib selesai sebelum implementasi service atau controller).
-   - Baca daftar perintah verifikasi baseline dari Section `## 4. Verification & Testing Strategy` rencana dan tabel Section 5 `profile_path`.
+   - Baca perintah verifikasi dari tabel `| Jenis | Perintah | Cwd | Risiko |` Section `## 4. Verification & Testing Strategy` rencana. Rencana lama tanpa tabel itu → pakai perintah yang tertulis di Section 4 dengan `Cwd` root dan Risiko `-`, kecuali perintah yang jelas membaca `.env`, docker-compose, atau `DATABASE_URL` (perlakukan sebagai `menyentuh DB/jaringan`); Section 4 tanpa perintah sama sekali → laporkan dan tutup `VERIFICATION_MANUAL_REQUIRED` di Fase 3.
 5. Mode `remediasi` (`review_findings` terisi, atau lanjutan dari baris `TEMUAN:`):
    - Petakan setiap temuan ke langkah rencana dan berkas target di Section 3; temuan yang menuntut berkas atau perilaku di luar rencana tidak dikerjakan dan dialihkan ke Failure path 5.
    - Jadikan temuan terpetakan sebagai daftar kerja Fase 1 menggantikan langkah rencana; checklist yang sudah `- [x]` tidak diubah.
-6. Mode `awal` — baseline segar (`fresh_baseline: true`): baca baris `PEMBANDING:` keluaran `start`, yang dihitung skrip dari baris `Baseline-Commit` Section 5 `profile_path`. `PEMBANDING: profil @<sha>` (diukur di `Base-Commit` **dan** `tree bersih: ya`) → profil adalah pembanding. `PEMBANDING: baseline segar — <alasan>` (commit berbeda, baris absen, format lama tanpa `tree bersih`, atau diukur di tree kotor) → sebelum mutasi pertama jalankan perintah baseline dengan aturan izin dan timeout Fase 3 butir 1, lalu kunci ringkasannya:
+6. Mode `awal` — baseline segar, selalu, sebelum mutasi pertama. Perintah Section 4 bertanda `menyentuh DB/jaringan` → satu `AskUserQuestion` berisi perintah dan risikonya: *Jalankan* · *Lewati* (catat `<jenis>=SKIPPED` di baseline dan verifikasi; status akhir `VERIFICATION_MANUAL_REQUIRED`). Izin ini berlaku untuk seluruh pemanggilan skill ini, termasuk Fase 3. Perintah lain sudah diizinkan lewat approval rencana. Jalankan perintah dengan aturan timeout Fase 3 butir 1, lalu kunci ringkasannya:
 
    ```
    python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py baseline --plan <plan_path> --summary - <<'QD_EOF'
@@ -88,13 +85,13 @@ QD_EOF
    QD_EOF
    ```
 
-   Format per perintah `<jenis>=<status>[<berkas> <aturan/kode/nama test>×<n>; …]`, maksimal 600 karakter; lebih panjang → `<jenis>=FAILED[<n> issue — repro: <perintah>]`. Skrip hanya menerimanya di HEAD = `Base-Commit` dengan tree bersih; `BASELINE FAIL` → pakai profil dengan aturan `UNVERIFIED`. Mode lain membaca pembanding dari baris `BASELINE:` keluaran `start`.
+   Format per perintah `<jenis>=<status>[<berkas> <aturan/kode/nama test>×<n>; …]`, maksimal 600 karakter; lebih panjang → `<jenis>=FAILED[<n> issue — repro: <perintah>]`. Skrip hanya menerimanya di HEAD = `Base-Commit` dengan tree bersih; `BASELINE FAIL` → lanjut tanpa pembanding (aturan Fase 3 butir 2). Mode lain membaca pembanding dari baris `BASELINE:` keluaran `start`; baris itu absen (sesi putus sebelum baseline terkunci) → tanpa pembanding.
 
 ### Fase 1 — Eksekusi Langkah Implementasi Atomik (Per-Step Loop)
 
 1. Lakukan iterasi eksekusi untuk setiap langkah implementasi (atau setiap temuan pada putaran remediasi) secara berurutan:
 2. **Eksekusi Perubahan Berkas (Code Mutation)**:
-   - Berkas baru: buat di direktori layer yang benar sesuai konvensi `profile_path`, dengan impor dependensi yang valid.
+   - Berkas baru: buat di direktori layer yang benar mengikuti berkas acuan konvensi di Section 2 rencana, dengan impor dependensi yang valid.
    - Berkas eksisting: edit terarah pada blok yang relevan tanpa merusak kode sekitar; pertahankan komentar, anotasi tipe, dan docstring yang tidak terkait perubahan.
 3. **Verifikasi Step-Level (Inspeksi Lokal)**:
    - Periksa sintaks berkas valid dan impor modul terhubung tanpa circular dependency.
@@ -109,24 +106,23 @@ QD_EOF
 
 ### Fase 3 — Eksekusi Baseline Verifikasi Penuh (Full Verification Gate)
 
-1. Jika `auto_verify: true`, jalankan tiap perintah baseline dari tabel Section 5 `profile_path` (dan Section 4 rencana) secara sequential, dari kolom `Cwd` sebagai `(cd <Cwd> && <perintah>)` dari root repo; `Cwd` kosong (profil lama) → root, dan catat `cwd tidak tercatat` di laporan. Setiap perintah memakai `timeout` tool Bash 300000 ms; `TIMEOUT` → ulang sekali, masih `TIMEOUT` → catat dan status akhir `VERIFICATION_MANUAL_REQUIRED`. Baris profil `SKIPPED` (ditolak user atau `skip_baseline_exec`; alasannya di kolom Known issues) → `AskUserQuestion` sebelum menjalankannya, dengan perintah dan risikonya: *Jalankan* · *Lewati* (catat `<jenis>=SKIPPED`, status akhir `VERIFICATION_MANUAL_REQUIRED`). Migrasi dan perintah pengubah skema/data tidak pernah dijalankan, walau tercantum di Section 4 rencana:
+1. Jika `auto_verify: true`, jalankan tiap perintah tabel Section 4 rencana secara sequential, dari kolom `Cwd` sebagai `(cd <Cwd> && <perintah>)` dari root repo; `Cwd` kosong → root. Setiap perintah memakai `timeout` tool Bash 300000 ms; `TIMEOUT` → ulang sekali, masih `TIMEOUT` → catat dan status akhir `VERIFICATION_MANUAL_REQUIRED`. Perintah bertanda `menyentuh DB/jaringan` yang belum diizinkan di pemanggilan ini (mode selain `awal`) → `AskUserQuestion` sebelum menjalankannya, dengan perintah dan risikonya: *Jalankan* · *Lewati* (catat `<jenis>=SKIPPED`, status akhir `VERIFICATION_MANUAL_REQUIRED`). Migrasi dan perintah pengubah skema/data tidak pernah dijalankan, walau tercantum di Section 4 rencana:
    - **Perintah 1 — Typecheck** (contoh: `pnpm typecheck`, `mypy .`): 0 error baru.
    - **Perintah 2 — Linter** (contoh: `pnpm lint`, `ruff check .`): auto-fix format atau import ordering hanya pada berkas yang disentuh rencana (contoh: `eslint --fix <berkas>`); dilarang menjalankan fixer ke seluruh repo.
-   - **Perintah 3 — Unit & Integration Tests** (contoh: `pnpm test`, `pytest`): test baru dan eksisting berstatus `PASSED`. Baris Test profil `TIDAK_ADA` → lewati, catat `test=TIDAK_ADA`, dan sertakan langkah QA manual Section 4 di laporan.
-   - **Perintah 4 — Build Check** (bila tercatat di profil, contoh: `pnpm build`, `go build ./...`).
-2. Bandingkan per perintah dengan pembanding, berurutan: (a) baris `BASELINE:` (baseline segar terikat `Base-Commit`); (b) Section 5 `profile_path` bila `start` mencetak `PEMBANDING: profil` (`Baseline-Commit` profil = `Base-Commit` dan `tree bersih: ya`); profil yang diukur di tree kotor tidak pernah menjadi pembanding (b), ia jatuh ke (c); (c) Section 5 profil yang diukur di commit lain atau tanpa `Baseline-Commit` — galat di berkas yang disentuh rencana dinilai terhadap profil, galat di berkas lain yang tidak ada di pembanding dicatat `UNVERIFIED` (bukan regresi) beserta perintah reproduksinya. Galat dicocokkan per berkas + aturan/kode galat/nama test, tanpa nomor baris (nomor baris bergeser saat berkas yang sama disunting); jumlah per pasangan tidak boleh naik:
+   - **Perintah 3 — Unit & Integration Tests** (contoh: `pnpm test`, `pytest`): test baru dan eksisting berstatus `PASSED`. Baris Test Section 4 `TIDAK_ADA` → lewati, catat `test=TIDAK_ADA`, dan sertakan langkah QA manual Section 4 di laporan.
+   - **Perintah 4 — Build Check** (bila tercatat di Section 4, contoh: `pnpm build`, `go build ./...`).
+2. Bandingkan per perintah dengan pembanding baris `BASELINE:` (baseline segar terikat `Base-Commit`). Galat dicocokkan per berkas + aturan/kode galat/nama test, tanpa nomor baris (nomor baris bergeser saat berkas yang sama disunting); jumlah per pasangan tidak boleh naik:
    - `PASSED` → galat apa pun sekarang = regresi.
-   - `FAILED` → galat yang penandanya ada di pembanding dengan jumlah tidak melebihi catatan = bawaan; galat lain = regresi.
-   - `FAILED` dengan Known issues berupa ringkasan (`<n> issue — contoh: …`) → daftar penandanya tidak lengkap, jadi galat di luar contoh tidak bisa dipastikan bawaan: galat di berkas yang disentuh rencana = regresi; galat di berkas lain = `UNVERIFIED`, dicatat di laporan beserta perintah reproduksi dari sel itu. Jumlah galat sekarang > `<n>` tanpa penjelasan dari berkas yang disentuh → laporkan ke user sebelum menutup `COMPLETED`.
-   - Pembanding `SKIPPED`, `TIMEOUT`, atau `UNVERIFIED_ENV_NOT_READY` → tidak ada pembanding. Gagal karena lingkungan (modul/binari hilang) → status akhir `VERIFICATION_MANUAL_REQUIRED`, bukan `COMPLETED`. Jalan tetapi gagal → laporkan tiap galat di berkas yang disentuh rencana sebagai regresi, sisanya sebagai `UNVERIFIED` di laporan, lalu minta user memutuskan.
+   - `FAILED[<penanda>]` → galat yang penandanya ada di pembanding dengan jumlah tidak melebihi catatan = bawaan; galat lain = regresi.
+   - `FAILED[<n> issue — repro: …]` (ringkasan) → daftar penandanya tidak lengkap: galat di berkas yang disentuh rencana = regresi; galat di berkas lain = `UNVERIFIED`, dicatat di laporan beserta perintah reproduksinya. Jumlah galat sekarang > `<n>` tanpa penjelasan dari berkas yang disentuh → laporkan ke user sebelum menutup `COMPLETED`.
+   - `SKIPPED`, `TIMEOUT`, atau baris `BASELINE:` absen → tidak ada pembanding. Gagal karena lingkungan (modul/binari hilang) → status akhir `VERIFICATION_MANUAL_REQUIRED`, bukan `COMPLETED`. Jalan tetapi gagal → galat di berkas yang disentuh rencana = regresi; galat di berkas lain = `UNVERIFIED` (bukan regresi) beserta perintah reproduksinya, lalu minta user memutuskan.
    - `TIDAK_ADA` → lewati, catat `<jenis>=TIDAK_ADA`.
-   - Profil lama tanpa tabel Section 5 → status tidak diketahui, perlakukan seperti `UNVERIFIED_ENV_NOT_READY` dan sarankan `quickdev:profile mode=REFRESH`.
 3. Regresi: perbaiki hanya bila perbaikannya berada di berkas target Section 3 (termasuk berkas test yang tercantum di sana), hingga `max_fix_iterations`; bila masih gagal, alihkan ke Failure path 2. Perbaikan yang menuntut berkas di luar Section 3 → hentikan loop, `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py close --plan <plan_path> --status BLOCKED --blocked-step <n> --verification -` dengan stdin `<perintah>: <galat> di <berkas:baris> (di luar rencana)`, dan laporkan ke user. Jalan lanjutnya revisi lewat `quickdev:plan` (`unlock` → tambah langkah → `lock`) lalu `quickdev:execute` mode `resume`.
 4. Seluruh verifikasi hijau (atau hanya galat bawaan): lanjutkan ke penutupan.
 
 ### Fase 4 — Penyusunan Laporan Eksekusi & Penutupan Tugas
 
-1. Tutup lewat `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py close --plan <plan_path> --status <COMPLETED | VERIFICATION_MANUAL_REQUIRED> --verification -` dengan ringkasan lewat stdin. Skrip memanggil `verify`, menulis/menimpa blok `## Execution Status` (`Status`, `Verification`, `Blocked-Step`, `Timestamp`; `Remediation-Round` ditulis `start`), menolak `COMPLETED` bila masih ada `- [ ]`, menutup ronde remediasi yang `OPEN`, dan menyegel `Verified-Hash` (= `Plan-Hash`) serta `Tree-Hash` (isi berkas yang berbeda dari `Base-Commit`, tanpa direktori rencana dan profil). Suntingan kode atau rencana sesudah close membuat review menolak dan `start` berikutnya masuk `resume (verifikasi basi)`, jadi close adalah langkah terakhir yang menyentuh kode. Dilarang menulis blok itu dengan tangan.
+1. Tutup lewat `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py close --plan <plan_path> --status <COMPLETED | VERIFICATION_MANUAL_REQUIRED> --verification -` dengan ringkasan lewat stdin. Skrip memanggil `verify`, menulis/menimpa blok `## Execution Status` (`Status`, `Verification`, `Blocked-Step`, `Timestamp`; `Remediation-Round` ditulis `start`), menolak `COMPLETED` bila masih ada `- [ ]`, menutup ronde remediasi yang `OPEN`, dan menyegel `Verified-Hash` (= `Plan-Hash`) serta `Tree-Hash` (isi berkas yang berbeda dari `Base-Commit`, tanpa direktori rencana). Suntingan kode atau rencana sesudah close membuat review menolak dan `start` berikutnya masuk `resume (verifikasi basi)`, jadi close adalah langkah terakhir yang menyentuh kode. Dilarang menulis blok itu dengan tangan.
 2. Susun laporan ringkasan implementasi komprehensif yang mencakup:
    - Daftar seluruh file baru yang dibuat dan berkas eksisting yang dimodifikasi.
    - Ringkasan log eksekusi verifikasi baseline (Typecheck: PASS, Lint: PASS, Tests: PASS) beserta sumber pembandingnya.
@@ -143,7 +139,7 @@ QD_EOF
 - MUST NOT melakukan commit atau merge atas perubahan hasil eksekusi; status `COMPLETED` hanya membuka `quickdev:review`, bukan izin merilis.
 - MUST NOT menghapus kode lama secara sembarangan tanpa instruksi eksplisit di dokumen rencana.
 - MUST NOT memasang framework/dependensi test yang tidak tercantum di Section 3 rencana.
-- MUST NOT menjalankan migrasi atau perintah pengubah skema/data, perintah verifikasi tanpa timeout, atau perintah yang ditolak user di profile tanpa `AskUserQuestion` baru.
+- MUST NOT menjalankan migrasi atau perintah pengubah skema/data, perintah verifikasi tanpa timeout, atau perintah bertanda `menyentuh DB/jaringan` tanpa izin user lewat `AskUserQuestion`.
 - MUST NOT menulis `Status`, `Base-Commit`, `Remediation-Round`, `Remediation-State`, `Findings-<n>`, `Baseline`, `Verified-Hash`, `Tree-Hash`, atau `Manual-Confirmation` blok `## Execution Status` dengan tangan; semuanya ditulis `plan_lock.py`.
 - MUST NOT mengirim teks bebas ke `plan_lock.py` dalam kutip ganda; pakai stdin dengan heredoc berkutip (Konvensi `plan_lock.py`).
 - MUST NOT memalsukan, memotong, atau mengabaikan log kegagalan verifikasi baseline runtime.
@@ -161,7 +157,7 @@ Skill ini menghasilkan perubahan kode sumber yang terverifikasi dan laporan term
 3. **Format Ringkasan Akhir (Maksimal 17 Baris)**:
    ```
    EXECUTE: <plan_path> — putaran <awal | resume dari langkah n/m | remediasi ke-n/2 | manual>
-   BASE: <Base-Commit> <(Base-Note) | > — pembanding <baseline segar | profil @<Baseline-Commit> | profil (UNVERIFIED di luar rencana)>
+   BASE: <Base-Commit> <(Base-Note) | > — pembanding <baseline segar @<Baseline-Commit> | tanpa pembanding (UNVERIFIED di luar rencana)>
    STATUS: COMPLETED | VERIFICATION_MANUAL_REQUIRED | BLOCKED
    LANGKAH: <n>/<n> tercentang
    REMEDIASI: <n>/<n> temuan review_findings tertangani | -
@@ -175,7 +171,7 @@ Skill ini menghasilkan perubahan kode sumber yang terverifikasi dan laporan term
 
 ## Failure path
 
-1. **Rencana Belum Terkunci atau Berubah**: Jika `verify` FAIL (`DRAFT`, tanpa `Plan-Hash`, atau Section 1–5/`Profile:` berubah sesudah approval), hentikan eksekusi segera, jangan lakukan mutasi kode, dan arahkan pemanggil memulihkan teks rencana atau memperoleh persetujuan ulang user di `quickdev:plan` (`unlock` → revisi → `lock`).
+1. **Rencana Belum Terkunci atau Berubah**: Jika `verify` FAIL (`DRAFT`, tanpa `Plan-Hash`, atau Section 1–5 berubah sesudah approval), hentikan eksekusi segera, jangan lakukan mutasi kode, dan arahkan pemanggil memulihkan teks rencana atau memperoleh persetujuan ulang user di `quickdev:plan` (`unlock` → revisi → `lock`).
 2. **Kegagalan Verifikasi Baseline Pasca-Implementasi**: Jika verifikasi typecheck atau test menghasilkan error setelah mutasi kode:
    - Analisis pesan stack trace error secara mendalam untuk menemukan akar masalah.
    - Terapkan perbaikan terarah pada baris kode yang bermasalah **di berkas target Section 3**; di luar itu → Fase 3 butir 3.

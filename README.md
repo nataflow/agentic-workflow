@@ -9,7 +9,7 @@ memahami seluruh aplikasi satu perusahaan dan kerja langsung dengan server nataf
 | [`analyst`](src/plugins/analyst/README.md) | 0.18.0 | Permintaan pengguna/stakeholder (satu, atau hingga lima sekaligus secara berurutan) menjadi `TICKET.md` non-teknis (user story, acceptance criteria, aturan bisnis), atau perubahan struktur dari lead engineer menjadi tiket `TECH` berbukti `file:baris`, lewat elisitasi, review independen, dan persetujuan; catatan kasar rapat menjadi `NOTULEN.md` | `/analyst:intake`, `/analyst:notulen` |
 | [`backend`](src/plugins/backend/README.md) | 0.18.0 | Kerja backend 7 stack (Java Spring, Go, Node, Bun, Rust, PHP, CodeIgniter 4): profil, TASK/BRD/PRD/brief, eksekusi, review, dan laporan | `/backend:tech-lead` |
 | [`frontend`](src/plugins/frontend/README.md) | 0.17.0 | Kerja frontend (React + Vite, React Native/Expo, SvelteKit, Svelte + Vite): alur layar, bentuk layar, kontrak, brief, eksekusi, review, dan laporan dengan ledger approval | `/frontend:lead` |
-| [`quickdev`](src/plugins/quickdev/README.md) | 0.10.0 | Alur ringan untuk stack apa pun: profil, explore, clarify, satu berkas rencana, execute, dan review, tanpa taskdir dan tanpa subagent | `/quickdev:profile`, `/quickdev:plan` |
+| [`quickdev`](src/plugins/quickdev/README.md) | 0.12.0 | Alur ringan tiga tahap untuk repo kecil di stack apa pun: `plan` (telusur kode, klarifikasi, satu berkas rencana), `execute`, dan `review`, tanpa taskdir, subagent, maupun profil repo | `/quickdev:plan` |
 | [`nataflow`](src/plugins/nataflow/README.md) | 0.1.1 | Artifact nataflow: halaman HTML mandiri yang dinilai gerbang kontrak halaman lalu di-upsert ke project milik MCP key, tanpa berkas di repo | `/nataflow:create-artifact` |
 | [`product`](src/plugins/product/README.md) | 0.1.1 | Inisiasi produk baru (folder kosong), fitur baru, atau improvement fitur (codebase) menjadi `CHARTER.md` enam pilar — Purpose, Actors, Business Process, Business Rules, Success Criteria, Scope — dengan guard permintaan yang terlalu umum, elisitasi, review independen, dan persetujuan | `/product:init` |
 | [`fullstack`](src/plugins/fullstack/README.md) | 0.3.0 | Memahami seluruh aplikasi dari root multi-repo (satu proyek atau banyak proyek satu perusahaan): peta aplikasi `PETA.md` dari profil backend/frontend tiap repo tanpa membaca kode, explore permukaan satu pertanyaan konkret dengan jahitan frontend → backend dan API → API yang dicocokkan skrip, dan penelusuran alur di dalam repo lewat subagent explorer backend/frontend; read-only terhadap repo | `/fullstack:explore` |
@@ -108,7 +108,7 @@ Ketujuh plugin biasanya dipasang user-wide. Yang menentukan perilaku di satu rep
   keduanya tidak menggerbangi: bloknya hanya menunjuk repo miliknya dan `/fullstack:explore`.
 - **Profil per plugin.** `.claude/profile/backenddev/` dan `.claude/profile/frontenddev/` terpisah. Profil
   lama di `.claude/profile/` dimigrasikan oleh pemiliknya (mode MIGRATE) dan tidak disentuh plugin lain.
-  `quickdev` memakai `repo-profile.md` sendiri.
+  `quickdev` tidak memakai profil repo; perintah verifikasinya tercatat di tiap rencana.
 - **Pemanggilan eksplisit.** Teks gerbang engineer mengecualikan permintaan yang memanggil atau melanjutkan
   `/analyst:*`, `/product:*`, `/quickdev:*`, dan `/nataflow:*`. Skill quickdev hanya jalan bila user mengetik `/quickdev:<skill>`.
 - **Penanda `.claude/workflow`.** Berkas teks di repo pengguna berisi nama plugin yang boleh menggerbangi

@@ -138,9 +138,11 @@ def test_d3_plafon_remediasi(repo, pl):
     assert r.returncode == 1 and "plafon 2 putaran" in r.stdout
 
 
-def test_d6_profile_tercatat_di_metadata(repo, pl):
-    pl("lock", "--answer", "ok", "--profile", "apps/api/repo-profile.md")
-    assert json.loads(pl("status", "--json").stdout)["profile"] == "apps/api/repo-profile.md"
+@pytest.mark.regression("34 L1")
+def test_d6_lock_tidak_lagi_menulis_profile(repo, pl):
+    assert pl("lock", "--answer", "ok").returncode == 0
+    st = json.loads(pl("status", "--json").stdout)
+    assert (st["profile"], st["hash_scope"]) == ("-", "body")
 
 
 def test_d7_konfirmasi_manual_tercatat(repo, pl):

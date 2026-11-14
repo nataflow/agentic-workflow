@@ -142,10 +142,14 @@ def test_engineer_task_dan_dokumen_repo_memilih_workspace(plugin, request):
 
 # ── quickdev ────────────────────────────────────────────────────────────────
 
-def test_quickdev_profil_dan_rencana_memilih_workspace(make_repo):
-    root = make_repo({"repo-profile.md": "# profil\n", ".claude/nataflow.json": json.dumps({"url": NF_URL, **TWO})})
+QD_PLAN = ("# Implementation Plan — t\nStatus: APPROVED\nApproved-At: 2026-11-14T00:00:00+07:00\n\n"
+           "## 1. Overview & Objectives\nTambah validasi.\n\n## 3. Atomic Implementation Steps\n- [ ] 1. Ubah `a.js`\n")
+
+
+def test_quickdev_rencana_memilih_workspace(make_repo):
+    root = make_repo({"plan/t.md": QD_PLAN, ".claude/nataflow.json": json.dumps({"url": NF_URL, **TWO})})
     commit(root, "init")
-    code, out = run_json(PL, root, "sync-payload", "--repo-profile", "repo-profile.md")
+    code, out = run_json(PL, root, "sync-payload", "--plan", "plan/t.md")
     assert code == 0 and out["workspace_choices"] == CHOICES and out["workspace_id"] == ""
-    code, out = run_json(PL, root, "sync-payload", "--repo-profile", "repo-profile.md", "--workspace", "web")
+    code, out = run_json(PL, root, "sync-payload", "--plan", "plan/t.md", "--workspace", "web")
     assert code == 0 and out["workspace_id"] == WEB and "workspace_choices" not in out

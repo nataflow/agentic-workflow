@@ -8,8 +8,7 @@ from conftest import PLUGINS
 
 QD = PLUGINS / "quickdev"
 SK = QD / "skills"
-TPL = SK / "profile" / "references"
-SKILLS = ["clarify", "execute", "explore", "plan", "profile", "review"]
+SKILLS = ["execute", "plan", "review"]
 
 
 def skill(name):
@@ -45,17 +44,12 @@ def test_q5_execute_meminta_izin_dan_bertimeout():
     assert "`SKIPPED` / `TIMEOUT`" not in fase3                   # tidak lagi "jalankan sekarang" tanpa izin
 
 
-@pytest.mark.parametrize("kind", ["backend", "frontend", "fullstack"])
-def test_q6_template_mencatat_baseline_commit(kind):
-    text = (TPL / f"{kind}-profile-template.md").read_text(encoding="utf-8")
-    assert "Baseline-Commit:" in section(text, "## 5.", "## 6.")
-
 
 def test_q6_execute_baseline_segar_tanpa_nomor_baris():
     execute = skill("execute")
-    assert "plan_lock.py baseline --plan" in execute and "`fresh_baseline`" in execute
+    assert "plan_lock.py baseline --plan" in execute and "`fresh_baseline`" not in execute
+    assert "PEMBANDING" not in execute
     assert "tanpa nomor baris" in section(execute, "### Fase 3", "### Fase 4")
-    assert "Baseline-Commit" in skill("profile")
 
 
 def test_q1_q3_q9_q14_tabel_mode_execute():
@@ -77,8 +71,8 @@ def test_q16_plan_path_punya_fallback(name):
     assert "kosong" in param.lower() and "status --json" in param
 
 
-def test_q17_profile_tanpa_path_detect_plugin_lain():
-    assert "hooks/detect.py" not in skill("profile")
+def test_q17_plan_tanpa_path_detect_plugin_lain():
+    assert "hooks/detect.py" not in skill("plan")
 
 
 @pytest.mark.parametrize("name", SKILLS)
