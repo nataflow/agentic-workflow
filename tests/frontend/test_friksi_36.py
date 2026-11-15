@@ -1,11 +1,12 @@
 """Langkah 36 — friksi lapangan frontend: verdict reviewer (V1), plafon journey di prosa (J1), keluaran prasyarat
 architect terstruktur (S1), format otomatis (F1), aksi DELETE (D1), ronde tambahan (T1), lead ramping (L1)."""
+import json
 import re
 
 import pytest
 
-from conftest import FE_SKILLS, FE_TD, PLUGINS, fe_draft as draft, fe_open_sidik, fe_round as round_, fe_run, \
-    load_module, write_files
+from conftest import FE_SKILLS, FE_TD, PLUGINS, fe_approved_chain, fe_base_commit, fe_draft as draft, fe_open_sidik, \
+    fe_round as round_, fe_run, load_module, write_files
 
 JOURNEY = FE_SKILLS / "_common" / "journey.py"
 
@@ -76,3 +77,45 @@ def test_j1_tiap_titik_panggil_menyebut_plafon():
 def test_j1_architect_tidak_menyalin_status_ke_journey():
     phase5 = _read("architect/SKILL.md").split("### Phase 5", 1)[1].split("## Guardrails", 1)[0]
     assert "hasil akhir" not in phase5 and "tidak ditulis ulang" in phase5
+
+
+# ------------------------------------------------------------------ S1 — keluaran prasyarat architect terstruktur
+
+
+def arch(repo, *args):
+    return fe_run(repo, "architect/scripts/check_preconditions.py", "--taskdir", FE_TD, *args)
+
+
+@pytest.mark.regression("36 S1")
+def test_s1_rantai_dan_base_commit_dari_skrip(fe_chain_repo):
+    repo = fe_chain_repo
+    fe_approved_chain(repo)
+    r = arch(repo)
+    base = fe_base_commit(repo)[:7]
+    assert f"base_commit={base}" in r.out, r.out
+    rantai = r.out.split("\nRantai:\n", 1)[1]
+    assert rantai.splitlines()[0] == ("- 01 · orders-lacak-button · READY · CREATE: src/features/orders/"
+                                      "OrderDetail.test.tsx · MODIFY: src/features/orders/OrderDetail.tsx · "
+                                      "depends_on []"), rantai
+    data = json.loads(arch(repo, "--json").out)
+    assert data["base_commit"] == base
+    assert data["briefs"][0]["files"] == {"CREATE": ["src/features/orders/OrderDetail.test.tsx"],
+                                          "MODIFY": ["src/features/orders/OrderDetail.tsx"]}
+
+
+@pytest.mark.regression("36 S1")
+def test_s1_ingest_mencetak_berkas_unit(fe_chain_repo):
+    repo = fe_chain_repo
+    fe_approved_chain(repo)
+    r = arch(repo, "--brief", "01")
+    assert "Berkas unit 01: CREATE: src/features/orders/OrderDetail.test.tsx · MODIFY: " in r.out, r.out
+    assert "\nRantai:" not in r.out
+    data = json.loads(arch(repo, "--brief", "01", "--json").out)
+    assert data["files"]["MODIFY"] == ["src/features/orders/OrderDetail.tsx"]
+
+
+def test_s1_prosa_architect_tidak_lagi_sed_atas_task_md():
+    skill = _read("architect/SKILL.md")
+    assert "sed -n 's/^base_commit" not in skill
+    phase0 = skill.split("### Phase 0", 1)[1].split("### Phase 1", 1)[0]
+    assert "`Rantai:`" in phase0 and "`base_commit=`" in phase0

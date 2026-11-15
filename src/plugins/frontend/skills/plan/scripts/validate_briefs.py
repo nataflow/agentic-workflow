@@ -40,6 +40,7 @@ from precondition_lib import (  # noqa: E402
     TASKDIR_PATTERN,
     FrontmatterError,
     ac_rows,
+    brief_actions,
     inside_root,
     normalize_taskdir,
     section_lines,
@@ -513,20 +514,8 @@ class BriefValidator:
             self._add(cid, name, "PASS", "seksi 2–5 bebas placeholder")
 
     def _action_table(self, brief: Dict[str, Any]) -> Dict[str, Tuple[str, str]]:
-        """Baca tabel aksi seksi 3 menjadi {path: (aksi, anchor)}.
-
-        Sel Anchor dibaca utuh (12 J33): `` `A`, `B` `` dan `` `A` (ekspor default) `` adalah Anchor.
-        """
-        section = read_section(brief["body"], REQUIRED_SECTIONS[2])
-        actions: Dict[str, Tuple[str, str]] = {}
-        for line in section.splitlines():
-            cells = table_cells(line)
-            if len(cells) < 2 or cells[0] not in ("CREATE", "MODIFY"):
-                continue
-            path = cells[1].strip().strip("`").strip()
-            if path:
-                actions[path] = (cells[0], cells[2].strip() if len(cells) > 2 else "")
-        return actions
+        """Baca tabel aksi seksi 3 menjadi {path: (aksi, anchor)} — pembaca bersama `brief_actions` (36 S1)."""
+        return brief_actions(brief["body"])
 
     def _check_r_repo_state(self) -> None:
         cid, name = "R", "Aksi & anchor berkas vs disk"

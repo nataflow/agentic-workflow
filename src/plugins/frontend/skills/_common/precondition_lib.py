@@ -595,6 +595,36 @@ def table_cells(line: str) -> List[str]:
     return [c.strip().replace(_ESCAPED_PIPE, "|") for c in s.split("|")]
 
 
+BRIEF_ACTION_HEADING = "## 3. Current Repo State & Reference Symbols"
+FILE_ACTIONS = ("CREATE", "MODIFY")
+
+
+def brief_actions(text: str) -> Dict[str, Tuple[str, str]]:
+    """Tabel aksi seksi 3 brief → `{path: (aksi, anchor)}` — satu pembaca untuk `validate_briefs.py` dan prasyarat
+    `architect` (36 S1).
+
+    Sel Anchor dibaca utuh (12 J33): `` `A`, `B` `` dan `` `A` (ekspor default) `` adalah Anchor.
+    """
+    actions: Dict[str, Tuple[str, str]] = {}
+    for line in section_lines(text, BRIEF_ACTION_HEADING):
+        cells = table_cells(line)
+        if len(cells) < 2 or cells[0] not in FILE_ACTIONS:
+            continue
+        path = cells[1].strip().strip("`").strip()
+        if path:
+            actions[path] = (cells[0], cells[2].strip() if len(cells) > 2 else "")
+    return actions
+
+
+def files_by_action(files: List[str], actions: Dict[str, Tuple[str, str]]) -> Dict[str, List[str]]:
+    """`files_touched` dikelompokkan per aksi tabel seksi 3, urut seperti `files_touched`; berkas tanpa baris aksi
+    masuk `?` (cacat Check R `validate_briefs.py`)."""
+    out: Dict[str, List[str]] = {a: [] for a in FILE_ACTIONS}
+    for f in files:
+        out.setdefault(actions.get(f, ("?", ""))[0], []).append(f)
+    return out
+
+
 def is_table_rule(cells: List[str]) -> bool:
     """Baris pemisah header `|---|:--:|`."""
     return bool(cells) and all(c and set(c) <= set("-: ") for c in cells)

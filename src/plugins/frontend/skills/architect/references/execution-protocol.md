@@ -24,6 +24,8 @@ python3 «check_preconditions.py» --taskdir <taskdir> --brief <NN>
 
 `FAIL` menahan dispatch; jalankan tindakan yang disebut, jangan menawar. `WARN` wajib disebut ke user sebelum dispatch berangkat.
 
+Keluaran yang sama mencetak `Berkas unit <NN>: CREATE: … · MODIFY: …` (`--json`: `files`) — path per aksi dari `files_touched` dan tabel seksi 3 brief, sumber tunggal perintah commit unit bagian 3. Dilarang menyusunnya ulang dengan membaca brief lewat `sed`/`grep`.
+
 **Pengecualian `.gitignore`**: `.gitignore` kotor yang satu-satunya perubahannya baris berjangkar `/.frontenddev/` atau `frontenddev/docs/**/.explore/` adalah jejak `frontend:profile` yang belum di-commit. Laporkan ke user dan rutekan ke `frontend:profile` mode REFRESH; dilarang men-stash, dilarang meng-commit atas nama rantai.
 
 ---

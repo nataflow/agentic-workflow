@@ -34,6 +34,7 @@ from precondition_lib import (  # noqa: E402
     profile_dir_for,
     PROFILE_FILES,
     as_list,
+    brief_actions,
     brief_closure,
     check_adapter,
     check_chain_rows,
@@ -44,6 +45,7 @@ from precondition_lib import (  # noqa: E402
     check_worktree,
     done_landed,
     expected_rows,
+    files_by_action,
     find_repo_root,
     format_report,
     git,
@@ -53,6 +55,7 @@ from precondition_lib import (  # noqa: E402
     report_json,
     review_is_fresh,
     runnable_briefs,
+    task_root_sha,
     taskdir_slug,
     typecheck_per_brief,
 )
@@ -411,15 +414,62 @@ class PreconditionChecker:
         value, source = typecheck_per_brief(self.profile_dir, self.stack or "")
         return f"{value} ({source})"
 
+    def base_commit(self) -> str:
+        """`base_commit` akar 7 digit — dibaca skrip supaya main loop tidak `sed` atas `TASK.md` (36 S1)."""
+        sha = task_root_sha(self.root, self.taskdir_rel) if (self.taskdir / "TASK.md").is_file() else ""
+        return sha[:7] if sha else "-"
+
+    def chain_rows(self) -> List[Dict[str, Any]]:
+        """Satu baris per brief: NN, unit, status, berkas per aksi, `depends_on`, `remedies` (36 S1).
+
+        Sumber tunggal tabel rantai Phase 0, `git add`/`git rm` commit unit, dan formatter — main loop tidak
+        membaca frontmatter brief satu per satu.
+        """
+        rows: List[Dict[str, Any]] = []
+        for nn, path in self.briefs().items():
+            try:
+                text = path.read_text(encoding="utf-8")
+                fm = parse_frontmatter(text)
+            except (OSError, UnicodeDecodeError, ValueError):
+                text, fm = "", {}
+            rows.append({"nn": nn, "unit": path.name[len("brief-00-"):-len(".md")],
+                         "status": str(fm.get("status", "")).strip() or "?",
+                         "files": files_by_action(as_list(fm.get("files_touched")), brief_actions(text)),
+                         "depends_on": as_list(fm.get("depends_on")),
+                         "remedies": str(fm.get("remedies", "") or "").strip()})
+        return rows
+
+    @staticmethod
+    def files_line(files: Dict[str, List[str]]) -> str:
+        return " · ".join(f"{a}: {', '.join(p) if p else '-'}" for a, p in files.items() if p or a != "?")
+
     def format_text(self) -> str:
-        return format_report("architect" + (f" ingest brief-{self.brief_nn}" if self.brief_nn else ""),
-                             self.results, {"fase": self.phase, "unit_berikutnya": self.next_unit,
-                                            "lane": self.lane or "-", "typecheck_per_brief": self.tpb()})
+        out = format_report("architect" + (f" ingest brief-{self.brief_nn}" if self.brief_nn else ""),
+                            self.results, {"fase": self.phase, "unit_berikutnya": self.next_unit,
+                                           "lane": self.lane or "-", "base_commit": self.base_commit(),
+                                           "typecheck_per_brief": self.tpb()})
+        rows = self.chain_rows()
+        if self.brief_nn:
+            row = next((r for r in rows if r["nn"] == self.brief_nn), None)
+            if row:
+                out += f"\nBerkas unit {row['nn']}: {self.files_line(row['files'])}"
+        elif rows:
+            out += "\nRantai:" + "".join(
+                f"\n- {r['nn']} · {r['unit']} · {r['status']} · {self.files_line(r['files'])} · "
+                f"depends_on [{', '.join(r['depends_on'])}]" + (f" · remedies {r['remedies']}" if r["remedies"] else "")
+                for r in rows)
+        return out
 
     def to_json(self) -> str:
+        rows = self.chain_rows()
+        extra: Dict[str, Any] = {}
+        if self.brief_nn:
+            row = next((r for r in rows if r["nn"] == self.brief_nn), None)
+            extra["files"] = row["files"] if row else {}
         return report_json(self.results, root=str(self.root), taskdir=self.taskdir_rel,
                            brief=self.brief_nn, phase=self.phase, next_unit=self.next_unit,
-                           lane=self.lane, stack=self.stack, typecheck_per_brief=self.tpb())
+                           lane=self.lane, stack=self.stack, base_commit=self.base_commit(),
+                           typecheck_per_brief=self.tpb(), briefs=rows, **extra)
 
 
 def main() -> None:
