@@ -31,7 +31,7 @@ Slot prompt: `taskdir`, `sections`, `stack`, `adapter_path`, `contract_template`
 - **Label BLOCKER.** `BLOCKER [SEMANTIK]` untuk seluruh fokus di atas. `BLOCKER [MEKANIS]` hanya bila cacatnya dapat divonis `validate_doc.py` — dan karena skrip itu sudah `PASS`, label ini seharusnya tidak pernah muncul; kemunculannya berarti kamu menghitung ulang.
 - **ADVISORY** tidak menahan vonis dan tidak memicu ronde. Dilarang menulis advisory yang menambah field, endpoint, layer, atau AC yang tak satu pun akar tuntut — `contract` menyerap advisory sebagai perbaikan, jadi saran semacam itu memindahkan over-engineering lewat pintu belakang. Saran yang menyederhanakan justru diharapkan.
 - **Ronde 2 menyempit.** Nilai hanya `changed_sections` dan temuan `previous_verdict` yang belum tertutup. Temuan baru atas seksi yang tidak berubah ditulis ADVISORY — seksi itu sudah lolos ronde 1.
-- **Jejak konkret wajib.** Tiap BLOCKER menyebut `CONTRACT.md:<baris>` dan bila lintas dokumen jangkar keduanya. Verdict `PASS` tanpa temuan ditulis persis `PASS — nol temuan`.
+- **Jejak konkret wajib.** Tiap BLOCKER menyebut `CONTRACT.md:<baris>` dan bila lintas dokumen jangkar keduanya. Baris verdict hanya memuat vonisnya — `- Verdict: PASS` atau `- Verdict: BLOCKED`; `PASS` tanpa temuan dinyatakan lewat daftar `- —` di bawah, bukan teks tambahan di baris verdict.
 - **Status dari predikat, bukan perasaan.** `BLOCKED` ⇔ minimal satu BLOCKER. Satu-satunya jalan menurunkan severity adalah bukti yang membatalkan temuannya.
 
 ## Format Output
@@ -50,7 +50,7 @@ Slot prompt: `taskdir`, `sections`, `stack`, `adapter_path`, `contract_template`
 - `CONTRACT.md:<baris>` — <saran non-blocking>
 ```
 
-Kosongkan daftar yang nihil dengan `- —`. Baris `- Sidik:` menyalin slot `sidik` apa adanya — ia mengikat vonismu ke konten yang dibuka `review_round.py open` ronde ini; tanpa baris itu, atau dengan sidik lain, `record` menolak balikanmu. Laporan ini diteruskan `frontend:contract` apa adanya ke `review_round.py record` dan ke user: verdict `PASS` yang dikarang menghapus satu-satunya gerbang kualitas kontrak sebelum brief dipecah.
+Kosongkan daftar yang nihil dengan `- —`. Baris `- Verdict:` dan `- BLOCKER:` dibaca mesin (`review_round.py record`): salin bentuknya persis, tanpa tebal atau teks lain. Baris `- Sidik:` menyalin slot `sidik` apa adanya — ia mengikat vonismu ke konten yang dibuka `review_round.py open` ronde ini; tanpa baris itu, atau dengan sidik lain, `record` menolak balikanmu. Laporan ini diteruskan `frontend:contract` apa adanya ke `review_round.py record` dan ke user: verdict `PASS` yang dikarang menghapus satu-satunya gerbang kualitas kontrak sebelum brief dipecah.
 
 ## Batas
 

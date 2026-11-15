@@ -76,7 +76,9 @@ MAX_PER_CYCLE = 2
 MAX_PER_TASKDIR = 8
 MAX_DISPATCH_FAILED = 2
 GATES = ("contract", "plan")
-REVIEW_LINE = re.compile(r"^-\s*Verdict:\s*(PASS|BLOCKED)\s*$", re.MULTILINE)
+# Komentar ber-em-dash sesudah verdict sah (36 V1: `- Verdict: PASS — nol temuan` dulu ditolak walau agent
+# disuruh menulisnya); bentuk lain di baris itu tetap ditolak.
+REVIEW_LINE = re.compile(r"^-\s*Verdict:\s*(PASS|BLOCKED)(?:\s+—[^\n]*)?\s*$", re.MULTILINE)
 SIDIK_LINE = re.compile(r"^-\s*Sidik:\s*`?([0-9a-f]{12,40})`?\s*$", re.MULTILINE)
 SIDIK_LEN = 12
 CAP_ROUTE = ("hentikan gate; `frontend:lead` bertanya lewat `AskUserQuestion`: rumuskan ulang di taskdir baru "
