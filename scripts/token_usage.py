@@ -9,7 +9,9 @@ Membaca log sesi lokal `~/.claude/projects/<slug>/*.jsonl` beserta `<sesi>/subag
 - subagent per tipe dan model, serta ukuran balikannya ke main loop;
 - compaction (konteks sebelum/sesudah) dan rangkaian skill per sesi;
 - subperintah `explorer`: dispatch `code-explorer` per fase, profil (surface/blast), dan kedalaman (Langkah 31 X4),
-  serta blast yang berangkat sebelum dispatch surface sesi itu berbalik (Langkah 31 X5).
+  serta blast yang berangkat sebelum dispatch surface sesi itu berbalik (Langkah 31 X5). Sejak 32 T1 prompt
+  dispatch hanya kalimat rujukan ke `.explore/prompt/<nama>.md`; isi utuhnya dibaca dari hasil `Read` berkas itu
+  di transcript subagent. Rujukan yang tak terpulihkan berprofil dan berkedalaman `?`.
 
 Biaya dinyatakan dalam "token setara input" dengan bobot relatif (bawaan rasio harga Opus: cache read 0,1×,
 cache write 2×, output 5×) yang dapat diganti lewat `--bobot`. Angkanya untuk membandingkan sebelum/sesudah,
@@ -40,6 +42,7 @@ SKILL_RE = re.compile(r"Base directory for this skill: (\S+)")
 VERSI_RE = re.compile(r"^\d+(\.\d+)+$")
 HANDBACK_RE = re.compile(r'<agent-message from="([^"]+)"')
 KEDALAMAN_RE = re.compile(r"Kedalaman\W+(ringkas|menyeluruh)")
+PROMPT_REF_RE = re.compile(r"`([^`\s]*\.explore/prompt/[^`\s]+\.md)`")
 PRA_SKILL = "(pra-skill)"
 ASYNC_ACK = "Async agent launched"
 
@@ -378,9 +381,48 @@ def render(r: Dict[str, Any], top: int) -> str:
 
 # ============================================================ explorer (Langkah 31 X4)
 
-def profil_of(block: Dict[str, Any]) -> str:
-    prompt = str((block.get("input") or {}).get("prompt") or "")
+def profil_of(prompt: Optional[str]) -> str:
+    if prompt is None:
+        return "?"
     return "blast" if re.search(r"Blast Map|Profil B", prompt) else "surface"
+
+
+def read_prompts(recs: List[Dict[str, Any]]) -> List[Tuple[str, str]]:
+    """(file_path, isi) tiap `Read` di transcript subagent; isi dari `toolUseResult.file.content`, cadangannya
+    teks `tool_result` (berprefiks nomor baris)."""
+    paths: Dict[str, str] = {}
+    out: List[Tuple[str, str]] = []
+    for rec in recs:
+        content = (rec.get("message") or {}).get("content")
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            if rec.get("type") == "assistant" and block.get("type") == "tool_use" and block.get("name") == "Read":
+                paths[block.get("id", "")] = str((block.get("input") or {}).get("file_path") or "")
+            elif block.get("type") == "tool_result" and block.get("tool_use_id") in paths:
+                tur = rec.get("toolUseResult")
+                f = tur.get("file") if isinstance(tur, dict) else None
+                if isinstance(f, dict) and isinstance(f.get("content"), str):
+                    text = f["content"]
+                else:
+                    c = block.get("content")
+                    text = c if isinstance(c, str) else text_of({"content": c})
+                out.append((paths[block["tool_use_id"]], text))
+    return out
+
+
+def prompt_efektif(block: Dict[str, Any], reads: Dict[str, List[Tuple[str, str]]]) -> Optional[str]:
+    """Prompt utuh sebuah dispatch: langsung dari `input.prompt`, atau — bila prompt itu rujukan berkas (32 T1) —
+    gabungan isi `Read` berkas rujukan di transcript subagentnya. `None` = rujukan tak terpulihkan."""
+    prompt = str((block.get("input") or {}).get("prompt") or "")
+    ref = PROMPT_REF_RE.search(prompt)
+    if not ref:
+        return prompt
+    rel = ref.group(1)
+    text = "\n".join(t for p, t in reads.get(block.get("id", ""), []) if p.endswith(rel))
+    return text or None
 
 
 def analyze_explorer(files: List[Path], bobot: Dict[str, float], since: Optional[datetime] = None,
@@ -395,12 +437,15 @@ def analyze_explorer(files: List[Path], bobot: Dict[str, float], since: Optional
         # `meta.json` agent menyimpan `toolUseId` dispatch-nya: biaya dan balikan dipasangkan lewat id itu.
         cost_by_tool: Dict[str, float] = {}
         tool_by_agent: Dict[str, str] = {}
+        reads_by_tool: Dict[str, List[Tuple[str, str]]] = {}
         for aid, path, meta in subagents(f):
             if meta.get("agentType") != agent or not meta.get("toolUseId"):
                 continue
             tool_by_agent[aid] = meta["toolUseId"]
+            arecs = read_jsonl(path)
             cost_by_tool[meta["toolUseId"]] = sum(cost(tokens(m.get("usage") or {}), bobot)
-                                                  for _, m in unique_usage(read_jsonl(path)))
+                                                  for _, m in unique_usage(arecs))
+            reads_by_tool[meta["toolUseId"]] = read_prompts(arecs)
         current = PRA_SKILL
         count = Counter()
         tool_key: Dict[str, Tuple[str, str, str]] = {}
@@ -412,7 +457,7 @@ def analyze_explorer(files: List[Path], bobot: Dict[str, float], since: Optional
                       and block.get("name") in ("Agent", "Task")
                       and (block.get("input") or {}).get("subagent_type") == agent]
         surface_msgs = {(rec.get("message") or {}).get("id") for rec, block in dispatches
-                        if profil_of(block) == "surface"}
+                        if profil_of(prompt_efektif(block, reads_by_tool)) == "surface"}
         open_surface: set = set()
         for rec in recs:
             msg = rec.get("message") or {}
@@ -431,9 +476,9 @@ def analyze_explorer(files: List[Path], bobot: Dict[str, float], since: Optional
                     inp = block.get("input") or {}
                     if inp.get("subagent_type") != agent:
                         continue
-                    prompt = str(inp.get("prompt") or "")
-                    profil = profil_of(block)
-                    kd = KEDALAMAN_RE.search(prompt)
+                    prompt = prompt_efektif(block, reads_by_tool)
+                    profil = profil_of(prompt)
+                    kd = KEDALAMAN_RE.search(prompt) if prompt is not None else None
                     key = (current, profil, kd.group(1) if kd else "?")
                     row = rows[key]
                     row["n"] += 1

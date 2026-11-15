@@ -194,3 +194,100 @@ def test_x5_blast_tumpang_tindih_surface(tmp_path, pola, harap):
     rows = {b["profil"]: b for b in r["baris"]}
     assert rows["blast"]["n"] == 1 and rows["surface"]["n"] == 1
     assert rows["blast"]["tumpang_tindih"] == harap and rows["surface"]["tumpang_tindih"] == 0
+
+
+# ---- 32 T1: prompt dispatch hanya kalimat rujukan; isi utuh dibaca dari `Read` di transcript subagent
+
+REPO = "/home/u/work/app"
+BLAST = "Objective: dampak simbol X\nKedalaman: menyeluruh\n### Blast Map\nRAHASIA-PROMPT"
+SURFACE = "Objective: x\nKedalaman: ringkas\n### Error Surface\nRAHASIA-PROMPT"
+
+
+def _rel(nama):
+    return f"backenddev/docs/t1/.explore/prompt/{nama}.md"
+
+
+def _dispatch_ref(tid, nama):
+    return {"type": "tool_use", "id": tid, "name": "Agent",
+            "input": {"subagent_type": "backend:code-explorer",
+                      "prompt": f"Baca dan jalankan instruksi di `{_rel(nama)}`; jangan menyuntingnya."}}
+
+
+def _agent_read(nama, isi, tur=True, baca=True):
+    """Transcript subagent yang membaca berkas prompt rujukannya (bentuk log nyata Claude Code)."""
+    path = f"{REPO}/{_rel(nama)}"
+    recs = [{"type": "user", "message": {"role": "user", "content": f"Baca dan jalankan instruksi di `{_rel(nama)}`"}}]
+    if baca:
+        numbered = "\n".join(f"{i}\t{baris}" for i, baris in enumerate(isi.splitlines(), 1))
+        hasil = {"type": "user", "message": {"role": "user", "content": [
+            {"type": "tool_result", "tool_use_id": f"r_{nama}", "content": numbered}]}}
+        if tur:
+            hasil["toolUseResult"] = {"type": "text", "file": {"filePath": path, "content": isi}}
+        recs += [_assistant(f"ar_{nama}", _usage(cr=10), [
+                     {"type": "tool_use", "id": f"r_{nama}", "name": "Read", "input": {"file_path": path}}]),
+                 hasil]
+    return recs + [_assistant(f"ax_{nama}", _usage(cr=20))]
+
+
+def _sesi_ref(root, name, recs, agents):
+    sesi = root / "-repo-t1" / f"{name}.jsonl"
+    _write(sesi, [{"type": "user", "timestamp": "2026-11-12T01:00:00Z", "message": {"role": "user", "content": "q"}},
+                  _meta(SKILL.format("system-analysis")), *recs])
+    for aid, (tid, arecs) in agents.items():
+        _write(sesi.with_suffix("") / "subagents" / f"agent-{aid}.jsonl", arecs)
+        (sesi.with_suffix("") / "subagents" / f"agent-{aid}.meta.json").write_text(
+            json.dumps({"agentType": "backend:code-explorer", "toolUseId": tid}), encoding="utf-8")
+
+
+@pytest.mark.regression("32 T1")
+def test_t1_prompt_rujukan_dibaca_dari_read_subagent(tmp_path):
+    recs = [_assistant("m1", _usage(cr=1), [_dispatch_ref("t_s", "surf")]), _ack("t_s"), _handback("s"),
+            _assistant("m2", _usage(cr=1), [_dispatch_ref("t_b", "blast")]), _ack("t_b"), _handback("b")]
+    _sesi_ref(tmp_path, "x", recs, {"s": ("t_s", _agent_read("surf", SURFACE)),
+                                    "b": ("t_b", _agent_read("blast", BLAST, tur=False))})
+    r = _run(tmp_path, "explorer", "--slug=-repo-t1")
+    rows = {b["profil"]: b for b in r["baris"]}
+    assert (rows["surface"]["kedalaman"], rows["surface"]["n"]) == ("ringkas", 1)
+    # tanpa `toolUseResult`: teks tool_result berprefiks nomor baris tetap terbaca
+    assert (rows["blast"]["kedalaman"], rows["blast"]["n"], rows["blast"]["tumpang_tindih"]) == ("menyeluruh", 1, 0)
+    assert rows["blast"]["biaya"] > 0
+
+
+@pytest.mark.regression("32 T1")
+@pytest.mark.parametrize("pola, harap", [("satu_pesan", 1), ("berurutan", 0)])
+def test_t1_tumpang_tindih_dengan_prompt_rujukan(tmp_path, pola, harap):
+    if pola == "satu_pesan":
+        recs = [_assistant("m1", _usage(cr=1), [_dispatch_ref("t_b", "blast")]),
+                _assistant("m1", _usage(cr=1), [_dispatch_ref("t_s", "surf")]),
+                _ack("t_b"), _ack("t_s"), _handback("s"), _handback("b")]
+    else:
+        recs = [_assistant("m1", _usage(cr=1), [_dispatch_ref("t_s", "surf")]), _ack("t_s"), _handback("s"),
+                _assistant("m2", _usage(cr=1), [_dispatch_ref("t_b", "blast")]), _ack("t_b"), _handback("b")]
+    _sesi_ref(tmp_path, pola, recs, {"s": ("t_s", _agent_read("surf", SURFACE)),
+                                     "b": ("t_b", _agent_read("blast", BLAST))})
+    rows = {b["profil"]: b for b in _run(tmp_path, "explorer", "--slug=-repo-t1")["baris"]}
+    assert rows["blast"]["tumpang_tindih"] == harap
+
+
+@pytest.mark.regression("32 T1")
+def test_t1_rujukan_tak_terbaca_berprofil_tanya(tmp_path):
+    # surface tak terpulihkan (subagent tak membaca berkasnya) tidak boleh membuka jendela tumpang tindih
+    recs = [_assistant("m1", _usage(cr=1), [_dispatch_ref("t_s", "surf")]), _ack("t_s"),
+            _assistant("m2", _usage(cr=1), [_dispatch_ref("t_b", "blast")]), _ack("t_b"),
+            _handback("s"), _handback("b")]
+    _sesi_ref(tmp_path, "y", recs, {"s": ("t_s", _agent_read("surf", SURFACE, baca=False)),
+                                    "b": ("t_b", _agent_read("blast", BLAST))})
+    rows = {b["profil"]: b for b in _run(tmp_path, "explorer", "--slug=-repo-t1")["baris"]}
+    assert (rows["?"]["kedalaman"], rows["?"]["n"]) == ("?", 1)
+    assert "surface" not in rows
+    assert rows["blast"]["tumpang_tindih"] == 0
+
+
+@pytest.mark.regression("32 T1")
+def test_t1_isi_prompt_tidak_dicetak(tmp_path):
+    recs = [_assistant("m1", _usage(cr=1), [_dispatch_ref("t_b", "blast")]), _ack("t_b"), _handback("b")]
+    _sesi_ref(tmp_path, "z", recs, {"b": ("t_b", _agent_read("blast", BLAST))})
+    for extra in ([], ["--json"]):
+        proc = subprocess.run([sys.executable, str(SCRIPT), "explorer", "--slug=-repo-t1", "--projects-dir",
+                               str(tmp_path), *extra], capture_output=True, text=True, timeout=60)
+        assert proc.returncode == 0 and "RAHASIA-PROMPT" not in proc.stdout
