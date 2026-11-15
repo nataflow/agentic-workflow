@@ -28,7 +28,7 @@ untuk traversal dan memverifikasi commit-nya mendarat. Satu-satunya tulisan `arc
 | `READY`     | Commit ber-`commit_message` sudah mendarat, status tertinggal | `DONE` | `architect` (koreksi) | Commit korektif brief saja, lanjut `NN+1` |
 | `DONE`      | Traversal sesi baru (re-entrancy)           | `DONE`       | —                  | Lewati unit, pertahankan commit eksisting    |
 | `BLOCKED`   | Traversal sesi baru, belum digantikan        | `BLOCKED`    | —                  | **BERHENTI**, eskalasi ke `tech-lead` (lane `PLANNING`, taskdir sama) |
-| `BLOCKED`   | `scaffold_brief.py --nn` baris pengganti     | `SUPERSEDED` | `plan` (skrip)     | Lewati; pengganti dieksekusi di NN-nya       |
+| `BLOCKED`   | `scaffold_brief.py --all`/`--nn` baris pengganti | `SUPERSEDED` | `plan` (skrip)     | Lewati; pengganti dieksekusi di NN-nya       |
 | `READY`     | Terbit ulang sesudah perbaikan (D2-A)        | `SUPERSEDED` | `plan` (skrip)     | Lewati                                       |
 | `SUPERSEDED`| Traversal sesi baru                          | `SUPERSEDED` | —                  | Lewati                                       |
 
@@ -151,7 +151,7 @@ Tulis di disk, tanpa commit. Pencabutan tidak menghapus berkasnya: ia menambah `
 
 | Pencabut | Kapan | Mekanisme |
 | --- | --- | --- |
-| `plan` | Brief perbaikan ber-`repairs: brief-NN` ditulis `scaffold_brief.py --nn` | Skrip menulis `status: DICABUT` + `dicabut: brief-NN (repairs)` |
+| `plan` | Brief perbaikan ber-`repairs: brief-NN` ditulis `scaffold_brief.py --all`/`--nn` | Skrip menulis `status: DICABUT` + `dicabut: brief-NN (repairs)` |
 | `tech-lead` | `SCOPE`/`SYMBOL` diterima user, atau commit unit di-reset user | `doc_seal.py cabut-halt --alasan "<scope diterima user \| commit di-reset user>"`; sesudah reset juga `doc_seal.py buka-done --brief <NN>` (brief `DONE` → `READY`) |
 | `architect` | tidak pernah | — |
 

@@ -27,8 +27,9 @@ brief `SUPERSEDED` tidak dihitung — penggantinya yang memikul. `--include-lock
 bukan gerbang.
 
 State ronde self-review dimateraikan ke laci taskdir: `--open-round` sebelum
-dispatch (snapshot brief), `--record-round` sesudah balikan, `--review-state`
-untuk membacanya. Plafonnya per **generasi batch** — himpunan berkas brief yang
+dispatch (snapshot brief; keluarannya membawa state ronde dan brief berubah, dan
+menolak membuka ronde lanjutan tanpa brief berubah — 35 G2), `--record-round`
+sesudah balikan, `--review-state` untuk membacanya tanpa membuka ronde. Plafonnya per **generasi batch** — himpunan berkas brief yang
 ada — sehingga brief yang ditambahkan sesudah plafon habis tetap dapat direview.
 Laci dan brief sama-sama hanya ada di disk (Langkah 24): hilangnya state berarti
 hilangnya taskdir itu sendiri, bukan jatah ronde gratis.
@@ -1964,16 +1965,35 @@ def review_state_cli(validator: "BriefValidator", args: argparse.Namespace) -> N
     changed = validator.changed_since_last_round()
 
     if args.open_round:
+        # 35 G2: `--open-round` membawa state ronde sendiri, sehingga `--review-state` terpisah sebelum
+        # dispatch tidak lagi dibutuhkan.
         left, why = validator.rounds_left()
         if left <= 0:
             print(f"REVIEW STATE: [FAIL] ronde tidak dapat dibuka — {why}")
             sys.exit(1)
+        before = validator.read_round_state()
+        if before["history"] and not changed:
+            # Aturan slot `{brief_berubah}`: daftar kosong → tutup self-review tanpa dispatch. Ronde yang
+            # dibuka di titik ini tidak pernah punya sasaran, jadi state tidak disentuh.
+            print(f"REVIEW STATE: ronde tidak dibuka — tidak ada brief berubah sejak ronde "
+                  f"{before['history'][-1]['round']} ({before['history'][-1]['verdict']}); "
+                  f"tutup self-review tanpa dispatch.")
+            sys.exit(0)
+        stale = before["open"] if (before["open"] or {}).get("generation") == before["generation"] else None
         opened = validator.open_round()
+        total = int(before["total_rounds"])
         print(f"REVIEW STATE: ronde {opened['round']} dibuka "
               f"(generasi {opened['generation']}, {len(opened['snapshot'])} brief tersnapshot)")
+        print(f"    ronde terpakai {before['rounds']}/{MAX_ROUNDS} (sisa {left}, termasuk ronde ini) · "
+              f"taskdir {total}/{MAX_ROUNDS_TASKDIR}")
+        if stale:
+            print(f"    * ronde {stale['round']} sebelumnya terbuka tanpa vonis — snapshot-nya diganti "
+                  f"snapshot dispatch ini; vonis ronde itu tidak pernah dimateraikan.")
         print(f"    brief berubah sejak ronde terakhir: "
               f"{', '.join(changed) if changed else '(tidak ada)'}")
-        print("    Berangkatkan dispatch sekarang, lalu tutup dengan `--record-round`.")
+        print(f"    Slot dispatcher: `{{ronde}}` = {opened['round']}"
+              + (f", `{{brief_berubah}}` = baris di atas." if opened["round"] > 1 else ".")
+              + " Berangkatkan dispatch sekarang, lalu tutup dengan `--record-round`.")
         sys.exit(0)
 
     if args.record_round:

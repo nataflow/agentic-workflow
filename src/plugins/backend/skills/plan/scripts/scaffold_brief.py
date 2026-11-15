@@ -31,6 +31,12 @@ menyusul**.
   satu-satunya penulis transisi itu. Baris ber-`repairs` memperbaiki brief `DONE`
   yang ditahan `{taskdir}/HALT.md` dan mencabut penanda itu saat kerangkanya ditulis.
 
+* `--all` — kerangka `--nn` untuk tiap baris matriks yang berkasnya belum ada dan
+  NN-nya tidak terkunci, dalam satu panggilan (35 G1). Seluruh baris diperiksa
+  lebih dulu: satu baris gagal berarti tidak satu berkas pun ditulis, termasuk
+  transisi `SUPERSEDED` dan pencabutan `HALT.md`. Berkas yang sudah ada dilewati,
+  bukan ditimpa; menulis ulang satu kerangka tetap lewat `--nn <NN> --force`.
+
 Alasan urutannya: alokasi `AC`/`SC` adalah keputusan slicing. Menentukannya
 sesudah delapan brief ditulis berarti coverage yang bolong menuntut pembongkaran
 slicing — biaya yang tidak pernah perlu dibayar bila matriksnya dikunci lebih
@@ -530,7 +536,7 @@ class MatrixTool:
 
     # -- scaffold ----------------------------------------------------------
 
-    def scaffold(self, nn: str, force: bool) -> str:
+    def _require_matrix(self) -> Dict[str, Any]:
         matrix = self.load_matrix()
         if not matrix:
             raise SystemExit(
@@ -538,12 +544,48 @@ class MatrixTool:
                 f"Jalankan `--write-matrix` lebih dulu: kerangka brief diturunkan darinya, "
                 f"bukan diketik ulang."
             )
+        return matrix
 
+    def scaffold(self, nn: str, force: bool) -> str:
+        matrix = self._require_matrix()
         row = next((b for b in matrix.get("briefs", []) if str(b.get("nn")) == nn), None)
         if not row:
             raise SystemExit(f"Matriks tidak memuat baris untuk brief-{nn}.")
+        return self._apply(self._plan(matrix, row, self.locked_briefs(), force))
 
+    def scaffold_all(self) -> Tuple[List[str], List[str]]:
+        """Kerangka tiap baris matriks yang berkasnya belum ada dan NN-nya tidak terkunci (35 G1).
+
+        Seluruh baris direncanakan lebih dulu; satu baris gagal → tidak satu berkas pun ditulis, termasuk
+        transisi `SUPERSEDED` dan pencabutan `HALT.md`. Berkas yang sudah ada dilewati, bukan ditimpa.
+        Kembali `(laporan baris tertulis, catatan baris dilewati)`."""
+        matrix = self._require_matrix()
         locked = self.locked_briefs()
+        plans: List[Dict[str, Any]] = []
+        skipped: List[str] = []
+        problems: List[str] = []
+        for row in sorted(matrix.get("briefs", []), key=lambda b: str(b.get("nn")).zfill(4)):
+            nn = str(row.get("nn"))
+            path = self.taskdir / f"brief-{nn}-{row.get('unit')}.md"
+            if nn in locked:
+                skipped.append(f"brief-{nn}: `{locked[nn]}` (terkunci)")
+                continue
+            if path.exists():
+                skipped.append(f"{path.name}: sudah ada")
+                continue
+            try:
+                plans.append(self._plan(matrix, row, locked, False))
+            except SystemExit as exc:
+                problems.append(f"brief-{nn}: {exc}")
+        if problems:
+            raise SystemExit(f"{len(problems)} baris gagal; tidak satu kerangka pun ditulis.\n    - "
+                             + "\n    - ".join(problems))
+        return [self._apply(p) for p in plans], skipped
+
+    def _plan(self, matrix: Dict[str, Any], row: Dict[str, Any], locked: Dict[str, str],
+              force: bool) -> Dict[str, Any]:
+        """Periksa satu baris matriks dan susun isi kerangkanya tanpa menyentuh disk."""
+        nn = str(row["nn"])
         sup = _supersedes(row)
         for s in sup:
             if locked.get(s, "READY") not in SUPERSEDABLE or not list(self.taskdir.glob(f"brief-{s}-*.md")):
@@ -626,7 +668,12 @@ class MatrixTool:
                 ])
             lines.append("")
 
-        path.write_text("\n".join(lines), encoding="utf-8")
+        return {"nn": nn, "row": row, "path": path, "text": "\n".join(lines), "sup": sup}
+
+    def _apply(self, plan: Dict[str, Any]) -> str:
+        """Tulis kerangka hasil `_plan` beserta efek sampingnya (`SUPERSEDED`, pencabutan `HALT.md`)."""
+        nn, row, path, sup = plan["nn"], plan["row"], plan["path"], plan["sup"]
+        path.write_text(plan["text"], encoding="utf-8")
         touched = [path.name]
         disk = {b["nn"]: b for b in scan_briefs(self.taskdir)}
         for s in sup:
@@ -684,6 +731,9 @@ def main():
                         help="Kunci matriks alokasi batch dari --spec")
     parser.add_argument("--spec", help="Path JSON spesifikasi batch; `-` berarti stdin")
     parser.add_argument("--nn", help="Nomor brief yang kerangkanya ditulis dari matriks")
+    parser.add_argument("--all", action="store_true",
+                        help="Tulis kerangka tiap baris matriks yang berkasnya belum ada dan NN-nya tidak "
+                             "terkunci; satu baris gagal → tidak satu berkas pun ditulis")
     parser.add_argument("--risk", help="Plafon risk; fallback frontmatter risk: TASK.md")
     parser.add_argument("--append", action="store_true",
                         help="Tambahkan baris ke matriks eksisting; alokasi brief yang sudah "
@@ -776,11 +826,29 @@ def main():
         print(f"    sumbu   : AC {len(tool.ac_ids())} · SC {len(tool.sc_ids())} tertutup penuh")
         sys.exit(0)
 
+    if args.all and args.nn:
+        parser.error("`--all` dan `--nn` tidak dipakai bersamaan")
+    if args.all and args.force:
+        parser.error("`--all` tidak menimpa kerangka; tulis ulang satu brief lewat `--nn <NN> --force`")
+
+    if args.all:
+        try:
+            written, skipped = tool.scaffold_all()
+        except SystemExit as exc:
+            print(f"SCAFFOLD: [FAIL] {exc}")
+            sys.exit(1)
+        print(f"SCAFFOLD: [PASS] {len(written)} kerangka ditulis")
+        for report in written:
+            print(f"    {report}")
+        if skipped:
+            print(f"    dilewati: {'; '.join(skipped)}")
+        sys.exit(0)
+
     if args.nn:
         print(f"SCAFFOLD: [PASS]\n    {tool.scaffold(args.nn, args.force)}")
         sys.exit(0)
 
-    parser.error("pilih salah satu mode: `--write-matrix --spec <json>` atau `--nn <NN>`")
+    parser.error("pilih salah satu mode: `--write-matrix --spec <json>`, `--all`, atau `--nn <NN>`")
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ Path: `backenddev/docs/<YYMMDDhhmm>-<slug>/brief-<NN>-<unit>.md` Format Penamaan
 
 ______________________________________________________________________
 
-> **Kerangka ditulis skrip, bukan disalin tangan.** Blok bagian 1 di bawah adalah **contoh terisi domain nyata** — ia memperlihatkan bentuk tiap seksi, bukan teks yang disalin ke brief. Kerangka sesungguhnya dituliskan `../scripts/scaffold_brief.py --nn <NN>` dari matriks alokasi Fase 3 langkah 1: sepuluh seksi berurutan, frontmatter terisi, dan baris `Covers:` — plus `Fulfills:` pada rantai tanpa PRD — yang disalin dari matriks. Tiap seksi kosongnya membawa penanda `<!-- scaffold: ... -->` berisi predikat yang akan ditagih Fase 4; hapus penanda itu saat seksinya diisi. Penanda yang masih tersisa saat validasi berarti seksi itu belum digarap, dan `../scripts/validate_briefs.py` menolaknya lewat Check S.
+> **Kerangka ditulis skrip, bukan disalin tangan.** Blok bagian 1 di bawah adalah **contoh terisi domain nyata** — ia memperlihatkan bentuk tiap seksi, bukan teks yang disalin ke brief. Kerangka sesungguhnya dituliskan `../scripts/scaffold_brief.py --all` (atau `--nn <NN>` untuk satu brief) dari matriks alokasi Fase 3 langkah 1: sepuluh seksi berurutan, frontmatter terisi, dan baris `Covers:` — plus `Fulfills:` pada rantai tanpa PRD — yang disalin dari matriks. Tiap seksi kosongnya membawa penanda `<!-- scaffold: ... -->` berisi predikat yang akan ditagih Fase 4; hapus penanda itu saat seksinya diisi. Penanda yang masih tersisa saat validasi berarti seksi itu belum digarap, dan `../scripts/validate_briefs.py` menolaknya lewat Check S.
 
 ## 1. Template Kanonik Brief
 
@@ -108,11 +108,11 @@ ______________________________________________________________________
 
 2. **Status Siklus Hidup Brief (Frontmatter)** — empat nilai, tiap transisi punya satu penulis:
 
-   - `READY`: Ditulis `backend:plan` lewat `scaffold_brief.py --nn`. Seluruh brief lahir siap eksekusi tanpa fase draft.
+   - `READY`: Ditulis `backend:plan` lewat `scaffold_brief.py --all`/`--nn`. Seluruh brief lahir siap eksekusi tanpa fase draft.
    - `DONE`: Ditulis `code-implementor` di disk sesudah seluruh `## Steps` tuntas, tepat sebelum ia meng-commit perubahan `src/**`-nya bersubjek `commit_message`; commit itu bukti unit mendarat, dan brief sendiri tidak di-commit. Koreksi `READY → DONE` oleh `architect` sah hanya pada baris "commit ada, status tertinggal" matriks bukti disk (`architect/references/lifecycle-recovery.md` bagian 3), berupa suntingan status di disk.
    - `BLOCKED`: Ditulis `code-implementor` saat terhenti oleh *stop condition*. Brief `BLOCKED` menahan rantai sampai digantikan.
-   - `SUPERSEDED`: Ditulis **hanya** oleh `scaffold_brief.py --nn <NN-pengganti>` atas brief yang disebut kolom `supersedes` baris pengganti. Asal sah: `BLOCKED`, atau `READY` hilir yang diterbitkan ulang sesudah perbaikan supaya urutan `NN` tetap urutan eksekusi. Brief lama menerima `superseded_by: brief-<NN>`, brief pengganti membawa `supersedes: brief-<NN>[, brief-<NN>]`. `SUPERSEDED` tertutup: dilewati traversal `architect`, tidak dihitung predikat cakupan `Covers:`/`Fulfills:`, dan tidak pernah kembali ke status lain.
-   - Field `repairs: brief-<NN>` (bukan status): brief perbaikan atas brief `DONE` yang ditahan `{taskdir}/HALT.md` (gerbang kompilasi, scope, simbol, atau berkas liar `architect`). Ditulis `scaffold_brief.py --nn` dari kolom spec `repairs`, yang sekaligus mencabut `HALT.md`.
+   - `SUPERSEDED`: Ditulis **hanya** oleh `scaffold_brief.py` saat menulis kerangka brief pengganti (`--all`, atau `--nn <NN-pengganti>`) atas brief yang disebut kolom `supersedes` baris pengganti. Asal sah: `BLOCKED`, atau `READY` hilir yang diterbitkan ulang sesudah perbaikan supaya urutan `NN` tetap urutan eksekusi. Brief lama menerima `superseded_by: brief-<NN>`, brief pengganti membawa `supersedes: brief-<NN>[, brief-<NN>]`. `SUPERSEDED` tertutup: dilewati traversal `architect`, tidak dihitung predikat cakupan `Covers:`/`Fulfills:`, dan tidak pernah kembali ke status lain.
+   - Field `repairs: brief-<NN>` (bukan status): brief perbaikan atas brief `DONE` yang ditahan `{taskdir}/HALT.md` (gerbang kompilasi, scope, simbol, atau berkas liar `architect`). Ditulis `scaffold_brief.py --all`/`--nn` dari kolom spec `repairs`, yang sekaligus mencabut `HALT.md`.
 
    *(Dilarang memakai `DRAFT` atau `APPROVED` pada brief — approval berhenti di BRD dan PRD — dan dilarang menulis `SUPERSEDED` dengan tangan: Check C `validate_briefs.py` menolak tautan yang tidak dua arah.)*
 

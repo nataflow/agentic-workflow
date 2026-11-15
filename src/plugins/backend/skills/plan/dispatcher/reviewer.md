@@ -40,8 +40,8 @@ penilaian: keselarasan invariant `BR-{n}`, pendaratan empat pilar kontrak PRD, k
 | --- | --- | --- |
 | `{taskdir}` | Parameter `taskdir` skill pemanggil | Path taskdir aktif |
 | `{target}` | `{taskdir}/brief-*.md` pada ronde 1; `{brief_berubah}` pada ronde 2 | **Wajib terisi.** Ronde 1 menilai seluruh batch sekaligus dan dilarang dipecah per berkas |
-| `{ronde}` | Keluaran `scripts/validate_briefs.py --review-state` | `1` pada dispatch pertama, `2` pada dispatch ulang. Ronde 3 dilarang berangkat, dan hitungannya berlaku **per taskdir** — bukan per invokasi `plan`, karena ia dimateraikan ke laci, bukan diingat main loop |
-| `{brief_berubah}` | Baris `brief berubah sejak ronde terakhir` keluaran `--review-state` | Diisi hanya pada ronde > 1. Daftar kosong berarti tidak ada yang perlu dinilai ulang: tutup self-review tanpa dispatch |
+| `{ronde}` | Keluaran `scripts/validate_briefs.py --open-round` (baris `Slot dispatcher`) | `1` pada dispatch pertama, `2` pada dispatch ulang. Ronde 3 dilarang berangkat, dan hitungannya berlaku **per taskdir** — bukan per invokasi `plan`, karena ia dimateraikan ke laci, bukan diingat main loop |
+| `{brief_berubah}` | Baris `brief berubah sejak ronde terakhir` keluaran `--open-round` | Diisi hanya pada ronde > 1. Daftar kosong berarti tidak ada yang perlu dinilai ulang: `--open-round` sudah menolak membuka ronde itu — tutup self-review tanpa dispatch |
 | `{chain}` | Parameter `chain` skill pemanggil, yang diteruskan `backend:analyst` dari `TASK.md` | **Wajib terisi.** Kosong → batalkan dispatch dan minta nilainya ke `backend:analyst`. Dilarang menyimpulkannya dari artefak yang ada di disk: kesimpulan itu membuat rantai putus terbaca sebagai chain pendek yang sah |
 | `{previous_report}` | Laporan reviewer ronde sebelumnya | Diisi hanya pada ronde > 1; ronde 2 tanpa slot ini dilarang berangkat |
 

@@ -313,9 +313,9 @@ flowchart TD
 - **Langkah**:
   1. **Fase 1**: tetapkan jalur masuk dari `entry_mode` apa adanya (`references/entry-rules.md` bagian 1). Jalur `LANGSUNG` berhenti bila menyentuh salah satu dari 5 pemicu eskalasi: kontrak API, transisi status, validation policy, permission/scope, atau side-effect lintas modul.
   2. **Fase 2**: pemetaan 12 dimensi per unit (`references/slicing-and-scan.md`). Pada jalur `PRD`, laporan Profil S/B di laci dipanen lebih dulu: unit yang anchor-nya ada di laporan Profil S dan berkas test-nya di dimensi 11 Profil B tidak didispatch, dan celah yang tercatat didispatch delta (32 E2). Unit yang melebihi kuota didelegasikan ke fan-out `code-explorer` (≤4 serentak). Jalur non-PRD juga menjalankan sapuan 7 dimensi residual.
-  3. **Fase 3**: tulis `brief-spec.json`, lalu jalankan `scaffold_brief.py --write-matrix` (atau `--append` untuk taskdir ber-brief lama) yang mengunci matriks alokasi `covers`/`fulfills`. Sesudah itu `scaffold_brief.py --nn <NN>` menulis kerangka 10 seksi: Objective, Interfaces, File scope, Out of scope, Steps, Migration, Mirrored paths, Risk & rollback, Work status, dan Analysis trace. Tiap kerangka diisi, lalu `validate_briefs.py --brief <NN>` dijalankan per brief. Langit-langit slicing: 5 langkah **produksi** dan 4 berkas kode per brief; langkah yang hanya menyebut berkas test tidak dihitung (32 L1), plafon 120 baris `## Steps` tetap berlaku.
+  3. **Fase 3**: tulis `brief-spec.json`, lalu jalankan `scaffold_brief.py --write-matrix` (atau `--append` untuk taskdir ber-brief lama) yang mengunci matriks alokasi `covers`/`fulfills`. Bentuk JSON spec dicontohkan di SKILL Fase 3 butir 1, supaya sumber skrip tidak dibaca untuk menebaknya (35 G4). Sesudah itu `scaffold_brief.py --all` menulis kerangka 10 seksi untuk tiap baris matriks yang berkasnya belum ada dalam satu panggilan, semua-atau-tidak sama sekali (35 G1; `--nn <NN>` tetap ada untuk satu brief dan `--force`): Objective, Interfaces, File scope, Out of scope, Steps, Migration, Mirrored paths, Risk & rollback, Work status, dan Analysis trace. Tiap kerangka diisi; `validate_briefs.py --brief <NN>` hanya dijalankan atas brief pertama batch untuk menangkap cacat sistemik, sisanya ditagih gerbang batch Fase 4 (35 G3). Langit-langit slicing: 5 langkah **produksi** dan 4 berkas kode per brief; langkah yang hanya menyebut berkas test tidak dihitung (32 L1), plafon 120 baris `## Steps` tetap berlaku.
   4. **Fase 4**: `validate_briefs.py` atas seluruh batch (predikat mekanis). Check A (source coverage) dan arah baliknya (kecukupan unit) dinilai main loop.
-  5. **Fase 5**: `--review-state` → `--open-round` → `brief-reviewer` → `--record-round`, dengan plafon 2 ronde per generasi batch dan 4 per taskdir. Balikan tiap ronde ditulis apa adanya ke `{taskdir}/.explore/review/brief.md`. Lalu `doc_seal.py lock-briefs` (`sidik_kontrak` tiap brief `READY`) dan laporan satu baris; tabel per brief tidak dicetak karena `architect` Fase 2 menyajikannya sebelum eksekusi.
+  5. **Fase 5**: `--open-round` (membawa state ronde dan brief berubah; ronde lanjutan tanpa brief berubah tidak dibuka, 35 G2) → `brief-reviewer` → `--record-round`, dengan plafon 2 ronde per generasi batch dan 4 per taskdir. Balikan tiap ronde ditulis apa adanya ke `{taskdir}/.explore/review/brief.md`. Lalu `doc_seal.py lock-briefs` (`sidik_kontrak` tiap brief `READY`) dan laporan satu baris; tabel per brief tidak dicetak karena `architect` Fase 2 menyajikannya sebelum eksekusi.
 - **Subagent yang didispatch**: `code-explorer` (Fase 2) dan `brief-reviewer` (vonis `Approved`/`Issues Found`, temuan `BLOCKER [MEKANIS|SEMANTIK]` atau `ADVISORY`. Hanya `BLOCKER` yang menahan penguncian).
 - **Output / artefak**: `brief-<NN>-<unit>.md` berstatus `READY`, laci `.explore/brief-matrix.md` dan `.explore/review/brief.md`, dan `### BACKEND PLAN GENERATION REPORT — <n> BRIEF READY @ <sidik batch 12 hex> … Check 15/15 · … · review <path>`.
 - **Gerbang & commit**: batch dikunci `doc_seal.py lock-briefs` tanpa commit. Brief baru, brief yang di-`SUPERSEDED`, dan pencabutan `HALT.md` bila ada baris `repairs` (`doc_seal.py cabut-halt`) semuanya suntingan disk. Satu-satunya commit adalah penanda `OBSOLETE`/`DROPPED` di berkas `finding_source` (`backenddev/issues/`, dokumen repo): `docs(plan): tandai temuan <ID> untuk <slug>`. `src/` tidak disentuh sama sekali.
@@ -333,14 +333,17 @@ flowchart TD
     B2 --> C
     C --> D["Fase 3.1: scaffold_brief --write-matrix (kunci alokasi)"]
     D -->|FAIL| D
-    D --> E["Fase 3.2: scaffold_brief --nn NN → isi 10 seksi"]
-    E --> F["validate_briefs --brief NN"]
+    D --> E0["Fase 3.2: scaffold_brief --all (seluruh kerangka)"]
+    E0 --> E["Isi 10 seksi brief pertama"]
+    E --> F["validate_briefs --brief NN (brief pertama saja)"]
     F -->|FAIL| E
-    F -->|"brief berikutnya"| E
-    F --> G["Fase 4: validate_briefs batch + Check A"]
-    G -->|FAIL| E
-    G --> H["Fase 5: brief-reviewer (ronde ≤2)"]
-    H -->|"BLOCKER"| E
+    F --> E2["Isi brief berikutnya"]
+    E2 -->|"brief berikutnya"| E2
+    E2 --> G["Fase 4: validate_briefs batch + Check A"]
+    G -->|FAIL| FX["Perbaiki seluruh pelanggaran → validate batch sekali lagi"]
+    FX --> G
+    G --> H["Fase 5: --open-round → brief-reviewer (ronde ≤2)"]
+    H -->|"BLOCKER"| FX
     H -->|Approved| I["doc_seal.py lock-briefs (sidik_kontrak)"]
     I --> J["Kembali ke analyst / tech-lead (RCA)"]
 ```
