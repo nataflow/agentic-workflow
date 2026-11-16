@@ -268,7 +268,12 @@ def classify(root: Path, rel: str) -> Dict[str, str]:
         row.update(state="RUSAK", route="tiket READY dengan elisitasi OPEN atau tanpa kartu — `reopen` "
                                         "dulu lewat spec, atau pulihkan isinya")
     elif es == "OPEN":
-        row.update(state="ELISITASI", route="analyst:elicit (lanjutkan pertanyaan terbuka)")
+        # Tiket yang belum pernah dielisitasi (log kosong) — umumnya ekor batch yang ditinggal (38 B1). Keadaannya
+        # tetap ELISITASI; rute menyebutnya supaya user memutuskan, tanpa pembatalan otomatis.
+        untouched = not log_rows(text_of(ticket))
+        row.update(state="ELISITASI", route=(f"analyst:elicit (belum disentuh sejak {t.get('created', '-')} — "
+                                             "lanjutkan, atau batalkan atas keputusan user)") if untouched
+                   else "analyst:elicit (lanjutkan pertanyaan terbuka)")
     elif not has_card(ticket):
         row.update(state="SPEC", route="analyst:spec (tulis kartu tiket)")
     elif ts == "DRAFT":

@@ -85,3 +85,5 @@ Ringkasan, sesudah tiket urutan N atau saat user berhenti. Kolom `Keadaan` dari 
 | 2 | <ticketdir> | ELISITASI — tertahan: menunggu <siapa> | — |
 - **Belum disentuh**: <urutan yang tidak sempat diproses di sesi ini> | —
 ```
+
+User berhenti sebelum urutan N dan baris `Belum disentuh` terisi → sesudah ringkasan, satu `AskUserQuestion` untuk tiket-tiket itu saja: *Biarkan terbuka (Recommended)* — tetap di disk dan muncul di `ticket.py state` dengan rute `belum disentuh sejak <tanggal>` · *Batalkan yang belum disentuh* — `python3 <ticket.py> cancel --ticketdir <ticketdir> --reason "batch dihentikan sebelum dielisitasi"` per tiket. Tiket yang sudah punya log tanya-jawab (tertahan) tidak ikut ditawarkan, dan tidak ada pembatalan tanpa jawaban user: sebagian tiket memang sengaja ditahan.

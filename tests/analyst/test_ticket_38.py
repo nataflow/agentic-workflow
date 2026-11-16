@@ -248,3 +248,30 @@ def test_v1_path_root_relatif_tetap_dibaca_terhadap_root(repo):
     assert r.returncode == 0, r.stdout
     r = run_script(VALIDATE, "--kind", "elicit", "--ticketdir", "bukan/ticketdir", cwd=repo)
     assert r.returncode == 1 and "Letak ticketdir" in r.stdout
+
+
+# --- B1: ekor batch -----------------------------------------------------------------------------------
+
+@pytest.mark.regression("38 B1")
+def test_b1_elisitasi_tanpa_log_bertanda_belum_disentuh(make_repo):
+    root = make_repo(name="batch")
+    for k in (1, 2):
+        args = ["new", "--slug", f"tujuan-{k}", "--type", "FEATURE", "--requester", "Rina", "--request",
+                f"Tujuan {k}.", "--urutan", f"{k}/2"]
+        if k == 2:
+            args += ["--batch", batch]
+        r = tk(root, *args)
+        assert r.code == 0, r.out
+        if k == 1:
+            batch = r.out.split("batch=")[1].split()[0]
+    rows = {Path(rel).name.split("-", 1)[1]: row for rel, row in state(root).items()}
+    assert rows["tujuan-1"]["state"] == rows["tujuan-2"]["state"] == "ELISITASI"
+    assert "belum disentuh sejak" in rows["tujuan-2"]["route"] and "keputusan user" in rows["tujuan-2"]["route"]
+
+
+@pytest.mark.regression("38 B1")
+def test_b1_elisitasi_berlog_tetap_rute_lama(repo):
+    p = path(repo)
+    p.write_text(lib.set_frontmatter_field(p.read_text(encoding="utf-8"), "elicitation", "OPEN"), encoding="utf-8")
+    row = state(repo)[TDIR]
+    assert row["state"] == "ELISITASI" and row["route"] == "analyst:elicit (lanjutkan pertanyaan terbuka)"

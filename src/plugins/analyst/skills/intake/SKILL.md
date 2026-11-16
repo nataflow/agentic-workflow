@@ -31,9 +31,9 @@ Jalankan `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/ticket.py state`. Tiap ba
 | Keadaan | Rute |
 |---|---|
 | `KOSONG` | direktori tanpa berkas (sisa alokasi yang gagal sebelum `TICKET.md` tertulis; permintaan aslinya tidak tersimpan) → minta user menempelkan permintaan aslinya bila tidak ada di pesan ini, jalankan Phase 2–3, lalu `analyst:elicit` dengan `slug` dari nama direktori beserta `type`, `request`, dan `requester` — `ticket.py new` memakai ulang direktori itu |
-| `ELISITASI` | `analyst:elicit` — lanjutkan pertanyaan terbuka |
+| `ELISITASI` | `analyst:elicit` — lanjutkan pertanyaan terbuka. Rute `belum disentuh sejak <tanggal>` (log kosong, umumnya ekor batch yang ditinggal): lanjutkan hanya bila permintaan ini menyambungnya; selain itu biarkan, dan pembatalannya hanya atas keputusan user (`references/batch.md` bagian 10) |
 | `SPEC` / `DRAFT` | `analyst:spec` — tulis tiket, atau ajukan keputusan atas draft tertunda |
-| `DRIFT` | tiket `READY` disunting sesudah disetujui → tanyakan user: setujui ulang lewat `analyst:spec` (reopen), atau pulihkan isi yang disetujui |
+| `DRIFT` | tiket `READY` disunting sesudah disetujui → tanyakan user: setujui ulang lewat `analyst:spec` (reopen), atau pulihkan isi yang disetujui. Sidik tahan formatter markdown; tiket yang disetujui sebelum `ticket.py reseal` lalu diformat ulang tetap terbaca DRIFT dan disetujui ulang |
 | `RUSAK` | laporkan baris skrip apa adanya ke user; dilarang menambal frontmatter dengan tangan |
 | `NAMA_TIDAK_SAH` | bukan ticketdir analyst — laporkan baris skrip; tawarkan `git mv` ke nama `<YYMMDDhhmm>-<slug>` atau pindahkan keluar `analyst/tickets/` atas keputusan user |
 
