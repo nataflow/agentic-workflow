@@ -16,6 +16,8 @@
 - `confirm` VERIFICATION_MANUAL_REQUIRED → COMPLETED (manual) dengan jawaban user apa adanya; segel basi → FAIL.
 - `status`  ringkasan untuk execute/review (`--json`); `consistent` menilai blok terhadap checklist dan segel.
 - `unlock`  APPROVED → DRAFT untuk revisi atas permintaan user; blok eksekusi dipertahankan.
+- `commit`  commit berkas rencana APPROVED saja (staging eksplisit, `--only`), sebelum eksekusi dimulai (39 C1);
+            bukan repo git, diabaikan `.gitignore`, tanpa perubahan, atau blok eksekusi sudah ada → SKIP.
 - `sync-payload` sinkron nataflow untuk rencana yang pernah dikunci (`--plan`); tanpa menulis berkas. `--push` memanggil server langsung (MCP key `.claude/nataflow.local.json`) dan
             mencetak satu baris segmen (29 S4). Config `.claude/nataflow.json` absen → SKIP sebelum rencana dibaca.
 
@@ -567,6 +569,62 @@ def cmd_unlock(p: Plan, a) -> int:
     return 0
 
 
+def git_error_line(out: str) -> str:
+    """Baris galat git yang bermakna: `fatal:`/`error:` lebih dulu, lalu baris non-`hint:` pertama."""
+    lines = [x.strip() for x in out.splitlines() if x.strip()]
+    for prefix in ("fatal:", "error:"):
+        hit = [x for x in lines if x.startswith(prefix)]
+        if hit:
+            return hit[0]
+    plain = [x for x in lines if not x.startswith("hint:")]
+    return " ".join(plain[:2]) if plain else (lines[0] if lines else "-")
+
+
+def cmd_commit(p: Plan, a) -> int:
+    """Commit berkas rencana yang baru dikunci, dan hanya berkas itu (39 C1).
+
+    Staging eksplisit + `--only`: index lain milik user tidak ikut. Bukan kegagalan (`COMMIT SKIP`, exit 0):
+    bukan repo git, rencana diabaikan `.gitignore`, isi sudah sama dengan HEAD, atau rencana sudah punya blok
+    `## Execution Status` (revisi sesudah eksekusi dimulai; rencana ikut commit kode milik user supaya `Base-Commit`
+    tidak tertinggal commit yang hanya berisi rencana). Commit gagal (hook, gpg, identitas) → exit 3.
+    """
+    if p.meta().get("Status") != "APPROVED" or p.meta().get("Plan-Hash") != plan_digest(p):
+        return fail("COMMIT FAIL: rencana bukan APPROVED atau sidiknya tidak cocok — `verify` dulu")
+    if p.exec_start < len(p.lines):
+        print(f"COMMIT SKIP: rencana sudah punya blok `{EXEC_H2}` — ikut commit kode, keputusan user")
+        return 0
+    top = repo_top(p)
+    if top is None:
+        print("COMMIT SKIP: bukan repo git")
+        return 0
+    rel = p.path.resolve().relative_to(top.resolve()).as_posix()
+    tracked = git(top, "ls-files", "--error-unmatch", "--", rel)
+    tracked = tracked is not None and tracked.returncode == 0
+    if not tracked:
+        ign = git(top, "check-ignore", "-q", "--", rel)
+        if ign is not None and ign.returncode == 0:
+            print(f"COMMIT SKIP: {rel} diabaikan .gitignore")
+            return 0
+    subject = f"docs(plan): setujui rencana {p.path.stem}"
+    for args in (["add", *(["-u"] if tracked else []), "--", rel],
+                 ["diff", "--cached", "--quiet", "--", rel],
+                 ["commit", "-q", "-m", subject, "--only", "--", rel]):
+        r = git(top, *args)
+        if r is None:
+            return fail("COMMIT FAIL: git tidak ada")
+        if args[0] == "diff":
+            if r.returncode == 0:
+                print(f"COMMIT SKIP: {rel} sudah sama dengan HEAD")
+                return 0
+            continue
+        if r.returncode != 0:
+            print(f"COMMIT GAGAL: {git_error_line(r.stdout + r.stderr)} — rencana tetap APPROVED; commit manual "
+                  f"`git add -- {rel} && git commit -m \"{subject}\" -- {rel}` sesudah sebabnya dibereskan")
+            return 3
+    print(f"COMMIT PASS: {rel} @{head_commit(top)[:12]}")
+    return 0
+
+
 def cmd_status(p: Plan, a) -> int:
     m, b, steps = p.meta(), p.block(), p.steps()
     rnd, why = remediation_round(b), inconsistency(p)
@@ -761,7 +819,7 @@ def main_sync(a) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description="Kunci rencana quickdev")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in ("lock", "verify", "start", "baseline", "close", "confirm", "status", "unlock"):
+    for name in ("lock", "verify", "start", "baseline", "close", "confirm", "status", "unlock", "commit"):
         s = sub.add_parser(name)
         s.add_argument("--plan", required=True)
         if name == "baseline":

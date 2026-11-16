@@ -22,7 +22,7 @@ def section(text, start, end):
 def test_q2_review_tidak_memanggil_execute():
     fase5 = section(skill("review"), "### Fase 5", "## Guardrails")
     assert "memanggil `quickdev:execute`" not in fase5
-    assert "/quickdev:execute" in fase5 and "disable-model-invocation" in fase5
+    assert "/quickdev:execute" in fase5 and "remediasi adalah keputusan user" in fase5   # 39 A3
     param = section(skill("execute"), "- `review_findings`", "\n## ")
     assert "laporan `quickdev:review` `CHANGES_REQUIRED` terakhir di percakapan" in param
 

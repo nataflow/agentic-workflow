@@ -19,7 +19,7 @@ DILARANG MENULIS KODE SUMBER SEBELUM RENCANA DISETUJUI USER SECARA EKSPLISIT DAN
 
 - Skill ini bagian dari alur ringan `quickdev` (`plan/<task>.md`, tanpa taskdir). Setiap rujukan skill di berkas ini berarti `quickdev:*`. Dilarang memakai `backend:*` atau `frontend:*` sebagai pengganti langkahnya.
 - Bila konteks sesi memuat blok `<backend-tech-lead-gate>` atau `<frontend-lead-gate>`:
-  - User memanggil `/quickdev:<skill>` secara eksplisit, atau melanjutkan artefak quickdev (`plan/<task>.md`) → lanjutkan skill ini. Blok gerbang itu mengecualikan alur plugin lain yang dipanggil eksplisit.
+  - User memanggil `/quickdev:<skill>` secara eksplisit, skill ini dipanggil skill quickdev lain di rantai `plan → execute → review`, atau user melanjutkan artefak quickdev (`plan/<task>.md`) → lanjutkan skill ini. Blok gerbang itu mengecualikan alur plugin lain yang dipanggil eksplisit.
   - Permintaan kerja baru tanpa pilihan alur → tanyakan sekali lewat `AskUserQuestion`: "Alur ringan quickdev (`plan/<task>.md`)" atau "Gerbang `<backend:tech-lead | frontend:lead>` (taskdir + brief)". Jangan memilih sendiri.
 - `.claude/workflow` ada dan tidak memuat kata `quickdev` → repo ini memilih alur lain; laporkan dan tanyakan dulu sebelum lanjut.
 - Penanda opt-out `.claude/workflow` (nama plugin yang boleh menggerbangi repo, dipisah spasi, koma, atau baris): isi `quickdev` membuat hook SessionStart `backend`/`frontend` diam; isi `frontend quickdev` hanya menyalakan hook `frontend`. Penawarannya ada di Fase 0 butir 6.
@@ -88,10 +88,10 @@ User meminta sinkron ulang rencana yang sudah ada ("sinkron ulang `<plan_path>`"
 ### Fase 4 — Presentasi Draf & Approval Gate
 
 1. Sajikan **ringkasan gerbang**, bukan isi rencana: baris `PLAN — DRAFT · <plan_dir>/<task_name>.md · <n> langkah · <n> berkas`, lalu 3–4 kalimat — pendekatan, keputusan desain kunci, perubahan skema atau dependensi baru bila ada, dan risiko terbesarnya. Sebut dalam satu frasa: `task_name` hasil turunan, asumsi yang dipilih user, alternatif yang ditolak, dan perintah verifikasi bertanda `menyentuh DB/jaringan`. Daftar langkah dan path berkas tetap di rencana; dilarang menyalinnya ke chat. Tutup ringkasan dengan baris `Baca rencana lengkap sebelum menyetujui: <plan_dir>/<task_name>.md (<n> AC, <n> langkah)`. User meminta rincian → sajikan section yang diminta saja, lalu ajukan ulang butir 2.
-2. Minta persetujuan eksplisit lewat `AskUserQuestion`: *Setujui rencana* · *Revisi (sebut poinnya)*. Persetujuan mencakup izin menjalankan perintah Section 4; perintah bertanda `menyentuh DB/jaringan` tetap ditanyakan `quickdev:execute` sebelum dijalankan. Diam atau jawaban ambigu bukan persetujuan.
+2. Minta persetujuan eksplisit lewat `AskUserQuestion`: *Setujui & eksekusi (Recommended)* · *Setujui saja* · *Revisi (sebut poinnya)*. Kedua opsi setuju mencakup commit berkas rencana (Fase 5 butir 2); *Setujui & eksekusi* juga langsung menjalankan `quickdev:execute` sesudah penguncian, tanpa pertanyaan lanjutan. Persetujuan mencakup izin menjalankan perintah Section 4; perintah bertanda `menyentuh DB/jaringan` tetap ditanyakan `quickdev:execute` sebelum dijalankan. Diam atau jawaban ambigu bukan persetujuan.
 3. Tangani respons:
    - **Revisi**: perbarui rencana, pertahankan `Status: DRAFT`, ajukan ulang. Rencana yang sudah memuat `## Execution Status`: revisi hanya Section 1–5 lewat Edit terarah; blok itu dan checkbox langkah yang teksnya tidak berubah dipertahankan, sedangkan langkah yang teksnya berubah dikembalikan ke `- [ ]` supaya `quickdev:execute` mengerjakannya ulang.
-   - **Persetujuan eksplisit**: jalankan perintah di bawah dengan jawaban user apa adanya lewat stdin. Heredoc berkutip mencegah shell mengekspansi `` ` `` dan `$`; dilarang memakai kutip ganda. `LOCK FAIL` → perbaiki sebabnya; dilarang menulis `Status: APPROVED` dengan tangan.
+   - **Persetujuan eksplisit** (*Setujui & eksekusi* atau *Setujui saja*): jalankan perintah di bawah dengan jawaban user apa adanya lewat stdin. Heredoc berkutip mencegah shell mengekspansi `` ` `` dan `$`; dilarang memakai kutip ganda. `LOCK FAIL` → perbaiki sebabnya; dilarang menulis `Status: APPROVED` dengan tangan.
 
      ```
      python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py lock --plan <plan_dir>/<task_name>.md --answer - <<'QD_EOF'
@@ -102,15 +102,17 @@ User meminta sinkron ulang rencana yang sudah ada ("sinkron ulang `<plan_path>`"
 ### Fase 5 — Penguncian & Handoff
 
 1. Pastikan keluaran `LOCK PASS` memuat sidik; `Approved-At`, `Approval`, `Hash-Scope`, dan `Plan-Hash` sudah ditulis skrip.
-2. **Sinkron nataflow**: jalankan prosedur `references/nataflow-sync.md` atas `<plan_dir>/<task_name>.md` apa adanya; hasilnya baris `NATAFLOW:` ringkasan. `GAGAL` tidak membatalkan `PLAN_APPROVED`.
-3. Set status terminal `PLAN_APPROVED`.
-4. Tawarkan `quickdev:execute` (`/quickdev:execute <plan_dir>/<task_name>.md`, sesudah user meng-commit rencana `APPROVED` bila ingin riwayatnya terlihat); tunggu user.
+2. **Commit rencana**: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py commit --plan <plan_dir>/<task_name>.md`. Skrip meng-commit berkas rencana saja (staging eksplisit, `--only`) di branch aktif dengan subjek `docs(plan): setujui rencana <task_name>`; index dan working tree user lainnya tidak disentuh. `COMMIT PASS` atau `COMMIT SKIP` (bukan repo git, diabaikan `.gitignore`, tanpa perubahan, atau blok `## Execution Status` sudah ada) → lanjut. `COMMIT GAGAL` (exit 3: hook, gpg, identitas git) → sajikan sebab dan perintah manual dari skrip, lalu lanjut; `PLAN_APPROVED` tidak batal. Dilarang mengulang dengan `--no-verify` atau meng-commit berkas lain. Commit mendahului sinkron supaya cermin nataflow mencatat sha commit rencana.
+3. **Sinkron nataflow**: jalankan prosedur `references/nataflow-sync.md` atas `<plan_dir>/<task_name>.md` apa adanya; hasilnya baris `NATAFLOW:` ringkasan. `GAGAL` tidak membatalkan `PLAN_APPROVED`.
+4. Set status terminal `PLAN_APPROVED` dan sajikan ringkasan akhir.
+5. Jawaban *Setujui & eksekusi* → langsung panggil tool `Skill` dengan `quickdev:execute` dan argumen `<plan_dir>/<task_name>.md`, tanpa bertanya lagi. Jawaban *Setujui saja* → tawarkan `/quickdev:execute <plan_dir>/<task_name>.md`; tunggu user.
 
 ## Guardrails
 
 - MUST NOT menulis, mengubah, atau membuat kode sumber fungsional selama skill ini berjalan.
 - MUST NOT menjalankan perintah verifikasi, build, test, atau migrasi di skill ini; baseline milik `quickdev:execute`.
 - MUST NOT mengizinkan transisi ke `PLAN_APPROVED` tanpa persetujuan eksplisit tertulis dari user.
+- MUST NOT meng-commit apa pun selain berkas rencana lewat `plan_lock.py commit`, atau melewati hook git (`--no-verify`).
 - MUST NOT membuat langkah yang ambigu tanpa path berkas target yang pasti, atau mencantumkan path dan simbol yang tidak terbukti di repo.
 - MUST NOT melompati Section 4 (tabel perintah verifikasi).
 - MUST NOT mengubah Section 1–5 berkas `APPROVED`. Revisi atas permintaan user: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py unlock --plan <plan_path> --reason - <<'QD_EOF'` (alasan lewat stdin, ditutup `QD_EOF`) → prosedur `references/nataflow-sync.md` (cermin menjadi `DRAFT`) → revisi → approval ulang (`lock`). Blok `## Execution Status` dipertahankan apa adanya. Rencana `APPROVED` tanpa `Plan-Hash` (format lama) diperlakukan sama: `unlock`, lalu minta user menyetujui ulang.
@@ -132,8 +134,9 @@ User meminta sinkron ulang rencana yang sudah ada ("sinkron ulang `<plan_path>`"
    KUNCI: Plan-Hash <12 hex> — Approval "<kutipan jawaban user>"
    VERIFIKASI: typecheck=<perintah|TIDAK_ADA> lint=<…> test=<…> build=<…> — DB/jaringan: <daftar | ->
    REVISI: <n> putaran sebelum disetujui
+   COMMIT: <sha12> | SKIP: <sebab> | GAGAL: <sebab>
    NATAFLOW: workdir <nama> · <n> dokumen (<c> baru, <u> diperbarui, <s> sama) | dilewati | GAGAL: <sebab>
-   HANDOFF: execute (plan_path=<plan_dir>/<task_name>.md)
+   HANDOFF: execute (plan_path=<plan_dir>/<task_name>.md) — <dipanggil langsung | ditawarkan>
    ```
 
 ## Failure path

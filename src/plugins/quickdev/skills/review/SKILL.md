@@ -1,7 +1,6 @@
 ---
 name: review
-description: Alur ringan quickdev (plan/<task>.md, tanpa taskdir dan tanpa profil repo) — menilai diff uncommitted hasil quickdev:execute terhadap plan/<task>.md dan konvensi kode di sekitarnya sebelum commit; dipanggil eksplisit lewat /quickdev:review.
-disable-model-invocation: true
+description: Alur ringan quickdev (plan/<task>.md, tanpa taskdir dan tanpa profil repo) — menilai diff uncommitted hasil quickdev:execute terhadap plan/<task>.md dan konvensi kode di sekitarnya sebelum commit; dipanggil quickdev:execute sesudah COMPLETED, atau eksplisit lewat /quickdev:review. Bukan untuk review kode umum tanpa rencana quickdev.
 ---
 
 ## THE IRON LAW
@@ -20,7 +19,7 @@ DILARANG MELAPORKAN SATU TEMUAN PUN TANPA BUKTI PATH BERKAS DAN NOMOR BARIS NYAT
 
 - Skill ini bagian dari alur ringan `quickdev` (`plan/<task>.md`, tanpa taskdir). Setiap rujukan skill di berkas ini berarti `quickdev:*`. Dilarang memakai `backend:*` atau `frontend:*` sebagai pengganti langkahnya.
 - Bila konteks sesi memuat blok `<backend-tech-lead-gate>` atau `<frontend-lead-gate>`:
-  - User memanggil `/quickdev:<skill>` secara eksplisit, atau melanjutkan artefak quickdev (`plan/<task>.md`) → lanjutkan skill ini. Blok gerbang itu mengecualikan alur plugin lain yang dipanggil eksplisit.
+  - User memanggil `/quickdev:<skill>` secara eksplisit, skill ini dipanggil skill quickdev lain di rantai `plan → execute → review`, atau user melanjutkan artefak quickdev (`plan/<task>.md`) → lanjutkan skill ini. Blok gerbang itu mengecualikan alur plugin lain yang dipanggil eksplisit.
   - Permintaan kerja baru tanpa pilihan alur → tanyakan sekali lewat `AskUserQuestion`: "Alur ringan quickdev (`plan/<task>.md`)" atau "Gerbang `<backend:tech-lead | frontend:lead>` (taskdir + brief)". Jangan memilih sendiri.
 - `.claude/workflow` ada dan tidak memuat kata `quickdev` → repo ini memilih alur lain; laporkan dan tanyakan dulu sebelum lanjut.
 - Penanda opt-out `.claude/workflow` (nama plugin yang boleh menggerbangi repo, dipisah spasi, koma, atau baris): isi `quickdev` membuat hook SessionStart `backend`/`frontend` diam; isi `frontend quickdev` hanya menyalakan hook `frontend`.
@@ -37,7 +36,7 @@ DILARANG MELAPORKAN SATU TEMUAN PUN TANPA BUKTI PATH BERKAS DAN NOMOR BARIS NYAT
 
 ### Fase 1 — Validasi Precondition & Pengumpulan Diff
 
-1. Verifikasi kelima precondition secara berurutan; setiap kegagalan menghentikan skill seketika dengan pesan blocker spesifik, bukan peringatan lunak. Bila review dijalankan di sesi yang sama dengan `quickdev:execute`, nyatakan di ringkasan (`MODE: … sesi-sama=ya`) dan sarankan user menjalankan ulang `/quickdev:review` di sesi baru untuk putaran terakhir.
+1. Verifikasi kelima precondition secara berurutan; setiap kegagalan menghentikan skill seketika dengan pesan blocker spesifik, bukan peringatan lunak. Bila review dijalankan di sesi yang sama dengan `quickdev:execute` (termasuk saat dipanggil langsung oleh `quickdev:execute`), nyatakan di ringkasan (`MODE: … sesi-sama=ya`) dan sarankan user menjalankan ulang `/quickdev:review` di sesi baru untuk putaran terakhir.
 2. Tetapkan `<BASE>`: `base_ref` bila terisi; selain itu `execution.Base-Commit` dari `plan_lock.py status --json`; blok tanpa `Base-Commit` → `HEAD`. `Base-Commit: none` (repo tanpa commit) → `<BASE>` = tree kosong `$(git hash-object -t tree /dev/null)`. `Base-Note` terisi → sebutkan di ringkasan bahwa kerja yang di-commit sebelum base tidak terlihat. `base_ref` kosong dan `base_drift` dari `status --json` ≠ `-` (base bukan leluhur HEAD karena rebase, amend, atau pindah branch) → hentikan sebelum membaca diff dan `AskUserQuestion`: *Sebutkan `base_ref`* · *Pakai base tercatat — diff memuat perubahan di luar tugas, dicatat di baris `MODE`* · *Batal*. `commits_since_base` > 0 → sebutkan di ringkasan bahwa commit itu dinilai sebagai bagian tugas.
 3. Kumpulkan daftar berkas terdampak dari dua sumber: `git diff <BASE> --name-status` (atau `git diff --name-status` bila `include_staged` bernilai `false`) untuk berkas tracked, dan `git ls-files --others --exclude-standard` untuk berkas untracked (catat berstatus `A`). Keluarkan seluruh berkas di bawah `<plan_dir>/` (dan `Profile:` rencana 0.11 bila tercatat) dari daftar karena keduanya artefak gate, bukan hasil implementasi.
 4. Kumpulkan isi perubahan beserta nomor baris: `git diff <BASE> -U3` (atau `git diff -U3` bila `include_staged` bernilai `false`) untuk berkas tracked, dengan pemetaan setiap hunk ke rentang baris berkas hasil; untuk berkas untracked, baca berkas utuh dan perlakukan seluruh barisnya sebagai baris tambahan. Bukti `file:line` wajib merujuk nomor baris berkas hasil.
@@ -81,7 +80,7 @@ Untuk dimensi 7, telusuri pemanggil setiap simbol yang diubah menggunakan pencar
 
 1. Tentukan status terminal: `CHANGES_REQUIRED` bila terdapat minimal satu temuan `BLOCKER` atau `MAJOR`, atau bila `strict` bernilai `true` dan terdapat temuan `MINOR`. Selain itu `REVIEWED`.
 2. Sajikan daftar temuan terurut menurun berdasarkan severity, lalu tabel cakupan tujuh dimensi, lalu ringkasan akhir maksimal 17 baris.
-3. Bila status `CHANGES_REQUIRED`: sajikan temuan, lalu `AskUserQuestion`: *Remediasi otomatis (putaran <n+1>/2)* · *Revisi rencana (`quickdev:plan`)* · *Terima apa adanya — keputusan commit di tangan user*. Opsi pertama tidak ditawarkan bila `remediation_round` (dari `plan_lock.py status --json`) sudah 2. Review tidak memanggil skill lain: ketiga skill quickdev ber-`disable-model-invocation`, sehingga opsi pertama ditutup dengan `HANDOFF: execute (remediasi)` dan perintah `/quickdev:execute <plan_path>` untuk diketik user di sesi yang sama — `quickdev:execute` mengambil temuan dari laporan ini sebagai `review_findings`. Sesi berganti sebelum itu → user menjalankan `/quickdev:review` ulang dulu. Jawaban user dikutip apa adanya di laporan. Dilarang memperbaiki sendiri di sesi review.
+3. Bila status `CHANGES_REQUIRED`: sajikan temuan, lalu `AskUserQuestion`: *Remediasi otomatis (putaran <n+1>/2)* · *Revisi rencana (`quickdev:plan`)* · *Terima apa adanya — keputusan commit di tangan user*. Opsi pertama tidak ditawarkan bila `remediation_round` (dari `plan_lock.py status --json`) sudah 2. Review tidak meneruskan ke skill lain sendiri: remediasi adalah keputusan user, sehingga opsi pertama ditutup dengan `HANDOFF: execute (remediasi)` dan perintah `/quickdev:execute <plan_path>` untuk diketik user di sesi yang sama — `quickdev:execute` mengambil temuan dari laporan ini sebagai `review_findings`. Sesi berganti sebelum itu → user menjalankan `/quickdev:review` ulang dulu. Jawaban user dikutip apa adanya di laporan. Dilarang memperbaiki sendiri di sesi review.
 4. Bila status `REVIEWED`, nyatakan bahwa keputusan commit atau merge menunggu tindakan user.
 
 ## Guardrails

@@ -44,8 +44,13 @@ def test_koeksistensi_section_present(path):
 
 @pytest.mark.parametrize("path", SKILLS, ids=IDS)
 def test_disable_model_invocation(path):
-    """K7: ketiga skill quickdev hanya dipanggil eksplisit lewat /quickdev:<skill>."""
-    assert _frontmatter(path).get("disable-model-invocation") == "true"
+    """K7 → 39 A1: `plan` hanya dipanggil user; `execute`/`review` boleh dipanggil model supaya rantai
+    plan → execute → review berjalan tanpa jeda. Gerbangnya `plan_lock.py verify/start/status`, bukan frontmatter."""
+    front = _frontmatter(path)
+    if path.parent.name == "plan":
+        assert front.get("disable-model-invocation") == "true"
+    else:
+        assert "disable-model-invocation" not in front and front.get("user-invocable", "true") == "true"
 
 
 @pytest.mark.regression("34 E1")

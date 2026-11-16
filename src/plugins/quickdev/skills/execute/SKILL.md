@@ -1,7 +1,6 @@
 ---
 name: execute
-description: Alur ringan quickdev (plan/<task>.md, tanpa taskdir dan tanpa profil repo) — menerapkan plan/<task>.md berstatus APPROVED ke kode dan menjalankan perintah verifikasi Section 4 rencana terhadap baseline segar; dipanggil eksplisit lewat /quickdev:execute.
-disable-model-invocation: true
+description: Alur ringan quickdev (plan/<task>.md, tanpa taskdir dan tanpa profil repo) — menerapkan plan/<task>.md berstatus APPROVED ke kode dan menjalankan perintah verifikasi Section 4 rencana terhadap baseline segar; dipanggil quickdev:plan sesudah user memilih Setujui & eksekusi, atau eksplisit lewat /quickdev:execute. Bukan untuk permintaan kerja tanpa rencana quickdev APPROVED.
 ---
 
 ## THE IRON LAW
@@ -20,7 +19,7 @@ DILARANG MEMULAI EKSEKUSI JIKA DOKUMEN RENCANA IMPLEMENTASI BELUM BERSTATUS APPR
 
 - Skill ini bagian dari alur ringan `quickdev` (`plan/<task>.md`, tanpa taskdir). Setiap rujukan skill di berkas ini berarti `quickdev:*`. Dilarang memakai `backend:*` atau `frontend:*` sebagai pengganti langkahnya.
 - Bila konteks sesi memuat blok `<backend-tech-lead-gate>` atau `<frontend-lead-gate>`:
-  - User memanggil `/quickdev:<skill>` secara eksplisit, atau melanjutkan artefak quickdev (`plan/<task>.md`) → lanjutkan skill ini. Blok gerbang itu mengecualikan alur plugin lain yang dipanggil eksplisit.
+  - User memanggil `/quickdev:<skill>` secara eksplisit, skill ini dipanggil skill quickdev lain di rantai `plan → execute → review`, atau user melanjutkan artefak quickdev (`plan/<task>.md`) → lanjutkan skill ini. Blok gerbang itu mengecualikan alur plugin lain yang dipanggil eksplisit.
   - Permintaan kerja baru tanpa pilihan alur → tanyakan sekali lewat `AskUserQuestion`: "Alur ringan quickdev (`plan/<task>.md`)" atau "Gerbang `<backend:tech-lead | frontend:lead>` (taskdir + brief)". Jangan memilih sendiri.
 - `.claude/workflow` ada dan tidak memuat kata `quickdev` → repo ini memilih alur lain; laporkan dan tanyakan dulu sebelum lanjut.
 - Penanda opt-out `.claude/workflow` (nama plugin yang boleh menggerbangi repo, dipisah spasi, koma, atau baris): isi `quickdev` membuat hook SessionStart `backend`/`frontend` diam; isi `frontend quickdev` hanya menyalakan hook `frontend`.
@@ -129,7 +128,7 @@ QD_EOF
    - Catatan instruksi pengujian manual untuk user (jika melibatkan interaksi visual UI atau pengetesan API via cURL/Postman).
 3. Set status terminal `COMPLETED`, atau `VERIFICATION_MANUAL_REQUIRED` bila verifikasi tidak dijalankan otomatis atau lingkungan belum siap (Fase 3 butir 1–2).
 4. Sajikan hasil akhir implementasi kepada user secara transparan.
-5. Tawarkan `quickdev:review`: biarkan perubahan tetap uncommitted di working tree dan sebutkan `plan_path` sebagai kontrak pembanding, agar `quickdev:review` dapat menilai diff sejak `Base-Commit` sebelum keputusan commit atau merge diambil user. `VERIFICATION_MANUAL_REQUIRED`: minta user menjalankan perintah manual lalu memanggil `quickdev:execute` lagi (mode `manual`) untuk mencatat konfirmasinya.
+5. Status `COMPLETED` (termasuk putaran remediasi) → sajikan ringkasan akhir, lalu langsung panggil tool `Skill` dengan `quickdev:review` dan argumen `<plan_path>`, tanpa bertanya lagi. Perubahan tetap uncommitted di working tree supaya `quickdev:review` menilai diff sejak `Base-Commit` sebelum keputusan commit atau merge diambil user. `COMPLETED (manual)` dari mode `manual` diperlakukan sama. `VERIFICATION_MANUAL_REQUIRED`: minta user menjalankan perintah manual lalu memanggil `quickdev:execute` lagi (mode `manual`) untuk mencatat konfirmasinya.
 
 ## Guardrails
 
@@ -166,7 +165,7 @@ Skill ini menghasilkan perubahan kode sumber yang terverifikasi dan laporan term
    REGRESI BARU: <n> | - — di luar rencana: <daftar berkas> | -
    ITERASI PERBAIKAN: <n>/<max_fix_iterations>
    NATAFLOW: workdir <nama> · <n> dokumen (<c> baru, <u> diperbarui, <s> sama) | dilewati | GAGAL: <sebab>
-   HANDOFF: review (plan_path) | user (perintah manual atau blocker)
+   HANDOFF: review (plan_path) — dipanggil langsung | user (perintah manual atau blocker)
    ```
 
 ## Failure path
