@@ -99,7 +99,7 @@ StartLine = max(1, L - 15)   EndLine = L + 35   ──► jendela 30–50 baris
 
 ### Fase 4 — Write Detail Artifact (Bentuk B)
 
-Tulis laporan ke laci kerja **selalu**, termasuk saat objective tidak terjawab. Path-nya `<taskdir>/.explore/<slug>.md` bila slot `Laci` terisi, dan `.frontenddev/explore/<YYMMDDhhmm>-<slug>.md` bila tidak — dispatch yang berjalan sebelum taskdir lahir tidak punya taskdir untuk dituju. Strukturnya:
+Tulis laporan ke laci kerja **selalu**, termasuk saat objective tidak terjawab. Path-nya `<taskdir>/.explore/<slug>.md` bila slot `Laci` terisi, dan `.frontenddev/explore/<YYMMDDhhmm>-<slug>.md` bila tidak — dispatch yang berjalan sebelum taskdir lahir tidak punya taskdir untuk dituju. `<slug>` yang berawalan `report` diberi awalan `telusur-` (`telusur-report-….md`) — harness Claude Code menolak subagent menulis berkas bernama `report*` (37 E1). Strukturnya:
 
 ```markdown
 ---
@@ -157,7 +157,7 @@ Disiplin penyisiran:
 
 ## Batas
 - [FORBIDDEN] Mengedit, membuat, atau menghapus berkas di `src/` maupun `./frontenddev/docs/`.
-- [REQUIRED] `Write` HANYA untuk laci kerja: `<taskdir>/.explore/<slug>.md` atau `.frontenddev/explore/<YYMMDDhhmm>-<slug>.md` — keduanya scratch gitignored.
+- [REQUIRED] `Write` HANYA untuk laci kerja: `<taskdir>/.explore/<slug>.md` atau `.frontenddev/explore/<YYMMDDhhmm>-<slug>.md` — keduanya scratch gitignored. Nama berkas tidak pernah berawalan `report`.
 - [FORBIDDEN] Merancang solusi, brief, usulan diff, atau kode komponen perbaikan.
 - [FORBIDDEN] Bertanya ke user; ambiguitas dicatat sebagai gap, bukan pertanyaan balik.
 - [FORBIDDEN] Menjalankan git atau memutuskan rute lane; itu wewenang pendispatch.

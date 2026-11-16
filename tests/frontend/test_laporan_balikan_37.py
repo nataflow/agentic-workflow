@@ -125,3 +125,13 @@ def test_u4_reviewer_membaca_ditunda_dari_brief():
     assert "absennya berarti nihil" in reviewer
     phase5 = _read("skills/architect/SKILL.md").split("### Phase 5", 1)[1]
     assert "`report-<NN>.md` yang ada" in phase5
+
+
+# ------------------------------------------------------------------ E1 — laci explorer tanpa awalan `report`
+
+@pytest.mark.regression("37 E1")
+def test_e1_explorer_frontend_tidak_menamai_laci_report():
+    explorer = _read("agents/code-explorer.md")
+    fase4 = explorer.split("### Fase 4", 1)[1].split("```markdown", 1)[0]
+    assert "berawalan `report` diberi awalan `telusur-`" in fase4
+    assert "Nama berkas tidak pernah berawalan `report`." in explorer.split("## Batas", 1)[1]

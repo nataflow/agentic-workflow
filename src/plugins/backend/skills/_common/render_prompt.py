@@ -18,11 +18,14 @@ Main loop tidak lagi memuat badan template dispatcher ke konteksnya. Skrip ini:
    `prompt/` menjaga prompt jadi dari panen laci (`validate_briefs.py` hanya memindai
    `.explore/*.md`).
 
+Slot `slug` menamai berkas laporan explorer di laci `.explore/`; nilai yang berawalan `report` ditolak (exit 1,
+37 E1) — harness Claude Code menolak subagent menulis berkas berawalan itu. Beri awalan `telusur-`.
+
 Prompt subagent lalu cukup satu kalimat, dicetak skrip ini apa adanya:
 "Baca dan jalankan instruksi di `<out>`; jangan menyuntingnya."
 
-Exit: 0 = prompt ditulis; 1 = slot wajib kosong, slot tak dikenal, atau slot tabel
-tersisa mentah (prompt tidak ditulis); 2 = template tak terbaca, tanpa blok template,
+Exit: 0 = prompt ditulis; 1 = slot wajib kosong, slot tak dikenal, slot tabel
+tersisa mentah, atau `slug` berawalan `report` (prompt tidak ditulis); 2 = template tak terbaca, tanpa blok template,
 atau `--out` di luar laci prompt.
 
 Zero external dependencies (Python Standard Library only).
@@ -139,6 +142,10 @@ def main() -> int:
                 raise RenderError(1, f"--slot `{item}` bukan bentuk nama=nilai")
             k, v = item.split("=", 1)
             values[k.strip()] = v
+        if values.get("slug", "").strip().lower().startswith("report"):
+            raise RenderError(1, f"slot `slug` `{values['slug']}` berawalan `report` — harness Claude Code menolak "
+                                 "subagent menulis berkas laporan bernama itu; beri awalan `telusur-` "
+                                 f"(`telusur-{values['slug'].strip()}`)")
         text = Path(a.template).read_text(encoding="utf-8")
         body, filled, dropped = render(text, values)
         out = Path(a.root) / out_rel

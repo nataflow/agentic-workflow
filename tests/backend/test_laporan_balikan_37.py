@@ -46,3 +46,24 @@ def test_b2_lease_tanpa_report_nn():
     guard = _read("hooks/guard_bash.py")
     assert 'f"report-{nn.group(1)}.md"' not in guard
     assert "tanpa `report-NN.md`" in guard
+
+
+# ------------------------------------------------------------------ E1 — slug laci explorer tanpa awalan `report`
+
+@pytest.mark.regression("37 E1")
+@pytest.mark.parametrize("slug, code", [("report-dcc-hasil", 1), ("Report-mingguan", 1), ("telusur-report-dcc", 0),
+                                        ("order-report", 0)])
+def test_e1_render_prompt_menolak_slug_berawalan_report(tmp_path, slug, code):
+    import json
+    import subprocess
+    import sys
+    td = "backenddev/docs/2611160900-x"
+    out = subprocess.run([sys.executable, str(BE / "skills/_common/render_prompt.py"),
+                          "--template", str(BE / "skills/plan/dispatcher/explorer.md"),
+                          "--slot", "objective=o", "--slot", f"taskdir={td}", "--slot", f"slug={slug}",
+                          "--slot", "resep_navigasi=- r",
+                          "--out", f"{td}/.explore/prompt/p.md", "--root", str(tmp_path), "--json"],
+                         capture_output=True, text=True)
+    assert out.returncode == code, out.stdout + out.stderr
+    if code:
+        assert "telusur-" in json.loads(out.stdout)["reason"]
