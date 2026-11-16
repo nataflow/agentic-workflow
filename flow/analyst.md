@@ -29,7 +29,7 @@
 | `code-explorer` | agent (read-only, model `sonnet`, `maxTurns: 45`) | Penelusuran kode untuk `elicit`: cara kode bekerja sekarang di sekitar konsep peminta (aktor dan izin, aturan berangka, status, pesan; `TECH`: struktur menurut `category`). `BUKTI` (`TECH`, `menyeluruh`, kuota 40) atau `KONTEKS` (tipe lain, `ringkas`, kuota 20). Diadaptasi dari `backend:code-explorer`, tanpa `Write` | `agents/code-explorer.md` |
 | `code-scout` | agent (read-only, model `sonnet`, `maxTurns: 10`) | Penelusuran kode dangkal khusus `notulen`: apa yang ada dan di mana, tanpa flow/alur/edge case. Selalu `KONTEKS`, kuota 8 pemanggilan | `agents/code-scout.md` |
 | `ticket-reviewer` | agent (read-only, model `sonnet`) | Memvonis draft kartu `PASS`/`BLOCKED` secara semantik terhadap catatan elisitasi; tiket `TECH` dinilai rubrik T1–T11, termasuk membuka sendiri tiap bukti `path:baris` | `agents/ticket-reviewer.md` |
-| `ticket.py` | script (CLI siklus hidup) | `state` (`--batch <id>` menyaring satu batch), `new` (menulis `TICKET.md` awal, dan `analyst/tickets/.gitignore` di repo bersinkron; `--urutan`/`--batch` menandai tiket batch), `check --gate elicit\|spec`, `close`, `review`, `revise`, `approve`, `commit --stage draft\|tertunda` (commit draft), `reopen`, `cancel`, `ref`, dan `sync-payload` (argumen tool MCP nataflow, read-only) | `skills/_common/ticket.py` |
+| `ticket.py` | script (CLI siklus hidup) | `state` (`--batch <id>` menyaring satu batch), `new` (menulis `TICKET.md` awal, dan `analyst/tickets/.gitignore` di repo bersinkron; `--urutan`/`--batch` menandai tiket batch), `check --gate elicit\|spec`, `close`, `review`, `revise`, `approve`, `commit --stage draft\|tertunda` (commit draft), `reopen`, `cancel`, `ref`, `reseal` (sidik tahan format tanpa mengubah isi), dan `sync-payload` (argumen tool MCP nataflow, read-only) | `skills/_common/ticket.py` |
 | `notulen.py` | script (CLI siklus hidup notulen) | `state`, `new` (kerangka, catatan asli, `source_hash`, `analyst/notulen/.gitignore`), `check [--final]` (termasuk nol `path:baris` di seksi notulen), `final` (`FINAL` + `final_hash`), dan `sync-payload` (argumen dokumen nataflow, read-only). Tidak pernah meng-commit | `skills/notulen/scripts/notulen.py` |
 | `validate_doc.py` | script (validator) | `--kind elicit` menilai catatan elisitasi; tipe selain `TECH` ditolak bila memuat `path:baris` (konteks `code-explorer` bukan fakta). `--kind ticket` menilai kartu, termasuk pemindai kebocoran teknis; kartu `TECH` sebagai gantinya ditagih AC `— verifikasi:`, `D-{n}`/`C-{n}`, dan bukti `path:baris` yang ada di disk | `skills/_common/validate_doc.py` |
 | `analyst_lib.py` | script (pustaka) | Mencari root, parser frontmatter, pemecah kartu/catatan, sidik `content_hash`, `request_digest`, kerangka `ticket_skeleton`, segel `ticket_seal`, `scan_leaks`, config sinkron `load_sync_config`, dan commit git yang melewati path diabaikan `.gitignore` | `skills/_common/analyst_lib.py` |
@@ -100,7 +100,9 @@ pun, sehingga `spec` dan reviewer selalu punya satu sumber kebenaran tertulis. `
 - **Langkah**:
   1. **Pemulihan ticketdir**: jalankan `ticket.py state`, lalu rutekan per keadaan: `KOSONG` (sisa alokasi
      lama, permintaan aslinya tidak tersimpan) meminta permintaan asli bila perlu, menjalankan Phase 2–3,
-     lalu `elicit` dengan slug direktori itu — `ticket.py new` memakai ulang direktorinya. `ELISITASI` ke `elicit`. `SPEC`/`DRAFT` ke `spec`. `DRIFT`
+     lalu `elicit` dengan slug direktori itu — `ticket.py new` memakai ulang direktorinya. `ELISITASI` ke `elicit`
+     (rute `belum disentuh sejak <tanggal>` — log kosong, umumnya ekor batch — dilanjutkan hanya bila permintaan
+     menyambungnya; pembatalannya hanya atas keputusan user). `SPEC`/`DRAFT` ke `spec`. `DRIFT`
      membuat intake bertanya ke user: setujui ulang lewat `spec` atau pulihkan isi. `RUSAK`/`NAMA_TIDAK_SAH`
      dilaporkan ke user. Permintaan yang jelas menyambung ticketdir terbuka dirutekan ke sana. Bila
      hubungannya tidak jelas, intake bertanya ke user lewat `AskUserQuestion`. Ticketdir yang dilanjutkan
@@ -178,8 +180,10 @@ pun, sehingga `spec` dan reviewer selalu punya satu sumber kebenaran tertulis. `
      `Aktor`/`Status` sekarang) ditulis lebih dulu sebagai `Asumsi:` tanpa rujukan berkas di `Kondisi Saat Ini`
      (`BUG`: `Langkah Reproduksi`) lalu ditanyakan sebagai konfirmasi; aturan dan aktor sekarang hanya menjadi
      opsi pertanyaan `Aturan Bisnis`/`Aktor`/`Yang Diharapkan`, tidak pernah fakta pilar. Konteks utama tidak
-     membaca kode sendiri; plafon 2 dispatch per tiket. Tiket batch memakai balikan explorer awal batch dan
-     menunggunya sebelum Phase 2.
+     membaca kode sendiri; plafon 2 dispatch per tiket. Temuan penelusuran yang sudah ada di percakapan sebelum
+     elisitasi (mis. lewat `backend:tech-lead` sebelum "buatkan tiketnya") dipakai seperti balikan `KONTEKS`, dan
+     explorer hanya untuk konsep yang belum tercakup; `TECH` tetap wajib `BUKTI`. Tiket batch memakai balikan
+     explorer awal batch dan menunggunya sebelum Phase 2.
      `Kondisi Diinginkan` diawali `Bentuk hasil:` (layar, API, proses otomatis, laporan; panduan bagian 6).
      Istilah teknis dari peminta dirumuskan ulang sebagai perilaku. Istilah yang memang kosakata produk
      dikonfirmasi, dicatat di log sebagai baris berjawaban *Ya*, lalu dimasukkan ke `domain_terms`.
@@ -292,7 +296,7 @@ flowchart TD
   Selain itu dipakai blok `SPEC — MENUNGGU KEPUTUSAN | TERTAHAN`.
 - **Gerbang & commit**: `validate_doc.py --kind ticket` harus `PASS` sebelum dispatch. Plafon review 2
   ronde per revisi, dan ronde kembali ke 0 hanya bila catatan elisitasi disegel ulang lewat `close`. Plafon revisi 3 per basis fakta.
-  `approve` menulis `READY`, `approved_hash`, `approved_seal`, dan `approval`, lalu meng-commit
+  `approve` menulis `READY`, `approved_hash`, `approved_seal`, `approved_seal_norm`, dan `approval`, lalu meng-commit
   `docs(ticket): kunci TICKET <slug> READY`. `external_ref` sesudah `READY` diisi lewat `ticket.py ref`
   (commit `docs(ticket): ref TICKET <slug>`) tanpa membuka ulang tiket; `ref` menolak `DRIFT` dan tidak
   meng-commit `DRAFT`. Semua commit itu dilewati untuk ticketdir yang diabaikan git; bila sinkron juga
@@ -492,13 +496,20 @@ direktori tidak cocok dengan pola `<YYMMDDhhmm>-<slug>`.
 
 **Sidik & segel** (`analyst_lib.py`):
 
+- Sidik dihitung atas teks yang dinormalkan dari perbedaan format (`norm_md`, 38 N1): baris kosong, padding sel
+  tabel, baris pemisah tabel, `>` kosong, bullet `*`/`+`, `*` tunggal ↔ `_`, spasi beruntun. Formatter markdown
+  (prettier) tidak membuat `DRIFT`; suntingan kata, angka, baris, atau sel tetap terdeteksi. Penulis selalu menulis
+  sidik baru; pemeriksa menerima sidik lama (`content_hash_legacy`, `request_digest_legacy`) atau baru, sehingga
+  tiket dari versi sebelumnya tidak berubah keadaan. `ticket.py reseal` menaikkan sidik lama yang masih cocok.
 - Sidik review adalah pasangan `<kartu>/<catatan elisitasi>` (masing-masing 12 hex `content_hash`).
   Suntingan di bagian mana pun membuat vonis basi.
 - `new` memateraikan `request_hash` (sidik `### Permintaan Asli`), yang ditagih validator elisitasi.
 - `close` memateraikan `elicit_hash` (sidik catatan elisitasi) dan `elicit_log` (jumlah baris log). `check
   --gate spec`, `review`, dan `approve` menolak catatan yang berbeda dari segel ini.
 - `approve` memateraikan `approved_hash` (sidik berkas utuh) dan `approved_seal` (`ticket_seal`: body utuh
-  plus `type`, `priority`, `domain_terms`, tanpa field pembukuan dan `external_ref`).
+  plus `type`, `priority`, `domain_terms`, tanpa field pembukuan dan `external_ref`), beserta `approved_seal_norm`
+  (`ticket_seal_norm`, pasangan tahan formatnya). `approved_seal` tetap algoritma lama supaya penerima yang belum
+  diperbarui memvonis seperti sebelumnya.
 - `batch` dan `urutan` di luar sidik maupun segel: tiket batch melewati review, persetujuan, dan serah terima
   persis seperti tiket tunggal.
 
@@ -527,13 +538,14 @@ frontmatter dan tanpa `## Catatan Asli`; judulnya `<H1> — <tanggal rapat>`, di
 - **Ke engineer**: tiket `READY` diserahkan sebagai `ticket_source: <ticketdir>/TICKET.md` ke
   `backend:tech-lead` dan/atau `frontend:lead`.
 - **Syarat penerimaan**: frontmatter `status: READY` dan `elicitation: CLOSED`, dan isi berkas sama dengan
-  `approved_seal`. Tiket lama tanpa segel dinilai dari subjek commit terakhir, yaitu
+  `approved_seal`, atau sama dengan `approved_seal_norm` sesudah dinormalkan (sejak backend 0.23.1/frontend 0.21.1).
+  Tiket lama tanpa segel dinilai dari subjek commit terakhir, yaitu
   `docs(ticket): kunci TICKET <slug> READY` atau `docs(ticket): ref TICKET <slug>`, dan berkasnya harus
   bersih. Penerima memeriksanya lewat `ticket_source_verdict` di `skills/_common/precondition_lib.py`
   backend dan frontend, yang dipanggil prasyarat skill `task` masing-masing. Tiket yang disunting sesudah
   approve ditolak sebagai `DRIFT` dan dikembalikan ke `analyst:spec`.
-- **Satu segel, tiga salinan**: `ticket_seal` di `analyst_lib.py` disalin apa adanya ke `precondition_lib.py`
-  backend dan frontend, dan `tests/test_a1_ticket_source.py` menagih ketiganya identik. Mengubah segel
+- **Satu segel, tiga salinan**: `ticket_seal` dan `ticket_seal_norm` (beserta `norm_md`) di `analyst_lib.py` disalin
+  ke `precondition_lib.py` backend dan frontend, dan `tests/test_a1_ticket_source.py` menagih ketiganya memberi segel sama. Mengubah segel
   atau subjek commit `approve`/`ref` berarti mengubah ketiganya bersamaan.
 - **Yang dibaca engineer**: kartu saja (H1 sampai akhir `## Lampiran`). Catatan elisitasi hanya jejak.
 - **Namespace**: di hilir, `AC-{n}`/`BR-{n}` tiket dirujuk sebagai `TAC-{n}`/`TBR-{n}`. Tiap `TAC-{n}` wajib
@@ -586,6 +598,8 @@ frontmatter dan tanpa `## Catatan Asli`; judulnya `<H1> — <tanggal rapat>`, di
 | `APPROVE FAIL` (status bukan DRAFT, validator FAIL, elisitasi bukan CLOSED atau berbeda dari segelnya, review bukan `PASS @<sidik sekarang>`, jawaban kosong) | spec | Ikuti sebab di keluaran. Bila review basi dan ronde tersisa, jalankan ronde berikut |
 | `close`/`approve`/`ref`/`cancel`/`commit` exit 3 (commit gagal karena hook, gpg, index terkunci) | elicit, spec / ticket.py | Isi sudah tertulis. Sajikan baris `COMMIT GAGAL`, lalu user meng-commit manual dengan perintah dan subjek persis yang dicetak. Dilarang `--no-verify` dan `git add -f`. Path yang diabaikan `.gitignore` bukan kegagalan: skrip melewati commit-nya |
 | Tiket `READY` disunting (`DRIFT`) | intake, penerima engineer | Setujui ulang lewat `spec` (`reopen` → review → approve), atau pulihkan isi yang disetujui. `ticket.py ref` menolak tiket `DRIFT`. Bila suntingannya menyentuh catatan elisitasi, check 5 mengarahkan ke `elicit` dulu |
+| Tiket `READY` dari versi sebelum 0.20.0 diformat ulang (prettier) sebelum `reseal` | intake, penerima engineer | Terbaca `DRIFT`: teks yang disetujui tidak tersimpan, jadi tidak dapat dibuktikan hanya format yang berubah. Setujui ulang lewat `spec`. Pencegahan: `ticket.py reseal --all` sesudah memperbarui plugin |
+| Validator `Letak ticketdir` FAIL | elicit, spec / ticket.py | Sejak 0.20.0 `--ticketdir` relatif dibaca terhadap cwd (`.` dari dalam ticketdir sah). Path di luar root tetap ditolak |
 | Membatalkan tiket `READY` | ticket.py, spec (`cancel_request`) | `cancel` ditolak tanpa `--force`, karena tiket mungkin sudah diserahkan ke engineer. `--force` hanya atas keputusan eksplisit user, lalu sinkron membuat task cerminnya `cancelled` |
 | `code-explorer` mengembalikan balikan kosong, tanpa blok `## Code Explorer`, atau error | elicit | Ulangi sekali (tidak dihitung plafon 2). Gagal lagi atau `Repo: tanpa kode`: tipe lain lanjut tanpa konteks kode; `TECH` `ELICIT — TERTAHAN` ("bukti kode tidak dapat dikumpulkan") |
 | Validator elisitasi check 11: `path:baris` di catatan tiket non-`TECH` | elicit | Tulis ulang sebagai perilaku yang terlihat pengguna atau `Asumsi:` tanpa rujukan berkas, lalu konfirmasi ke peminta |

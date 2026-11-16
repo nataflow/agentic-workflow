@@ -80,7 +80,10 @@ skeletons), `dispatcher/` (prompts used to dispatch subagents), `scripts/`, and 
   `NOTULEN.md` (`skills/notulen/scripts/notulen.py`), may dispatch the shallow `code-scout` (sonnet, `KONTEKS` only) to sharpen
   clarifying questions (never as notulen content; `check` rejects `path:baris`), and is optionally mirrored to
   nataflow as a `notes.meeting` document. `skills/_common/ticket.py` is the state machine; a READY ticket is handed to
-  `backend:tech-lead`/`frontend:lead` as `ticket_source`.
+  `backend:tech-lead`/`frontend:lead` as `ticket_source`. Ticket digests are format-insensitive (`norm_md`, step 38):
+  a markdown formatter must never turn a ticket `DRIFT`. `approved_seal` keeps the old algorithm and
+  `approved_seal_norm` carries the normalized one; `ticket_seal`/`ticket_seal_norm` are copied into backend and
+  frontend `precondition_lib.py` (`tests/test_a1_ticket_source.py` asserts equal output).
 - **backend** — entry `backend:tech-lead` picks a lane/risk/taskdir, then `backend:analyst` orchestrates a
   document chain (TASK → optional BRD → optional PRD → briefs) with reviewer subagents and user approval,
   then `backend:architect` runs READY briefs sequentially through `code-implementor` (commits per brief),
