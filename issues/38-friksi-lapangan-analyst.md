@@ -7,7 +7,12 @@ Sumber: analisis lapangan plugin analyst di `~/work/hkm` (2026-11-16) — 101 se
 `scripts/token_usage.py` dan skrip scratch per sesi di atasnya; frontmatter dan log tanya-jawab tiket dibaca lewat
 `md_grep`.
 
-**Status (2026-11-16):** DIKERJAKAN di branch `feat/38-friksi-lapangan-analyst`.
+**Status (2026-11-16):** SELESAI di branch `feat/38-friksi-lapangan-analyst`; analyst 0.20.0, backend 0.23.1, frontend
+0.21.1 (`src/plugins/analyst/MIGRATION_v0.19.1_to_v0.20.0.md`). Test baru: `tests/analyst/test_ticket_38.py` (N1, N2,
+V1, B1) dan perluasan `tests/test_a1_ticket_source.py` (N1 lintas plugin); suite penuh 3036 lulus di Python bawaan dan
+3.12, lint `--base origin/main` 0 FAIL. Uji nyata atas salinan seluruh tiket hkm: `reseal --all` lalu prettier 3.9.6 →
+188/188 READY tetap READY, 6 DRIFT `wms-svelte` dilaporkan `reseal`. Belum: `reseal` di repo hkm, persetujuan ulang 6
+tiket DRIFT, dan pengukuran lapangan (bagian Verifikasi).
 
 ## Temuan dasar (data log)
 
