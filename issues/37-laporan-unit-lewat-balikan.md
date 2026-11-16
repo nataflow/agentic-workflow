@@ -5,7 +5,12 @@ wms-3d, wms-dashboard, nocan/frontend, nataflow-frontend untuk frontend; wms-rus
 nataflow-backend untuk backend), Claude Code 2.1.323 dan 2.1.325. Keputusan diambil 2026-11-16. Basis kode: commit
 `238f09f` (frontend 0.20.0, backend 0.22.0).
 
-**Status (2026-11-16):** RENCANA — belum ada kode yang diubah.
+**Status (2026-11-16):** SELESAI di branch `feat/37-laporan-unit-lewat-balikan`; frontend 0.21.0
+(`MIGRATION_v0.20.0_to_v0.21.0.md`), backend 0.23.0 (`MIGRATION_v0.22.0_to_v0.23.0.md`). Test baru:
+`tests/frontend/test_laporan_balikan_37.py` (U1–U4, E1), `tests/backend/test_laporan_balikan_37.py` (B1, B2, E1).
+Suite penuh 3008 lulus, lint `--base main` 0 FAIL. Penyimpangan dari rencana: E1 backend cukup di `render_prompt.py` — seluruh dispatch
+explorer backend, termasuk gerbang `tech-lead`, lewat skrip itu ("Jalur tunggal"), jadi kalimat Slot Hidrasi
+tambahan tidak diperlukan. Belum: uji lapangan di hkm (bagian Verifikasi).
 
 ## Temuan dasar (data log)
 
@@ -132,8 +137,8 @@ laporan di disk — tanpa melonggarkan vonis: status unit tetap klaim subagent y
 - `frontend/agents/code-explorer.md` Fase 4 dan `## Batas`: slug laci yang berawalan `report` diberi awalan
   `telusur-` (`<taskdir>/.explore/telusur-report-….md`).
 - Backend: slug laci dipilih skill pendispatch. `_common/render_prompt.py` menolak (exit 1) nilai slot `slug` yang
-  berawalan `report` dengan pesan "beri awalan `telusur-`"; dispatch yang tidak lewat `render_prompt.py` (mis. gerbang
-  `tech-lead` `dispatcher/explorer.md`) diberi kalimat yang sama di Slot Hidrasi-nya.
+  berawalan `report` dengan pesan "beri awalan `telusur-`". Tidak ada dispatch explorer backend di luar skrip itu
+  (gerbang `tech-lead` juga merender lewat `render_prompt.py`).
 
 ### R1 — Dokumen dan rilis
 
@@ -153,9 +158,9 @@ laporan di disk — tanpa melonggarkan vonis: status unit tetap klaim subagent y
 | backend `agents/code-implementor.md`, `architect/dispatcher/implementor.md` | B1 |
 | backend `architect/references/lifecycle-recovery.md`, `architect/SKILL.md` | B2 |
 | backend `hooks/guard_bash.py` (`lease`) | B2 |
-| backend `_common/render_prompt.py`, `tech-lead/dispatcher/explorer.md` | E1 |
+| backend `_common/render_prompt.py` | E1 |
 | `flow/frontend.md`, `flow/backend.md`, kedua `README.md`, `MIGRATION_*`, kedua `plugin.json` | R1 |
-| `tests/frontend/test_12_guard.py` (baris `report-01.md`/`report-12.md` → 2), `test_24_riwayat.py:180` (WARN → PASS), `test_12_orchestration.py` (R6 `TERPUTUS`), `test_l34_implementor_no_bash.py` | U3, U5 |
+| `tests/frontend/test_12_guard.py` (baris `report-01.md`/`report-12.md` → 2), `test_24_riwayat.py:180` (WARN → PASS); `test_12_orchestration.py` R6 dan `test_l34_implementor_no_bash.py` diperiksa, tidak berubah (frasa yang dipatok tetap) | U3, U5 |
 | `tests/backend/test_l34_guard_bash.py` (lease tanpa `report-01.md`; `Edit` → 2), `test_25_report_contract.py` (penulis = amplop + `architect`) | B1, B2 |
 | `tests/frontend/test_laporan_balikan_37.py`, `tests/backend/test_laporan_balikan_37.py` (baru) | semua |
 

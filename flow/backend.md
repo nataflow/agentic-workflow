@@ -466,7 +466,7 @@ flowchart TD
 | Agent | Dipanggil oleh | Tools | Input | Output/vonis | Larangan |
 |---|---|---|---|---|---|
 | `code-explorer` | `tech-lead` (Fase 1), `business-analysis` (Fase 1), `system-analysis` (Profil S/B), `plan` (Fase 2), `debug` (Fase 2) | Read, Grep, Glob, Write | Objective, Slug, Kedalaman `ringkas`/`menyeluruh`, Berkas laporan, Format laporan, konteks, dan batas cakupan dari template `dispatcher/*.md` | Laporan utuh `.explore/<slug>.md` berfrontmatter (`confidence`, `permukaan_diminta`, `permukaan_tertutup`, `gaps_terbuka`); balikan ke context hanya amplop ringkas ≤15 baris (`confidence`, angka cakupan, `### Summary`, daftar seksi, path). Pendispatch membaca seksi yang dibutuhkan dari berkas (Langkah 31) | Mengedit kode, menjalankan git/bash, merancang solusi, berdialog; Write hanya ke satu path `Berkas laporan` |
-| `code-implementor` | `architect` Fase 3 (satu per brief, sekuensial) | Read, Grep, Glob, Edit, Write, Bash | `brief_path`, `taskdir`, `unit_name`, `adapter_path` | `## Implementor Report — brief-NN-unit`: `DONE` (status brief di disk) + commit kode `commit_message`, atau `BLOCKED` + `report-NN.md` dan status di disk + commit `wip(<domain>): … [BLOCKED]` atas berkas yang sudah tersentuh | Menyentuh berkas di luar `## File scope`, men-stage brief atau dokumen taskdir, build/test, bertanya ke user, `git add .`, amend, push, reset, rantai perintah (ditegakkan hook) |
+| `code-implementor` | `architect` Fase 3 (satu per brief, sekuensial) | Read, Grep, Glob, Edit, Write, Bash | `brief_path`, `taskdir`, `unit_name`, `adapter_path` | `## Implementor Report — brief-NN-unit`: `DONE` (status brief di disk) + commit kode `commit_message`, atau `BLOCKED` + badan laporan di amplop (bukan berkas; architect menyimpannya ke `report-NN.md`, 37 B1–B2) dan status di disk + commit `wip(<domain>): … [BLOCKED]` atas berkas yang sudah tersentuh | Menyentuh berkas di luar `## File scope`, men-stage brief atau dokumen taskdir, build/test, bertanya ke user, `git add .`, amend, push, reset, rantai perintah (ditegakkan hook) |
 | `code-reviewer` | `architect` Fase 4 (sekali per putaran) | Read, Grep, Glob, Bash, Write | `taskdir`, `base_branch`, `adapter_path`, `findings_contract` | `REVIEW.md` di disk (`range: <merge-base>..<HEAD>`) + baris `backenddev/issues/README.md` di-commit sendiri (`docs(<slug>): add final review report`), dengan severity tertinggi `CLEAN`/`P3`/`P2`/`P1` | Mengedit `src/`, build/test, bertanya ke user. Menilai rentang `merge-base..HEAD` terhadap union File scope lewat 5 pemeriksaan: scope, koherensi lintas-brief, kelengkapan Steps, migrasi & mirrored paths, dan 6 dimensi |
 | `brd-reviewer` | `business-analysis` Fase 5 via `dispatcher/reviewer.md` | Read, Grep, Glob | `taskdir`, `chain`, `ronde` | `## BRD Review`: `Approved — nol temuan` / `Approved` / `Issues Found`, ditulis pemanggil ke `.explore/review/brd.md` | Mengedit dokumen, menulis `APPROVED`, berdialog, memberi rekomendasi yang menambah aturan |
 | `prd-reviewer` | `system-analysis` Fase 8 via `dispatcher/reviewer.md` | Read, Grep, Glob | `taskdir`, `chain`, `ronde` | `## PRD Review`: `Approved — nol temuan` / `Approved` / `Issues Found`, ditulis pemanggil ke `.explore/review/prd.md` | Sama dengan `brd-reviewer`; tidak boleh menuntut path berkas `src/` di breakdown |
@@ -489,7 +489,7 @@ Semua dispatch memakai template `skills/<skill>/dispatcher/*.md` yang dirender `
 
 | Subagent | Yang diizinkan | Alasan |
 |---|---|---|
-| `backend:code-implementor` | Git read-only (`status`, `diff`, `log`, `show`, `rev-parse`, `ls-files`), `git add <path lease>` tanpa flag, `git commit -m`. Edit/Write hanya ke path lease. Karakter meta (`;&|<>` backtick, `$(`, `${`) dan glob (`*?[`) sebelum `--` ditolak | Lease ditulis `architect` (`guard_bash.py lease --brief`) ke `<git-dir>/nataflow/lease-backend.json`, di luar working tree. Isinya File scope brief, berkas brief, `report-NN.md`, dan `finding_source`. Brief dan `report-NN.md` hanya untuk Edit/Write: keduanya diabaikan git dan tidak di-stage. Tanpa lease, semua Bash/Edit/Write ditolak. Bersifat fail-closed: galat internal pun menolak (exit 2) |
+| `backend:code-implementor` | Git read-only (`status`, `diff`, `log`, `show`, `rev-parse`, `ls-files`), `git add <path lease>` tanpa flag, `git commit -m`. Edit/Write hanya ke path lease. Karakter meta (`;&|<>` backtick, `$(`, `${`) dan glob (`*?[`) sebelum `--` ditolak | Lease ditulis `architect` (`guard_bash.py lease --brief`) ke `<git-dir>/nataflow/lease-backend.json`, di luar working tree. Isinya File scope brief, berkas brief, dan `finding_source` — tanpa `report-NN.md` sejak 37 B2 (harness Claude Code menolak subagent menulis berkas laporan). Brief hanya untuk Edit/Write: ia diabaikan git dan tidak di-stage. Tanpa lease, semua Bash/Edit/Write ditolak. Bersifat fail-closed: galat internal pun menolak (exit 2) |
 | `backend:code-explorer` | Edit/Write hanya ke `backenddev/docs/[<taskdir>/].explore/*.md` | Explorer hanya boleh menulis laporannya sendiri |
 | `backend:code-reviewer` | Git read-only ditambah `merge-base` dan `symbolic-ref` bentuk baca (tanpa `-d`/`--delete`/`-m`, ≤ 1 argumen posisi), `ls`, serta `git add`/`git commit -m` dan Edit/Write hanya atas `<taskdir>/REVIEW.md` dan `backenddev/issues/README.md`. Yang ter-commit hanya indeks, karena `REVIEW.md` diabaikan git | Reviewer read-only atas repo kecuali laporannya. `reset`, `checkout`, `push`, build, dan test ditolak |
 
@@ -507,7 +507,7 @@ backenddev/
     <YYMMDDhhmm>-<slug>/           taskdir
       TASK.md  BRD.md  PRD.md  RCA.md
       brief-NN-<unit>.md           READY → DONE | BLOCKED | SUPERSEDED
-      report-NN.md                 laporan brief yang gagal (BLOCKED)
+      report-NN.md                 laporan brief yang gagal (BLOCKED), ditulis architect dari amplop
       HALT.md                      verdict COMPILE | SCOPE | SYMBOL | STRAY; status DICABUT bila dicabut
       REVIEW.md  REPORT.md
       JOURNEY.md                   keputusan antar sesi, satu baris per titik (journey.py); bukan sumber status
@@ -528,7 +528,7 @@ docs/api/<slug>.md                 ter-commit
 | `BRD.md` | `business-analysis`. `APPROVED` ditulis `analyst` (`doc_seal.py approve`) | `DRAFT` → `APPROVED` + `approved_seal`. 9 seksi, `BR-{n}`/`EC-{n}`/`BM-{n}` |
 | `PRD.md` | `system-analysis`. `APPROVED` ditulis `analyst` (`doc_seal.py approve`) | `DRAFT` → `APPROVED` + `approved_seal`. 9 seksi, 4 pilar kontrak, impact map 16 dimensi, `AC-{n}` |
 | `brief-NN-<unit>.md` | `plan` (`scaffold_brief.py`, `sidik_kontrak` oleh `doc_seal.py lock-briefs`). Status `DONE`/`BLOCKED` ditulis `code-implementor` di disk | `READY`/`DONE`/`BLOCKED`/`SUPERSEDED`. 10 seksi, `Covers:`/`Fulfills:`, `commit_message`, `sidik_kontrak` |
-| `report-NN.md` | `code-implementor` (jalur gagal) | Stop condition, bukti, dan akar masalah |
+| `report-NN.md` | `architect`, salinan persis badan laporan amplop `code-implementor` (jalur gagal) | Stop condition, bukti, dan akar masalah |
 | `RCA.md` | `debug` | `ROOT_CAUSE_CONFIRMED` / `INCONCLUSIVE` |
 | `HALT.md` | `architect`. Dicabut `plan` (baris `repairs`) atau `tech-lead` (scope diterima) lewat `doc_seal.py cabut-halt` | `verdict: COMPILE / SCOPE / SYMBOL / STRAY`. Menahan tiap sesi lewat check 7 architect sampai `status: DICABUT`; berkasnya tidak dihapus |
 | `REVIEW.md` | `code-reviewer` | Severity tertinggi `CLEAN`/`P3`/`P2`/`P1`, `range: <merge-base>..<HEAD>`. Dianggap basi bila commit kode mendarat sesudah ujung `range:` |
@@ -574,7 +574,7 @@ Ledger `## Chain` di `TASK.md` berjalan `- [ ]` → `- [x] … @ APPROVED <sidik
 | `business-analysis` / `system-analysis` | — | Draft BRD/PRD final sesudah reviewer `Approved`, tanpa materai |
 | `analyst` | — | Approval BRD/PRD (`doc_seal.py approve`), tutup ledger (`doc_seal.py tick`), re-entry dan eskalasi di `TASK.md` |
 | `plan` | Penanda `OBSOLETE`/`DROPPED` di `finding_source` (`docs(plan): tandai temuan <ID> untuk <slug>`) | Batch brief (`doc_seal.py lock-briefs`) |
-| `code-implementor` | `src/**` (+ `finding_source` bertanda `FIXED`), dengan `commit_message` brief, atau `wip(<domain>): brief-NN-<unit> [BLOCKED]` | Status brief, `report-NN.md` |
+| `code-implementor` | `src/**` (+ `finding_source` bertanda `FIXED`), dengan `commit_message` brief, atau `wip(<domain>): brief-NN-<unit> [BLOCKED]` | Status brief; badan laporan jalur gagal dibawa amplop, `report-NN.md` ditulis architect |
 | `architect` | — | `HALT.md`, koreksi status `READY → DONE` |
 | `code-reviewer` | Baris indeks `backenddev/issues/README.md` (`docs(<slug>): add final review report`) | `REVIEW.md` |
 | `report` | — | `REPORT.md` |
@@ -611,7 +611,7 @@ Ledger `## Chain` di `TASK.md` berjalan `- [ ]` → `- [x] … @ APPROVED <sidik
 | `NOT_READY_FOR_IMPLEMENTATION` | `analyst` Fase 6 | `tech-lead` membuka ulang `PLANNING` pada taskdir sama dengan `reentry_reason` berisi predikat gagal |
 | `plan` LANGSUNG / RCA menyentuh pemicu eskalasi | `plan` Fase 1 (`entry-rules.md` 1A/1C) | LANGSUNG: eskalasi chain #1 di analyst. RCA: user memilih naik ke PRD lewat amandemen akar |
 | Brief `DONE` tanpa commit unit pembawa kode (commit di-reset user, atau `DONE` tak pernah mendarat) | Check 3 architect, matriks bukti disk | Tree kotor: eskalasi ke user. Tree bersih: gerbang mengonfirmasi ke user lalu `doc_seal.py buka-done` (brief → `READY`), lalu architect men-dispatch ulang |
-| Brief `BLOCKED` | Implementor (`report-NN.md`), matriks bukti disk architect | Rantai berhenti tanpa review. `PLANNING` pada taskdir sama, lalu `plan` menulis pengganti ber-`supersedes` |
+| Brief `BLOCKED` | Amplop implementor (badan laporan → `report-NN.md` oleh architect), matriks bukti disk architect | Rantai berhenti tanpa review. `PLANNING` pada taskdir sama, lalu `plan` menulis pengganti ber-`supersedes` |
 | `HALT.md` COMPILE/STRAY | Gerbang kompilasi / `git status` architect | `PLANNING` pada taskdir sama, lalu `plan` menulis baris `repairs` dan mencabut `HALT.md` lewat `doc_seal.py cabut-halt` |
 | `HALT.md` SCOPE/SYMBOL (termasuk kontrak brief yang disunting sesudah `sidik_kontrak`) | `verify_scope.py`, `symbol_map.py` | Gerbang bertanya ke user: bila diterima, `doc_seal.py cabut-halt` lalu architect lagi. Bila tidak, user me-reset, lalu `cabut-halt` + `doc_seal.py buka-done` dan `PLANNING` |
 | Isi `BRD.md`/`PRD.md` berubah sesudah approve (`approved_seal` tidak cocok) | Prasyarat `system-analysis`/`plan` | Re-entry membuka hop itu, lalu gerbang dokumen Fase 4 berjalan lagi. Materai tidak ditulis tangan |

@@ -46,7 +46,7 @@ menerjemahkan dan boleh berhenti bertanya, yang kedua menjalankan dan tidak memu
 | `code-explorer` | laci `.explore/` / `.frontenddev/explore/` (scratch, gitignored) | `lead`, `ux-design`, `ui-design`, `contract`, `plan` |
 | `contract-reviewer` | — (read-only) | `contract` lewat `contract/dispatcher/reviewer.md` |
 | `doc-reviewer` | `<taskdir>/REVIEW-PLAN.md` | `plan` lewat `plan/dispatcher/reviewer.md` |
-| `code-implementor` | `src/**` dalam `files_touched` + `<taskdir>/report-<NN>.md` | `architect` lewat `architect/dispatcher/implementor.md` |
+| `code-implementor` | `src/**` dalam `files_touched` saja — laporan unit dikembalikan sebagai balikan | `architect` lewat `architect/dispatcher/implementor.md` |
 | `code-reviewer` | `<taskdir>/REVIEW.md` (+ baris `> Status:` berkas temuan asal) | `architect` lewat `architect/dispatcher/reviewer.md` |
 
 Subagent menghemat **context window**, bukan token, dan tiap dispatch membayar penuh. Lima yang ada
@@ -81,7 +81,7 @@ permintaan ──► lead ──┬─► profile ──────────
                             │                → chain.py draft → AskUserQuestion → chain.py approve CONTRACT
                             ├─► plan       → brief READY × N → validate_briefs → doc-reviewer (≤2 ronde)
                             │                → chain.py draft → AskUserQuestion → chain.py approve BRIEF
-                            └─► architect  → per unit: ingest → code-implementor → report-NN.md
+                            └─► architect  → per unit: ingest → code-implementor → balikan → matriks
                                              → matriks bukti disk → commit unit (+ gerbang kompilasi)
                                            → verifikasi penutup sekali → code-reviewer → validate_review
                                            → REVIEW.md (validate_review) → report → REPORT.md (tuntas)
@@ -154,7 +154,7 @@ Di atasnya tujuh penjaga — enam validator dan satu hook:
 | `plan/scripts/validate_briefs.py` | 16 check S N D L T F B R V K O E C P G M — termasuk **G** (tiap `SC` dipikul brief `READY`/`DONE` lewat `fulfills`; brief `BLOCKED` tidak memikul apa pun, begitu pula di C dan E), **D** (DAG satu arah; remedi yang bergantung pada unit asalnya — rantai buntu — ditolak), **V** (operator shell hanya bila perintah sama persis dengan perintah profil), dan **M** (remedi menunjuk brief `BLOCKED`; brief `READY` yang beririsan dengan brief `BLOCKED` belum ter-remedi wajib `remedies`; plafon 2 per unit asal, +1 per re-entry kontrak sesudah `BLOCKED` pertama: `reopen … CONTRACT`, atau eskalasi dari `HOTFIX_MINOR`); `CREATE` ganda antar brief, `unit` ≠ NN nama berkas, dan path `../`/absolut FAIL |
 | `task/scripts/validate_task.py` | struktur akar, pasangan lane/sections, `SC` ber-alat-ukur, bukti `file:baris` nyata, ledger `[ ]` (`--amend`: amandemen akar oleh `lead`, ledger boleh bercentang) |
 | `architect/scripts/validate_review.py` | `taskdir`/`stack`/`reviewed_at` sah, H1 ber-slug; tiap `SC` dan `AC` `terbukti` wajib berbukti (`path:baris` berkas rantai atau perintah HIJAU; AC `test otomatis` hanya `path:baris` berkas test rantai, sehingga test yang tak pernah dibuat tidak dapat divonis `terbukti`); status 9 dimensi = severity terburuk temuan; `## Summary` dan Done Criteria DITUNDA ikut menurunkan verdict; `--log` mencocokkan verifikasi penutup dengan log mesin dan menagih `baseline_head` leluhur commit `implement unit` pertama (baseline diukur sebelum unit mana pun mendarat); hitungan temuan; `base` = `base_commit` akar `TASK.md`, `head` = `HEAD` yang dinilai (leluhur `HEAD`); **verdict diturunkan**: `BLOCKED` ⇔ P1 / SC belum terbukti / verifikasi merah (`TIMEOUT` atau galat baru > 0; `MERAH` bergalat baru 0 adalah warisan baseline) |
-| `hooks/guard_bash.py` (PreToolUse) | `code-reviewer` read-only atas repo: Bash hanya git baca (`status`, `diff`, `log`, `show`, `rev-parse`, `ls-files`, `merge-base`, `blame`, `symbolic-ref` bentuk baca — pencarian lewat tool Grep), opsi global hanya `--no-pager`, tanpa ekspansi shell, glob sebelum `--`, pipe, atau pengalihan; `ls`; dan `chain.py files` plugin ini; Write hanya `REVIEW.md`; Edit hanya `REVIEW.md` dan berkas temuan `frontenddev/reviews/`. Penulis lain hanya Edit/Write: `code-explorer` hanya laci `.explore/`/`.frontenddev/explore/`, `doc-reviewer` hanya `REVIEW-PLAN.md`, `code-implementor` ditolak di luar repo, di `.git/`, atau pada path ter-ignore kecuali `report-NN.md` taskdir-nya (scope `files_touched`-nya divonis `verify_scope.py` sesudah unit). Fail-closed; main loop tidak dipagar. `validate_review.py --log` menagih tree bersih sesudah reviewer — hanya `REVIEW.md` dan `finding_source` taskdir itu (check `TREE`) |
+| `hooks/guard_bash.py` (PreToolUse) | `code-reviewer` read-only atas repo: Bash hanya git baca (`status`, `diff`, `log`, `show`, `rev-parse`, `ls-files`, `merge-base`, `blame`, `symbolic-ref` bentuk baca — pencarian lewat tool Grep), opsi global hanya `--no-pager`, tanpa ekspansi shell, glob sebelum `--`, pipe, atau pengalihan; `ls`; dan `chain.py files` plugin ini; Write hanya `REVIEW.md`; Edit hanya `REVIEW.md` dan berkas temuan `frontenddev/reviews/`. Penulis lain hanya Edit/Write: `code-explorer` hanya laci `.explore/`/`.frontenddev/explore/`, `doc-reviewer` hanya `REVIEW-PLAN.md`, `code-implementor` ditolak di luar repo, di `.git/`, atau pada path ter-ignore, tanpa pengecualian (scope `files_touched`-nya divonis `verify_scope.py` sesudah unit). Fail-closed; main loop tidak dipagar. `validate_review.py --log` menagih tree bersih sesudah reviewer — hanya `REVIEW.md` dan `finding_source` taskdir itu (check `TREE`) |
 | `report/scripts/validate_report.py` | Ringkasan ≥ 5 kata, butir ≥ 3 kata; perubahan berakar berkas rantai; temuan REVIEW `PLANNED`/`DEFERRED` disebut di Catatan; tiap SC `PERLU VERIFIKASI MANUAL` tercatat |
 | `review/scripts/validate_audit.py` | berkas audit `frontenddev/reviews/`: ID `P{n}-{m}` berurutan, hitungan `p1/p2/p3`, `verdict` turunan, `> Status:` ber-enum, jangkar `file:baris`; `--only-status-changed` menolak diff `finding_source` yang menyentuh baris selain `> Status:` |
 
@@ -205,9 +205,13 @@ Rantai yang janji akarnya tidak mendarat tidak pernah sampai ke `report`, sebers
 
 1. **Ingest** — `check_preconditions.py --brief NN`: brief `READY` ber-`stack` sama dengan profil,
    `depends_on` tertutup lewat commit `implement unit` yang membawa kode sejak `base_commit` (status `DONE`
-   yang diketik tanpa commit itu tidak sah), `report-NN.md` belum ada, kesegaran `based_on`.
+   yang diketik tanpa commit itu tidak sah), `report-NN.md` belum ada, kesegaran `based_on`. Brief `DONE`
+   tanpa `report-NN.md` sah — unit bersih memang tanpa berkas laporan.
 2. **Dispatch** — `code-implementor` menerapkan brief tanpa satu perintah terminal pun (tool `Bash` tidak
-   tersedia) dan menulis `report-<NN>.md` — laporan yang bertahan melewati sesi. Berkas yang perlu
+   tersedia) dan mengembalikan laporan unit sebagai balikan, tanpa berkas — harness Claude Code menolak
+   subagent menulis berkas laporan. `architect` menyalinnya persis ke `report-<NN>.md` (+ `## Triase`)
+   hanya bila unit tidak bersih: `FAILED`, `BLOCKED`, ber-`## Triase`, atau `## Out of Scope / Mismatch`
+   tidak kosong. Berkas yang perlu
    dipulihkan dicatatnya di `## Rollback`; rollback-nya (`git restore --` berkas `MODIFY`, `rm --` berkas
    `CREATE`) milik `architect` di matriks bukti disk. Berkas ber-aksi `DELETE` tidak disentuh implementor —
    `architect` menghapusnya lewat `git rm` di commit unit.
@@ -281,7 +285,7 @@ membacanya, ia tidak disinkron ke nataflow, dan bila bertentangan dengan disk, d
       CONTRACT.md        kontrak           → contract         (DRAFT → APPROVED)
       brief-01-*.md      scope satu unit   → plan             (READY → DONE | BLOCKED)
       REVIEW-PLAN.md     audit dokumen     → doc-reviewer
-      report-01.md       laporan unit      → code-implementor (+ ## Triase architect)
+      report-01.md       laporan unit      → architect, unit tak bersih saja (balikan + ## Triase)
       REVIEW.md          review penutup    → code-reviewer
       REPORT.md          laporan hasil     → report — penanda tuntas
       JOURNEY.md         keputusan antar sesi → journey.py — bukan sumber status, tidak disinkron

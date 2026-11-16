@@ -150,7 +150,7 @@ backenddev/
     2609231200-order-refund/         <YYMMDDhhmm>-<slug>
       TASK.md  BRD.md  PRD.md  RCA.md
       brief-01-<unit>.md             READY → DONE | BLOCKED | SUPERSEDED
-      report-01.md                   laporan brief yang gagal
+      report-01.md                   laporan brief yang gagal (ditulis architect dari amplop implementor)
       HALT.md  REVIEW.md  REPORT.md
       JOURNEY.md                     keputusan antar sesi (journey.py), bukan sumber status
       .explore/                      scratch skill hilir; laporan explorer utuh
@@ -230,7 +230,8 @@ substitusi, dan ekspansi shell (`$`, backtick, brace `{a,b}`) ditolak, begitu pu
 sebelum `--`, karena nama berkas hasil ekspansinya dapat menjadi flag; operator dinilai sesudah tokenisasi,
 jadi `<T>` atau `->` di dalam kutip tetap satu argumen. Edit/Write hanya boleh ke path lease. Lease ditulis `architect` sebelum dispatch
 (`guard_bash.py lease --brief <path>`) ke `<git-dir>/nataflow/lease-backend.json`, di luar
-working tree. Isinya `## File scope` brief, berkas brief, `report-NN.md`, dan `finding_source`. Tanpa lease,
+working tree. Isinya `## File scope` brief, berkas brief, dan `finding_source` — tanpa `report-NN.md`, yang
+disimpan `architect` dari badan laporan amplop jalur gagal (37 B2). Tanpa lease,
 semua Bash/Edit/Write implementor ditolak. Untuk `backend:code-explorer`, hook yang sama hanya
 mengizinkan Edit/Write ke laporan `backenddev/docs/[<taskdir>/].explore/*.md`. `backend:code-reviewer` hanya
 boleh git read-only (ditambah `merge-base` dan `symbolic-ref` bentuk baca — tanpa `-d`/`--delete`/`-m`, maksimal

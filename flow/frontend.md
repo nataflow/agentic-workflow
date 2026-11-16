@@ -19,7 +19,7 @@
 | `code-explorer` | agent (sonnet) | Penelusur kode read-only. Mengembalikan bukti `file:baris` | `agents/code-explorer.md` |
 | `contract-reviewer` | agent (sonnet) | Penilai `CONTRACT.md` read-only | `agents/contract-reviewer.md` |
 | `doc-reviewer` | agent (sonnet) | Auditor batch brief lintas dokumen. Menulis `REVIEW-PLAN.md` | `agents/doc-reviewer.md` |
-| `code-implementor` | agent (sonnet) | Menerapkan satu brief ke `src/` dan menulis `report-<NN>.md` | `agents/code-implementor.md` |
+| `code-implementor` | agent (sonnet) | Menerapkan satu brief ke `src/` dan mengembalikan laporan unit sebagai balikan (tanpa berkas, 37 U1) | `agents/code-implementor.md` |
 | `code-reviewer` | agent (opus) | Penilai independen diff rantai. Menulis `REVIEW.md` | `agents/code-reviewer.md` |
 | `detect.py` | hook `SessionStart` | Mendeteksi stack dan profil, lalu menyuntik pengingat gate `frontend:lead` | `hooks/detect.py` (identik dengan milik `backend`) |
 | `gate_text.py` | hook (teks) | Teks yang disuntik: aturan gate dan catatan status profil | `hooks/gate_text.py` |
@@ -418,7 +418,7 @@ flowchart TD
   - Nilai `typecheck_per_brief`, `base_commit`, dan `format` (perintah formatter profil, `-` bila tidak ada) juga diambil dari baris ini. Mode rantai mencetak blok `Rantai:` (NN, unit, status, berkas per aksi, `depends_on`); mode `--brief` mencetak `Berkas unit <NN>:` — sumber tabel rantai dan perintah commit unit, sehingga main loop tidak membaca frontmatter brief atau `TASK.md` lewat `sed`/`grep` (36 S1).
 - **Langkah**:
   1. **Phase 0.** Ambil baseline seluruh perintah `commands.md` sekali lewat `run_verification.py baseline` (Bash background) sebelum unit pertama mendarat, disimpan ke `.explore/verification-baseline.json` beserta `head`. Baseline hilang sesudah unit mendarat → ukur di worktree pada `base_commit` akar, bukan di HEAD. Sajikan tabel rantai dari blok `Rantai:` prasyarat, lalu baca `journey.py show` (keputusan sesi planning; disk menang bila bertentangan).
-  2. **Phase 1 (ingest).** Jalankan `check_preconditions.py --brief <NN>`. Check 10–13 menagih: brief READY dengan `stack` = profil, `depends_on` tertutup (`DONE` di disk ditambah commit `implement unit` pembawa kode sejak `base_commit`), `report-<NN>.md` belum ada, dan kesegaran `based_on` (hanya `WARN`).
+  2. **Phase 1 (ingest).** Jalankan `check_preconditions.py --brief <NN>`. Check 10–13 menagih: brief READY dengan `stack` = profil, `depends_on` tertutup (`DONE` di disk ditambah commit `implement unit` pembawa kode sejak `base_commit`), `report-<NN>.md` belum ada (laporan untuk brief `READY` berarti unit itu sudah pernah ditriase), dan kesegaran `based_on` (hanya `WARN`).
   3. **Phase 2 (dispatch dan triase).**
      - Hidrasi `dispatcher/implementor.md` dan dispatch `code-implementor` tepat sekali.
      - Jalankan `verify_scope.py --brief <b> --worktree` dan pemeriksaan anchor (`git diff -U0`), lalu ambil tindakan dari matriks bukti disk.
@@ -439,10 +439,10 @@ flowchart TD
      - `REPORT.md` tertulis tetapi gagal validator (`LAPORAN TERTUNDA`) → butir 4: `validate_report.py`; PASS → sinkron nataflow; FAIL → hapus `REPORT.md` dan panggil `report` sekali lagi.
      - Putaran yang berhenti sebelum review (unit BLOCKED, verifikasi merah, berkas yatim, jejak verifikasi) atau mendapati `REPORT.md` sudah terbit menjalankan sinkron sekali sebelum baris penutup. Baris penutup membawa segmen sinkron terakhir.
 - **Subagent yang didispatch**:
-  - `code-implementor`: satu per brief, sekuensial, retry maksimal 1 hanya kalau laporan absen dan tree bersih. Balikannya `REPORT <unit>: DONE | FAILED`.
+  - `code-implementor`: satu per brief, sekuensial, retry maksimal 1 hanya kalau balikan absen/rusak dan tree bersih. Balikannya laporan unit utuh (`status: DONE | FAILED`), bukan berkas.
   - `code-reviewer`: sekali per penutup, dispatch ulang maksimal 1 kalau `REVIEW.md` absen atau validator FAIL. Verdict `PASS`, `WARNING`, atau `BLOCKED` diturunkan mekanis.
 - **Output / artefak**:
-  - Status brief `DONE`/`BLOCKED`, dan `report-<NN>.md` yang ditambahi `## Triase` oleh architect.
+  - Status brief `DONE`/`BLOCKED`, dan `report-<NN>.md` untuk unit tak bersih saja (`FAILED`, `BLOCKED`, ber-`## Triase`, atau `## Out of Scope / Mismatch` tidak kosong): salinan persis balikan implementor + `## Triase` architect (37 U2). Unit bersih tanpa berkas laporan.
   - `REVIEW.md`.
   - Di `.explore/`: `verification-baseline.json`, `closing-verification.md`/`.json`, `gate-<NN>.md`, dan `verification-logs/`.
   - Baris penutup `ARCHITECT — COMPLETED … · nataflow <segmen>` atau blok `### ARCHITECT — BLOCKED | TERTAHAN` berslot **Nataflow**.
@@ -456,15 +456,15 @@ flowchart TD
 
 **Matriks bukti disk** (`skills/architect/references/execution-protocol.md` §3):
 
-| `report-<NN>.md` | Disk vs `files_touched` | Tindakan |
+| Balikan (laporan unit) | Disk vs `files_touched` | Tindakan |
 |---|---|---|
-| `DONE` | hanya `files_touched` (+ laporan) yang berubah, anchor sah | **Commit unit** (brief → `DONE` di disk, lalu commit kode) |
-| `DONE` | ada berkas liar, atau hunk menyentuh simbol di luar `Anchor` | Pulihkan, tulis `## Triase`, brief → `BLOCKED`, **tandai BLOCKED** (disk) |
+| `DONE` | hanya `files_touched` yang berubah, anchor sah | **Commit unit** (brief → `DONE` di disk, lalu commit kode) |
+| `DONE` | ada berkas liar, atau hunk menyentuh simbol di luar `Anchor` | Pulihkan, simpan laporan + `## Triase`, brief → `BLOCKED`, **tandai BLOCKED** (disk) |
 | `DONE` | `## Changes` menyebut berkas yang tidak berubah (selain baris `DELETE`) | Diperlakukan sebagai laporan rusak |
 | `FAILED` | bersih | **Tandai BLOCKED** (disk) |
 | `FAILED` | kotor di dalam `files_touched` | Architect melakukan rollback (`git restore --` untuk MODIFY dan DELETE yang tersunting, `rm --` untuk CREATE), lalu **tandai BLOCKED** (disk) |
-| absen/rusak | bersih | Kegagalan dispatch. Hapus laporan rusak, ulangi maksimal sekali |
-| absen/rusak | kotor | **HENTIKAN**, eskalasi ke user |
+| absen/rusak/terpotong | bersih | Kegagalan dispatch. Ulangi maksimal sekali, tanpa berkas laporan |
+| absen/rusak/terpotong | kotor | **HENTIKAN**, eskalasi ke user |
 
 ```mermaid
 flowchart TD
@@ -475,8 +475,8 @@ flowchart TD
     DIS --> VS["verify_scope.py --worktree + cek anchor"]
     VS -->|"DONE, scope bersih"| CU["brief DONE di disk + commit kode unit"]
     VS -->|"FAILED atau scope liar"| CB["rollback + tandai BLOCKED di disk"]
-    VS -->|"laporan absen, tree bersih"| DIS
-    VS -->|"laporan absen, tree kotor"| HALT["HENTIKAN, eskalasi user"]
+    VS -->|"balikan absen, tree bersih"| DIS
+    VS -->|"balikan absen, tree kotor"| HALT["HENTIKAN, eskalasi user"]
     CU --> TC{"typecheck-per-brief = ya?"}
     TC -->|"ya, galat baru"| CB
     TC -->|"lolos atau tidak berlaku"| NEXT{"masih ada brief READY?"}
@@ -533,7 +533,7 @@ flowchart TD
 | `code-explorer` | `lead`, `ux-design`, `ui-design`, `contract`, `plan` (via `dispatcher/explorer.md`) | Read, Grep, Glob, Write · sonnet | `Objective` spesifik, konteks, batas cakupan, slug, `Laci`, `Kedalaman`, blok `Format laporan` | Bentuk A: ringkasan 400–900 token dengan `confidence`. Bentuk B: artefak di `<taskdir>/.explore/<slug>.md` atau `.frontenddev/explore/` | Edit `src/`/`frontenddev/docs/`, merancang solusi, git, bertanya ke user, membaca adapter, membaca berkas utuh >100 baris |
 | `contract-reviewer` | `contract` (via `dispatcher/reviewer.md`) | Read, Grep, Glob · sonnet | `taskdir`, `sections`, `stack`, `adapter_path`, `contract_template`, `round`, `sidik` (+ `previous_verdict`, `changed_sections` di ronde 2) | `## Contract Review`: `PASS`/`BLOCKED`, `- Sidik:`, BLOCKER `[MEKANIS]`/`[SEMANTIK]`, ADVISORY | Mengedit berkas, menulis `APPROVED`, merancang ulang, bertanya ke user, menghitung ulang predikat `validate_doc.py` |
 | `doc-reviewer` | `plan`, lane non-MINOR (via `dispatcher/reviewer.md`) | Read, Grep, Glob, Write · sonnet | `taskdir`, `round`, `sections`, `profile_path`, `brief_berubah`, `previous_report`, blok `Format artefak` dan `Format balikan` | `REVIEW-PLAN.md` (D1–D4, temuan `RP-nn`, pemilik revisi, `sidik:` ronde) + payload 300–700 token. `PASS` ⇔ nol BLOCKER | Menulis selain `REVIEW-PLAN.md` (dipagar hook), mengedit dokumen planning dan `src/`, git, bertanya ke user, menghitung ulang 16 check `validate_briefs.py`, membaca adapter |
-| `code-implementor` | `architect` (via `dispatcher/implementor.md`), satu per brief | Read, Grep, Glob, Edit, Write · sonnet (tanpa Bash) | `taskdir`, `unit_name`, `brief_path`, `report_path`, `adapter_path`, blok `Format laporan` | `report-<NN>.md` (`DONE`/`FAILED`) + satu baris `REPORT <unit>: …` | Menyentuh di luar `files_touched`/`Anchor` (tulisan di luar repo, `.git/`, atau path ter-ignore ditolak hook, kecuali `report-NN.md` taskdir-nya), terminal apa pun, commit, menyunting frontmatter brief, `@ts-ignore`/`eslint-disable`, mengubah config, bertanya ke user |
+| `code-implementor` | `architect` (via `dispatcher/implementor.md`), satu per brief | Read, Grep, Glob, Edit, Write · sonnet (tanpa Bash) | `taskdir`, `unit_name`, `brief_path`, `adapter_path`, blok `Format laporan` | Laporan unit utuh sebagai balikan (`DONE`/`FAILED`), tanpa berkas — architect menyimpannya bila unit tidak bersih | Menyentuh di luar `files_touched`/`Anchor` (tulisan di luar repo, `.git/`, atau path ter-ignore ditolak hook, termasuk `report-NN.md`), terminal apa pun, commit, menyunting frontmatter brief, `@ts-ignore`/`eslint-disable`, mengubah config, bertanya ke user |
 | `code-reviewer` | `architect` Phase 4 (via `dispatcher/reviewer.md`), sekali per penutup | Read, Grep, Glob, Bash, Write, Edit · opus (dipagar `guard_bash.py`) | `taskdir`, `base` (`base_commit` akar), `head` (`HEAD` yang dinilai), `verification_log`, `template`, `adapter_path`, `chain_py`, `finding_source` | `REVIEW.md` (9 dimensi, cakupan SC/AC, Done Criteria DITUNDA, umpan balik profil) + amplop ≤10 baris. `BLOCKED` ⇔ P1 atau SC belum terbukti atau verifikasi merah | Mengedit `src/`, build/test, commit, bertanya ke user. Bash hanya git baca (tanpa `git grep`), `ls`, dan `chain.py files` plugin ini |
 
 Penulis dan penilai selalu berada di context terpisah. Sebabnya, penilai yang berbagi context dengan penulisnya akan menilai ingatannya sendiri, bukan dokumen di disk (`README.md` § Five Subagents). Tiap subagent dipanggil langsung lewat template `skills/<skill>/dispatcher/*.md`, tanpa skill pembungkus. Kalau prompt masih memuat slot `{...}` mentah, dispatch dibatalkan.
@@ -560,7 +560,7 @@ Penulis dan penilai selalu berada di context terpisah. Sebabnya, penilai yang be
   - **Write**: hanya `frontenddev/docs/<taskdir>/REVIEW.md`.
   - **Edit**: `REVIEW.md` yang sama dan `frontenddev/reviews/*.md` (baris `> Status:`).
 - Hook ini fail-closed: galat internal pun menolak dengan exit 2.
-- Penulis lain hanya dipagar Edit/Write: `code-explorer` hanya laci `.explore/`/`.frontenddev/explore/`, `doc-reviewer` hanya `REVIEW-PLAN.md`, `code-implementor` ditolak di luar repo, di `.git/`, atau pada path ter-ignore, kecuali `frontenddev/docs/<taskdir>/report-NN.md` (24 K13). Scope `files_touched` implementor tetap divonis `verify_scope.py` sesudah unit mendarat (lease ala backend sengaja tidak dibawa).
+- Penulis lain hanya dipagar Edit/Write: `code-explorer` hanya laci `.explore/`/`.frontenddev/explore/`, `doc-reviewer` hanya `REVIEW-PLAN.md`, `code-implementor` ditolak di luar repo, di `.git/`, atau pada path ter-ignore, tanpa pengecualian — `report-NN.md` disimpan architect dari balikan (37 U5; harness Claude Code juga menolak subagent menulis berkas laporan). Scope `files_touched` implementor tetap divonis `verify_scope.py` sesudah unit mendarat (lease ala backend sengaja tidak dibawa).
 
 **Penjaga mekanis lain**, dijalankan skill, bukan hook:
 
@@ -584,7 +584,7 @@ frontenddev/
       CONTRACT.md    kontrak data + layer, AC-{n}  → contract            (DRAFT → APPROVED)
       brief-<NN>-<unit>.md  scope satu unit        → plan                (READY → DONE | BLOCKED)
       REVIEW-PLAN.md audit dokumen planning        → doc-reviewer
-      report-<NN>.md laporan unit (+ ## Triase)    → code-implementor (+ architect)
+      report-<NN>.md laporan unit tak bersih       → architect (salinan balikan implementor + ## Triase)
       REVIEW.md      review penutup, base + head   → code-reviewer
       REPORT.md      laporan hasil, tanda tuntas   → report
       JOURNEY.md     keputusan antar sesi (33)     → journey.py; bukan sumber status, tidak disinkron
@@ -736,8 +736,8 @@ Plafon (reopen 3 per hop dan 6 per taskdir, eskalasi 2, revisi 2), epoch ronde r
 | State ronde rusak atau hilang | `review_round.py` | Pulihkan dari `.bak`, atau `rebuild` dari field `review` kejadian Riwayat. Dilarang menulis state dengan tangan |
 | Plan MINOR menemukan endpoint, DTO, query key, atau state baru | `plan` Phase 0 | Lead `escalate --lane FAST_FORWARD` (atau FULL_PIPELINE) |
 | Unit `BLOCKED` | matriks bukti disk | `reopen --row BRIEF`, lalu `plan` APPEND brief remedi (`remedies: "NN"`) |
-| Brief `DONE` di disk tanpa commit unit pembawa kode (sesi terputus, `DONE` diketik tangan, atau commit unit di-reset) | `taskdir_state.py` `TERPUTUS`, architect check 4 `WARN` (`done_landed`) | Architect fase `TERPUTUS`, matriks bukti disk tanpa dispatch: laporan `DONE` + hanya `files_touched` → commit unit; laporan absen/rusak + tree bersih → status kembali `READY` lalu dispatch; berkas di luar `files_touched` atau laporan `FAILED` → HENTIKAN, eskalasi ke user |
-| `report-NN.md` hilang dari disk sesudah commit unit pembawa kode mendarat | architect check 4 `WARN` | Commit unit tetap bukti `DONE`; rantai lanjut tanpa dispatch ulang, laporan dipulihkan dari cermin nataflow bila dibutuhkan |
+| Brief `DONE` di disk tanpa commit unit pembawa kode (sesi terputus, `DONE` diketik tangan, atau commit unit di-reset) | `taskdir_state.py` `TERPUTUS`, architect check 4 `WARN` (`done_landed`) | Architect fase `TERPUTUS`, matriks bukti disk tanpa dispatch, divonis dari tree saja (37 U3): hanya `files_touched` berubah → commit unit; tree bersih → status kembali `READY`, laporan sisa dihapus, lalu dispatch; berkas di luar `files_touched` → HENTIKAN, eskalasi ke user |
+| Implementor mencoba menulis `report-NN.md` | harness Claude Code ("Subagents should return findings as text") dan hook | Tidak perlu pemulihan: laporan memang balikan; architect menyimpannya bila unit tidak bersih (37 U1–U2) |
 | Rantai buntu (`TERHENTI (DAG)`: brief READY tak satu pun dapat berangkat) | `taskdir_state.py`, architect check 4, `validate_briefs.py` Check D | `reopen --row BRIEF`, lalu `plan` APPEND memperbaiki `depends_on` |
 | Remedi ketiga atas unit yang sama | `validate_briefs.py` Check M | `reopen --row CONTRACT`. Di MINOR: `reopen BRIEF` lalu `escalate FAST_FORWARD` |
 | Berkas yatim (di luar union `files_touched`) | architect Phase 3, `code-reviewer` P1 | `reopen --row CONTRACT`, lalu contract melengkapi Files Touched, lalu `plan` APPEND |
