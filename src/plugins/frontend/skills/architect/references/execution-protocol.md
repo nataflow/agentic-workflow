@@ -2,7 +2,7 @@
 
 Rumah kanonik prosedur eksekusi rantai brief: ingest, dispatch implementor, matriks bukti disk, kontrak `report-<NN>.md`, gerbang kompilasi per-brief, verifikasi penutup, klasifikasi kegagalan, dan protokol rollback. `SKILL.md` merujuk bagian bernomor di sini dan dilarang menulis ulang isinya. Penulisan kode hidup di `agents/code-implementor.md`; penilaian penutup di `agents/code-reviewer.md`.
 
-**Satu aturan yang membingkai seluruh dokumen**: tidak ada verifikasi terminal **di dalam subagent**. Lint, test, dan build berjalan tepat sekali di Phase 4, sesudah seluruh brief tertutup. Satu pengecualian sempit hidup di main loop: typecheck per unit (bagian 5), dijalankan `architect` sesudah commit unit, dan hanya bila baris `typecheck-per-brief` adapter bernilai `ya`.
+**Satu aturan yang membingkai seluruh dokumen**: tidak ada verifikasi terminal **di dalam subagent**. Lint, test, dan build berjalan tepat sekali di Phase 4, sesudah seluruh brief tertutup. Satu pengecualian sempit hidup di main loop: typecheck per unit (bagian 5), dijalankan `architect` sesudah commit unit, dan hanya bila baris `typecheck-per-brief` adapter bernilai `ya`. Formatter profil atas berkas unit sebelum commit (bagian 3, **Format unit**) bukan verifikasi — ia mengubah format, tidak memvonis apa pun.
 
 ---
 
@@ -66,11 +66,24 @@ Kotoran di **luar** `files_touched` pada baris mana pun bukan wewenang `architec
 
 **Pemeriksaan anchor.** Untuk tiap berkas `MODIFY`: `git diff -U0 -- <path>`; hunk header `@@ … @@ <konteks>` yang tidak menyebut anchor adalah pelanggaran. Funcname bawaan git untuk TypeScript/Svelte hanya menangkap deklarasi top-level tanpa indentasi — repo tanpa diff driver (`*.ts diff=typescript` di `.gitattributes`) menghasilkan hunk header kosong; pada kasus itu vonis turun ke `WARN`, isi hunk diperiksa manual, dan temuan dicatat sebagai rekomendasi profil.
 
+**Format unit** (36 F1) — hanya bila `format=` baris `Terselesaikan:` prasyarat bukan `-`; sesudah pemeriksaan anchor, tepat sebelum commit unit, di setiap jalan menuju commit unit (termasuk fase `TERPUTUS`):
+
+```bash
+<format> <path CREATE dan MODIFY baris `Berkas unit <NN>:` yang ada di disk>
+python3 «verify_scope.py» --brief <brief_path> --worktree
+```
+
+- Formatter exit 0 dan `verify_scope.py` `PASS` → commit unit.
+- `verify_scope.py` `FAIL` → formatter menyentuh berkas di luar unit: pulihkan berkas liar itu (`git restore -- <path>`; Check 8 menjamin ia bersih sebelum dispatch), catat di `## Triase`, sebut ke user bahwa baris `format` profil perlu dikoreksi lewat `frontend:profile` REFRESH, lalu commit unit.
+- Formatter exit ≠ 0 (mis. berkas tak terurai) → catat ekor keluarannya di `## Triase` dan commit tanpa format; gerbang kompilasi bagian 5 dan verifikasi penutup yang memvonis.
+
+Formatter adalah transformasi mekanis, bukan verifikasi: ia tidak pernah memutuskan status unit, tidak pernah dijalankan atas berkas di luar unit, dan ini satu-satunya suntingan `src/` yang boleh dilakukan main loop. Tanpanya, cacat format yang tak terlihat implementor (yang tak punya terminal) baru ketahuan di verifikasi penutup dan dibayar dengan putaran `reopen BRIEF` → brief perbaikan → Plan Review → approval.
+
 **Commit unit** — kenaikan status di disk lalu commit kode, satu langkah:
 
 ```bash
 # frontmatter brief: status: READY → DONE (disk; brief dan report-<NN>.md tidak di-stage)
-git add <files_touched>
+git add <path CREATE dan MODIFY baris `Berkas unit <NN>:`>
 git commit -m "feat(<slug>): implement unit <NN> - <nama unit>"
 ```
 
@@ -202,7 +215,7 @@ Kategori generik lintas stack. Tabel per stack — nama galat persis dan resolus
 
 ## 9. Anti-Pattern
 
-- Menjalankan lint/test/build per unit "sekadar memastikan" — oleh subagent maupun `architect`.
+- Menjalankan lint/test/build per unit "sekadar memastikan" — oleh subagent maupun `architect`. Formatter `format` profil atas berkas unit (bagian 3) bukan pelanggaran; menjalankannya atas seluruh repo, atau memakai `lint --fix`/perintah lint sebagai pengganti formatter, adalah pelanggaran.
 - Menonaktifkan rule (`eslint-disable`, `@ts-ignore`, `svelte-ignore`) atau mengedit `tsconfig.json`/`package.json`/config bundler untuk meloloskan verifikasi.
 - Menghapus, men-skip, atau melemahkan assertion test yang gagal; mengubah mock global demi test lokal.
 - Mendispatch ulang unit `BLOCKED` secara buta, atau memindahkan sisa pekerjaan ke taskdir baru — itu menyembunyikan brief `BLOCKED` dari tiap gerbang yang memindainya.

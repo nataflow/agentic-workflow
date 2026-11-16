@@ -47,6 +47,7 @@ from precondition_lib import (  # noqa: E402
     expected_rows,
     files_by_action,
     find_repo_root,
+    format_command,
     format_report,
     git,
     normalize_taskdir,
@@ -447,7 +448,8 @@ class PreconditionChecker:
         out = format_report("architect" + (f" ingest brief-{self.brief_nn}" if self.brief_nn else ""),
                             self.results, {"fase": self.phase, "unit_berikutnya": self.next_unit,
                                            "lane": self.lane or "-", "base_commit": self.base_commit(),
-                                           "typecheck_per_brief": self.tpb()})
+                                           "typecheck_per_brief": self.tpb(),
+                                           "format": format_command(self.profile_dir) or "-"})
         rows = self.chain_rows()
         if self.brief_nn:
             row = next((r for r in rows if r["nn"] == self.brief_nn), None)
@@ -469,7 +471,8 @@ class PreconditionChecker:
         return report_json(self.results, root=str(self.root), taskdir=self.taskdir_rel,
                            brief=self.brief_nn, phase=self.phase, next_unit=self.next_unit,
                            lane=self.lane, stack=self.stack, base_commit=self.base_commit(),
-                           typecheck_per_brief=self.tpb(), briefs=rows, **extra)
+                           typecheck_per_brief=self.tpb(), format=format_command(self.profile_dir),
+                           briefs=rows, **extra)
 
 
 def main() -> None:

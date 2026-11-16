@@ -5,7 +5,7 @@ import re
 
 import pytest
 
-from conftest import FE_SKILLS, FE_TD, PLUGINS, fe_approved_chain, fe_base_commit, fe_draft as draft, fe_open_sidik, \
+from conftest import FE_SKILLS, FE_TD, PLUGINS, commit, fe_approved_chain, fe_base_commit, fe_draft as draft, fe_open_sidik, \
     fe_round as round_, fe_run, load_module, write_files
 
 JOURNEY = FE_SKILLS / "_common" / "journey.py"
@@ -119,3 +119,41 @@ def test_s1_prosa_architect_tidak_lagi_sed_atas_task_md():
     assert "sed -n 's/^base_commit" not in skill
     phase0 = skill.split("### Phase 0", 1)[1].split("### Phase 1", 1)[0]
     assert "`Rantai:`" in phase0 and "`base_commit=`" in phase0
+
+
+# ------------------------------------------------------------------ F1 — format otomatis sebelum commit unit
+
+COMMANDS = ".claude/profile/frontenddev/commands.md"
+
+
+@pytest.mark.regression("36 F1")
+def test_f1_format_dari_profil_atau_strip(fe_chain_repo):
+    repo = fe_chain_repo
+    fe_approved_chain(repo)
+    assert "format=-" in arch(repo).out
+    assert json.loads(arch(repo, "--json").out)["format"] == ""
+    text = (repo / COMMANDS).read_text(encoding="utf-8")
+    write_files(repo, {COMMANDS: text + "\n- `format`: `pnpm prettier --write --ignore-unknown` — repo bersih format\n"})
+    commit(repo, "chore: profil format", COMMANDS)
+    r = arch(repo)
+    assert "format=pnpm prettier --write --ignore-unknown" in r.out, r.out
+    assert json.loads(arch(repo, "--json").out)["format"] == "pnpm prettier --write --ignore-unknown"
+
+
+def test_f1_format_command_tanpa_fallback_adapter(tmp_path):
+    lib = load_module(FE_SKILLS / "_common" / "precondition_lib.py", "fe_lib_36_f1")
+    assert lib.format_command(tmp_path) == ""
+    (tmp_path / "commands.md").write_text("- `typecheck-per-brief`: `ya`\n", encoding="utf-8")
+    assert lib.format_command(tmp_path) == ""
+
+
+def test_f1_prosa_format_unit_sebelum_commit_unit():
+    proto = _read("architect/references/execution-protocol.md")
+    bagian3 = proto.split("## 3.", 1)[1].split("## 4.", 1)[0]
+    assert bagian3.index("**Format unit**") < bagian3.index("**Commit unit**")
+    for wajib in ("`format=`", "verify_scope.py", "`## Triase`", "bukan verifikasi"):
+        assert wajib in bagian3, wajib
+    guard = _read("architect/SKILL.md").split("## Guardrails", 1)[1]
+    assert "**Format unit**" in guard.split("\n- **SEKUENSIAL", 1)[0]
+    tpl = _read("profile/templates/profile-template.md").split("## 6.", 1)[1].split("## 7.", 1)[0]
+    assert "- `format`:" in tpl and "opsional" in tpl

@@ -175,6 +175,22 @@ PROFILE_TPB = re.compile(r"^-\s*`typecheck-per-brief`\s*:\s*`?\s*(ya|tidak)\b", 
 ADAPTER_TPB = re.compile(r"^\|\s*typecheck-per-brief\s*\|\s*`?(ya|tidak)\b", re.MULTILINE)
 
 
+PROFILE_FORMAT = re.compile(r"^-\s*`format`\s*:\s*`([^`\n]+)`", re.MULTILINE)
+
+
+def format_command(profile_dir: Path) -> str:
+    """Perintah formatter `commands.md` profil (baris opsional `format`), atau kosong (36 F1).
+
+    Tidak ada fallback adapter: formatter hanya aman dijalankan atas berkas unit bila repo sudah bersih format di
+    baseline, dan itu keputusan profil per repo, bukan per stack.
+    """
+    try:
+        m = PROFILE_FORMAT.search((profile_dir / "commands.md").read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError):
+        return ""
+    return m.group(1).strip() if m else ""
+
+
 def typecheck_per_brief(profile_dir: Path, stack: str) -> Tuple[str, str]:
     """`(nilai, sumber)` gerbang kompilasi per-brief — satu resolver untuk seluruh pembaca.
 

@@ -135,6 +135,7 @@ Invariant yang repo-nya belum patuhi tetap ditulis sebagai invariant; ketidakpat
 Status sah: `OK (...)`, `FAIL (<n> errors)`, `UNVERIFIED_ENV_NOT_READY`, `TIMEOUT / UNVERIFIED`, `tidak berlaku`.
 
 - `typecheck-per-brief`: `<ya | tidak — alasan>` — nilai adapter, atau dinaikkan/diturunkan profil sesuai `stacks/_CONTRACT.md` §2 dengan durasi `typecheck` baseline sebagai alasan (`ya — svelte-check 8 dtk`); ia menjawab cara pemakaian, bukan status jalan, dan menang atas adapter.
+- `format`: `<perintah formatter yang menerima daftar path di ujungnya, mis. yarn prettier --write --ignore-unknown>` — **opsional**. Tulis hanya bila (a) repo memakai formatter (skrip `package.json`, `.prettierrc*`, `biome.json`), (b) baseline pemeriksaan formatnya `OK` — repo sudah bersih format, sehingga format atas berkas unit hanya menyentuh baris yang diubah implementor — dan (c) perintahnya tidak memeriksa atau memutasi berkas di luar path yang diberikan. Syarat mana pun gagal → baris tidak ditulis. `architect` menjalankannya atas berkas unit sebelum commit unit (`execution-protocol.md` bagian 3) — bukan verifikasi, melainkan transformasi mekanis yang mencegah verifikasi penutup merah karena format.
 
 > [!NOTE]
 > Jika baseline awal memuat error pre-existing, kriteria verifikasi implementasi berbunyi "nol error baru dibanding baseline", bukan "bersih total". `UNVERIFIED_ENV_NOT_READY` bukan utang kode: ia menandai dependensi belum terpasang, dan menagihnya sebagai utang menghentikan rantai yang sebenarnya sehat.

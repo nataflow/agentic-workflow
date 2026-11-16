@@ -90,7 +90,7 @@ Muara tiap titik ke berkas profil ditetapkan oleh judul titik itu di `references
 
 Uji perintah hasil Phase 2 titik 2 di terminal sebelum ditulis ke `commands.md` [REQUIRED]:
 
-1. Eksekusi berurutan `typecheck`, `lint`, `test`, `build`. Tulis `tidak berlaku` bila perintah tidak punya padanan di stack ini. Baris keputusan `typecheck-per-brief`: salin nilai adapter; profil boleh menaikkan/menurunkannya sesuai `stacks/_CONTRACT.md` §2 dengan durasi `typecheck` terukur di butir ini sebagai alasan (`ya — svelte-check 8 dtk`), tanpa menjalankan ulang typecheck khusus untuk keputusan ini. Nilai profil menang atas adapter — `architect` membacanya lewat prasyarat.
+1. Eksekusi berurutan `typecheck`, `lint`, `test`, `build`. Tulis `tidak berlaku` bila perintah tidak punya padanan di stack ini. Baris keputusan `typecheck-per-brief`: salin nilai adapter; profil boleh menaikkan/menurunkannya sesuai `stacks/_CONTRACT.md` §2 dengan durasi `typecheck` terukur di butir ini sebagai alasan (`ya — svelte-check 8 dtk`), tanpa menjalankan ulang typecheck khusus untuk keputusan ini. Nilai profil menang atas adapter — `architect` membacanya lewat prasyarat. Baris opsional `format` (formatter yang dijalankan `architect` atas berkas unit sebelum commit): tulis hanya bila tiga syarat `templates/profile-template.md` bagian 6 terpenuhi — formatter ada, pemeriksaan formatnya `OK` di baseline butir ini (biasanya bagian dari `lint`, mis. `prettier --check`), dan perintahnya hanya menyentuh path yang diberikan; tanpa menjalankan formatter `--write` atas repo.
 2. Catat status tiap perintah:
    - `OK (0 errors)` atau `OK (N passing)` — exit code 0.
    - `FAIL (<n> errors)` beserta potongan pesan error ringkas — exit code bukan 0 karena kodenya merah.
@@ -124,7 +124,7 @@ Tulis `<repo>/.claude/profile/frontenddev/` persis mengikuti skema, format, dan 
 | `structure.md` | source root, workspace, path fitur, anatomi layer per direktori, shared components, definisi rute |
 | `surface-map.md` | permukaan runtime: path kanonik · penanda pengenal kode · bukti |
 | `invariants.md` | 6 invariant mutlak; pelanggaran = blocker, bukan gaya |
-| `commands.md` | 4 perintah verifikasi + status baseline + cakupan yang TIDAK diperiksa, `typecheck-per-brief`, standar test |
+| `commands.md` | 4 perintah verifikasi + status baseline + cakupan yang TIDAK diperiksa, `typecheck-per-brief`, `format` (opsional), standar test |
 | `layer-adoption.md` | tingkat adopsi 5 layer, aturan arsitektur, persisted state, shared HTTP client |
 | `visual.md` | token warna, tipografi, spacing & radius, batas platform |
 | `drift.md` | pola warisan → pola modern, tiap baris ber-resep `deteksi` |
