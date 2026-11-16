@@ -146,7 +146,7 @@ def test_g2_close_menutup_menyegel_dan_meng_commit(repo):
     r = tk(repo, "close", "--ticketdir", TDIR)
     assert r.code == 0 and "elicitation CLOSED" in r.out
     fm, _ = lib.split_frontmatter(text(repo))
-    assert fm["elicitation"] == "CLOSED" and fm["elicit_hash"] == lib.content_hash(text(repo), "elicit")
+    assert fm["elicitation"] == "CLOSED" and lib.hash_matches(fm["elicit_hash"], text(repo), "elicit")
     assert fm["elicit_log"] == "1"
     assert "tanpa perubahan" in r.out                                 # identik dengan fixture ter-commit
     reopen_elicit(repo)

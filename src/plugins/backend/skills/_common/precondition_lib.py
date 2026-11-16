@@ -618,6 +618,50 @@ def ticket_seal(text: str) -> str:
     return hashlib.sha256(("\n".join(head) + "\n\x00\n" + norm).encode("utf-8")).hexdigest()[:16]
 
 
+# Segel tahan format (38 N1) — salinan `analyst_lib.ticket_seal_norm` beserta `norm_md`, ditulis analyst ke
+# `approved_seal_norm`; ketiganya ditagih sama oleh `tests/test_a1_ticket_source.py`. Ubah bersamaan.
+_TICKET_MD_QUOTE = re.compile(r"^((?:[ \t]*>)+)")
+_TICKET_MD_TABLE_SEP = re.compile(r"^:?-+:?$")
+_TICKET_MD_BULLET = re.compile(r"^[-*+]\s+")
+_TICKET_MD_SINGLE_STAR = re.compile(r"(?<!\*)\*(?!\*)")
+_TICKET_MD_SPACES = re.compile(r"\s+")
+
+
+def ticket_norm_md(text: str) -> str:
+    out = []
+    for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        m = _TICKET_MD_QUOTE.match(line)
+        depth = m.group(1).count(">") if m else 0
+        s = (line[m.end():] if m else line).strip()
+        if not s:
+            continue
+        if s.startswith("|") and s.endswith("|") and len(s) > 1:
+            cells = [c.strip() for c in s[1:-1].split("|")]
+            if all(_TICKET_MD_TABLE_SEP.match(c) for c in cells if c):
+                cells = ["---" for _ in cells]
+            s = "| " + " | ".join(cells) + " |"
+        s = _TICKET_MD_BULLET.sub("- ", s)
+        s = _TICKET_MD_SINGLE_STAR.sub("_", s)
+        s = _TICKET_MD_SPACES.sub(" ", s)
+        out.append(">" * depth + (" " if depth else "") + s)
+    return "\n".join(out)
+
+
+def ticket_seal_norm(text: str) -> str:
+    text = text.lstrip("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
+    lines = text.split("\n")
+    head: List[str] = []
+    body = lines
+    if lines and lines[0].rstrip() == "---":
+        end = next((i for i in range(1, len(lines)) if lines[i].rstrip() == "---"), None)
+        if end is not None:
+            head = [_TICKET_MD_SPACES.sub(" ", l.strip()) for l in lines[1:end]
+                    if re.match(r"^(%s)\s*:" % "|".join(TICKET_SEAL_FIELDS), l)]
+            body = lines[end + 1:]
+    norm = ticket_norm_md("\n".join(body))
+    return hashlib.sha256(("\n".join(head) + "\n\x00\n" + norm).encode("utf-8")).hexdigest()[:16]
+
+
 def sealed_verdict(root: Path, rel: str, fm: Dict[str, Any]) -> Optional[Tuple[str, str, str]]:
     """Vonis dari `approved_seal` bila tiket bersegel; None = tiket lama (vonis dari subjek commit).
 
@@ -627,14 +671,18 @@ def sealed_verdict(root: Path, rel: str, fm: Dict[str, Any]) -> Optional[Tuple[s
     seal = str(fm.get("approved_seal") or "-").strip()
     if seal in ("", "-"):
         return None
+    norm = str(fm.get("approved_seal_norm") or "-").strip()
     try:
-        now = ticket_seal((root / rel).read_text(encoding="utf-8"))
+        text = (root / rel).read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as exc:
         return "FAIL", f"`{rel}` tak terbaca ({exc})", TICKET_ACTION
-    if now != seal:
-        return ("FAIL", f"isi `{rel}` berubah sesudah disetujui (segel {seal}, sekarang {now}) — DRIFT",
-                TICKET_ACTION)
-    return "PASS", f"{rel} READY bersegel {seal}", ""
+    now = ticket_seal(text)
+    if now == seal:
+        return "PASS", f"{rel} READY bersegel {seal}", ""
+    if norm not in ("", "-") and ticket_seal_norm(text) == norm:   # hanya format yang berubah (38 N1)
+        return "PASS", f"{rel} READY bersegel {norm} (tahan format)", ""
+    return ("FAIL", f"isi `{rel}` berubah sesudah disetujui (segel {seal}, sekarang {now}) — DRIFT",
+            TICKET_ACTION)
 
 
 def ticket_source_verdict(root: Path, value: Optional[str]) -> Tuple[str, str, str]:

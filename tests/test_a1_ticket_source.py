@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from conftest import (BE_SKILLS, FE_SKILLS, PLUGINS, be_checks, be_profile, commit, fe_profile, fe_run, git,
-                      load_module, run_script, ticket_review, write_files)
+                      load_module, prettier_like, run_script, ticket_review, write_files)
 
 TICKET_PY = PLUGINS / "analyst/skills/_common/ticket.py"
 FIXTURE = Path(__file__).resolve().parent / "analyst" / "fixtures" / "ticket_valid.md"
@@ -76,6 +76,31 @@ def test_ref_sesudah_ready_tetap_lolos(ready, check):
     assert check(ready, TICKET)["status"] == "PASS"
 
 
+@pytest.mark.regression("38 N1")
+@CHECKERS
+def test_tiket_ready_yang_diformat_tetap_lolos(ready, check):
+    p = ready / TICKET
+    p.write_text(prettier_like(p.read_text(encoding="utf-8")), encoding="utf-8")
+    c = check(ready, TICKET)
+    assert c["status"] == "PASS" and "tahan format" in c["summary"], c
+    p.write_text(p.read_text(encoding="utf-8").replace("minimal Rp 50.000.000", "minimal Rp 10.000.000"),
+                 encoding="utf-8")
+    c = check(ready, TICKET)
+    assert c["status"] == "FAIL" and "DRIFT" in c["summary"], c
+
+
+@pytest.mark.regression("38 N1")
+@CHECKERS
+def test_tiket_lama_tanpa_segel_norm_tetap_seperti_sebelumnya(ready, check):
+    p = ready / TICKET
+    p.write_text("\n".join(l for l in p.read_text(encoding="utf-8").split("\n")
+                           if not l.startswith("approved_seal_norm:")), encoding="utf-8")
+    assert check(ready, TICKET)["status"] == "PASS"
+    p.write_text(prettier_like(p.read_text(encoding="utf-8")), encoding="utf-8")
+    c = check(ready, TICKET)
+    assert c["status"] == "FAIL" and "DRIFT" in c["summary"], c
+
+
 @pytest.mark.regression("A1")
 @CHECKERS
 def test_tiket_draft_ditolak(repo, check):
@@ -127,9 +152,13 @@ def test_segel_ketiga_salinan_identik():
     variants = [base, base.replace("\n", "\r\n"), "\ufeff" + base, base + "\n\n",
                 base.replace("status: DRAFT", "status: READY\nexternal_ref: FIN-9\napproved_seal: x"),
                 base.replace("minimal Rp 50.000.000", "minimal Rp 10.000.000"), "# tanpa frontmatter\n"]
-    for text in variants:
+    for text in variants + [prettier_like(base)]:
         seals = {name: lib.ticket_seal(text) for name, lib in LIBS.items()}
         assert len(set(seals.values())) == 1, seals
+        norms = {name: lib.ticket_seal_norm(text) for name, lib in LIBS.items()}   # 38 N1
+        assert len(set(norms.values())) == 1, norms
+    norm = LIBS["analyst"].ticket_seal_norm
+    assert norm(base) == norm(prettier_like(base)) != norm(variants[5])
     seal = LIBS["analyst"].ticket_seal
     assert seal(variants[0]) == seal(variants[1]) == seal(variants[2]) == seal(variants[3]) == seal(variants[4])
     assert seal(variants[0]) != seal(variants[5])

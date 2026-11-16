@@ -181,7 +181,8 @@ def test_t5_sidik_tiket_lama_tanpa_category_tidak_bergeser():
     fm, body = lib.split_frontmatter(text)
     norm = "\n".join(l.rstrip() for l in body.strip().splitlines())
     old = hashlib.sha256(f"type={fm['type']}\npriority={fm['priority']}\ndomain_terms=\n{norm}".encode()).hexdigest()
-    assert lib.content_hash(text) == old[:12]
+    assert lib.content_hash_legacy(text) == old[:12]   # sidik lama (sebelum 38 N1) tetap terbaca
+    assert lib.hash_matches(old[:12], text)
     tech = FIXTURE.read_text(encoding="utf-8")
     assert lib.content_hash(tech) != lib.content_hash(tech.replace("DATA_MODEL", "REFACTOR"))
     assert lib.content_hash(tech, "elicit") == lib.content_hash(tech.replace("DATA_MODEL", "REFACTOR"), "elicit")

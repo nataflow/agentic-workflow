@@ -348,21 +348,75 @@ CONTENT_FIELDS = {
 }
 
 
-def content_hash(text: str, part: str = "all") -> str:
-    """Sidik 12 hex atas bagian body (`card`, `elicit`, atau `all`) + field isinya.
+MD_QUOTE = re.compile(r"^((?:[ \t]*>)+)")
+MD_TABLE_SEP = re.compile(r"^:?-+:?$")
+MD_BULLET = re.compile(r"^[-*+]\s+")
+MD_SINGLE_STAR = re.compile(r"(?<!\*)\*(?!\*)")
+MD_SPACES = re.compile(r"\s+")
 
-    Sidik `card` dan `elicit` dipasangkan sebagai sidik review; `all` dimateraikan `approve`.
-    Spasi ujung baris dinormalkan.
+
+def norm_md(text: str) -> str:
+    """Markdown dinormalkan dari perbedaan yang hanya format (38 N1) — pasangan sidik tahan formatter.
+
+    Formatter (prettier) menambah baris kosong di bawah heading, meratakan padding tabel, mengubah `*x*` → `_x_`,
+    menambah `>` kosong di kutipan, dan memadatkan spasi. Baris kosong dibuang; penanda `>` menjadi kedalaman; baris
+    dan sel tabel di-strip, baris pemisah tabel menjadi `---`; bullet `*`/`+` menjadi `-`; `*` tunggal menjadi `_`;
+    spasi beruntun menjadi satu. Suntingan kata, angka, baris, atau sel tetap mengubah hasil.
     """
+    out = []
+    for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        m = MD_QUOTE.match(line)
+        depth = m.group(1).count(">") if m else 0
+        s = (line[m.end():] if m else line).strip()
+        if not s:
+            continue
+        if s.startswith("|") and s.endswith("|") and len(s) > 1:
+            cells = [c.strip() for c in s[1:-1].split("|")]
+            if all(MD_TABLE_SEP.match(c) for c in cells if c):
+                cells = ["---" for _ in cells]
+            s = "| " + " | ".join(cells) + " |"
+        s = MD_BULLET.sub("- ", s)
+        s = MD_SINGLE_STAR.sub("_", s)
+        s = MD_SPACES.sub(" ", s)
+        out.append(">" * depth + (" " if depth else "") + s)
+    return "\n".join(out)
+
+
+def _content_digest(text: str, part: str, norm) -> str:
     fm, body = split_frontmatter(text)
     if part != "all":
         body = split_parts(body)[0 if part == "card" else 1]
-    norm = "\n".join(l.rstrip() for l in body.strip().splitlines())
     # `category` (17) hanya ikut bila tertulis: sidik tiket lama tanpa field itu tidak bergeser.
     keys = CONTENT_FIELDS[part] + (("category",) if part != "elicit" and "category" in fm else ())
     fields = "\n".join(f"{k}={','.join(sorted(fm[k])) if isinstance(fm.get(k), list) else fm.get(k, '')}"
                        for k in keys)
-    return hashlib.sha256(f"{fields}\n{norm}".encode("utf-8")).hexdigest()[:12]
+    return hashlib.sha256(f"{fields}\n{norm(body)}".encode("utf-8")).hexdigest()[:12]
+
+
+def content_hash(text: str, part: str = "all") -> str:
+    """Sidik 12 hex atas bagian body (`card`, `elicit`, atau `all`) + field isinya, tahan format (38 N1).
+
+    Sidik `card` dan `elicit` dipasangkan sebagai sidik review; `all` dimateraikan `approve`. Penulis selalu
+    memakai fungsi ini; pemeriksa memakai `hash_matches`, yang juga menerima `content_hash_legacy`.
+    """
+    return _content_digest(text, part, norm_md)
+
+
+def content_hash_legacy(text: str, part: str = "all") -> str:
+    """Sidik sebelum 38 N1 — hanya spasi ujung baris yang dinormalkan. Dibaca, tidak pernah ditulis lagi."""
+    return _content_digest(text, part, lambda body: "\n".join(l.rstrip() for l in body.strip().splitlines()))
+
+
+def hash_matches(stored: Any, text: str, part: str = "all") -> bool:
+    """Sidik tersimpan cocok dengan isi sekarang menurut algoritma baru atau lama."""
+    stored = str(stored or "").strip()
+    return bool(stored) and stored in (content_hash(text, part), content_hash_legacy(text, part))
+
+
+def digest_matches(stored: str, text: str) -> bool:
+    """Sidik review `<kartu>/<elisitasi>` cocok dengan isi sekarang (tiap bagian menurut algoritma mana pun)."""
+    parts = str(stored or "").split("/")
+    return len(parts) == 2 and hash_matches(parts[0], text, "card") and hash_matches(parts[1], text, "elicit")
 
 
 # Segel serah-terima (09 E8). Sengaja tanpa parser YAML: penerima (backend/frontend
@@ -388,6 +442,34 @@ def ticket_seal(text: str) -> str:
     return hashlib.sha256(("\n".join(head) + "\n\x00\n" + norm).encode("utf-8")).hexdigest()[:16]
 
 
+# Segel tahan format (38 N1), ditulis ke `approved_seal_norm`. `approved_seal` tetap `ticket_seal` supaya penerima
+# backend/frontend yang belum diperbarui tetap memvonis seperti sebelumnya. Disalin apa adanya ke `precondition_lib`
+# backend dan frontend bersama `norm_md` dan konstantanya; `tests/test_a1_ticket_source.py` menagih ketiganya sama.
+def ticket_seal_norm(text: str) -> str:
+    text = text.lstrip("﻿").replace("\r\n", "\n").replace("\r", "\n")
+    lines = text.split("\n")
+    head: List[str] = []
+    body = lines
+    if lines and lines[0].rstrip() == "---":
+        end = next((i for i in range(1, len(lines)) if lines[i].rstrip() == "---"), None)
+        if end is not None:
+            head = [MD_SPACES.sub(" ", l.strip()) for l in lines[1:end]
+                    if re.match(r"^(%s)\s*:" % "|".join(SEAL_FIELDS), l)]
+            body = lines[end + 1:]
+    norm = norm_md("\n".join(body))
+    return hashlib.sha256(("\n".join(head) + "\n\x00\n" + norm).encode("utf-8")).hexdigest()[:16]
+
+
+def seal_matches(fm: Dict[str, Any], text: str) -> bool:
+    """Segel persetujuan cocok dengan isi sekarang. Tiket tanpa segel (sebelum 09 E8) lolos di sini;
+    `approved_hash` tetap yang memvonisnya."""
+    seal = str(fm.get("approved_seal", "-") or "-").strip()
+    norm = str(fm.get("approved_seal_norm", "-") or "-").strip()
+    if seal == "-" and norm == "-":
+        return True
+    return (seal != "-" and seal == ticket_seal(text)) or (norm != "-" and norm == ticket_seal_norm(text))
+
+
 def meaningful(lines: List[str]) -> List[str]:
     """Baris berisi, tanpa komentar HTML."""
     return [l for l in lines if l.strip() and not l.strip().startswith("<!--")]
@@ -399,10 +481,18 @@ def request_digest(text: str) -> str:
     Elisitasi menulis ulang `TICKET.md` tiap giliran; sidik ini yang menjaga kutipan permintaan tetap
     verbatim lintas penulisan ulang itu.
     """
+    return hashlib.sha256(norm_md("\n".join(_request_quote(text))).encode("utf-8")).hexdigest()[:12]
+
+
+def request_digest_legacy(text: str) -> str:
+    """`request_digest` sebelum 38 N1. Dibaca, tidak pernah ditulis lagi."""
+    return hashlib.sha256("\n".join(l.rstrip() for l in _request_quote(text)).encode("utf-8")).hexdigest()[:12]
+
+
+def _request_quote(text: str) -> List[str]:
     _, body = split_frontmatter(text)
     notes = sections(split_parts(body)[1], 2).get(ELICIT_H2, [])
-    quote = meaningful(sections("\n".join(notes), 3).get("Permintaan Asli", []))
-    return hashlib.sha256("\n".join(l.rstrip() for l in quote).encode("utf-8")).hexdigest()[:12]
+    return meaningful(sections("\n".join(notes), 3).get("Permintaan Asli", []))
 
 
 def parse_urutan(value: Any) -> Optional[Tuple[int, int]]:

@@ -65,7 +65,9 @@ from analyst_lib import (  # noqa: E402
     Checker,
     clean_value,
     content_hash,
+    digest_matches,
     find_root,
+    hash_matches,
     format_report,
     git_commit,
     git_error_line,
@@ -80,7 +82,9 @@ from analyst_lib import (  # noqa: E402
     split_frontmatter,
     split_parts,
     sync_configured,
+    seal_matches,
     ticket_seal,
+    ticket_seal_norm,
     ticket_skeleton,
     tracked_files,
 )
@@ -173,7 +177,7 @@ def seal_problem(text: str) -> str:
     current = content_hash(text, "elicit")
     if sealed == "-":
         return "elisitasi tanpa segel — tutup lewat `ticket.py close` (tiket lama: sekali, untuk adopsi segel)"
-    if sealed != current:
+    if not hash_matches(sealed, text, "elicit"):
         return (f"catatan elisitasi ({current}) berubah sesudah ditutup (segel {sealed}) — hanya analyst:elicit "
                 "yang mengubah fakta: pulihkan catatannya, atau buka ulang elisitasi (baris log `Dibuka ulang`) "
                 "lalu `ticket.py close`")
@@ -184,7 +188,7 @@ def next_round(fm: Dict[str, Any], text: str) -> int:
     """Ronde review yang akan dicatat berikutnya (1-based); basis fakta baru membuka siklus ronde baru."""
     rnd = int_field(fm, "review_round")
     prev = parse_review(fm.get("review", ""))
-    if prev and prev[2] != content_hash(text, "elicit"):
+    if prev and not hash_matches(prev[2], text, "elicit"):
         rnd = 0  # basis fakta berubah sesudah ronde terakhir → siklus ronde baru (pola revision_base)
     return rnd + 1
 
@@ -265,8 +269,7 @@ def classify(root: Path, rel: str) -> Dict[str, str]:
         row.update(state="SPEC", route="analyst:spec (tulis kartu tiket)")
     elif ts == "DRAFT":
         row.update(state="DRAFT", route="analyst:spec (ajukan keputusan atau revisi)")
-    elif str(t.get("approved_hash", "")) != content_hash(text_of(ticket)) or \
-            str(t.get("approved_seal", "-")) not in ("-", "", ticket_seal(text_of(ticket))):
+    elif not hash_matches(t.get("approved_hash", ""), text_of(ticket)) or not seal_matches(t, text_of(ticket)):
         row.update(state="DRIFT", route="TICKET READY disunting sesudah disetujui — analyst:spec REVISE "
                                         "(reopen) atau pulihkan isinya")
     else:
@@ -471,10 +474,11 @@ def cmd_check(root: Path, args: argparse.Namespace) -> int:
                 resolved["ronde"] = str(nxt) if 0 < nxt <= REVIEW_CAP else "habis" if nxt else "-"  # slot `{round}`
                 digest = review_digest(d)
                 resolved["sidik"] = digest          # slot `{sidik}` prompt dispatch reviewer
-                fresh = str(t.get("review", "")) == f"PASS @{digest}"
+                prev = parse_review(t.get("review", ""))
+                fresh = bool(prev) and prev[0] == "PASS" and digest_matches(f"{prev[1]}/{prev[2]}", text)
                 resolved["review_segar"] = "ya" if fresh else "tidak"
-                prev, cur = parse_review(t.get("review", "")), digest.split("/")
-                stale = [n for n, i in (("kartu", 1), ("elisitasi", 2)) if prev and prev[i] != cur[i - 1]]
+                stale = [n for n, i, part in (("kartu", 1, "card"), ("elisitasi", 2, "elicit"))
+                         if prev and not hash_matches(prev[i], text, part)]
                 resolved["review_basi"] = "belum" if not prev else (",".join(stale) or "-")
                 report = review_report(d, t)
                 resolved["review_report"] = f"{rel}/{REVIEW_FILE}" if report else "-"
@@ -531,7 +535,7 @@ def cmd_review(root: Path, args: argparse.Namespace) -> int:
         return 1
     digest = review_digest(path.parent)
     seen = re.search(r"^- Sidik:\s*(\S+)", report, re.MULTILINE)
-    if not seen or seen.group(1).strip("`") != digest:
+    if not seen or not digest_matches(seen.group(1).strip("`"), text_of(path)):
         print(f"REVIEW FAIL: sidik yang dinilai reviewer `{seen.group(1) if seen else 'tidak ada'}` ≠ sidik disk "
               f"`{digest}` — draft berubah sesudah dispatch, atau prompt tanpa `{{sidik}}`; dispatch ulang "
               f"(`check --gate spec` memberi `sidik`)")
@@ -564,7 +568,8 @@ def cmd_revise(root: Path, args: argparse.Namespace) -> int:
     # Plafon berlaku per basis fakta: elisitasi yang dibuka ulang dan berubah memulai siklus baru,
     # karena draft sesudahnya disusun dari fakta yang berbeda, bukan diredaksi ulang.
     base = content_hash(text_of(path), "elicit")
-    rev = int_field(fm, "revision") if str(fm.get("revision_base", base)) == base else 0
+    stored = fm.get("revision_base")
+    rev = int_field(fm, "revision") if stored is None or hash_matches(stored, text_of(path), "elicit") else 0
     if rev >= REVISION_CAP:
         print(f"REVISE FAIL: plafon {REVISION_CAP} revisi habis — lingkup belum jelas; kembali ke analyst:elicit "
               f"(`check --gate elicit --reopen`) atau `cancel` atas keputusan user")
@@ -592,20 +597,20 @@ def cmd_close(root: Path, args: argparse.Namespace) -> int:
     rows = log_rows(text)
     adopted = False
     if fm.get("elicitation") == "CLOSED":
-        if sealed == notes:
+        if hash_matches(sealed, text, "elicit"):
             print(f"CLOSE PASS: {rel}/{TICKET_FILE} sudah tertutup, segel {sealed} cocok — tidak ada yang ditulis")
             return 0
         if sealed != "-":
             print(f"CLOSE FAIL: {seal_problem(text)}")
             return 1
         prev = parse_review(fm.get("review", ""))
-        if prev and prev[2] != notes:   # tiket lama: adopsi hanya bila catatan sama dengan yang terakhir direview
+        if prev and not hash_matches(prev[2], text, "elicit"):   # tiket lama: adopsi hanya bila catatan sama dengan yang terakhir direview
             print("CLOSE FAIL: tiket lama tanpa segel, dan catatan elisitasi berubah sesudah review terakhir — "
                   "buka ulang elisitasi (`elicitation: OPEN` + baris log `Dibuka ulang`) lalu `ticket.py close`")
             return 1
         adopted = True
     elif fm.get("elicitation") == "OPEN":
-        if sealed not in ("-", notes):
+        if sealed != "-" and not hash_matches(sealed, text, "elicit"):
             since = rows[int_field(fm, "elicit_log"):]
             if not any(r[2].lower().startswith(REOPEN_ROW) for r in since):
                 print(f"CLOSE FAIL: catatan berubah sejak segel {sealed} tanpa baris log baru `Dibuka ulang` — "
@@ -622,7 +627,8 @@ def cmd_close(root: Path, args: argparse.Namespace) -> int:
         print("CLOSE FAIL: validate_doc.py --kind elicit FAIL pada CLOSED — elisitasi tetap "
               f"{fm.get('elicitation')}\n" + format_report(f"validate {TICKET_FILE} (elicit)", v.results))
         return 1
-    seal = content_hash(closed, "elicit")
+    # Segel lama yang masih cocok dipertahankan (38 N1): menutup ulang catatan yang sama tidak mengubah berkas.
+    seal = sealed if sealed != "-" and hash_matches(sealed, closed, "elicit") else content_hash(closed, "elicit")
     write_fields(path, elicit_hash=seal, elicit_log=str(len(rows)))
     msg = f"CLOSE PASS: {rel}/{TICKET_FILE} elicitation CLOSED · segel {seal} · {len(rows)} log" \
           + (" · segel diadopsi (tiket lama)" if adopted else "")
@@ -653,7 +659,8 @@ def cmd_approve(root: Path, args: argparse.Namespace) -> int:
     elif seal_problem(text_of(path)):
         errors.append(seal_problem(text_of(path)))
     digest = review_digest(path.parent)
-    if str(fm.get("review", "")) != f"PASS @{digest}":
+    prev = parse_review(fm.get("review", ""))
+    if not (prev and prev[0] == "PASS" and digest_matches(f"{prev[1]}/{prev[2]}", text_of(path))):
         errors.append(f"vonis review terakhir `{fm.get('review', '-')}` bukan `PASS @{digest}` (belum "
                       f"direview, BLOCKED, atau tiket/elisitasi berubah sesudah review → review ulang)")
     if not args.answer.strip():
@@ -663,10 +670,13 @@ def cmd_approve(root: Path, args: argparse.Namespace) -> int:
         return 1
     report = review_report(path.parent, fm)
     sealed = content_hash(text_of(path))
-    # `approved_seal` (tanpa parser YAML) dibaca penerima backend/frontend; `approved_hash`
-    # tetap dipakai analyst sendiri untuk DRIFT dan tiket lama.
-    write_fields(path, status="READY", approved=dt.date.today().isoformat(),
-                 approved_hash=sealed, approved_seal=ticket_seal(text_of(path)), approval=clean_value(args.answer))
+    # `approved_seal` (tanpa parser YAML) dibaca penerima backend/frontend; `approved_seal_norm` (38 N1) adalah
+    # pasangan tahan formatnya, dibaca penerima sejak backend 0.23.1/frontend 0.21.1. `approved_hash` tetap
+    # dipakai analyst sendiri untuk DRIFT dan tiket lama.
+    text = text_of(path)
+    write_fields(path, status="READY", approved=dt.date.today().isoformat(), approved_hash=sealed,
+                 approved_seal=ticket_seal(text), approved_seal_norm=ticket_seal_norm(text),
+                 approval=clean_value(args.answer))
     msg = f"APPROVE PASS: {rel}/{TICKET_FILE} READY @{sealed}"
     if is_git_repo(root) and not args.no_commit:
         # Subjek ini (dan `ref TICKET`) menandai tiket terkunci. Pembacanya: `ticket_source_verdict`
@@ -741,7 +751,7 @@ def cmd_reopen(root: Path, args: argparse.Namespace) -> int:
         return 1
     n = int_field(fm, "reopened") + 1
     write_fields(path, status="DRAFT", revision="0", review="-", review_round="0", approved="-",
-                 approved_hash="-", approved_seal="-", approval="-", reopened=str(n),
+                 approved_hash="-", approved_seal="-", approved_seal_norm="-", approval="-", reopened=str(n),
                  reopen_reason=clean_value(args.reason))
     print(f"REOPEN PASS: TICKET.md DRAFT (buka ulang ke-{n})")
     return 0

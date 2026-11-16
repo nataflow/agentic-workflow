@@ -43,14 +43,16 @@ from analyst_lib import (  # noqa: E402
     find_root,
     format_report,
     h1_lines,
+    hash_matches,
     meaningful,
     normalize_ticketdir,
     report_json,
     request_digest,
+    request_digest_legacy,
     scan_leaks,
     sections,
+    seal_matches,
     split_frontmatter,
-    ticket_seal,
 )
 
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -188,7 +190,7 @@ class DocValidator(Checker):
 
         request = meaningful(self.h3.get("Permintaan Asli", []))
         sealed = str(self.fm.get("request_hash", "-")).strip() or "-"    # `-`: tiket sebelum G9
-        drifted = sealed != "-" and sealed != request_digest(self.text)
+        drifted = sealed != "-" and sealed not in (request_digest(self.text), request_digest_legacy(self.text))
         ok = bool(request) and all(l.startswith(">") for l in request) and not drifted
         self.add(3, "Permintaan asli terekam", ok,
                  ("Permintaan Asli berubah sejak `ticket.py new` (request_hash " + sealed + ")") if drifted
@@ -385,9 +387,8 @@ class DocValidator(Checker):
         if self.fm.get("status") == "READY":
             current = content_hash(self.text)
             sealed = str(self.fm.get("approved_hash", ""))
-            seal = str(self.fm.get("approved_seal", "-") or "-")
-            seal_ok = seal == "-" or seal == ticket_seal(self.text)   # `-`: tiket sebelum 09 E8
-            self.add(11, "Konten = yang disetujui", sealed == current and seal_ok,
+            seal_ok = seal_matches(self.fm, self.text)   # tanpa segel: tiket sebelum 09 E8
+            self.add(11, "Konten = yang disetujui", hash_matches(sealed, self.text) and seal_ok,
                      f"approved_hash {sealed or '-'} · konten {current} · segel {'cocok' if seal_ok else 'BERBEDA'}",
                      "Tiket READY disunting sesudah disetujui: `ticket.py reopen`, atau pulihkan isinya.")
 

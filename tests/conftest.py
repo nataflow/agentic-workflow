@@ -11,7 +11,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 import pytest
 
@@ -504,3 +504,39 @@ def ticket_review(root: Path, ticketdir: str, verdict: str, *, cwd: Optional[Pat
     """`ticket.py review` dengan blok reviewer bersidik (jalur yang diperintahkan `analyst:spec`)."""
     return run_script(TICKET_PY, "review", "--ticketdir", ticketdir, "--verdict", verdict, "--report", "-",
                       cwd=cwd or root, stdin=ticket_block(root, ticketdir, verdict, sidik=sidik, cwd=cwd))
+
+
+# --- Formatter markdown tiruan (38 N1) -------------------------------------------------------------
+
+_PRETTIER_ITALIC = re.compile(r"(?<![*\w])\*(?![*\s])([^*\n]+?)(?<![*\s])\*(?![*\w])")
+
+
+def prettier_like(text: str) -> str:
+    """Tiruan perubahan prettier atas markdown yang terlihat di lapangan (13 Nov, `wms-svelte`).
+
+    Baris kosong sesudah heading, padding sel tabel dan baris pemisah `| --- |`, `*x*` → `_x_`, baris `>` kosong di
+    antara baris kutipan, dan spasi ganda dipadatkan. Frontmatter tidak disentuh. CI tidak punya Node, jadi prettier
+    asli tidak dipakai; uji nyata atas tiket hkm tercatat di `issues/38-friksi-lapangan-analyst.md`.
+    """
+    head, sep, body = text.partition("\n---\n")
+    if not sep:
+        head, body = "", text
+    lines = body.split("\n")
+    out: List[str] = []
+    for i, line in enumerate(lines):
+        s = line.strip()
+        if s.startswith("|") and s.endswith("|"):
+            cells = [c.strip() for c in s[1:-1].split("|")]
+            if all(re.fullmatch(r":?-+:?", c) for c in cells if c):
+                cells = ["-----" for _ in cells]
+            line = "| " + " | ".join(c.ljust(8) for c in cells) + " |"
+        elif not s.startswith("#"):
+            line = re.sub(r"(?<=\S)  +(?=\S)", " ", line)
+        line = _PRETTIER_ITALIC.sub(r"_\1_", line)
+        out.append(line)
+        nxt = lines[i + 1] if i + 1 < len(lines) else ""
+        if s.startswith("#") and nxt.strip():
+            out.append("")
+        elif s.startswith(">") and s != ">" and nxt.strip().startswith(">"):
+            out.append(">")
+    return head + sep + "\n".join(out)
