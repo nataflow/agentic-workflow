@@ -97,7 +97,7 @@ DD_ROW = re.compile(r"^\|\s*`?(DD-\d+)`?\s*\|")
 ST_HEAD = re.compile(r"^###\s+(ST-\d+)\.\s")
 ST_TITLE = re.compile(r"^###\s+(ST-\d+)\.\s+(.*)$")
 TOKEN = re.compile(r"\b(SC|DD|ST)-\d+\b")
-FILES_ROW = re.compile(r"^\s*[-*]\s+`(CREATE|MODIFY)`\s+`([^`<>]+)`")
+FILES_ROW = re.compile(r"^\s*[-*]\s+`(CREATE|MODIFY|DELETE)`\s+`([^`<>]+)`")  # DELETE: 36 D1
 # Enam cabang wajib per layar (ui-design Phase 4). Jenis sebuah ST = kata kunci
 # yang muncul PALING AWAL di judulnya ("State Error saat Loading" = error).
 STATE_KINDS = (
@@ -299,7 +299,7 @@ class DocValidator:
         files = [m.group(2).strip() for m in matches if m]
         outside = [f"`{f}` di luar root repo (path absolut atau `..`)" for f in files if not inside_root(self.root, f)]
         self._add("E", "Files Touched", outside if files else ["`# Execution ## 1. Files Touched` kosong atau "
-                                                               "tidak berpola `- \\`CREATE|MODIFY\\` \\`<path>\\``"],
+                                                               "tidak berpola `- \\`CREATE|MODIFY|DELETE\\` \\`<path>\\``"],
                   f"{len(files)} berkas", "Tulis satu butir per berkas relatif root repo: `- `CREATE` `path``.")
         # Acceptance Criteria
         rows, problems = ac_rows(self.body)

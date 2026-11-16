@@ -413,7 +413,8 @@ class BriefValidator:
         problems: List[str] = []
         for b in targets:
             files = self._files(b)
-            non_test = [f for f in files if not TEST_FILE.search(f)]
+            deleted = self._deleted(b)
+            non_test = [f for f in files if not TEST_FILE.search(f) and f not in deleted]
             if not files:
                 problems.append(f"{b['name']}: `files_touched` kosong")
             if len(non_test) > self.max_files:
@@ -436,7 +437,8 @@ class BriefValidator:
             return
         problems: List[str] = []
         for b in targets:
-            files = self._files(b)
+            deleted = self._deleted(b)
+            files = [f for f in self._files(b) if f not in deleted]
             tests = [f for f in files if TEST_FILE.search(f)]
             for f in files:
                 if TEST_FILE.search(f):
@@ -513,6 +515,11 @@ class BriefValidator:
         else:
             self._add(cid, name, "PASS", "seksi 2–5 bebas placeholder")
 
+    def _deleted(self, brief: Dict[str, Any]) -> Set[str]:
+        """Berkas ber-aksi `DELETE` (36 D1): dihapus `architect` saat commit unit, bukan dikerjakan implementor —
+        tidak dihitung kuota L, tidak menuntut atau menjadi test pendamping (T), dan bukan bukti AC (C)."""
+        return {p for p, (a, _) in self._action_table(brief).items() if a == "DELETE"}
+
     def _action_table(self, brief: Dict[str, Any]) -> Dict[str, Tuple[str, str]]:
         """Baca tabel aksi seksi 3 menjadi {path: (aksi, anchor)} — pembaca bersama `brief_actions` (36 S1)."""
         return brief_actions(brief["body"])
@@ -530,12 +537,16 @@ class BriefValidator:
             if not actions:
                 problems.append(
                     f"{b['name']} seksi 3: tabel aksi berkas "
-                    "(`| CREATE \\| MODIFY | <path> |`) tidak ada"
+                    "(`| CREATE \\| MODIFY \\| DELETE | <path> |`) tidak ada"
                 )
                 continue
             upstream_created = {
                 p: o["nn"] for o in self.briefs if o["nn"] < b["nn"] and o["status"] != "BLOCKED"
                 for p, (a, _) in self._action_table(o).items() if a == "CREATE"
+            }
+            upstream_deleted = {
+                p: o["nn"] for o in self.briefs if o["nn"] < b["nn"] and o["status"] != "BLOCKED"
+                for p, (a, _) in self._action_table(o).items() if a == "DELETE"
             }
             for f in files:
                 if not inside_root(self.root, f):
@@ -546,6 +557,19 @@ class BriefValidator:
                     problems.append(f"{b['name']}: `{f}` tidak punya baris aksi di seksi 3")
                     continue
                 act, anchor = actions[f]
+                if f in upstream_deleted:
+                    problems.append(
+                        f"{b['name']}: `{f}` ditandai {act} tetapi sudah di-DELETE brief hulu "
+                        f"`{upstream_deleted[f]}` — berkas itu tidak ada lagi saat unit ini berangkat"
+                    )
+                    continue
+                if act == "DELETE":
+                    if not ((self.root / f).is_file() or f in upstream_created):
+                        problems.append(
+                            f"{b['name']}: `{f}` ditandai DELETE tetapi tidak ada di disk "
+                            "(dan tidak di-CREATE brief hulu)"
+                        )
+                    continue
                 if act == "CREATE" and f in upstream_created:
                     problems.append(
                         f"{b['name']}: `{f}` ditandai CREATE tetapi sudah di-CREATE brief hulu "
@@ -873,7 +897,8 @@ class BriefValidator:
                 landed = False
                 for nn in claims[ac]:
                     brief = next(b for b in self.briefs if b["nn"] == nn)
-                    tests = [f for f in self._files(brief) if TEST_FILE.search(f)]
+                    tests = [f for f in self._files(brief) if TEST_FILE.search(f)
+                             and f not in self._deleted(brief)]
                     if not tests:
                         continue
                     for t in tests:

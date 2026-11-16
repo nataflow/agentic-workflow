@@ -442,7 +442,7 @@ class PreconditionChecker:
 
     @staticmethod
     def files_line(files: Dict[str, List[str]]) -> str:
-        return " · ".join(f"{a}: {', '.join(p) if p else '-'}" for a, p in files.items() if p or a != "?")
+        return " · ".join(f"{a}: {', '.join(p)}" for a, p in files.items() if p) or "-"
 
     def format_text(self) -> str:
         out = format_report("architect" + (f" ingest brief-{self.brief_nn}" if self.brief_nn else ""),

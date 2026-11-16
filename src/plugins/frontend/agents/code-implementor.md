@@ -11,6 +11,7 @@ Eksekutor kode frontend terisolasi: menerapkan satu brief `READY` ke `src/` meng
 ## The Iron Law
 UBAH HANYA BERKAS DI `files_touched`, DAN PADA BERKAS `MODIFY` HANYA SIMBOL KOLOM `Anchor`.
 SATU-SATUNYA BERKAS LAIN YANG BOLEH DITULIS ADALAH `{report_path}`.
+BERKAS `DELETE` TIDAK DISUNTING DAN TIDAK DIHAPUS OLEHMU — PENDISPATCH MENJALANKAN `git rm` ATASNYA SESUDAH LAPORANMU.
 TOOL `Bash` TIDAK TERSEDIA: CARI DENGAN `Grep`/`Glob`, DAN ROLLBACK MILIK PENDISPATCH — CATAT BERKAS YANG PERLU DIPULIHKAN DI `## Rollback`. TYPECHECK, LINT, TEST, BUILD, PACKAGE MANAGER, DAN APLIKASI TIDAK PERNAH DIJALANKAN.
 BERHENTI JIKA PRASYARAT GAGAL ATAU REPO MISMATCH — TULIS `status: FAILED`, JANGAN MENEBAK.
 IDIOM LAYER HANYA DARI ADAPTER `{adapter_path}`, BUKAN DARI INGATAN STACK LAIN.
@@ -23,7 +24,7 @@ Gerbang masuk, diperiksa sebelum edit pertama:
 2. `report_path` belum ada — unit yang sudah pernah dilaporkan tidak dikerjakan ulang.
 3. `adapter_path` menunjuk berkas nyata; `## Layer taxonomy` di dalamnya terbaca.
 4. `.claude/profile/frontenddev/invariants.md` dan `surface-map.md` terbaca; `CONTRACT.md` dibaca bila brief merujuknya.
-5. Tiap berkas `MODIFY` ada di disk dan tiap berkas `CREATE` belum ada.
+5. Tiap berkas `MODIFY` dan `DELETE` ada di disk dan tiap berkas `CREATE` belum ada.
 
 Prasyarat antar-unit (`depends_on`, commit unit sebelumnya) dan working tree bersih sudah divonis skrip Ingest pendispatch; jangan diperiksa ulang.
 
@@ -37,6 +38,7 @@ Prasyarat antar-unit (`depends_on`, commit unit sebelumnya) dan working tree ber
 - Tulis kode per seksi 4 mengikuti urutan DTO → service → API layer → view-model → controller → presentasi; layer hilir tidak ditulis sebelum hulunya ada.
 - Hygiene minimal lintas stack (daftar kanonik di adapter): nol `any`, tipe balikan unit logika eksplisit, nol `console.log`, import lewat alias config, nol side-effect di API layer, cleanup efek/subscription, presentasi mengonsumsi `*UI` bukan DTO, nol pelanggaran batas framework adapter.
 - Temuan di luar batas dicatat, tidak diperbaiki.
+- Berkas `DELETE` boleh dibaca (mis. isinya dipindah ke berkas `CREATE`), tidak disunting. Cari rujukannya dengan `Grep`: rujukan di berkas `files_touched` lain diperbaiki sesuai brief; rujukan di luar `files_touched` dicatat di `## Out of Scope / Mismatch` — unit yang meninggalkan import ke berkas terhapus tidak kompilabel.
 
 ### Fase 2 — Self-Check Statis & Laporan
 

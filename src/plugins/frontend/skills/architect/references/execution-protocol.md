@@ -24,7 +24,7 @@ python3 «check_preconditions.py» --taskdir <taskdir> --brief <NN>
 
 `FAIL` menahan dispatch; jalankan tindakan yang disebut, jangan menawar. `WARN` wajib disebut ke user sebelum dispatch berangkat.
 
-Keluaran yang sama mencetak `Berkas unit <NN>: CREATE: … · MODIFY: …` (`--json`: `files`) — path per aksi dari `files_touched` dan tabel seksi 3 brief, sumber tunggal perintah commit unit bagian 3. Dilarang menyusunnya ulang dengan membaca brief lewat `sed`/`grep`.
+Keluaran yang sama mencetak `Berkas unit <NN>: CREATE: … · MODIFY: … · DELETE: …` (`--json`: `files`) — path per aksi dari `files_touched` dan tabel seksi 3 brief, sumber tunggal perintah commit unit bagian 3. Dilarang menyusunnya ulang dengan membaca brief lewat `sed`/`grep`.
 
 **Pengecualian `.gitignore`**: `.gitignore` kotor yang satu-satunya perubahannya baris berjangkar `/.frontenddev/` atau `frontenddev/docs/**/.explore/` adalah jejak `frontend:profile` yang belum di-commit. Laporkan ke user dan rutekan ke `frontend:profile` mode REFRESH; dilarang men-stash, dilarang meng-commit atas nama rantai.
 
@@ -36,7 +36,7 @@ Keluaran yang sama mencetak `Berkas unit <NN>: CREATE: … · MODIFY: …` (`--j
 
 Enam butir batas ditegakkan di tingkat prompt:
 
-1. Hanya berkas `files_touched`; pada berkas `MODIFY` hanya simbol kolom `Anchor` tabel seksi 3 brief.
+1. Hanya berkas `files_touched`; pada berkas `MODIFY` hanya simbol kolom `Anchor` tabel seksi 3 brief; berkas `DELETE` tidak disunting implementor — `architect` menghapusnya saat commit unit.
 2. Satu-satunya berkas di luar `files_touched` yang boleh ditulis adalah `{taskdir}/report-<NN>.md`.
 3. Bug di berkas atau simbol lain dicatat di `## Out of Scope / Mismatch` `report-<NN>.md`, tidak diperbaiki.
 4. Nol `@ts-ignore`, `eslint-disable`, `svelte-ignore`, dan nol penambahan package tanpa instruksi brief.
@@ -53,10 +53,10 @@ Enam butir batas ditegakkan di tingkat prompt:
 |---|---|---|
 | `status: DONE` | hanya `files_touched` (+ `report-<NN>.md`) berubah | Pemeriksaan anchor (bawah), lalu **commit unit** |
 | `status: DONE` | ada berkas berubah di luar `files_touched` | Pelanggaran scope: pulihkan berkas liar dan `files_touched`, tulis `## Triase` ke `report-<NN>.md`, turunkan brief ke `BLOCKED` — **tandai BLOCKED** |
-| `status: DONE` | `## Changes` menyebut berkas yang tidak berubah | Laporan tidak jujur: perlakukan sebagai baris "kosong/rusak" di bawah |
+| `status: DONE` | `## Changes` menyebut berkas yang tidak berubah (kecuali baris `DELETE` — berkas itu memang baru dihapus saat commit unit) | Laporan tidak jujur: perlakukan sebagai baris "kosong/rusak" di bawah |
 | `status: DONE` | hunk `git diff -U0` berkas `MODIFY` menyebut simbol di luar `Anchor` | Pelanggaran scope tingkat simbol: perlakuan sama dengan berkas liar |
 | `status: FAILED` | bersih | **Tandai BLOCKED** |
-| `status: FAILED` | kotor di dalam `files_touched` | Rollback milik `architect` (implementor tidak punya terminal): `git restore -- <path>` berkas `MODIFY` dan `rm -- <path>` berkas `CREATE` yang disebut `## Rollback` laporan atau terbaca kotor, catat di `## Triase`, lalu **tandai BLOCKED** |
+| `status: FAILED` | kotor di dalam `files_touched` | Rollback milik `architect` (implementor tidak punya terminal): `git restore -- <path>` berkas `MODIFY` (juga berkas `DELETE` yang tersunting) dan `rm -- <path>` berkas `CREATE` yang disebut `## Rollback` laporan atau terbaca kotor, catat di `## Triase`, lalu **tandai BLOCKED** |
 | absen / rusak | bersih | Kegagalan dispatch: hapus `report-<NN>.md` rusak itu bila ada (Check 12 menuntut ia absen), lalu ulangi maksimal sekali dengan slot yang sama; brief tetap `READY` |
 | absen / rusak | kotor | **HENTIKAN.** Tampilkan berkas kotor ke user dan eskalasi; dilarang retry, rollback otomatis, dan commit |
 
@@ -83,9 +83,12 @@ Formatter adalah transformasi mekanis, bukan verifikasi: ia tidak pernah memutus
 
 ```bash
 # frontmatter brief: status: READY → DONE (disk; brief dan report-<NN>.md tidak di-stage)
+git rm -q -- <path DELETE baris `Berkas unit <NN>:`>      # hanya bila unit ber-DELETE (36 D1)
 git add <path CREATE dan MODIFY baris `Berkas unit <NN>:`>
 git commit -m "feat(<slug>): implement unit <NN> - <nama unit>"
 ```
+
+Penghapusan `DELETE` adalah bagian commit unit, bukan suntingan bebas main loop: path-nya dari keluaran prasyarat, tidak pernah dari ingatan. Berkas `DELETE` yang sudah tidak ada di disk (sesi terputus sesudah `git rm`) dilewati. Rujukan yang tertinggal ke berkas terhapus divonis gerbang kompilasi bagian 5 dan verifikasi penutup, lalu diperbaiki lewat brief remedi/perbaikan seperti cacat eksekusi lain.
 
 **Tandai BLOCKED** — suntingan disk, tanpa commit:
 
@@ -112,7 +115,7 @@ status: DONE | FAILED
 # Unit <NN> — <nama unit>
 
 ## Changes
-- `<path>` — CREATE | MODIFY — simbol: `<simbol yang disentuh>` — <ringkasan>
+- `<path>` — CREATE | MODIFY | DELETE — simbol: `<simbol yang disentuh | - untuk DELETE>` — <ringkasan | dihapus pendispatch>
 
 ## Verification
 - `<perintah verification brief>` → DITUNDA (verifikasi penutup)

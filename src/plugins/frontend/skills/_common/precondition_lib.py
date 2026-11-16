@@ -612,7 +612,7 @@ def table_cells(line: str) -> List[str]:
 
 
 BRIEF_ACTION_HEADING = "## 3. Current Repo State & Reference Symbols"
-FILE_ACTIONS = ("CREATE", "MODIFY")
+FILE_ACTIONS = ("CREATE", "MODIFY", "DELETE")   # DELETE: 36 D1 — dihapus architect, bukan implementor
 
 
 def brief_actions(text: str) -> Dict[str, Tuple[str, str]]:

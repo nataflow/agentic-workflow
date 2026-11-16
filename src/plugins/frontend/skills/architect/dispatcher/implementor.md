@@ -16,6 +16,8 @@ Eksekusi satu brief implementasi frontend.
 - Kontrak Acuan: `{taskdir}/CONTRACT.md` bila ada — layer shape dan DTO di sana adalah batas arsitektur.
 - Batas File: frontmatter `files_touched` brief adalah batas mutlak; pada berkas `MODIFY` hanya simbol
   kolom `Anchor` tabel seksi 3. Satu-satunya berkas lain yang boleh ditulis adalah `{report_path}`.
+  Berkas `DELETE` tidak disunting dan tidak dihapus — pendispatch menjalankan `git rm` sesudah laporanmu;
+  rujukan ke berkas itu di `files_touched` diperbaiki, di luarnya dicatat.
 - Urutan Layer: DTO → service → API layer → view-model → controller → presentasi.
 - Verifikasi: DILARANG. Jangan jalankan typecheck, lint, test, build, atau aplikasi. Salin perintah
   `verification:` brief ke `## Verification` bertanda `DITUNDA`.
@@ -39,7 +41,7 @@ status: DONE | FAILED
 # Unit <NN> — <nama unit>
 
 ## Changes
-- `<path>` — CREATE | MODIFY — simbol: `<simbol yang disentuh, termasuk di luar anchor>` — <ringkasan>
+- `<path>` — CREATE | MODIFY | DELETE — simbol: `<simbol yang disentuh, termasuk di luar anchor | - untuk DELETE>` — <ringkasan | dihapus pendispatch>
 
 ## Verification
 - `<perintah verification brief>` → DITUNDA (verifikasi penutup)

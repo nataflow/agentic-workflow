@@ -81,7 +81,7 @@ Spesifikasi kontrak data, batas layer 5-tier, dan rencana eksekusi. Path berkas 
 
 1. **Frontmatter**: `status` hanya `DRAFT` atau `APPROVED` (yang kedua hanya lewat `chain.py approve`); `slug`, `stack` terisi; `order: 30`; `based_on` berpola `<sha 7 digit> (YYYY-MM-DD)`; `sections` identik dengan `sections` `TASK.md`.
 2. **Struktur**: tepat satu H1 berawalan `# Contract — `, lalu `# Architecture` dengan lima `##` dan `# Execution` dengan lima `##`, persis urutan bagian 1.
-3. **Files Touched**: minimal satu butir `` - `CREATE|MODIFY` `<path>` ``. Daftar ini batas union `files_touched` brief — `validate_briefs.py` Check E menagih keduanya sama.
+3. **Files Touched**: minimal satu butir `` - `CREATE|MODIFY|DELETE` `<path>` ``. Daftar ini batas union `files_touched` brief — `validate_briefs.py` Check E menagih keduanya sama. `DELETE` untuk berkas yang dihapus utuh (dihapus `architect` saat commit unit, bukan implementor); konsumennya yang ikut berubah ditulis `MODIFY`.
 4. **Acceptance Criteria**: `AC-{n}` berurutan dari `AC-1`; kolom *Cara verifikasi* `test otomatis` atau `QA manual: <langkah>`; kolom *Sumber* memuat token `SC-{n}`/`DD-{n}`/`ST-{n}` yang benar-benar ada di `TASK.md`/`FLOW.md`/`UI.md`, atau `—` untuk kriteria yang lahir dari kontrak sendiri.
 5. **Keterlacakan dua arah**: tiap `SC-{n}` `TASK.md`, tiap `DD-{n}` `FLOW.md` (bila `sections` memuat `flow`), dan tiap `ST-{n}` `UI.md` (bila memuat `ui`) muncul di kolom *Sumber* minimal satu AC. Satu AC boleh memikul beberapa token sekaligus (`SC-2` · `ST-4`). Token hulu tanpa AC berarti janji akar atau kebutuhan layar yang tidak akan pernah dikerjakan brief mana pun.
 6. **Placeholder**: nol `TBD`/`TODO`/`diisi nanti` dan nol slot `<...>` berspasi di luar blok kode.

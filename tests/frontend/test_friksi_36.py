@@ -5,8 +5,8 @@ import re
 
 import pytest
 
-from conftest import FE_SKILLS, FE_TD, PLUGINS, commit, fe_approved_chain, fe_base_commit, fe_draft as draft, fe_open_sidik, \
-    fe_round as round_, fe_run, load_module, write_files
+from conftest import FE_SKILLS, FE_TD, PLUGINS, commit, fe_approved_chain, fe_base_commit, fe_brief, \
+    fe_draft as draft, fe_open_sidik, fe_round as round_, fe_run, load_module, write_files
 
 JOURNEY = FE_SKILLS / "_common" / "journey.py"
 
@@ -100,7 +100,7 @@ def test_s1_rantai_dan_base_commit_dari_skrip(fe_chain_repo):
     data = json.loads(arch(repo, "--json").out)
     assert data["base_commit"] == base
     assert data["briefs"][0]["files"] == {"CREATE": ["src/features/orders/OrderDetail.test.tsx"],
-                                          "MODIFY": ["src/features/orders/OrderDetail.tsx"]}
+                                          "MODIFY": ["src/features/orders/OrderDetail.tsx"], "DELETE": []}
 
 
 @pytest.mark.regression("36 S1")
@@ -157,3 +157,90 @@ def test_f1_prosa_format_unit_sebelum_commit_unit():
     assert "**Format unit**" in guard.split("\n- **SEKUENSIAL", 1)[0]
     tpl = _read("profile/templates/profile-template.md").split("## 6.", 1)[1].split("## 7.", 1)[0]
     assert "- `format`:" in tpl and "opsional" in tpl
+
+
+# ------------------------------------------------------------------ D1 — aksi DELETE
+
+B1 = f"{FE_TD}/brief-01-orders-lacak-button.md"
+LEGACY = "src/features/orders/services/legacy.service.ts"
+
+
+def edit(repo, rel, old, new):
+    p = repo / rel
+    text = p.read_text(encoding="utf-8")
+    assert old in text, (rel, old)
+    p.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+
+def checks(proc):
+    assert "Traceback" not in proc.stdout + proc.stderr, proc.stdout + proc.stderr
+    return {c["id"]: c for c in json.loads(proc.stdout)["checks"]}
+
+
+def vb(repo):
+    return checks(fe_run(repo, "plan/scripts/validate_briefs.py", "--taskdir", FE_TD, "--json", "--contract"))
+
+
+def add_delete(repo, rel=B1, path=LEGACY, action="DELETE", contract=True):
+    edit(repo, rel, "  - src/features/orders/OrderDetail.test.tsx\n",
+         f"  - src/features/orders/OrderDetail.test.tsx\n  - {path}\n")
+    edit(repo, rel, "| CREATE | `src/features/orders/OrderDetail.test.tsx` | — |",
+         f"| CREATE | `src/features/orders/OrderDetail.test.tsx` | — |\n| {action} | `{path}` | "
+         + ("— |" if action != "MODIFY" else "`legacy` |"))
+    if contract:
+        edit(repo, f"{FE_TD}/CONTRACT.md", "- `CREATE` `src/features/orders/OrderDetail.test.tsx`",
+             f"- `CREATE` `src/features/orders/OrderDetail.test.tsx`\n- `{action}` `{path}`")
+
+
+@pytest.fixture
+def legacy(fe_chain_repo):
+    write_files(fe_chain_repo, {LEGACY: "export const legacy = 1\n"})
+    commit(fe_chain_repo, "chore: legacy service", LEGACY)
+    fe_brief(fe_chain_repo, "01")
+    return fe_chain_repo
+
+
+@pytest.mark.regression("36 D1")
+def test_d1_delete_berkas_ada_lolos_tanpa_test_pendamping(legacy):
+    add_delete(legacy)
+    c = vb(legacy)
+    assert all(x["status"] != "FAIL" for x in c.values()), {k: v for k, v in c.items() if v["status"] == "FAIL"}
+    e = checks(fe_run(legacy, "_common/validate_doc.py", "--kind", "contract", "--taskdir", FE_TD, "--json"))["E"]
+    assert e["status"] == "PASS" and "3 berkas" in e["summary"], e
+
+
+@pytest.mark.regression("36 D1")
+def test_d1_delete_berkas_tak_ada_fail(legacy):
+    add_delete(legacy, path="src/features/orders/services/hantu.service.ts")
+    r = vb(legacy)["R"]
+    assert r["status"] == "FAIL" and "DELETE tetapi tidak ada di disk" in " ".join(r.get("details", [])), r
+
+
+@pytest.mark.regression("36 D1")
+def test_d1_brief_hilir_menyentuh_berkas_terhapus_fail(legacy):
+    add_delete(legacy)
+    rel = fe_brief(legacy, "02", total=2)
+    edit(legacy, B1, 'total_units: "1"', 'total_units: "2"')
+    edit(legacy, rel, "depends_on: []", 'depends_on: ["01"]')
+    add_delete(legacy, rel=rel, action="MODIFY", contract=False)
+    r = vb(legacy)["R"]
+    assert r["status"] == "FAIL" and "sudah di-DELETE brief hulu `01`" in " ".join(r.get("details", [])), r
+
+
+@pytest.mark.regression("36 D1")
+def test_d1_prasyarat_architect_memisahkan_delete(legacy):
+    add_delete(legacy)
+    r = arch(legacy)
+    assert ("- 01 · orders-lacak-button · READY · CREATE: src/features/orders/OrderDetail.test.tsx · MODIFY: "
+            f"src/features/orders/OrderDetail.tsx · DELETE: {LEGACY} · depends_on []") in r.out, r.out
+
+
+def test_d1_prosa_commit_unit_menghapus_dan_implementor_tidak():
+    bagian3 = _read("architect/references/execution-protocol.md").split("## 3.", 1)[1].split("## 4.", 1)[0]
+    commit_unit = bagian3.split("**Commit unit**", 1)[1]
+    assert commit_unit.index("git rm -q --") < commit_unit.index("git add")
+    assert "kecuali baris `DELETE`" in bagian3
+    agent = (PLUGINS / "frontend" / "agents" / "code-implementor.md").read_text(encoding="utf-8")
+    assert "BERKAS `DELETE` TIDAK DISUNTING DAN TIDAK DIHAPUS OLEHMU" in agent
+    assert "| DELETE | `<path>` | — |" in _read("plan/templates/brief-template.md")
+    assert "`CREATE|MODIFY|DELETE`" in _read("contract/templates/contract-template.md")
