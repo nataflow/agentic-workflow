@@ -40,7 +40,8 @@ CI (`.github/workflows/ci.yml`) runs pytest on Python 3.12–3.13 (Linux) plus 3
   version; lint M7 (`--base`) enforces it. Releases are usually a separate `chore(release)` commit.
 - `description` and `author` in each `marketplace.json` entry must equal `plugin.json` (lint M4).
 - A skill whose description starts with "Dipanggil …" is internal and must set `user-invocable: false`
-  (lint F3). quickdev skills use `disable-model-invocation: true` so only the user can invoke them.
+  (lint F3). quickdev `plan` uses `disable-model-invocation: true` so only the user starts the flow; `execute`/`review`
+  are model-invocable so the chain runs without pauses (step 39), gated by `plan_lock.py` instead.
 - Skill/agent frontmatter may only use the fields whitelisted in `scripts/lint_plugins.py`
   (`SKILL_FIELDS`, `AGENT_FIELDS`); description length cap is 1536.
 - Paths referenced in prose as `${CLAUDE_PLUGIN_ROOT}/...` or backticked relative paths are checked for
@@ -108,11 +109,13 @@ skeletons), `dispatcher/` (prompts used to dispatch subagents), `scripts/`, and 
   `/frontend:lead lanjutkan <taskdir>` skips the sweep and routes by `taskdir_state.py --taskdir`. Decisions cross
   sessions in `{taskdir}/JOURNEY.md` (`_common/journey.py`, adapted from backend — `entries`/`teks_problem` are
   test-pinned identical), never read by any gate script; free text never goes into `## Riwayat Rantai`.
-- **quickdev** — lightweight for small, early-stage repos: three user-invoked skills `plan → execute → review`,
+- **quickdev** — lightweight for small, early-stage repos: three skills `plan → execute → review`,
   no taskdir, no subagents, no repo profile. `plan` absorbs code tracing and clarification (scale `kecil`/`standar`,
   fast-path skip) and writes verification commands from the manifest into the plan's Section 4 table, which the seal
   covers; `execute` always measures a fresh baseline at `Base-Commit`. One `plan/<task>.md` guarded by
-  `_common/plan_lock.py` (`Hash-Scope: body`; 0.11 plans with `profile+body` still verify). Step 34.
+  `_common/plan_lock.py` (`Hash-Scope: body`; 0.11 plans with `profile+body` still verify). Step 34. Since step 39
+  the chain runs on: approval *Setujui & eksekusi* → `plan_lock.py commit` (plan file only, `--only`, active branch)
+  → `execute` invoked directly → `COMPLETED` invokes `review` directly; review remediation stays user-typed.
 - **nataflow** — direct work against the nataflow server over MCP, no repo artifacts. `create-artifact`
   writes a self-contained HTML page, gates it with `skills/create-artifact/scripts/artifact.py check`, and
   `artifact.py publish` upserts it under the MCP key's project via the `*_artifact` tools. Model-invocable.

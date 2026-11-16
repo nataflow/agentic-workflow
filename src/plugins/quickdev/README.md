@@ -26,13 +26,21 @@ gerbang `backend:tech-lead` atau `frontend:lead`.
 
 Prasyarat: `git` (execute dan review menuntut repo git), `python3` (3.12+, hanya stdlib) untuk
 `plan_lock.py`, dan toolchain repo sendiri untuk baseline dan verifikasi. Pindah dari 0.11: lihat
-`MIGRATION_v0.11.x_to_v0.12.0.md`.
+`MIGRATION_v0.11.x_to_v0.12.0.md`; dari 0.12: `MIGRATION_v0.12.x_to_v0.13.0.md`.
 
 ## Tiga Skill
 
-Ketiga skill ber-`disable-model-invocation: true`: skill hanya jalan bila **user** mengetik
-`/quickdev:<skill>`. Model tidak memanggilnya sendiri, termasuk dari skill quickdev lain. Setiap skill
-menutup dengan status dan **menawarkan** langkah berikutnya, lalu menunggu user.
+Alur dimulai user dengan `/quickdev:plan` (satu-satunya skill ber-`disable-model-invocation: true`), lalu
+berantai tanpa jeda konfirmasi tambahan:
+
+- Gerbang approval rencana punya tiga opsi: *Setujui & eksekusi* · *Setujui saja* · *Revisi*. Kedua opsi setuju
+  mengunci dan meng-commit berkas rencana; *Setujui & eksekusi* langsung memanggil `quickdev:execute`.
+- `execute` yang ditutup `COMPLETED` langsung memanggil `quickdev:review` dan melaporkan temuannya.
+- Status lain (`VERIFICATION_MANUAL_REQUIRED`, `BLOCKED`) dan remediasi dari review tetap berhenti dan menunggu
+  user. `execute` dan `review` juga tetap bisa diketik langsung (`/quickdev:execute`, `/quickdev:review`).
+
+Rantai ini aman karena gerbangnya ada di skrip, bukan di frontmatter: `execute` ditolak `plan_lock.py
+verify`/`start` tanpa rencana `APPROVED` bersidik cocok, dan `review` ditolak tanpa status `COMPLETED` yang konsisten.
 
 ```
 /quickdev:plan     → PLAN_APPROVED
@@ -42,7 +50,7 @@ menutup dengan status dan **menawarkan** langkah berikutnya, lalu menunggu user.
 
 | Skill | Yang dilakukan |
 |---|---|
-| `plan` | Membaca manifest (tipe repo dan perintah verifikasi), menelusuri kode terkait dengan skala `kecil` (≤2 berkas, tanpa kontrak/skema/env) atau `standar`, mengklarifikasi celah (fast-path bila nol celah; maksimal `batch_limit` pertanyaan per batch dan 2 batch), lalu menulis `plan/<task>.md` sebagai `DRAFT` dan menguncinya (`plan_lock.py lock`) menjadi `APPROVED` hanya dengan persetujuan eksplisit user. Tidak menjalankan perintah apa pun. |
+| `plan` | Membaca manifest (tipe repo dan perintah verifikasi), menelusuri kode terkait dengan skala `kecil` (≤2 berkas, tanpa kontrak/skema/env) atau `standar`, mengklarifikasi celah (fast-path bila nol celah; maksimal `batch_limit` pertanyaan per batch dan 2 batch), lalu menulis `plan/<task>.md` sebagai `DRAFT` dan menguncinya (`plan_lock.py lock`) menjadi `APPROVED` hanya dengan persetujuan eksplisit user, lalu meng-commit berkas rencana itu (`plan_lock.py commit`). Tidak menjalankan perintah verifikasi apa pun. |
 | `execute` | Menjalankan langkah rencana `APPROVED` yang lolos `verify`, mengukur baseline segar di `Base-Commit` sebelum mutasi pertama, memverifikasi dengan perintah Section 4 rencana, dan memperbaiki maksimal `max_fix_iterations` kali di berkas rencana saja. |
 | `review` | Menilai diff sejak `Base-Commit` terhadap rencana dan konvensi kode di sekitarnya dengan 7 dimensi dan severity `BLOCKER`/`MAJOR`/`MINOR`. Hanya laporan di terminal. |
 
@@ -52,8 +60,8 @@ menutup dengan status dan **menawarkan** langkah berikutnya, lalu menunggu user.
   `/quickdev:plan`, atau rollback.
 - **`review`**: `CHANGES_REQUIRED` bila ada minimal satu temuan BLOCKER/MAJOR, atau MINOR dengan
   `strict=true`. Review lalu bertanya: remediasi otomatis (maksimal 2 putaran), revisi rencana, atau terima
-  apa adanya. Review tidak memanggil `execute`: opsi pertama menutup review dengan perintah
-  `/quickdev:execute <plan_path>` untuk diketik user di sesi yang sama, dan `execute` mengambil temuan dari
+  apa adanya. Review tidak meneruskan ke `execute` sendiri karena remediasi adalah keputusan user: opsi
+  pertama menutup review dengan perintah `/quickdev:execute <plan_path>` untuk diketik user di sesi yang sama, dan `execute` mengambil temuan dari
   laporan itu sebagai `review_findings`.
 
 `execute` menurunkan mode dari berkas rencana (`plan_lock.py start`), tanpa parameter tambahan:
@@ -146,7 +154,15 @@ QD_EOF
 **`plan/` di-commit ke repo.** Rencana adalah jejak keputusan: apa yang disetujui, apa yang dieksekusi, dan
 hasil verifikasinya. Jangan masukkan ke `.gitignore`.
 
-quickdev sendiri tidak pernah meng-commit. Commit dan merge adalah keputusan user:
+Satu-satunya commit yang dibuat quickdev adalah berkas rencana itu sendiri. Commit kode dan merge adalah
+keputusan user:
+
+- **`plan`** meng-commit berkas rencana sesudah `LOCK PASS` lewat `plan_lock.py commit`, di branch aktif
+  (termasuk `main`), dengan subjek `docs(plan): setujui rencana <task>`. Hanya berkas itu yang di-stage
+  (`--only`); index dan working tree lain milik user tidak disentuh, dan hook git tidak dilewati. Dilewati
+  (`COMMIT SKIP`) bila bukan repo git, rencana diabaikan `.gitignore`, isinya sudah sama dengan HEAD, atau
+  rencana sudah punya blok `## Execution Status` (revisi sesudah eksekusi; rencana ikut commit kode user).
+  `COMMIT GAGAL` (hook, gpg, identitas) tidak membatalkan `PLAN_APPROVED`; skrip mencetak perintah manualnya.
 
 - **`execute`** tidak meng-commit dan tidak merge. Perubahan sengaja dibiarkan uncommitted untuk `review`.
   Pada putaran awal, `plan_lock.py start` menolak working tree (`git status --porcelain -uall`) yang memuat
@@ -158,7 +174,7 @@ quickdev sendiri tidak pernah meng-commit. Commit dan merge adalah keputusan use
   `plan_lock.py verify`/`status`. Berkas untracked ikut dinilai. Diff dihitung sejak `Base-Commit` (tree
   kosong di repo tanpa commit), jadi hasil `execute` yang sudah di-commit tetap ter-review; `base_ref`
   mengganti pembandingnya.
-- Urutan yang disarankan: `plan` → commit rencana `APPROVED` → `execute` → `review` → commit kode bersama
+- Urutan git: `plan` (commit rencana `APPROVED`) → `execute` → `review` → user meng-commit kode bersama
   blok penutup rencana.
 
 ## Parameter Penting
@@ -217,7 +233,7 @@ berkas apa pun, sehingga `Plan-Hash`, `Verified-Hash`, dan `Tree-Hash` tidak bas
 
 - **Kunci rencana adalah bukti audit, bukan pencegahan mutlak.** Model tetap bisa memanggil `unlock` lalu
   `lock` sendiri. `lock` menuntut jawaban user dan `unlock` menuntut alasan; keduanya tercatat di metadata
-  (`Approval:`, `Unlock-Reason:`). Commit rencana `APPROVED` sebelum `execute` supaya riwayatnya terlihat.
+  (`Approval:`, `Unlock-Reason:`). `plan` meng-commit rencana `APPROVED` sebelum `execute` supaya riwayatnya terlihat.
 - **Konteks repo dideteksi ulang di setiap rencana.** Tanpa profil, `plan` membaca manifest dan menelusuri kode
   untuk tiap tugas; murah di repo kecil, berulang di repo besar (untuk repo besar, pertimbangkan `backend`/`frontend`).
 - **Temuan review lintas sesi hanya ringkasan.** `Findings-<n>` dipotong 300 karakter dan `Baseline` 600
@@ -226,4 +242,5 @@ berkas apa pun, sehingga `Plan-Hash`, `Verified-Hash`, dan `Tree-Hash` tidak bas
 - **`Tree-Hash` hanya menilai berkas ter-track yang berbeda dari `Base-Commit` dan berkas untracked yang
   tidak di-ignore.** Isi submodule dan berkas ter-ignore (mis. `dist/`) tidak ikut disegel.
 - **Independensi review bergantung sesi.** Review di sesi yang sama dengan `execute` ditandai
-  `sesi-sama=ya`; jalankan ulang `/quickdev:review` di sesi baru untuk putaran terakhir.
+  `sesi-sama=ya`, dan rantai otomatis membuat ini keadaan bawaan. Jalankan ulang `/quickdev:review` di sesi
+  baru untuk putaran terakhir.

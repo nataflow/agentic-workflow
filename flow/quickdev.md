@@ -14,10 +14,10 @@ Path relatif terhadap `src/plugins/quickdev/`.
 | `plan_lock.py` | script | Pengunci rencana: sidik Section 1–5 (`Plan-Hash`, `Hash-Scope: body`), penurunan mode eksekusi (termasuk predikat tree bersih mode `awal`), baseline segar terikat `Base-Commit`, segel verifikasi (`Verified-Hash`/`Tree-Hash`), penulisan blok `## Execution Status`, dan sinkron nataflow (`sync-payload`) | `skills/_common/plan_lock.py` |
 | `nataflow_sync.py` | pustaka | Config `.claude/nataflow.json`, identitas repo, argumen task/workdir/dokumen, dan diff manifest remote. Salinan identik lintas plugin | `skills/_common/nataflow_sync.py` |
 | Prosedur sinkron nataflow | referensi | Satu perintah `sync-payload --push` untuk rencana; dipakai `plan` dan `execute` | `skills/plan/references/nataflow-sync.md` |
-| Panduan migrasi | dokumen | Pindah dari 0.11 (enam skill, profil) ke 0.12 | `MIGRATION_v0.11.x_to_v0.12.0.md` |
+| Panduan migrasi | dokumen | Pindah dari 0.11 (enam skill, profil) ke 0.12, dan dari 0.12 ke 0.13 (alur berantai, commit rencana) | `MIGRATION_v0.11.x_to_v0.12.0.md`, `MIGRATION_v0.12.x_to_v0.13.0.md` |
 | Manifest plugin | konfigurasi | Nama, versi, deskripsi | `.claude-plugin/plugin.json` |
 
-Ketiga skill memakai `disable-model-invocation: true`. Artinya, skill hanya jalan bila **user** mengetik `/quickdev:<skill>`. Model tidak memanggilnya sendiri, termasuk dari skill quickdev lain. Setiap skill ditutup dengan status terminal, lalu **menawarkan** langkah berikutnya dan menunggu user.
+Hanya `plan` yang memakai `disable-model-invocation: true`, jadi alur selalu dimulai user dengan `/quickdev:plan`. `execute` dan `review` boleh dipanggil model supaya rantai berjalan tanpa jeda (39): approval *Setujui & eksekusi* memanggil `execute` langsung, dan `execute` yang `COMPLETED` memanggil `review` langsung. Gerbang keduanya ada di `plan_lock.py` (`verify`/`start`/`status`), bukan di frontmatter. Remediasi dari review dan status selain `COMPLETED` tetap berhenti dan menunggu user.
 
 ## Alur Utama
 
@@ -31,9 +31,11 @@ flowchart TD
     PL --> DR["tulis plan/{task}.md DRAFT"]
     DR --> AP{"User setuju eksplisit?"}
     AP -->|"minta revisi"| DR
-    AP -->|ya| LK["plan_lock.py lock: APPROVED + Plan-Hash"]
-    LK --> CM["Disarankan: user commit rencana APPROVED"]
-    CM --> EXE["/quickdev:execute: start, baseline, langkah, verifikasi, close"]
+    AP -->|"Setujui & eksekusi / Setujui saja"| LK["plan_lock.py lock: APPROVED + Plan-Hash"]
+    LK --> CM["plan_lock.py commit: berkas rencana saja"]
+    CM --> AE{"Jawaban approval"}
+    AE -->|"Setujui & eksekusi: dipanggil langsung"| EXE["quickdev:execute: start, baseline, langkah, verifikasi, close"]
+    AE -->|"Setujui saja: user ketik /quickdev:execute"| EXE
     EXE --> ES{"Status penutup execute"}
     ES -->|BLOCKED| BL{"Pilihan user"}
     BL -->|"lanjut (mode resume)"| EXE
@@ -42,7 +44,7 @@ flowchart TD
     BL -->|rollback| RB["Rollback hanya atas perintah eksplisit user"]
     ES -->|VERIFICATION_MANUAL_REQUIRED| MAN["User jalankan perintah manual,<br/>lalu /quickdev:execute (mode manual)"]
     MAN --> ES
-    ES -->|COMPLETED| RV["/quickdev:review: diff sejak Base-Commit"]
+    ES -->|"COMPLETED: dipanggil langsung"| RV["quickdev:review: diff sejak Base-Commit"]
     RV --> RS{"Status review"}
     RS -->|NO_CHANGES| NC["Berhenti tanpa temuan"]
     RS -->|REVIEWED| DONE["User commit kode bersama blok penutup rencana"]
@@ -52,7 +54,7 @@ flowchart TD
     RQ -->|"terima apa adanya"| DONE
 ```
 
-Semua panah antar-skill adalah **tawaran**. Skill berikutnya baru jalan setelah user mengetik perintahnya sendiri. Tidak ada langkah persiapan tingkat repo: `plan` membaca manifest dan menelusuri kode untuk setiap tugas. Titik tengah alur ini adalah `plan/<task>.md`. Isinya, termasuk tabel perintah verifikasi Section 4, dikunci oleh sidik `Plan-Hash` saat user menyetujuinya. Setelah itu `execute` hanya boleh mengubah checkbox Section 3 dan blok `## Execution Status`. `review` menilai hasilnya terhadap rencana itu dan membuka tiga jalan: remediasi (maksimal 2 putaran), revisi rencana, atau terima apa adanya. quickdev sendiri tidak pernah meng-commit.
+Panah plan → execute (*Setujui & eksekusi*) dan execute `COMPLETED` → review berjalan langsung; panah lain adalah **tawaran** yang menunggu user mengetik perintahnya. Tidak ada langkah persiapan tingkat repo: `plan` membaca manifest dan menelusuri kode untuk setiap tugas. Titik tengah alur ini adalah `plan/<task>.md`. Isinya, termasuk tabel perintah verifikasi Section 4, dikunci oleh sidik `Plan-Hash` saat user menyetujuinya. Setelah itu `execute` hanya boleh mengubah checkbox Section 3 dan blok `## Execution Status`. `review` menilai hasilnya terhadap rencana itu dan membuka tiga jalan: remediasi (maksimal 2 putaran), revisi rencana, atau terima apa adanya. Satu-satunya commit quickdev adalah berkas rencana yang baru disetujui; commit kode milik user.
 
 ## Alur per Skill
 
@@ -75,11 +77,11 @@ Semua panah antar-skill adalah **tawaran**. Skill berikutnya baru jalan setelah 
   4. **Fase 3: dekomposisi dan tulis rencana.** Langkah atomik hanya untuk layer tersentuh (backend: skema → DTO → data access → service → route → test; frontend: types → API client → state → komponen → page → test), masing-masing dengan path, simbol, dan kriteria selesai; konsumen terdampak → langkah "sesuaikan konsumen".
      - Metadata: `Status: DRAFT`, `Author`, `Date`.
      - Isi: Section 1 Overview & Objectives (akar masalah bugfix, keputusan klarifikasi, asumsi, acceptance criteria `AC-<n>`, `Alternatif ditolak` bila ada lebih dari satu pendekatan, out of scope), 2 Architecture & Layer Impact (modul berbukti `path:baris`, kemampuan existing yang dipakai ulang, berkas acuan konvensi, risiko kompatibilitas mundur/data existing/konkurensi/keamanan/performa atau `-`), 3 Atomic Implementation Steps (checkbox `- [ ]`), 4 Verification & Testing Strategy (tabel `Jenis | Perintah | Cwd | Risiko` + skenario happy path, error/validasi, batas nilai, dan edge case yang dipetakan ke `AC-<n>`), 5 Rollback & Contingency (bila `include_rollback`).
-  5. **Fase 4: approval gate.** Sajikan ringkasan gerbang 3–4 kalimat beserta path rencana (bukan daftar langkah), sebut alternatif yang ditolak dan perintah bertanda DB/jaringan, tutup dengan baris yang meminta user membaca rencana lengkap, lalu `AskUserQuestion`: *Setujui rencana* atau *Revisi (sebut poinnya)*. Persetujuan mencakup izin menjalankan perintah Section 4 kecuali yang bertanda DB/jaringan.
+  5. **Fase 4: approval gate.** Sajikan ringkasan gerbang 3–4 kalimat beserta path rencana (bukan daftar langkah), sebut alternatif yang ditolak dan perintah bertanda DB/jaringan, tutup dengan baris yang meminta user membaca rencana lengkap, lalu `AskUserQuestion`: *Setujui & eksekusi (Recommended)*, *Setujui saja*, atau *Revisi (sebut poinnya)*. Persetujuan mencakup izin menjalankan perintah Section 4 kecuali yang bertanda DB/jaringan.
      - User minta revisi → perbarui rencana, tetap `DRAFT`, ajukan ulang.
      - User minta revisi pada rencana yang sudah dieksekusi → langkah yang teksnya berubah dikembalikan ke `- [ ]`.
      - User setuju → jalankan `plan_lock.py lock --plan … --answer -` dengan jawaban user apa adanya lewat heredoc berkutip (`<<'QD_EOF'`).
-  6. **Fase 5.** Setelah `LOCK PASS`, jalankan sinkron nataflow (`references/nataflow-sync.md`), set status `PLAN_APPROVED`, dan tawarkan `/quickdev:execute`.
+  6. **Fase 5.** Setelah `LOCK PASS`, jalankan `plan_lock.py commit` (berkas rencana saja, branch aktif; `COMMIT SKIP` bila bukan git, di-ignore, tanpa perubahan, atau blok eksekusi sudah ada; `COMMIT GAGAL` exit 3 tidak membatalkan approval), lalu sinkron nataflow (`references/nataflow-sync.md`) supaya cermin mencatat sha commit rencana, dan set status `PLAN_APPROVED`. *Setujui & eksekusi* → panggil `quickdev:execute` langsung lewat tool `Skill`; *Setujui saja* → tawarkan `/quickdev:execute`.
   7. **Rute sinkron ulang.** "sinkron ulang `<plan_path>`" hanya menjalankan prosedur sinkron atas rencana yang sudah ada, lalu menutup dengan `SINKRON — <plan_path> · nataflow <segmen>`, tanpa menyentuh rencana.
 - **Subagent yang didispatch**: Tidak ada.
 
@@ -96,7 +98,10 @@ flowchart TD
     P4 -->|setuju| LK["plan_lock.py lock"]
     LK -->|"LOCK FAIL"| FIX["Perbaiki sebab, jangan tulis APPROVED dengan tangan"]
     FIX --> LK
-    LK -->|"LOCK PASS"| OK["PLAN_APPROVED, lanjut ke execute"]
+    LK -->|"LOCK PASS"| CM["plan_lock.py commit (PASS / SKIP / GAGAL)"]
+    CM --> SY["Sinkron nataflow, PLAN_APPROVED"]
+    SY -->|"Setujui & eksekusi"| OK["Panggil quickdev:execute langsung"]
+    SY -->|"Setujui saja"| OF["Tawarkan /quickdev:execute"]
 ```
 
 - **Output / artefak**: `plan/<task>.md` berstatus `APPROVED`, dengan `Approved-At`, `Approval` (kutipan jawaban user), `Hash-Scope: body`, dan `Plan-Hash` yang ditulis skrip. Ringkasan terminal memuat `TIPE`, `KLARIFIKASI`, `VERIFIKASI`, dan `KUNCI: Plan-Hash <12 hex>`. Status: `PLAN_APPROVED`.
@@ -105,8 +110,8 @@ flowchart TD
   - Skill tidak menjalankan perintah verifikasi, build, test, atau migrasi.
   - Section 1–5 rencana yang sudah `APPROVED` tidak boleh diubah langsung. Revisi harus lewat `unlock --reason`, lalu revisi, lalu `lock` lagi. Blok `## Execution Status` dipertahankan.
   - Rencana format lama (tanpa `Plan-Hash`) harus di-`unlock` dan disetujui ulang.
-  - Skill tidak meng-commit. README menyarankan user meng-commit rencana `APPROVED` sebelum `execute`.
-- **Lanjut ke**: `quickdev:execute` (`plan_path=<plan_dir>/<task_name>.md`).
+  - Skill hanya meng-commit berkas rencana, lewat `plan_lock.py commit` (staging eksplisit, `--only`, tanpa `--no-verify`). Index dan working tree lain milik user tidak disentuh.
+- **Lanjut ke**: `quickdev:execute` (`plan_path=<plan_dir>/<task_name>.md`), langsung atau lewat tawaran sesuai jawaban approval.
 
 ### `quickdev:execute`
 
@@ -139,7 +144,7 @@ flowchart TD
      - pembanding `SKIPPED`, `TIMEOUT`, atau baseline absen → tidak ada pembanding; bila gagal karena lingkungan, hasil akhirnya `VERIFICATION_MANUAL_REQUIRED`.
 
      Regresi di berkas Section 3 diperbaiki, maksimal `max_fix_iterations` kali (default 3). Regresi yang menuntut berkas di luar Section 3 → `BLOCKED`.
-  5. **Fase 4.** Jalankan `close --status COMPLETED|VERIFICATION_MANUAL_REQUIRED --verification -`. Skrip menolak `COMPLETED` bila masih ada `- [ ]`, menutup ronde remediasi yang `OPEN`, dan menyegel `Verified-Hash` + `Tree-Hash`. Susun laporan dan tawarkan `review`, dengan perubahan dibiarkan uncommitted.
+  5. **Fase 4.** Jalankan `close --status COMPLETED|VERIFICATION_MANUAL_REQUIRED --verification -`. Skrip menolak `COMPLETED` bila masih ada `- [ ]`, menutup ronde remediasi yang `OPEN`, dan menyegel `Verified-Hash` + `Tree-Hash`. Susun laporan, lalu `COMPLETED` (termasuk `COMPLETED (manual)` dan putaran remediasi) memanggil `quickdev:review` langsung lewat tool `Skill`, dengan perubahan dibiarkan uncommitted.
   6. **Sinkron nataflow.** Sesudah **tiap** `close`/`confirm` yang PASS (termasuk `BLOCKED` di Fase 0, 1, 3, dan Failure path), prosedur sinkron mendorong rencana beserta blok eksekusinya. Hasilnya baris `NATAFLOW:` ringkasan; `GAGAL` tidak mengubah status terminal.
 - **Subagent yang didispatch**: Tidak ada.
 
@@ -167,7 +172,7 @@ flowchart TD
     VF -->|true| RUN["Perintah Section 4 (timeout 5 menit)<br/>dibanding baseline segar"]
     RUN -->|"lingkungan belum siap"| VM
     RUN --> RG{"Regresi baru?"}
-    RG -->|tidak| OK["close COMPLETED"]
+    RG -->|tidak| OK["close COMPLETED, panggil quickdev:review langsung"]
     RG -->|"ya, di berkas Section 3"| FX["Perbaiki, maks max_fix_iterations"]
     FX --> RUN
     FX -->|"plafon habis"| BL
@@ -186,13 +191,13 @@ flowchart TD
   - Skill **tidak commit dan tidak merge**.
   - Rollback (`git checkout`, `reset`, `stash`, hapus berkas) hanya dengan persetujuan eksplisit user.
 - **Lanjut ke**:
-  - `COMPLETED` → `quickdev:review`.
+  - `COMPLETED` → `quickdev:review`, dipanggil langsung.
   - `VERIFICATION_MANUAL_REQUIRED` → user menjalankan perintah manual, lalu `quickdev:execute` (mode `manual`).
   - `BLOCKED` → `quickdev:execute` (mode `resume`, atau `remediasi` lanjutan bila ronde masih `OPEN`), `quickdev:plan` (revisi), atau rollback.
 
 ### `quickdev:review`
 
-- **Pemicu / kapan dipakai**: eksekusi sudah `COMPLETED`/`COMPLETED (manual)` dan diff perlu dinilai sebelum user meng-commit.
+- **Pemicu / kapan dipakai**: dipanggil langsung oleh `execute` yang `COMPLETED`/`COMPLETED (manual)`, atau diketik user (`/quickdev:review`), untuk menilai diff sebelum user meng-commit.
 - **Prasyarat**:
   - `plan_lock.py verify` → PASS.
   - `plan_lock.py status --json` → `execution.Status` ∈ {`COMPLETED`, `COMPLETED (manual)`} dan `consistent: true`. `consistent: false` mencakup segel basi (kode atau rencana berubah sesudah `close`) → kembali ke `execute` mode `resume`.
@@ -217,7 +222,7 @@ flowchart TD
      7. Regresi Cakupan (wajib mencari pemanggil secara nyata)
   4. **Fase 4: verifikasi bukti.** Buka ulang tiap baris kandidat temuan dan buang yang tidak terbukti. Beri severity `BLOCKER`/`MAJOR`/`MINOR`, deduplikasi, dan tulis rekomendasi imperatif (tanpa patch).
   5. **Fase 5: status.** Hasilnya `CHANGES_REQUIRED` bila ada minimal satu BLOCKER/MAJOR, atau MINOR dengan `strict=true`. Selain itu `REVIEWED`.
-     - `CHANGES_REQUIRED` → `AskUserQuestion`: *Remediasi otomatis (putaran n+1/2)*, *Revisi rencana*, atau *Terima apa adanya*. Opsi pertama tidak ditawarkan bila `remediation_round` sudah 2. Review tidak memanggil `execute` (`disable-model-invocation`): opsi pertama ditutup dengan perintah `/quickdev:execute <plan_path>` untuk diketik user di sesi yang sama, dan `execute` mengambil temuan dari laporan ini.
+     - `CHANGES_REQUIRED` → `AskUserQuestion`: *Remediasi otomatis (putaran n+1/2)*, *Revisi rencana*, atau *Terima apa adanya*. Opsi pertama tidak ditawarkan bila `remediation_round` sudah 2. Review tidak meneruskan ke `execute` sendiri karena remediasi adalah keputusan user (39 A3): opsi pertama ditutup dengan perintah `/quickdev:execute <plan_path>` untuk diketik user di sesi yang sama, dan `execute` mengambil temuan dari laporan ini.
      - `REVIEWED` → keputusan commit/merge diserahkan ke user.
 - **Subagent yang didispatch**: Tidak ada. Konsekuensinya, independensi review bergantung pada sesi. README menyarankan menjalankan ulang `/quickdev:review` di sesi baru untuk putaran terakhir.
 
@@ -250,7 +255,7 @@ flowchart TD
 Tidak ada. README menyebutkan "semua kerja berlangsung di percakapan utama", dan `plugin.json` menegaskan "tanpa taskdir, subagent, maupun profil repo". Akibatnya:
 
 - tidak ada reviewer independen seperti di `backend`/`frontend`;
-- `review` hanya menandai `sesi-sama=ya` bila jalan di sesi yang sama dengan `execute`, lalu menyarankan putaran terakhir di sesi baru.
+- `review` hanya menandai `sesi-sama=ya` bila jalan di sesi yang sama dengan `execute` (selalu begitu saat dipanggil langsung oleh `execute`), lalu menyarankan putaran terakhir di sesi baru.
 
 ## Hooks & Guard
 
@@ -260,7 +265,7 @@ Tidak ada. README menyebutkan "semua kerja berlangsung di percakapan utama", dan
 
 | Guard | Mekanisme |
 |---|---|
-| Pemanggilan hanya oleh user | `disable-model-invocation: true` di ketiga skill. Tiap skill menawarkan langkah berikutnya, tidak memanggilnya sendiri |
+| Titik masuk oleh user | `disable-model-invocation: true` hanya di `plan`. `execute` dipanggil `plan` hanya atas jawaban *Setujui & eksekusi*; `review` dipanggil `execute` hanya sesudah `COMPLETED`. Remediasi tetap diketik user |
 | Koeksistensi | Blok gerbang engineer + `/quickdev:*` eksplisit → lanjut. Permintaan baru tanpa pilihan alur → tanya sekali (quickdev atau gerbang engineer). Dilarang memakai `backend:*`/`frontend:*` sebagai pengganti langkah |
 | Penanda `.claude/workflow` | Berkas ini ada tetapi tidak memuat `quickdev` → skill melapor dan bertanya dulu sebelum lanjut |
 | Kunci rencana (`plan_lock.py`) | Sidik sha256 atas `## 1.` sampai sebelum `## Execution Status` (CRLF → LF, spasi ujung dibuang, `[x]` dihitung sebagai `[ ]`), ditandai `Hash-Scope: body`. Heading dan checklist di dalam code fence diabaikan; fence tak tertutup → FAIL. Rencana 0.4.0 tanpa `Hash-Scope` dan rencana 0.5–0.11 ber-`Hash-Scope: profile+body` (sidik ditambah baris `Profile:`) diverifikasi dengan rumusnya masing-masing. `execute`/`review` menolak rencana yang sidiknya berbeda |
@@ -286,6 +291,7 @@ Tidak ada. README menyebutkan "semua kerja berlangsung di percakapan utama", dan
 | `close` | `execute` (penutupan / BLOCKED) | Blok berstatus `IN_PROGRESS`, atau `VERIFICATION_MANUAL_REQUIRED` → `BLOCKED` | Tulis status terminal, `Verification`, `Blocked-Step`. Menolak `COMPLETED` bila masih ada `[ ]`. `BLOCKED` butuh `--blocked-step`. `COMPLETED`/`VERIFICATION_MANUAL_REQUIRED` menyegel `Verified-Hash` + `Tree-Hash` dan menutup ronde remediasi |
 | `confirm` | `execute` mode `manual` | Semua `[x]`, blok `VERIFICATION_MANUAL_REQUIRED`, jawaban user tidak kosong, segel cocok | `COMPLETED (manual)` + `Manual-Confirmation` |
 | `status` | `review` (`--json`) | — | Ringkasan: `hash_ok`, `hash_scope`, `profile` (rencana 0.11; `-` untuk rencana baru), jumlah langkah, `remediation_round`/`remediation_open`/`open_findings`, `base_drift`/`commits_since_base`, `baseline`, `consistent`/`inconsistency` (termasuk segel basi), blok eksekusi |
+| `commit` | `plan` Fase 5 | `APPROVED` dengan sidik cocok | Commit berkas rencana saja (`add` + `commit --only`), subjek `docs(plan): setujui rencana <task>`. `COMMIT SKIP` (exit 0) bila bukan repo git, rencana di-ignore, sama dengan HEAD, atau blok eksekusi sudah ada. `COMMIT GAGAL` (exit 3) beserta perintah manual |
 | `unlock` | `plan` (revisi) | `APPROVED`, `--reason` tidak kosong | `Status: DRAFT`, `Plan-Hash: -`, `Unlock-Reason`. Blok eksekusi dipertahankan |
 | `sync-payload` | prosedur sinkron (`plan`, `execute`) | `.claude/nataflow.json` ada dan sah (absen → `SKIP` sebelum rencana dibaca). `--plan`: rencana pernah dikunci (`Approved-At`) | Tidak menulis berkas. `--push` (prosedur): memanggil server sendiri dan mencetak satu baris segmen (29). Tanpa `--push`: argumen `task`/`workdir`/`list_document` tanpa isi; `--remote -`: dokumen yang sha, tipe, atau metadatanya berbeda dari manifest remote |
 
@@ -341,7 +347,7 @@ stateDiagram-v2
     COMPLETED_MANUAL --> [*] : review REVIEWED, user commit
 ```
 
-Urutan git yang disarankan README: `plan` → commit rencana `APPROVED` → `execute` → `review` → commit kode bersama blok penutup rencana.
+Urutan git: `plan` (commit rencana `APPROVED` lewat `plan_lock.py commit`) → `execute` → `review` → user meng-commit kode bersama blok penutup rencana.
 
 ## Handoff Lintas Plugin
 
