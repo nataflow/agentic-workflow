@@ -63,7 +63,8 @@ def test_j1_tiap_titik_panggil_menyebut_plafon():
     mod = load_module(JOURNEY, "fe_journey_36_j1")
     slot = f"≤{mod.MAX_KALIMAT} kalimat, ≤{mod.MAX_TEKS} karakter"
     for rel in ("lead/SKILL.md", "ux-design/SKILL.md", "ui-design/SKILL.md", "contract/SKILL.md",
-                "plan/SKILL.md", "architect/SKILL.md", "lead/references/lane-routing-matrix.md"):
+                "plan/SKILL.md", "architect/SKILL.md", "lead/references/lane-routing-matrix.md",
+                "lead/references/permintaan-baru.md"):
         text = _read(rel)
         calls = re.findall(r"journey\.py[»`]? add [^\n]*", text)
         assert calls, rel
@@ -302,3 +303,26 @@ def test_t1_prosa_gate_menawarkan_ronde_tambahan():
     assert "satu ronde reviewer tambahan per putaran" in lead.split("## Precondition", 1)[0]
     plafon = _read("lead/references/lane-routing-matrix.md").split("## 5. Plafon Loop", 1)[1]
     assert "**satu ronde tambahan**" in plafon and "ronde tambahan, lalu *H28*" in plafon
+
+
+# ------------------------------------------------------------------ L1 — lead ramping untuk sesi lanjutan
+
+
+@pytest.mark.regression("36 L1")
+def test_l1_phase_3_7_hanya_di_rujukan_permintaan_baru():
+    skill = _read("lead/SKILL.md")
+    ref = _read("lead/references/permintaan-baru.md")
+    for phase in ("## Phase 3 — Lane", "## Phase 4 — Sections", "## Phase 5 — Slug & Taskdir",
+                  "## Phase 6 — Gate & Pemiliknya", "## Phase 7 — Klarifikasi & Kunci Akar"):
+        assert phase in ref and f"#{phase}" not in skill, phase
+    pointer = skill.split("### Phase 3–7 — Permintaan Baru", 1)[1].split("### Phase 8", 1)[0]
+    assert "**baca `references/permintaan-baru.md` utuh**" in pointer and "melompati" in pointer
+    # urutan fase SKILL tetap: 1, 2, penunjuk 3–7, 8
+    order = [skill.index(h) for h in ("### Phase 1", "### Phase 2", "### Phase 3–7", "### Phase 8")]
+    assert order == sorted(order)
+    # rujukan tanpa ${CLAUDE_PLUGIN_ROOT} literal (lint R2); skrip lewat peta «nama.py»
+    assert "${CLAUDE_PLUGIN_ROOT}" not in ref and "«journey.py» add" in ref
+
+
+def test_l1_body_lead_lebih_ramping():
+    assert len(_read("lead/SKILL.md")) < 21_000

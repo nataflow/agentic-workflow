@@ -76,7 +76,8 @@ def test_h2_lanjutan_lewat_lead_melewati_sapuan():
 def test_j2_penulis_journey_memakai_hop_sah():
     mod = load_module(JOURNEY, "fe_journey_33_j2")
     found = {
-        "lead/SKILL.md": {"LEAD", "REVIEW"},
+        "lead/SKILL.md": {"REVIEW"},
+        "lead/references/permintaan-baru.md": {"LEAD"},   # Phase 7 pindah (36 L1)
         "ux-design/SKILL.md": {"FLOW"},
         "ui-design/SKILL.md": {"UI"},
         "contract/SKILL.md": {"CONTRACT"},
@@ -88,7 +89,7 @@ def test_j2_penulis_journey_memakai_hop_sah():
         assert hops <= set(mod.HOPS), rel
     assert set().union(*found.values()) == set(mod.HOPS)
     # LEAD ditulis sesudah akar terkunci: journey.py menolak taskdir tanpa TASK.md
-    phase7 = _section(_read("lead/SKILL.md"), "### Phase 7", "### Phase 8")
+    phase7 = _read("lead/references/permintaan-baru.md").split("## Phase 7", 1)[1]
     assert phase7.index("TASK ROOT LOCKED") < phase7.index("--hop LEAD")
 
 

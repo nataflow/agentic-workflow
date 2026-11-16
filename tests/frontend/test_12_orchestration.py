@@ -422,7 +422,8 @@ def test_j45_contract_reviewer_menggemakan_sidik():
 
 @pytest.mark.regression("J49")
 def test_j49_lead_sufiks_slug_kembar():
-    assert "`-2`" in section(read(FE_SKILLS / "lead" / "SKILL.md"), "### Phase 5")
+    # Phase 3–7 lead pindah ke references/permintaan-baru.md (36 L1)
+    assert "`-2`" in section(read(FE_SKILLS / "lead" / "references" / "permintaan-baru.md"), "## Phase 5")
 
 
 # --- Sisa tahap 1 & rilis ------------------------------------------------------------------
