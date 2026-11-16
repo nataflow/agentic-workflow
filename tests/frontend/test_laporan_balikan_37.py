@@ -71,3 +71,44 @@ def test_u2_skill_architect_selaras():
     assert "atas balikan implementor dan `git status --porcelain`" in skill
     assert "**Balikan implementor absen, rusak, atau terpotong, tree bersih**" in skill
     assert "hapus `report-<NN>.md` rusak" not in skill
+
+
+# ------------------------------------------------------------------ U3 — prasyarat architect
+
+@pytest.mark.regression("37 U3")
+def test_u3_terputus_divonis_dari_tree_saja():
+    from conftest import load_module
+    mod = load_module(FE / "skills" / "architect" / "scripts" / "check_preconditions.py", "cp_arch_37")
+    aksi = mod.TERPUTUS_ACTION.format(nn="03")
+    assert "dari tree saja" in aksi and "hapus `report-03.md` sisa" in aksi
+    assert "laporan absen/rusak" not in aksi and "laporan FAILED" not in aksi
+    assert not hasattr(mod.Checker if hasattr(mod, "Checker") else object, "_warn_missing_reports")
+    assert "missing_reports" not in (FE / "skills" / "architect" / "scripts" / "check_preconditions.py").read_text(
+        encoding="utf-8")
+
+
+@pytest.mark.regression("37 U3")
+def test_u3_prosa_terputus_dan_check_4_selaras():
+    b3 = _bagian(3)
+    assert "divonis dari tree saja (37 U3)" in b3 and "Check 4 `PASS`" in b3
+    assert "Check 4 hanya `WARN`" not in b3
+    assert "laporan unit tidak dinilai" in _bagian(1)
+
+
+@pytest.mark.regression("37 U3")
+def test_u3_plan_tetap_menuntut_laporan_unit_blocked(fe_chain_repo):
+    """K3: unit `BLOCKED` selalu disimpan laporannya oleh architect — Check 5 `plan` tetap menagihnya."""
+    import json
+    from conftest import FE_TD, fe_approved_chain, fe_brief, fe_run, write_files
+    repo = fe_chain_repo
+    fe_approved_chain(repo)
+    fe_brief(repo, "01", status="BLOCKED")
+
+    def c5():
+        r = fe_run(repo, "plan/scripts/check_preconditions.py", "--taskdir", FE_TD, "--mode", "APPEND", "--json")
+        return next(c for c in json.loads(r.stdout)["checks"] if c["id"] == 5)
+
+    assert c5()["status"] == "FAIL" and "01" in c5()["summary"]
+    write_files(repo, {f"{FE_TD}/report-01.md":
+                       '---\nartifact: UNIT_REPORT\nunit: "01"\nstatus: FAILED\n---\n\n# Unit 01\n\n## Triase\n- x\n'})
+    assert c5()["status"] == "PASS"

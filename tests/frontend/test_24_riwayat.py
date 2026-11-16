@@ -167,8 +167,10 @@ def test_done_tanpa_commit_unit_ditolak_lalu_sah_sesudah_commit_kode(fe_chain_re
 
 
 @pytest.mark.regression("25 R6")
-def test_r6_report_hilang_sesudah_commit_mendarat_hanya_warn(fe_chain_repo):
-    """Dulu FAIL tanpa jalur pemulihan (memantul architect ↔ lead); commit unit tetap bukti DONE."""
+@pytest.mark.regression("37 U3")
+def test_r6_done_tanpa_report_sesudah_commit_mendarat_pass(fe_chain_repo):
+    """Dulu FAIL tanpa jalur pemulihan (25 R6), lalu WARN; sejak 37 U3 unit bersih memang tanpa berkas laporan —
+    commit unit satu-satunya bukti DONE."""
     repo = fe_chain_repo
     fe_approved_chain(repo)
     edit(repo, B1, "status: READY", "status: DONE")
@@ -177,8 +179,7 @@ def test_r6_report_hilang_sesudah_commit_mendarat_hanya_warn(fe_chain_repo):
     arch = fe_run(repo, "architect/scripts/check_preconditions.py", "--taskdir", FE_TD, "--json")
     data = json.loads(arch.stdout)
     c4 = next(c for c in data["checks"] if c["id"] == 4)
-    assert c4["status"] == "WARN" and "report-NN.md` hilang dari disk: 01" in c4["summary"], c4
-    assert "dilarang mendispatch ulang" in c4["action"]
+    assert c4["status"] == "PASS" and "hilang dari disk" not in c4["summary"], c4
     assert data["phase"] == "PENUTUP", data
     assert all(c["status"] != "FAIL" for c in data["checks"] if c["id"] == 4)
 
