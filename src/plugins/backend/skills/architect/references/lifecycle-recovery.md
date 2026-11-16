@@ -99,7 +99,7 @@ ______________________________________________________________________
 Ketika subagent `code-implementor` mengalami kegagalan atau terantuk stop condition:
 
 ```
-[ Implementor Gagal ] ──► report-<NN>.md ──► status: BLOCKED ──► Commit WIP (bila kode tersentuh) ──► Fase 5 (BLOCKED) ──► tech-lead
+[ Implementor Gagal ] ──► status: BLOCKED ──► Commit WIP (bila kode tersentuh) ──► amplop + badan laporan ──► architect: report-<NN>.md ──► Fase 5 (BLOCKED) ──► tech-lead
 ```
 
 **Rantai terhenti tidak pernah direview.** Tidak ada jalur "review parsial": Fase 4 dilewati utuh —
@@ -164,6 +164,13 @@ diabaikan git.
 dispatch tidak pernah berangkat (**tidak ada vonis**). Kata statusnya tidak membedakan keduanya, jadi
 `architect` memutuskan dari bukti di disk — bukan dari amplop.
 
+Sebelum matriks: amplop `BLOCKED` dari implementor yang berangkat adalah vonis. `architect` menyimpannya ke
+`{taskdir}/report-<NN>.md` lebih dulu — badan laporan amplop **disalin persis**; amplop tanpa badan (hanya
+`Status`/`Cause`) → frontmatter `brief`, `status: BLOCKED`, `reason` dari `Cause`, empat seksi kontrak di bawah
+dengan `## Evidence` berbunyi `badan laporan tidak dikirim implementor`. Implementor tidak menulis berkas laporan
+sendiri (harness Claude Code menolaknya, 37 B1). Amplop kosong, rusak, atau galat dispatch bukan vonis — tidak ada
+laporan yang ditulis, dan matriks memutuskan dari kolom lain.
+
 | `report-<NN>.md`? | Commit unit di `git log`? | `status` brief di disk | `git status` | Tindakan `architect` |
 | --- | --- | --- | --- | --- |
 | ya | apa pun | `BLOCKED` | bersih | **HENTIKAN**, Fase 5 `BLOCKED (di brief-NN)`; brief ditutup `plan` lewat pengganti ber-`supersedes` |
@@ -183,8 +190,8 @@ pekerjaan yang tidak diklaim siapa pun milik user.
 
 ### Struktur Laporan Kegagalan (`report-<NN>.md`)
 
-File `{taskdir}/report-<NN>.md` ditulis `code-implementor` menurut kontrak di `agents/code-implementor.md` (rumah
-kanoniknya; 25 R11): frontmatter `brief`, `status: BLOCKED`, `reason`, lalu empat seksi berikut.
+File `{taskdir}/report-<NN>.md` ditulis `architect`, salinan persis badan laporan amplop `code-implementor` (37 B2);
+kontraknya di `agents/code-implementor.md` (rumah kanoniknya; 25 R11): frontmatter `brief`, `status: BLOCKED`, `reason`, lalu empat seksi berikut.
 
 1. **`## Stop condition / Trigger`**: Alasan tepat penghentian (misal: anchor simbol hilang, type mismatch, test gagal).
 2. **`## Evidence`**: Kutipan `berkas:baris`, perintah terminal yang dijalankan, atau potongan galat verbatim.

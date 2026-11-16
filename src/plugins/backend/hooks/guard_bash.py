@@ -22,7 +22,8 @@ memblokir (docs hooks: "Any other exit code doesn't block on its own").
 Allowlist Bash implementor: git read-only (`status`, `diff`, `log`, `show`, `rev-parse`,
 `ls-files`), `git add <path lease>…` tanpa flag, `git commit -m "<pesan>"`. Edit/Write hanya pada
 path lease. Lease = scope brief (parser `skills/_common/verify_scope.py`) + berkas brief +
-`report-NN.md` + `finding_source`; disimpan di `<git-dir>/nataflow/lease-backend.json`,
+`finding_source` — tanpa `report-NN.md`: badan laporan jalur gagal dibawa amplop dan disimpan `architect`
+(37 B2), karena harness Claude Code menolak subagent menulis berkas laporan; disimpan di `<git-dir>/nataflow/lease-backend.json`,
 di luar working tree sehingga tidak pernah muncul di `git status --porcelain`.
 """
 import argparse
@@ -308,9 +309,6 @@ def lease(brief: str, clear: bool) -> int:
         if not paths:
             raise ValueError("`## File scope` kosong atau tak terbaca")
         allowed = [rel(root, p) for p in paths] + [rel(root, str(b))]
-        nn = re.match(r"brief-(\d+)-", b.name)
-        if nn:                                     # jalur gagal: commit wip menstage report-NN.md
-            allowed.append(rel(root, str(b.parent / f"report-{nn.group(1)}.md")))
         if fs:                                     # penanda FIXED di-stage implementor (L2.6)
             allowed.append(rel(root, fs))
         lp.parent.mkdir(parents=True, exist_ok=True)

@@ -50,7 +50,7 @@ def test_lease_lives_outside_worktree(repo):
     assert git(repo, "status", "--porcelain") == ""
     lp = repo / ".git/nataflow/lease-backend.json"
     allowed = json.loads(lp.read_text())["allowed"]
-    assert {"src/order.go", "src/lock.go", BRIEF, f"{TD}/report-01.md", FINDING} == set(allowed)
+    assert {"src/order.go", "src/lock.go", BRIEF, FINDING} == set(allowed)     # 37 B2: tanpa report-NN.md
 
 
 def test_lease_empty_scope_refused(repo):
@@ -100,7 +100,7 @@ def test_bash_allowlist(repo, cmd, rc):
 def test_edit_write_limited_to_lease(repo):
     lease(repo, "--brief", BRIEF)
     assert hook(repo, tool="Write", file_path=str(repo / "src/lock.go")).returncode == 0
-    assert hook(repo, tool="Edit", file_path=str(repo / f"{TD}/report-01.md")).returncode == 0
+    assert hook(repo, tool="Edit", file_path=str(repo / f"{TD}/report-01.md")).returncode == 2   # 37 B2
     assert hook(repo, tool="Edit", file_path=str(repo / "src/other.go")).returncode == 2
     assert hook(repo, tool="Write", file_path=str(repo / ".env.local")).returncode == 2
     assert hook(repo, tool="Write", file_path="/etc/passwd").returncode == 2

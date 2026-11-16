@@ -29,10 +29,10 @@ Eksekusi satu brief implementasi.
   `git commit -m "<commit_message>"` —
   satu `-m` berisi persis `commit_message` frontmatter brief, tanpa trailer, heredoc, atau `$`
   (pagar hook menolaknya, termasuk trailer atribusi yang diminta pengingat harness).
-- Balikan: maksimum 10 baris terstruktur sesuai `## Format Output` agent-mu. Jalur gagal wajib
-  menulis `{taskdir}/report-<NN>.md` — `NN` dua digit prefiks `{unit_name}` — lebih dulu lalu
-  menyebut path-nya. Preseden kode yang menyesatkan dicatat di baris `Umpan balik profil:` laporan itu
-  (kontrak `report-{NN}.md` agent-mu).
+- Balikan: amplop sesuai `## Format Output` agent-mu — maksimum 10 baris di jalur sukses. Jalur gagal
+  membawa badan laporan utuh di amplop, bukan berkas: jangan menulis `report-<NN>.md` (harness menolak
+  subagent menulis berkas laporan) — pendispatch yang menyimpannya. Preseden kode yang menyesatkan
+  dicatat di baris `Umpan balik profil:` badan laporan itu.
 ```
 
 ### Slot Hidrasi
@@ -50,6 +50,6 @@ Eksekusi satu brief implementasi.
 - **Satu brief per dispatch**: eksekusi implementor sekuensial, satu dispatch per brief, tanpa paralelisasi.
 - **Penanda kurung sudut bukan slot**: `<NN>` dan `<domain>` diturunkan subagent saat runtime dan wajib dibiarkan apa adanya. Batalkan dispatch bila masih tersisa slot kurung kurawal yang belum terhidrasi.
 
-**Subagent mengembalikan:** Amplop `## Implementor Report — brief-{NN}-{unit}` dengan status `DONE` atau `BLOCKED`, memuat baris `Commit:` dan baris `Simbol Tersentuh:`.
+**Subagent mengembalikan:** Amplop `## Implementor Report — brief-{NN}-{unit}` dengan status `DONE` atau `BLOCKED`, memuat baris `Commit:` dan baris `Simbol Tersentuh:` (jalur sukses), atau badan laporan utuh sesudah baris `Commit:` (jalur gagal) — `architect` menyalinnya persis ke `{taskdir}/report-<NN>.md` sebelum triase `BLOCKED` (37 B2).
 
 Baris `Simbol Tersentuh:` mengenumerasi simbol yang benar-benar diubah, termasuk yang **tidak** disebut kolom `Anchor` brief. Method, test, atau tipe baru yang deklarasinya ditulis `## Steps` brief sah tanpa disebut `Anchor`; suntingan simbol eksisting di luar `Anchor` tidak. `architect` Fase 3 butir 4 membandingkannya dengan peta simbol `scripts/symbol_map.py`, dan selisih di antara keduanya dicatat apa adanya. Batas scope brief mengikat berkas **dan** simbol: berkas yang sama menampung banyak simbol, sehingga perbandingan tingkat berkas saja meloloskan penyuntingan simbol mana pun asalkan berkasnya kebetulan terdaftar.
