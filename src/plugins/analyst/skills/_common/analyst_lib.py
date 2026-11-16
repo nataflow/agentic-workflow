@@ -73,7 +73,11 @@ PILLARS_OPTIONAL = {
 # ── Root & git ────────────────────────────────────────────────────────────────
 
 def find_root() -> Path:
-    """Akar worktree git, atau cwd bila bukan repo git."""
+    """Akar worktree git, atau cwd bila bukan repo git.
+
+    Di luar git, cwd di dalam `analyst/tickets/…` atau `analyst/notulen/…` (model sering `cd` ke ticketdir sebelum
+    memanggil skrip) naik ke induk `analyst/` — ruang kerja yang sama dengan pemanggilan dari akarnya (38 V1).
+    """
     try:
         out = subprocess.check_output(["git", "rev-parse", "--show-toplevel"],
                                       stderr=subprocess.DEVNULL, universal_newlines=True).strip()
@@ -81,7 +85,12 @@ def find_root() -> Path:
             return Path(out)
     except Exception:
         pass
-    return Path.cwd()
+    cwd = Path.cwd()
+    parts = cwd.parts
+    for i in range(len(parts) - 1):
+        if parts[i] == "analyst" and parts[i + 1] in ("tickets", "notulen"):
+            return Path(*parts[:i])
+    return cwd
 
 
 def is_git_repo(root: Path) -> bool:
@@ -179,13 +188,22 @@ def git_error_line(out: str) -> str:
 
 
 def normalize_ticketdir(ticketdir: str, root: Path) -> str:
-    """Path ticketdir relatif root, tanpa garis miring penutup."""
+    """Path ticketdir relatif root, tanpa garis miring penutup.
+
+    Path relatif yang sudah berbentuk `analyst/tickets/…` dibaca terhadap root apa adanya. Selain itu path relatif
+    dibaca terhadap cwd (`--ticketdir .` dari dalam ticketdir, `../<ticketdir>` dari ticketdir sebelah) lalu
+    dijadikan relatif root (38 V1).
+    """
     p = Path(ticketdir)
-    if p.is_absolute():
-        try:
-            p = p.resolve().relative_to(root.resolve())
-        except ValueError:
-            return str(p)
+    if not p.is_absolute():
+        rel = str(p).strip("/").removeprefix("./")
+        if rel == TICKETS_DIR or rel.startswith(TICKETS_DIR + "/"):
+            return rel
+        p = Path.cwd() / p
+    try:
+        p = p.resolve().relative_to(root.resolve())
+    except ValueError:
+        return str(p)
     return str(p).strip("/").removeprefix("./")
 
 

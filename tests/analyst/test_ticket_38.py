@@ -217,3 +217,34 @@ def test_n2_reseal_tidak_menyentuh_drift(ready):
 def test_n2_reseal_menolak_tanpa_atau_dengan_dua_sasaran(ready):
     assert tk(ready, "reseal").code == 1
     assert tk(ready, "reseal", "--all", "--ticketdir", TDIR).code == 1
+
+
+# --- V1: ticketdir dari cwd ---------------------------------------------------------------------------
+
+@pytest.mark.regression("38 V1")
+@pytest.mark.parametrize("arg", [".", "./", "../2609231400-cicilan"])
+def test_v1_ticketdir_relatif_dari_dalam_ticketdir(repo, arg):
+    inside = repo / TDIR
+    r = run_script(VALIDATE, "--kind", "elicit", "--ticketdir", arg, cwd=inside)
+    assert r.returncode == 0 and "Letak ticketdir" not in r.stdout, r.stdout
+    r = tk(repo, "check", "--gate", "spec", "--ticketdir", arg, cwd=inside)
+    assert r.code == 0 and TDIR in r.out, r.out
+
+
+@pytest.mark.regression("38 V1")
+def test_v1_di_luar_git_root_naik_dari_ticketdir(make_repo):
+    root = make_repo({f"{TDIR}/TICKET.md": FIXTURE.read_text(encoding="utf-8")}, name="tanpa-git", git_init=False)
+    inside = root / TDIR
+    r = run_script(TICKET, "state", "--json", cwd=inside)
+    assert json.loads(r.stdout)["root"] == str(root.resolve()), r.stdout
+    r = tk(root, "check", "--gate", "spec", "--ticketdir", ".", cwd=inside)
+    assert r.code == 0 and f"root={root.resolve()}" in r.out, r.out
+
+
+@pytest.mark.regression("38 V1")
+def test_v1_path_root_relatif_tetap_dibaca_terhadap_root(repo):
+    sub = repo / "analyst"
+    r = run_script(VALIDATE, "--kind", "elicit", "--ticketdir", TDIR, cwd=sub)
+    assert r.returncode == 0, r.stdout
+    r = run_script(VALIDATE, "--kind", "elicit", "--ticketdir", "bukan/ticketdir", cwd=repo)
+    assert r.returncode == 1 and "Letak ticketdir" in r.stdout
