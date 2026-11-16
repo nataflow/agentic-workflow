@@ -111,9 +111,10 @@ def test_j4_implementor_git_dir_dan_ignored_ditolak(repo, tool, path, code):
 
 
 @pytest.mark.regression("24 K13")
+@pytest.mark.regression("37 U5")
 @pytest.mark.parametrize("tool, path, code", [
-    ("Write", f"{TDIR}/report-01.md", 0),                # laporan unit: satu-satunya keluaran implementor di taskdir
-    ("Edit", f"{TDIR}/report-12.md", 0),
+    ("Write", f"{TDIR}/report-01.md", 2),                # 37 U5: laporan unit dikirim lewat balikan, architect menyimpan
+    ("Edit", f"{TDIR}/report-12.md", 2),
     ("Edit", f"{TDIR}/brief-01-x.md", 2),                # status brief milik architect
     ("Write", f"{TDIR}/FLOW.md", 2),
     ("Write", f"{TDIR}/report-01.md.bak", 2),

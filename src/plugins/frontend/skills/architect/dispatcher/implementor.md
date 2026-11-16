@@ -2,7 +2,7 @@
 
 Gunakan template ini saat `architect` mendispatch subagent eksekutor brief (`code-implementor`) secara langsung.
 
-**Tujuan:** Mengubah satu brief `READY` menjadi perubahan `src/**` dalam batas `files_touched` tanpa satu pun perintah terminal, lalu menulis `{taskdir}/report-<NN>.md` sebagai balikan persisten; `architect` mengunci unit dengan status `DONE` di disk dan commit kode atomik (laporan tidak di-commit, Langkah 24).
+**Tujuan:** Mengubah satu brief `READY` menjadi perubahan `src/**` dalam batas `files_touched` tanpa satu pun perintah terminal, lalu mengembalikan laporan unit sebagai balikan; `architect` memvonisnya dari disk, menyimpannya ke `{taskdir}/report-<NN>.md` bila unit tidak bersih (37 U2), dan mengunci unit dengan status `DONE` di disk dan commit kode atomik (laporan tidak di-commit, Langkah 24).
 
 **Dispatch setelah:** Ingest (`references/execution-protocol.md` bagian 1) `PASS` untuk unit ini.
 
@@ -15,20 +15,20 @@ Eksekusi satu brief implementasi frontend.
   hygiene layer stack repo ini. Baca sendiri; dilarang memakai idiom stack lain.
 - Kontrak Acuan: `{taskdir}/CONTRACT.md` bila ada — layer shape dan DTO di sana adalah batas arsitektur.
 - Batas File: frontmatter `files_touched` brief adalah batas mutlak; pada berkas `MODIFY` hanya simbol
-  kolom `Anchor` tabel seksi 3. Satu-satunya berkas lain yang boleh ditulis adalah `{report_path}`.
-  Berkas `DELETE` tidak disunting dan tidak dihapus — pendispatch menjalankan `git rm` sesudah laporanmu;
+  kolom `Anchor` tabel seksi 3. Tidak ada berkas lain yang boleh ditulis, termasuk berkas laporan.
+  Berkas `DELETE` tidak disunting dan tidak dihapus — pendispatch menjalankan `git rm` sesudah balikanmu;
   rujukan ke berkas itu di `files_touched` diperbaiki, di luarnya dicatat.
 - Urutan Layer: DTO → service → API layer → view-model → controller → presentasi.
 - Verifikasi: DILARANG. Jangan jalankan typecheck, lint, test, build, atau aplikasi. Salin perintah
   `verification:` brief ke `## Verification` bertanda `DITUNDA`.
 - Terminal: tidak tersedia (tool `Bash` dicabut). Commit, git, dan rollback milik pendispatch; unit
   `FAILED` mencatat tiap berkas `files_touched` yang sudah disentuh di `## Rollback`.
-- Stop Condition: gerbang masuk lengkap ada di definisi agent-mu — BERHENTI dan tulis `status: FAILED`
-  beserta penghalangnya, jangan menebak.
-- Balikan: tulis `{report_path}` persis `Format laporan` di bawah, lalu kembalikan satu baris
-  `REPORT <unit_name>: <DONE | FAILED> — {report_path}` tanpa teks lain.
+- Stop Condition: gerbang masuk lengkap ada di definisi agent-mu — BERHENTI dan kembalikan
+  `status: FAILED` beserta penghalangnya, jangan menebak.
+- Balikan: kembalikan laporan persis `Format laporan` di bawah sebagai balikan, tanpa teks lain.
+  Jangan menulisnya ke berkas — pendispatch yang menyimpannya.
 
-Format laporan (`{report_path}`):
+Format laporan (balikan):
 
 ```markdown
 ---
@@ -69,7 +69,6 @@ statis; selain itu `FAILED`. Seksi kosong ditulis `- Tidak ada`, bukan dihapus. 
 | `{taskdir}` | Parameter `taskdir` architect | **[REQUIRED]** misal `frontenddev/docs/2609231200-order-checkout` |
 | `{brief_path}` | `unit_berikutnya` skrip prasyarat | **[REQUIRED]** Path brief `READY`, misal `{taskdir}/brief-01-order-api.md` |
 | `{unit_name}` | Nama berkas brief | **[REQUIRED]** Format `NN-unit`, misal `01-order-api` |
-| `{report_path}` | Diturunkan dari `NN` | **[REQUIRED]** `{taskdir}/report-<NN>.md`; Check 12 menjamin belum ada |
 | `{adapter_path}` | Field `stack` `index.json` profil | **[REQUIRED]** `${CLAUDE_PLUGIN_ROOT}/skills/profile/stacks/<stack>.md` — diisi hasil substitusi di badan `architect/SKILL.md`, bukan literal placeholder |
 
 ### Aturan untuk Pendispatch
@@ -82,12 +81,12 @@ statis; selain itu `FAILED`. Seksi kosong ditulis `- Tidak ada`, bukan dihapus. 
 
 ### Penanganan Balikan
 
-Balikan chat hanya penunjuk; keputusan diambil dari **disk** lewat matriks `references/execution-protocol.md` bagian 3 — `report-<NN>.md` beserta `git status --porcelain` dan pemeriksaan anchor.
+Balikan adalah klaim subagent; keputusan diambil dari **disk** lewat matriks `references/execution-protocol.md` bagian 3 — `verify_scope.py`, `git status --porcelain`, dan pemeriksaan anchor. Penyimpanan balikan ke `report-<NN>.md` mengikuti bagian 4.
 
 | Balikan | Penanganan `architect` |
 | --- | --- |
-| `REPORT <unit>: DONE` | Matriks bagian 3; bersih → commit unit |
-| `REPORT <unit>: FAILED` | Matriks bagian 3 → tandai BLOCKED, rantai berhenti |
-| Payload lain, kosong, atau error | Kegagalan dispatch: cek `report-<NN>.md` dan tree lebih dulu — laporan mungkin sudah tertulis; lalu baris matriks yang berlaku |
+| Laporan `status: DONE` | Matriks bagian 3; bersih → commit unit |
+| Laporan `status: FAILED` | Matriks bagian 3 → tandai BLOCKED, rantai berhenti |
+| Payload lain, kosong, terpotong, atau error | Kegagalan dispatch: baris "balikan absen/rusak" matriks bagian 3 menurut keadaan tree |
 
-**Subagent mengembalikan:** satu baris penunjuk `report-<NN>.md`; isinya dibaca dari disk.
+**Subagent mengembalikan:** laporan unit utuh persis `Format laporan`, tanpa berkas.
