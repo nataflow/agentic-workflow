@@ -152,3 +152,68 @@ def test_n1_permintaan_asli_diformat_bukan_perubahan():
     formatted = multi.replace(quote + "\n> baris", quote + "\n>\n> baris", 1).replace("*penekanan*", "_penekanan_")
     assert lib.request_digest(formatted) == sealed
     assert lib.request_digest(multi.replace("baris kedua", "baris ketiga")) != sealed
+
+
+# --- N2: `reseal` -------------------------------------------------------------------------------------
+
+@pytest.mark.regression("38 N2")
+def test_n2_reseal_tiket_lama_lalu_tahan_format(ready):
+    legacy_ready(ready)
+    body = path(ready).read_text(encoding="utf-8").split("\n---\n", 1)[1]
+    r = tk(ready, "reseal", "--all")
+    assert r.code == 0 and "1 disegel ulang" in r.out and "commit" in r.out, r.out
+    text = path(ready).read_text(encoding="utf-8")
+    assert text.split("\n---\n", 1)[1] == body                      # isi tidak berubah
+    fm = fm_of(ready)
+    assert fm["approved_hash"] == lib.content_hash(text) and fm["approved_seal_norm"] == lib.ticket_seal_norm(text)
+    assert "segel ulang cicilan" in git(ready, "log", "-1", "--format=%s")
+    reformat(ready)
+    assert state(ready)[TDIR]["state"] == "READY"
+
+
+@pytest.mark.regression("38 N2")
+def test_n2_reseal_idempoten(ready):
+    assert tk(ready, "reseal", "--all").code == 0          # fixture: `elicit_hash` masih sidik lama
+    head = git(ready, "rev-parse", "HEAD")
+    r = tk(ready, "reseal", "--ticketdir", TDIR)
+    assert r.code == 0 and "0 disegel ulang · 1 sudah tahan format" in r.out, r.out
+    assert git(ready, "rev-parse", "HEAD") == head
+
+
+@pytest.mark.regression("38 N2")
+def test_n2_reseal_tiket_terbuka_menaikkan_sidik_permintaan_dan_elisitasi(repo):
+    p = path(repo)
+    text = p.read_text(encoding="utf-8")
+    quote = next(l for l in text.splitlines() if l.startswith("> "))
+    text = text.replace(quote, quote + "\n> baris kedua permintaan", 1)
+    text = lib.set_frontmatter_field(text, "request_hash", lib.request_digest_legacy(text))
+    text = lib.set_frontmatter_field(text, "elicit_hash", lib.content_hash_legacy(text, "elicit"))
+    p.write_text(text, encoding="utf-8")
+    assert failed(repo, "elicit") == {}
+    r = tk(repo, "reseal", "--ticketdir", TDIR)
+    assert r.code == 0 and "1 disegel ulang" in r.out, r.out
+    fm = fm_of(repo)
+    assert fm["request_hash"] == lib.request_digest(text) and fm["elicit_hash"] == lib.content_hash(text, "elicit")
+    assert "approved_seal_norm" not in fm                          # bukan READY: segel persetujuan tidak ditulis
+    reformat(repo)
+    assert failed(repo, "elicit") == {}
+    r = tk(repo, "check", "--gate", "spec", "--ticketdir", TDIR)
+    assert r.code == 0, r.out
+
+
+@pytest.mark.regression("38 N2")
+def test_n2_reseal_tidak_menyentuh_drift(ready):
+    legacy_ready(ready)
+    reformat(ready)
+    before = path(ready).read_text(encoding="utf-8")
+    r = tk(ready, "reseal", "--all")
+    assert r.code == 0 and "DRIFT 1" in r.out and "analyst:spec REVISE" in r.out and TDIR in r.out, r.out
+    assert path(ready).read_text(encoding="utf-8") == before
+    r = tk(ready, "reseal", "--ticketdir", TDIR)
+    assert r.code == 1 and "DRIFT" in r.out, r.out
+
+
+@pytest.mark.regression("38 N2")
+def test_n2_reseal_menolak_tanpa_atau_dengan_dua_sasaran(ready):
+    assert tk(ready, "reseal").code == 1
+    assert tk(ready, "reseal", "--all", "--ticketdir", TDIR).code == 1

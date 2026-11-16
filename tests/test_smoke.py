@@ -31,6 +31,7 @@ CASES = [
     ("analyst/skills/_common/ticket.py", ["sync-payload", "--ticketdir", AN_TD, "--json"], True, None),
     ("analyst/skills/_common/ticket.py", ["sync-payload", "--ticketdir", AN_TD, "--push", "--json"], True, None),
     ("analyst/skills/_common/ticket.py", ["commit", "--ticketdir", AN_TD, "--stage", "draft"], False, None),
+    ("analyst/skills/_common/ticket.py", ["reseal", "--all"], False, None),
     ("analyst/skills/_common/validate_doc.py", ["--kind", "elicit", "--ticketdir", AN_TD, "--json"], True, None),
     ("analyst/skills/notulen/scripts/notulen.py", ["state", "--json"], True, None),
     ("analyst/skills/notulen/scripts/notulen.py", ["check", "--notulendir", AN_NT, "--json"], True, None),

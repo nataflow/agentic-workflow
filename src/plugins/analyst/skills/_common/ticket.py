@@ -22,6 +22,8 @@ Satu-satunya jalan mutasi status yang punya konsekuensi di luar penulisnya:
 - `reopen`  — buka ulang tiket `READY` menjadi `DRAFT` untuk perubahan permintaan.
 - `cancel`  — tutup ticketdir atas keputusan user.
 - `ref`     — isi `external_ref` (kunci kartu Jira/Trello) pada DRAFT maupun READY.
+- `reseal`  — naikkan sidik yang masih cocok ke algoritma tahan format (38 N2) tanpa mengubah isi: `request_hash`,
+              `elicit_hash`, dan untuk READY segel persetujuan; `--all` atau satu `--ticketdir`. DRIFT tidak disentuh.
 - `sync-payload` — isi argumen tool MCP nataflow untuk tiket READY (`list_task`/`create_task`/`update_task`
               beserta `upsert_document` `review.md`) atau tiket pernah-READY yang dibatalkan
               (`update_task_status cancelled`); tanpa commit, dan tidak pernah menulis `TICKET.md`. `--push`
@@ -32,7 +34,7 @@ sama dengan segel `close`, **dan** vonis review `PASS` atas sidik `<kartu>/<cata
 persis dengan sekarang: draft yang disunting sesudah direview, atau elisitasi yang dibuka dan berubah
 sesudahnya, tidak dapat disetujui.
 
-Kontrak exit `close`/`approve`/`ref`/`cancel`/`commit`: 0 = tertulis dan ter-commit (atau tanpa git/`--no-commit`, atau
+Kontrak exit `close`/`approve`/`ref`/`cancel`/`commit`/`reseal`: 0 = tertulis dan ter-commit (atau tanpa git/`--no-commit`, atau
 diabaikan `.gitignore`; `ref` pada DRAFT tidak meng-commit), 1 = ditolak, 3 = tertulis tetapi commit gagal.
 
 Repo bersinkron nataflow (`.claude/nataflow.json` atau `analyst/nataflow.json` ada): `new` menulis
@@ -78,6 +80,8 @@ from analyst_lib import (  # noqa: E402
     normalize_ticketdir,
     parse_urutan,
     report_json,
+    request_digest,
+    request_digest_legacy,
     set_frontmatter_field,
     split_frontmatter,
     split_parts,
@@ -834,6 +838,76 @@ def cmd_ref(root: Path, args: argparse.Namespace) -> int:
     return 0
 
 
+RESEALABLE = ("READY", "ELISITASI", "SPEC", "DRAFT")
+
+
+def reseal_fields(text: str, fm: Dict[str, Any], state: str) -> Dict[str, str]:
+    """Field sidik yang dinaikkan `reseal` ke algoritma tahan format; hanya sidik yang masih cocok dengan isi.
+
+    `request_hash` dan `elicit_hash` di keadaan mana pun yang dapat disegel ulang; READY juga `approved_hash`,
+    `approved_seal_norm`, dan `approved_seal` bila tiket lama belum punya. `review` dan `revision_base` tidak
+    ditulis ulang: pemeriksanya sudah menerima sidik lama, dan `review` ikut tertulis di kepala `review.md`.
+    """
+    fields: Dict[str, str] = {}
+    req = str(fm.get("request_hash", "-")).strip() or "-"
+    if req != "-" and req == request_digest_legacy(text):
+        fields["request_hash"] = request_digest(text)
+    eli = str(fm.get("elicit_hash", "-")).strip() or "-"
+    if eli != "-" and hash_matches(eli, text, "elicit"):
+        fields["elicit_hash"] = content_hash(text, "elicit")
+    if state == "READY":
+        fields.update(approved_hash=content_hash(text), approved_seal_norm=ticket_seal_norm(text))
+        if str(fm.get("approved_seal", "-") or "-").strip() in ("", "-"):
+            fields["approved_seal"] = ticket_seal(text)
+    return {k: v for k, v in fields.items() if str(fm.get(k, "")).strip() != v}
+
+
+def cmd_reseal(root: Path, args: argparse.Namespace) -> int:
+    """Segel ulang sidik tiket ke algoritma tahan format (38 N2) — isi tidak berubah.
+
+    Formatter markdown (prettier) mengubah spasi, padding tabel, dan penanda penekanan; sidik lama memvonisnya
+    sebagai perubahan isi. Hanya sidik yang masih cocok dengan isi sekarang yang dinaikkan (`reseal_fields`). Tiket
+    yang sudah DRIFT tidak dapat dibuktikan (teks yang disetujui tidak tersimpan) — jalurnya `analyst:spec` REVISE.
+    """
+    if bool(args.all) == bool(args.ticketdir):
+        print("RESEAL FAIL: pilih tepat satu: `--all` atau `--ticketdir <ticketdir>`")
+        return 1
+    rels = ticketdirs(root) if args.all else [normalize_ticketdir(args.ticketdir, root)]
+    done: List[str] = []
+    current = 0
+    skipped: Dict[str, List[str]] = {}
+    for rel in rels:
+        row = classify(root, rel)
+        if row["state"] not in RESEALABLE:
+            if not args.all:
+                print(f"RESEAL FAIL: {rel} {row['state']} — hanya tiket {'/'.join(RESEALABLE)} yang disegel ulang "
+                      f"({row['route']})")
+                return 1
+            skipped.setdefault(row["state"], []).append(rel)
+            continue
+        path = root / rel / TICKET_FILE
+        fields = reseal_fields(text_of(path), read(path), row["state"])
+        if not fields:
+            current += 1
+            continue
+        write_fields(path, **fields)
+        done.append(rel)
+    tail = "".join(f" · {state} {len(rows)}" for state, rows in sorted(skipped.items()))
+    msg = f"RESEAL PASS: {len(done)} disegel ulang · {current} sudah tahan format{tail}"
+    drift = ("\n  DRIFT — setujui ulang lewat analyst:spec REVISE: " + ", ".join(skipped["DRIFT"])
+             if "DRIFT" in skipped else "")
+    if done and is_git_repo(root) and not args.no_commit:
+        paths = [f"{rel}/{TICKET_FILE}" for rel in done]
+        subject = (f"docs(ticket): segel ulang {done[0].split('-', 1)[-1]}" if len(done) == 1
+                   else f"docs(ticket): segel ulang {len(done)} tiket")
+        ok, out = git_commit(root, paths, subject)
+        if not ok:
+            return _commit_failed(msg, root, paths, out, subject)
+        msg += f" · commit {out}"
+    print(msg + drift)
+    return 0
+
+
 def _compact(obj: Dict[str, Any]) -> str:
     """Teks JSON byte-stabil: ketiga tool MCP menerima `metadata` sebagai string, bukan objek."""
     return json.dumps(obj, separators=(",", ":"), ensure_ascii=False)
@@ -1058,6 +1132,10 @@ def main() -> None:
     s.add_argument("--ticketdir", required=True)
     s.add_argument("--ref", required=True, help="kunci atau tautan kartu Jira/Trello")
     s.add_argument("--no-commit", action="store_true", dest="no_commit")
+    s = sub.add_parser("reseal")
+    s.add_argument("--ticketdir", default="")
+    s.add_argument("--all", action="store_true", help="semua ticketdir READY di root")
+    s.add_argument("--no-commit", action="store_true", dest="no_commit")
     s = sub.add_parser("sync-payload")
     s.add_argument("--ticketdir", required=True)
     s.add_argument("--push", action="store_true", help="kirim langsung ke server lewat MCP key lokal; keluaran "
@@ -1069,7 +1147,8 @@ def main() -> None:
     root = (Path(args.root) if args.root else find_root()).resolve()
     handler = {"state": cmd_state, "new": cmd_new, "check": cmd_check, "close": cmd_close, "review": cmd_review,
                "revise": cmd_revise, "approve": cmd_approve, "commit": cmd_commit, "reopen": cmd_reopen,
-               "cancel": cmd_cancel, "ref": cmd_ref, "sync-payload": cmd_sync_payload}[args.cmd]
+               "cancel": cmd_cancel, "ref": cmd_ref, "reseal": cmd_reseal,
+               "sync-payload": cmd_sync_payload}[args.cmd]
     sys.exit(handler(root, args))
 
 
