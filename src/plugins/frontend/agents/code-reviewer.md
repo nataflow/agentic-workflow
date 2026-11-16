@@ -31,7 +31,7 @@ Verifikasi sendiri sebelum menyentuh diff. Kegagalan mana pun mengembalikan `Sta
 1. Rentang wajib **berkas rantai**: `python3 {chain_py} files --taskdir {taskdir}` — berkas dari commit bersubjek `<type>(<slug>):` sejak akar `{base}`, tanpa `frontenddev/docs/**`, `frontenddev/reviews/**`, dan `.claude/**`. Hunk tiap berkas: `git diff {base}..HEAD -- <berkas>`. Commit di luar rantai (kerja user di rentang yang sama) tidak dinilai, dan berkasnya bukan berkas yatim.
 2. Himpun **union** `files_touched` seluruh brief sebagai batas cakupan tunggal; `Anchor` tabel seksi 3 tiap brief sebagai batas simbol.
 3. Baca `TASK.md` (`SC-{n}` beserta alat ukurnya, `## Out of Scope`), `CONTRACT.md` bila ada (DTO, Layer Shape, `AC-{n}`), `.claude/profile/frontenddev/invariants.md`, `layer-adoption.md`, `drift.md`, dan `## Review checklist` + `## Failure signatures` adapter. Adapter menang bila katalog di bawah dan adapter menyebut butir yang sama.
-4. Baca tiap `report-<NN>.md`: baris `preseden menyesatkan` di `## Out of Scope / Mismatch` adalah bahan `## Umpan balik profil`, dan butir `## Done Criteria` bertanda `DITUNDA` adalah bahan `## Done Criteria DITUNDA`.
+4. Butir terminal seksi `## 5. Done Criteria & Verification Baseline` tiap brief `DONE` — yang hanya terbukti lewat perintah terminal, sehingga implementor menandainya `DITUNDA` — adalah bahan `## Done Criteria DITUNDA`; brief adalah sumbernya, bukan laporan unit (37 U4). Baca tiap `report-<NN>.md` yang ada: baris `preseden menyesatkan` di `## Out of Scope / Mismatch` adalah bahan `## Umpan balik profil`. Unit bersih tidak punya berkas laporan — absennya berarti nihil, bukan temuan.
 
 ## Fase 1 — Scope Conformance
 
@@ -63,7 +63,7 @@ Katalog ini kembaran diff-scoped `skills/review/references/nine-dimensions-catal
    - `PERLU VERIFIKASI MANUAL`: **hanya** untuk butir ber-alat-ukur `QA manual:`; salin langkahnya.
    - `belum terbukti`: selain itu. Satu saja menjadikan verdict `BLOCKED` — janji akar yang tidak mendarat tidak boleh dilaporkan tuntas, sebersih apa pun kodenya.
 2. **Acceptance Criteria** (bila `CONTRACT.md` ada) — satu baris per `AC-{n}`: `terbukti` (berkas test yang menyebut nomor AC itu, atau `file:baris` perilakunya), `QA manual` (butir `QA manual:`), atau `belum terbukti`. `TAC-{n}` adalah nomor tiket analyst, bukan `AC-{n}` CONTRACT: test yang hanya menyebut `TAC-3` bukan bukti `AC-3`.
-3. **Done Criteria DITUNDA** — tiap butir `DITUNDA` di `report-<NN>.md` divonis dari `{verification_log}`.
+3. **Done Criteria DITUNDA** — tiap butir terminal seksi 5 brief `DONE` divonis dari `{verification_log}`.
 
 ## Fase 4 — Gerbang Bukti
 

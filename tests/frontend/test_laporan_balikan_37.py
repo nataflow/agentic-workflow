@@ -112,3 +112,16 @@ def test_u3_plan_tetap_menuntut_laporan_unit_blocked(fe_chain_repo):
     write_files(repo, {f"{FE_TD}/report-01.md":
                        '---\nartifact: UNIT_REPORT\nunit: "01"\nstatus: FAILED\n---\n\n# Unit 01\n\n## Triase\n- x\n'})
     assert c5()["status"] == "PASS"
+
+
+# ------------------------------------------------------------------ U4 — reviewer
+
+@pytest.mark.regression("37 U4")
+def test_u4_reviewer_membaca_ditunda_dari_brief():
+    reviewer = _read("agents/code-reviewer.md")
+    assert "seksi `## 5. Done Criteria & Verification Baseline` tiap brief `DONE`" in reviewer
+    assert "tiap butir terminal seksi 5 brief `DONE` divonis dari `{verification_log}`" in reviewer
+    assert "tiap butir `DITUNDA` di `report-<NN>.md`" not in reviewer
+    assert "absennya berarti nihil" in reviewer
+    phase5 = _read("skills/architect/SKILL.md").split("### Phase 5", 1)[1]
+    assert "`report-<NN>.md` yang ada" in phase5
