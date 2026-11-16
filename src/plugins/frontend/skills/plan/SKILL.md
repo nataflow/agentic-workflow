@@ -108,7 +108,7 @@ Breakdown disetujui — tutup satu baris: `PLAN — BRIEF @ READY <sidik12> · <
 4. **Pencatatan batch gagal** (`chain.py draft` FAIL: validator, ronde belum `PASS`, konten sama dengan draft tercatat, plafon revisi): perbaiki penyebabnya dan ulangi sebelum approval diajukan. State ronde rusak/hilang → pulihkan dari `.bak`, atau `review_round.py rebuild` bila `## Riwayat Rantai` mencatat ronde; dilarang menulis state dengan tangan.
 5. **Siklus dependensi**: refaktor DAG menjadi rantai linier satu arah.
 6. **Adapter tidak ditemukan**: hentikan; arahkan ke `frontend:profile` — brief tanpa penamaan adapter tidak boleh lahir.
-7. **Plafon ronde Plan Review habis dengan BLOCKER tersisa**: jangan catat draft; sajikan BLOCKER ke user dan serahkan ke `frontend:lead` Phase 8 (plafon habis: `AskUserQuestion` rumuskan ulang di taskdir baru atau hentikan). BLOCKER yang berakar di kontrak bukan jalan keluar plafon: ia diajukan sebagai bagian rumusan ulang.
+7. **Plafon ronde Plan Review habis dengan BLOCKER tersisa**: Plafon habis dengan BLOCKER tersisa → jangan catat draft; sajikan BLOCKER ke user lewat `AskUserQuestion`: *Satu ronde tambahan* (hanya sekali per putaran — perbaiki, validator `PASS`, lalu `review_round.py open --gate plan --tambahan "<alasan; jawaban user>"` dan dispatch ronde menyempit), *Rumuskan ulang* (serahkan ke `frontend:lead` Phase 8: taskdir baru), atau *Hentikan*. Ronde tambahan yang masih `BLOCKED`, atau ditolak user → `frontend:lead` Phase 8 (taskdir baru atau hentikan). BLOCKER yang berakar di kontrak bukan jalan keluar plafon: ia diajukan sebagai bagian rumusan ulang.
 
 ## STYLE
 

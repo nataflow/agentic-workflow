@@ -10,7 +10,7 @@ Gunakan template ini saat `plan` mendispatch subagent auditor dokumen planning (
 Audit dokumen planning satu taskdir secara helikopter view sebelum eksekusi kode.
 
 - Taskdir: `{taskdir}` — `brief-*.md` aktif berstatus `READY`; brief `DONE`/`BLOCKED` terkunci dan hanya ditagih predikat cakupan.
-- Ronde: `{round}` dari plafon 2 per putaran (putaran baru sesudah draft `PASS` dicatat `chain.py draft`, atau sesudah `reopen`).
+- Ronde: `{round}` dari plafon 2 per putaran, +1 tambahan atas persetujuan user (putaran baru sesudah draft `PASS` dicatat `chain.py draft`, atau sesudah `reopen`).
 - Sidik: `{sidik}` — sidik batch brief yang kamu nilai; salin persis ke frontmatter `sidik`.
 - Ronde menyempit: brief berubah sejak ronde lalu `{brief_berubah}`; laporan ronde lalu `{previous_report}`.
   Keduanya `-` pada ronde 1. Bila terisi, baca laporan lalu untuk tahu temuan mana yang seharusnya
@@ -126,7 +126,7 @@ laporan.
 | --- | --- | --- |
 | `{taskdir}` | Parameter `taskdir` plan | **[REQUIRED]** Path taskdir aktif apa adanya, mis. `frontenddev/docs/2608251430-order-export-csv`. Tanpa slot ini subagent tidak punya muara tulis dan menghentikan dispatch |
 | `{sections}` | Frontmatter `sections` `TASK.md` (baris `Terselesaikan:` prasyarat plan) | **[REQUIRED]** Satu atau gabungan dari `architecture`, `flow`, `ui`. Nilai kosong berarti lane `HOTFIX_MINOR` — gerbang ini dilewati, bukan didispatch dengan slot kosong |
-| `{round}` | Keluaran `review_round.py open --gate plan` | **[REQUIRED]** `1` atau `2`; subagent menyalinnya ke frontmatter `round` |
+| `{round}` | Keluaran `review_round.py open --gate plan` | **[REQUIRED]** `1`, `2`, atau `3` (ronde tambahan `--tambahan`); subagent menyalinnya ke frontmatter `round` |
 | `{sidik}` | Keluaran `review_round.py open --gate plan` (`sidik <12 hex>`) | **[REQUIRED]** Disalin apa adanya dari keluaran `open` ronde ini; subagent menyalinnya ke frontmatter `sidik` |
 | `{profile_path}` | Parameter pendispatch | **[OPTIONAL]** Default `.claude/profile/frontenddev/`. Isi slotnya dengan path default itu, bukan dibiarkan kosong |
 | `{brief_berubah}` | Daftar berkas yang direvisi sejak ronde sebelumnya | **[OPTIONAL]** Ronde 2 saja; `-` pada ronde 1. Ronde 2 tanpa slot ini mengulang seluruh dimensi dengan biaya penuh |
@@ -142,7 +142,7 @@ python3 «review_round.py» open --taskdir {taskdir} --gate plan
 ```
 
 - `validate_briefs.py` `FAIL` → perbaiki brief dulu. Temuannya mekanis; memberangkatkan subagent berbayar untuk menemukannya lagi adalah pemborosan.
-- `review_round.py open` `FAIL` → plafon ronde habis (2 per putaran, 8 per taskdir). Dilarang mendispatch; batch ber-BLOCKER tidak dapat disetujui (`chain.py approve` menuntut ronde terakhir `PASS`) — jangan catat draft batch; sajikan `BLOCKER` tersisa ke user dan serahkan ke `frontend:lead` Phase 8 (plafon habis: `AskUserQuestion` rumuskan ulang di taskdir baru atau hentikan). Isi slot `{round}` dengan nomor ronde dari keluaran `open`.
+- `review_round.py open` `FAIL` → plafon ronde habis (2 per putaran, 8 per taskdir). Dilarang mendispatch tanpa keputusan user; batch ber-BLOCKER tidak dapat disetujui (`chain.py approve` menuntut ronde terakhir `PASS`) — jangan catat draft batch; jalankan `plan/SKILL.md` Failure path 7 (*satu ronde tambahan* lewat `open --tambahan`, sekali per putaran, atau `frontend:lead` Phase 8). Isi slot `{round}` dengan nomor ronde dari keluaran `open`.
 
 **Predikat mekanis sudah dijamin.** Seluruh check `validate_briefs.py` — S, N, D, L, T, F, B, R, V, K, O, E, C, P, G, M — sudah `PASS`. `doc-reviewer` dilarang menghitung ulang satu pun.
 

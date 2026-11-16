@@ -244,3 +244,61 @@ def test_d1_prosa_commit_unit_menghapus_dan_implementor_tidak():
     assert "BERKAS `DELETE` TIDAK DISUNTING DAN TIDAK DIHAPUS OLEHMU" in agent
     assert "| DELETE | `<path>` | — |" in _read("plan/templates/brief-template.md")
     assert "`CREATE|MODIFY|DELETE`" in _read("contract/templates/contract-template.md")
+
+
+# ------------------------------------------------------------------ T1 — ronde tambahan atas persetujuan user
+
+ALASAN = "BLOCKER tersisa redaksional (tabel Decisions rusak); user: Setujui satu ronde tambahan"
+
+
+def blocked_twice(repo, gate="contract"):
+    round_(repo, "BLOCKED", gate=gate, semantic=1)
+    round_(repo, "BLOCKED", gate=gate, semantic=1)
+
+
+@pytest.mark.regression("36 T1")
+def test_t1_plafon_menawarkan_ronde_tambahan_lalu_approve(fe_chain_repo):
+    repo = fe_chain_repo
+    blocked_twice(repo)
+    r = rr(repo, "open")
+    assert r.returncode == 1 and "plafon 2 ronde" in r.out and "--tambahan" in r.out, r.out
+    r = rr(repo, "open", "--tambahan", ALASAN)
+    assert r.returncode == 0 and "ronde 3/2+1" in r.out, r.out
+    rel = _evidence(repo, 3, "- Verdict: PASS", fe_open_sidik(repo))
+    assert rr(repo, "record", "--verdict", "PASS", "--evidence", rel).returncode == 0
+    assert "tambahan: BLOCKER tersisa redaksional" in rr(repo, "status").out
+    assert draft(repo).returncode == 0
+    r = fe_run(repo, "_common/chain.py", "approve", "--taskdir", FE_TD, "--row", "CONTRACT", "--answer", "Setujui")
+    assert r.returncode == 0, r.out
+    assert "review contract r3 t3 PASS" in (repo / FE_TD / "TASK.md").read_text(encoding="utf-8")
+
+
+@pytest.mark.regression("36 T1")
+def test_t1_ronde_tambahan_sekali_per_putaran(fe_chain_repo):
+    repo = fe_chain_repo
+    blocked_twice(repo)
+    assert rr(repo, "open", "--tambahan", ALASAN).returncode == 0
+    rel = _evidence(repo, 3, "- Verdict: BLOCKED", fe_open_sidik(repo))
+    write_files(repo, {rel: (repo / rel).read_text(encoding="utf-8").replace("0 [SEMANTIK]", "1 [SEMANTIK]")})
+    r = rr(repo, "record", "--verdict", "BLOCKED", "--semantic", "1", "--evidence", rel)
+    assert r.returncode == 0 and "termasuk ronde tambahan" in r.out, r.out
+    r = rr(repo, "open", "--tambahan", ALASAN)
+    assert r.returncode == 1 and "sudah terpakai" in r.out and "abandon" in r.out, r.out
+
+
+@pytest.mark.regression("36 T1")
+def test_t1_tambahan_sebelum_plafon_dan_di_luar_open_ditolak(fe_chain_repo):
+    repo = fe_chain_repo
+    r = rr(repo, "open", "--tambahan", ALASAN)
+    assert r.returncode == 1 and "hanya sesudah plafon" in r.out, r.out
+    r = rr(repo, "status", "--tambahan", ALASAN)
+    assert r.returncode == 1 and "hanya untuk `open`" in r.out, r.out
+
+
+def test_t1_prosa_gate_menawarkan_ronde_tambahan():
+    for rel in ("contract/SKILL.md", "plan/SKILL.md"):
+        assert "*Satu ronde tambahan*" in _read(rel) and "--tambahan" in _read(rel), rel
+    lead = _read("lead/SKILL.md")
+    assert "satu ronde reviewer tambahan per putaran" in lead.split("## Precondition", 1)[0]
+    plafon = _read("lead/references/lane-routing-matrix.md").split("## 5. Plafon Loop", 1)[1]
+    assert "**satu ronde tambahan**" in plafon and "ronde tambahan, lalu *H28*" in plafon

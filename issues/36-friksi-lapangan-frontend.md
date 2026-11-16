@@ -100,7 +100,7 @@ perubahan mekanis tetap divonis skrip, dan tiap kelonggaran baru berjalan hanya 
 ### T1 — Ronde tambahan atas persetujuan user (P2a)
 
 - `review_round.py open --tambahan "<alasan + jawaban user>"`: sah hanya bila putaran berjalan sudah memakai tepat
-  2 ronde, ronde terakhirnya `BLOCKED`, putaran itu belum memakai ronde tambahan, dan plafon taskdir belum habis.
+  2 ronde, putaran itu belum memakai ronde tambahan, dan plafon taskdir belum habis.
   Entri ronde menyimpan `tambahan`; keluaran `ronde 3/2+1`.
 - Pesan plafon (`CAP_ROUTE`) menawarkan urutan: ronde tambahan atas persetujuan user → taskdir baru → hentikan.
 - `lead` Phase 8, `contract`/`plan` SKILL dan dispatcher, `lane-routing-matrix.md` §5, README: kelonggaran ini satu-

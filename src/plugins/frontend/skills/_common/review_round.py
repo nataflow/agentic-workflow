@@ -12,7 +12,9 @@ Subperintah:
              sidik konten berkas yang akan direview, epoch reopen, dan jumlah kejadian
              `## Riwayat Rantai` saat itu, lalu mencetak `sidik <12 hex>` untuk slot
              `{sidik}` prompt reviewer. `FAIL` (exit 1) bila plafon putaran (2) atau
-             plafon taskdir (8) habis — dispatch dilarang berangkat.
+             plafon taskdir (8) habis — dispatch dilarang berangkat. `--tambahan "<alasan + jawaban user>"`
+             membuka **satu** ronde tambahan per putaran sesudah plafon putaran habis, hanya atas persetujuan
+             user lewat `AskUserQuestion` (36 T1); plafon taskdir tetap.
 - `record` — dipanggil sesudah balikan reviewer. Mencatat verdict ronde terakhir
              beserta hitungan `BLOCKER [MEKANIS]`/`[SEMANTIK]`. Gate contract menuntut
              `--evidence` (balikan `contract-reviewer` apa adanya); gate plan menuntut
@@ -81,8 +83,12 @@ GATES = ("contract", "plan")
 REVIEW_LINE = re.compile(r"^-\s*Verdict:\s*(PASS|BLOCKED)(?:\s+—[^\n]*)?\s*$", re.MULTILINE)
 SIDIK_LINE = re.compile(r"^-\s*Sidik:\s*`?([0-9a-f]{12,40})`?\s*$", re.MULTILINE)
 SIDIK_LEN = 12
+MAX_TAMBAHAN = 1           # ronde tambahan per putaran, hanya atas persetujuan user (36 T1)
 CAP_ROUTE = ("hentikan gate; `frontend:lead` bertanya lewat `AskUserQuestion`: rumuskan ulang di taskdir baru "
              "(`chain.py abandon` taskdir ini) atau hentikan")
+EXTRA_ROUTE = ("sajikan BLOCKER tersisa ke user; `AskUserQuestion`: *satu ronde tambahan* (hanya bila BLOCKER-nya "
+               "redaksional/terlokalisasi — `open --tambahan \"<alasan + jawaban user>\"`), *rumuskan ulang di "
+               "taskdir baru* (`chain.py abandon`), atau *hentikan*")
 BLOCKER_LINE = re.compile(r"^-\s*BLOCKER:\s*(\d+)\s*\[MEKANIS\]\s*·\s*(\d+)\s*\[SEMANTIK\]\s*$", re.MULTILINE)
 
 
@@ -207,7 +213,7 @@ class Rounds:
         rounds = state.get("rounds", [])
         return {"cycle": len(self.cycle(rounds)), "taskdir": len(rounds)}
 
-    def open(self) -> str:
+    def open(self, tambahan: str = "") -> str:
         targets = self.targets()
         missing = [t for t in targets if not (self.root / t).is_file()]
         if not targets or missing:
@@ -219,22 +225,35 @@ class Rounds:
             raise SystemExit("REVIEW ROUND OPEN: [FAIL] ronde sebelumnya belum dicatat — jalankan "
                              "`record` dengan verdict balikannya, atau `record --verdict DISPATCH_FAILED` "
                              "bila dispatch gagal (tidak dihitung plafon).")
+        cycle = self.cycle(rounds)
+        extra_used = sum(1 for r in cycle if r.get("tambahan"))
+        tambahan = " ".join(tambahan.split())
+        if tambahan and c["cycle"] < MAX_PER_CYCLE:
+            raise SystemExit(f"REVIEW ROUND OPEN: [FAIL] `--tambahan` hanya sesudah plafon {MAX_PER_CYCLE} ronde "
+                             f"putaran ini habis (terpakai {c['cycle']}) — buka ronde biasa tanpa `--tambahan`.")
         if c["cycle"] >= MAX_PER_CYCLE:
-            raise SystemExit(f"REVIEW ROUND OPEN: [FAIL] plafon {MAX_PER_CYCLE} ronde per putaran habis "
-                             "(putaran sejak draft terakhir yang lolos `PASS` dan dicatat `chain.py draft`, "
-                             f"epoch reopen {self.epoch()}). Dilarang mendispatch ronde ketiga: sajikan BLOCKER "
-                             f"yang tersisa ke user, lalu {CAP_ROUTE}. Putaran baru hanya dibuka reopen hop "
-                             "ini atau hop di atasnya, atau eskalasi lane.")
+            if not tambahan or extra_used >= MAX_TAMBAHAN:
+                why = "ronde tambahan putaran ini sudah terpakai" if extra_used >= MAX_TAMBAHAN else ""
+                raise SystemExit(f"REVIEW ROUND OPEN: [FAIL] plafon {MAX_PER_CYCLE} ronde per putaran habis "
+                                 "(putaran sejak draft terakhir yang lolos `PASS` dan dicatat `chain.py draft`, "
+                                 f"epoch reopen {self.epoch()})" + (f" — {why}" if why else "") + ". Dilarang "
+                                 "mendispatch ronde berikutnya tanpa keputusan user: "
+                                 + (f"sajikan BLOCKER yang tersisa ke user, lalu {CAP_ROUTE}" if why
+                                    else EXTRA_ROUTE)
+                                 + ". Putaran baru hanya dibuka reopen hop ini atau hop di atasnya, atau eskalasi lane.")
         if c["taskdir"] >= MAX_PER_TASKDIR:
             raise SystemExit(f"REVIEW ROUND OPEN: [FAIL] plafon {MAX_PER_TASKDIR} ronde per taskdir habis — "
                              f"{CAP_ROUTE}.")
         entry = {"round": c["cycle"] + 1, "epoch": self.epoch(), "riwayat": len(self.history()),
                  "snapshot": content_snapshot(self.root, targets), "opened": _now(),
                  "verdict": None}
+        if tambahan:
+            entry["tambahan"] = tambahan
         rounds.append(entry)
         state["rounds"] = rounds
         self.save(state)
-        return (f"REVIEW ROUND OPEN: [PASS] {self.gate} ronde {entry['round']}/{MAX_PER_CYCLE} "
+        cap = f"{MAX_PER_CYCLE}+{MAX_TAMBAHAN} (tambahan atas persetujuan user)" if tambahan else str(MAX_PER_CYCLE)
+        return (f"REVIEW ROUND OPEN: [PASS] {self.gate} ronde {entry['round']}/{cap} "
                 f"(taskdir {c['taskdir'] + 1}/{MAX_PER_TASKDIR}) atas {len(targets)} berkas — "
                 f"sidik {entry['snapshot'][:SIDIK_LEN]} (slot `{{sidik}}` prompt reviewer)")
 
@@ -281,11 +300,13 @@ class Rounds:
         state["rounds"] = rounds
         self.save(state)
         c = self.counts(state)
+        extra_used = any(r.get("tambahan") for r in self.cycle(rounds))
         nxt = ("gerbang terbuka" if verdict == "PASS" else
                "perbaiki, jalankan validator, lalu buka ronde menyempit atas konten final (approval menuntut ronde PASS)"
-               if not semantic else
+               if not semantic and c["cycle"] < MAX_PER_CYCLE else
                ("perbaiki lalu buka ronde menyempit" if c["cycle"] < MAX_PER_CYCLE
-                else "plafon habis — sajikan BLOCKER ke user"))
+                else "plafon habis termasuk ronde tambahan — sajikan BLOCKER ke user" if extra_used
+                else f"plafon habis — {EXTRA_ROUTE}"))
         return f"REVIEW ROUND RECORD: {self.gate} ronde {rounds[-1]['round']} {verdict} — {nxt}"
 
     def check_sidik(self, written: str, opened: Dict[str, Any], report: str, where: str) -> None:
@@ -355,7 +376,8 @@ class Rounds:
                      else f"epoch {r['epoch']}, format lama" if "epoch" in r
                      else f"format lama {r.get('generation', '-')}")
             lines.append(f"- ronde {r.get('round')} [{where}] → {r.get('verdict') or 'terbuka'}"
-                         + (f" (mekanis {r.get('mechanical')}, semantik {r.get('semantic')})" if r.get("verdict") else ""))
+                         + (f" (mekanis {r.get('mechanical')}, semantik {r.get('semantic')})" if r.get("verdict") else "")
+                         + (f" · tambahan: {r['tambahan']}" if r.get("tambahan") else ""))
         lines.append("siap diajukan: ya" if not problem else f"siap diajukan: tidak — {problem}")
         return "\n".join(lines)
 
@@ -382,10 +404,14 @@ def main() -> None:
     parser.add_argument("--semantic", type=nonneg, default=0)
     parser.add_argument("--evidence", default="", help="gate contract: balikan reviewer di .explore/")
     parser.add_argument("--ready", action="store_true", help="status: exit 1 bila belum siap diajukan")
+    parser.add_argument("--tambahan", default="",
+                        help="open: alasan + jawaban user untuk satu ronde tambahan sesudah plafon putaran (36 T1)")
     args = parser.parse_args()
     rounds = Rounds(args.taskdir, args.gate, Path(args.root) if args.root else None)
+    if args.tambahan and args.cmd != "open":
+        raise SystemExit("REVIEW ROUND: [FAIL] `--tambahan` hanya untuk `open`.")
     if args.cmd == "open":
-        print(rounds.open())
+        print(rounds.open(args.tambahan))
     elif args.cmd == "record":
         if not args.verdict:
             raise SystemExit("REVIEW ROUND RECORD: [FAIL] `--verdict` wajib.")

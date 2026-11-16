@@ -13,7 +13,7 @@ Review satu draft CONTRACT.md frontend.
   `sections`, `FLOW.md`/`UI.md` sudah disetujui.
 - Sections: `{sections}`
 - Stack: `{stack}` — idiom penamaan di `{adapter_path}` seksi `## Layer taxonomy`.
-- Ronde: `{round}` dari plafon 2 per putaran (putaran baru sesudah draft `PASS` dicatat `chain.py draft`, atau sesudah `reopen`).
+- Ronde: `{round}` dari plafon 2 per putaran, +1 tambahan atas persetujuan user (putaran baru sesudah draft `PASS` dicatat `chain.py draft`, atau sesudah `reopen`).
 - Ronde 2 saja: vonis sebelumnya `{previous_verdict}`, seksi yang berubah `{changed_sections}`.
 - Sidik: `{sidik}` — sidik konten yang kamu nilai. Salin persis sebagai baris `- Sidik: {sidik}` tepat
   sesudah `- Ronde:` di blok balikan; balikan tanpa baris itu ditolak pendispatch.
@@ -33,7 +33,7 @@ Review satu draft CONTRACT.md frontend.
 | `{stack}` | Field `stack` `index.json` profil | **[REQUIRED]** |
 | `{adapter_path}` | Entri `adapter` peta **Skrip:** SKILL.md, `<stack>` dari `index.json` | **[REQUIRED]** Hasil substitusi, bukan literal |
 | `{contract_template}` | Entri `contract-template.md` peta **Skrip:** SKILL.md | **[REQUIRED]** Path absolut hasil substitusi |
-| `{round}` | Keluaran `review_round.py open --gate contract` | **[REQUIRED]** `1` atau `2` |
+| `{round}` | Keluaran `review_round.py open --gate contract` | **[REQUIRED]** `1`, `2`, atau `3` (ronde tambahan `--tambahan`) |
 | `{sidik}` | Keluaran `review_round.py open --gate contract` (`sidik <12 hex>`) | **[REQUIRED]** Disalin apa adanya dari keluaran `open` ronde ini, bukan ronde lalu |
 | `{previous_verdict}` | Blok `## Contract Review` ronde 1 | **[OPTIONAL]** Hanya ronde 2; `-` di ronde 1 |
 | `{changed_sections}` | Heading `##` yang berubah sejak ronde 1 | **[OPTIONAL]** Hanya ronde 2; `-` di ronde 1 |
@@ -48,7 +48,7 @@ python3 «review_round.py» open --taskdir {taskdir} --gate contract
 ```
 
 - `validate_doc.py` `FAIL` → perbaiki draft dulu; memberangkatkan subagent untuk temuan mekanis adalah pemborosan.
-- `review_round.py open` `FAIL` → plafon habis (2 per putaran, 8 per taskdir); dilarang mendispatch. Kontrak ber-BLOCKER tidak dapat disetujui (`chain.py approve` menuntut ronde terakhir `PASS`): hentikan Gate Contract tanpa mencatat draft, sajikan BLOCKER tersisa ke user, dan serahkan ke `frontend:lead` Phase 8 (plafon habis: `AskUserQuestion` rumuskan ulang di taskdir baru atau hentikan) — dua ronde yang gagal menandakan lingkupnya yang belum jelas, bukan redaksinya.
+- `review_round.py open` `FAIL` → plafon habis (2 per putaran, 8 per taskdir); dilarang mendispatch tanpa keputusan user. Kontrak ber-BLOCKER tidak dapat disetujui (`chain.py approve` menuntut ronde terakhir `PASS`): jangan catat draft; jalankan cabang plafon `contract/SKILL.md` Phase 5 butir 3 — *satu ronde tambahan* (`open --tambahan`, sekali per putaran) hanya bila BLOCKER-nya redaksional atau terlokalisasi; dua ronde yang gagal atas lingkup yang sama menandakan lingkupnya belum jelas, dan jalannya `frontend:lead` Phase 8.
 - **Ronde 2** bila ronde 1 ber-verdict `BLOCKED` — termasuk yang hanya ber-`BLOCKER [MEKANIS]` — atau draft disunting sesudah ronde `PASS`: `chain.py approve` menuntut ronde terakhir `PASS` atas konten final, tanpa `reopen` hop sesudahnya.
 - **Dispatch langsung tanpa skill pembungkus**: doktrin review duduk di `agents/contract-reviewer.md`. Dilarang menyalin isi kontrak, FLOW, UI, atau profil ke prompt; sebut path-nya.
 - **Audit hidrasi**: batalkan dispatch bila prompt masih memuat slot `{...}` mentah atau `TBD`/`TODO`.
