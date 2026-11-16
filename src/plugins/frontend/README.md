@@ -95,7 +95,8 @@ Tiap loop berplafon (ronde reviewer, revisi user, re-entry, eskalasi; lihat
 `skills/lead/references/lane-routing-matrix.md` bagian 5). Bila plafon habis, rantai berhenti dan `lead`
 menanyakan user lewat `AskUserQuestion`: **rumuskan ulang di taskdir baru** (`chain.py abandon` taskdir
 lama) atau **hentikan**. Tidak ada jalan pintas yang me-reset plafon — amandemen akar dan `draft` ulang
-pun tidak.
+pun tidak. Satu-satunya kelonggaran: plafon ronde reviewer boleh ditambah **satu ronde per putaran** atas
+persetujuan user (`review_round.py open --tambahan`), ditawarkan gate pemiliknya sebelum taskdir dirumuskan ulang.
 
 ## The Ledger
 
@@ -159,7 +160,7 @@ Di atasnya tujuh penjaga — enam validator dan satu hook:
 
 Dan dua penjaga keadaan:
 
-- `_common/review_round.py` — plafon ronde reviewer dokumen (2 per putaran, 8 per taskdir; putaran baru
+- `_common/review_round.py` — plafon ronde reviewer dokumen (2 per putaran + 1 tambahan atas persetujuan user, 8 per taskdir; putaran baru
   dimulai sesudah dokumen yang lolos ronde `PASS` dicatat `chain.py draft`, atau sesudah `reopen` hop gate itu
   atau hop di atasnya, atau sesudah `escalate`) disimpan di `.explore/<gate>-review-state.json` beserta sidik
   konten, epoch, dan jumlah kejadian Riwayat tiap ronde. `open` mencetak sidik konten; reviewer menggemakannya (`- Sidik:` di balikan
@@ -208,10 +209,13 @@ Rantai yang janji akarnya tidak mendarat tidak pernah sampai ke `report`, sebers
 2. **Dispatch** — `code-implementor` menerapkan brief tanpa satu perintah terminal pun (tool `Bash` tidak
    tersedia) dan menulis `report-<NN>.md` — laporan yang bertahan melewati sesi. Berkas yang perlu
    dipulihkan dicatatnya di `## Rollback`; rollback-nya (`git restore --` berkas `MODIFY`, `rm --` berkas
-   `CREATE`) milik `architect` di matriks bukti disk.
+   `CREATE`) milik `architect` di matriks bukti disk. Berkas ber-aksi `DELETE` tidak disentuh implementor —
+   `architect` menghapusnya lewat `git rm` di commit unit.
 3. **Matriks bukti disk** — `git status` dan hunk anchor disandingkan dengan `files_touched`; laporan
    adalah klaim, disk adalah bukti. Hasilnya commit unit (status `DONE` di disk lalu commit kode saja)
-   atau brief `BLOCKED` di disk.
+   atau brief `BLOCKED` di disk. Sebelum commit unit, perintah `format` profil (opsional, hanya untuk repo
+   yang sudah bersih format) dijalankan atas berkas unit, supaya cacat format tidak baru ketahuan di
+   verifikasi penutup. Path per aksi dibaca dari keluaran prasyarat (`Berkas unit <NN>:`), bukan dari brief.
 4. **Gerbang kompilasi per-brief** — typecheck sesudah commit, hanya bila adapter `typecheck-per-brief: ya`,
    divonis relatif baseline.
 

@@ -6,7 +6,10 @@ wms-3d, wms-svelte, wms-dashboard, nocan/frontend), 110 sesi, 75 di antaranya me
 commit `acfa709` (frontend 0.19.0). Alat ukur: `scripts/token_usage.py` dan skrip scratch per-sesi/per-taskdir di
 atasnya (atribusi sesi → taskdir yang paling sering disebut `tool_use`).
 
-**Status (2026-11-16):** dikerjakan di branch `feat/36-friksi-lapangan-frontend`; target frontend 0.20.0.
+**Status (2026-11-16):** SELESAI di branch `feat/36-friksi-lapangan-frontend`; frontend 0.20.0
+(`MIGRATION_v0.19.0_to_v0.20.0.md`). Test baru: `tests/frontend/test_friksi_36.py` (V1, J1, S1, F1, D1, T1, L1);
+suite penuh 2991 lulus, lint `--base main` 0 FAIL. Belum: uji lapangan di hkm dan compare `token_usage.py`
+sesudah 0.20.0 terpasang (bagian Verifikasi).
 
 ## Temuan dasar (data log)
 
@@ -71,8 +74,9 @@ perubahan mekanis tetap divonis skrip, dan tiap kelonggaran baru berjalan hanya 
 ### S1 — Keluaran prasyarat `architect` terstruktur (P3a)
 
 - Baris `Terselesaikan:` ditambah `base_commit=<sha7>` dan `format=<perintah | ->`.
-- Mode rantai mencetak blok `Rantai:` — satu baris per brief: `NN · <unit> · <status> · <aksi>:<path>,… · depends_on
-  [..]`. Mode ingest (`--brief NN`) mencetak `Berkas unit: CREATE=…; MODIFY=…; DELETE=…`.
+- Mode rantai mencetak blok `Rantai:` — satu baris per brief: `NN · <unit> · <status> · <AKSI>: <path>, … · depends_on
+  [..]` (aksi kosong tidak dicetak). Mode ingest (`--brief NN`) mencetak `Berkas unit <NN>: CREATE: … · MODIFY: … ·
+  DELETE: …`.
 - `--json` membawa `base_commit`, `format`, `briefs` (list objek) dan, pada ingest, `files` per aksi.
 - `architect/SKILL.md` Phase 0 butir 2/3 dan `execution-protocol.md` bagian 3 membaca dari keluaran itu.
 
@@ -102,7 +106,7 @@ perubahan mekanis tetap divonis skrip, dan tiap kelonggaran baru berjalan hanya 
 - `review_round.py open --tambahan "<alasan + jawaban user>"`: sah hanya bila putaran berjalan sudah memakai tepat
   2 ronde, putaran itu belum memakai ronde tambahan, dan plafon taskdir belum habis.
   Entri ronde menyimpan `tambahan`; keluaran `ronde 3/2+1`.
-- Pesan plafon (`CAP_ROUTE`) menawarkan urutan: ronde tambahan atas persetujuan user → taskdir baru → hentikan.
+- Pesan plafon (`EXTRA_ROUTE`, lalu `CAP_ROUTE` bila ronde tambahan sudah terpakai) menawarkan urutan: ronde tambahan atas persetujuan user → taskdir baru → hentikan.
 - `lead` Phase 8, `contract`/`plan` SKILL dan dispatcher, `lane-routing-matrix.md` §5, README: kelonggaran ini satu-
   satunya, tidak me-reset plafon apa pun.
 
