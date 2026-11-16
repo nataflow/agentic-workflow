@@ -7,7 +7,7 @@ user-invocable: false
 ## THE IRON LAW
 
 - Jalankan brief satu per satu, sekuensial, lewat `code-implementor`; dilarang menyentuh `src/` dari main loop, dan dilarang mendispatch dua implementor bersamaan.
-- Status unit divonis dari **disk** — `report-<NN>.md`, `git status`, dan hunk anchor — bukan dari kata balikan subagent. Kenaikan status brief dan commit kode unit adalah satu langkah: status `DONE` ditulis di disk tepat sebelum commit kode. Brief, `report-<NN>.md`, `REVIEW.md`, dan `REPORT.md` tidak pernah di-commit — dokumen taskdir diabaikan git dan dicerminkan ke nataflow (Langkah 24).
+- Status unit divonis dari **disk** — `verify_scope.py`, `git status`, dan hunk anchor — bukan dari balikan subagent; balikan implementor (laporan unit) hanya klaim, disimpan ke `report-<NN>.md` bila unit tidak bersih. Kenaikan status brief dan commit kode unit adalah satu langkah: status `DONE` ditulis di disk tepat sebelum commit kode. Brief, `report-<NN>.md`, `REVIEW.md`, dan `REPORT.md` tidak pernah di-commit — dokumen taskdir diabaikan git dan dicerminkan ke nataflow (Langkah 24).
 - Lint, test, dan build berjalan tepat sekali, di penutup; typecheck per unit hanya bila `typecheck_per_brief` prasyarat bernilai `ya` (profil, fallback adapter), dan divonis relatif baseline.
 - Dispatch `code-reviewer` sekali per penutup; dispatch ulang **maksimal satu kali**, hanya bila `REVIEW.md` absen atau `validate_review.py` `FAIL` (`dispatcher/reviewer.md` Penanganan Balikan). Gagal kedua kalinya → Failure path 6. `REVIEW.md` sah hanya sesudah `validate_review.py` `PASS`; field `head:`-nya mengikat review pada `HEAD` yang dinilai. Review ulang (sesudah brief perbaikan) menimpa `REVIEW.md` utuh.
 - Rantai yang berhenti `BLOCKED` tidak pernah direview dan tidak pernah dilaporkan tuntas. Cacat yang ditemukan di penutup diperbaiki di taskdir yang sama, tidak pernah dipindah ke taskdir baru.
@@ -39,8 +39,8 @@ Jalankan skrip prasyarat dengan `--brief <unit_berikutnya>` (`references/executi
 
 ### Phase 2 — Dispatch & Triase Unit
 
-1. Hidrasi `dispatcher/implementor.md` dengan `{ taskdir, brief_path, unit_name, report_path, adapter_path }` — `adapter_path` = `${CLAUDE_PLUGIN_ROOT}/skills/profile/stacks/<stack>.md` — lalu dispatch `code-implementor` lewat tool `Agent` (`subagent_type`: `frontend:code-implementor`) tepat sekali.
-2. Jalankan matriks bukti disk bagian 3 atas `report-<NN>.md` dan `git status --porcelain`, termasuk pemeriksaan anchor tiap berkas `MODIFY`. Ambil tindakan persis baris yang berlaku: **commit unit** (didahului **Format unit** bila `format=` prasyarat bukan `-`), **tandai BLOCKED**, retry sekali, atau HENTIKAN.
+1. Hidrasi `dispatcher/implementor.md` dengan `{ taskdir, brief_path, unit_name, adapter_path }` — `adapter_path` = `${CLAUDE_PLUGIN_ROOT}/skills/profile/stacks/<stack>.md` — lalu dispatch `code-implementor` lewat tool `Agent` (`subagent_type`: `frontend:code-implementor`) tepat sekali.
+2. Jalankan matriks bukti disk bagian 3 atas balikan implementor dan `git status --porcelain`, termasuk pemeriksaan anchor tiap berkas `MODIFY`. Ambil tindakan persis baris yang berlaku: **commit unit** (didahului **Format unit** bila `format=` prasyarat bukan `-`), **tandai BLOCKED**, retry sekali, atau HENTIKAN. Unit tak bersih menyimpan balikannya ke `report-<NN>.md` lebih dulu, salin persis (bagian 4).
 3. Commit unit mendarat → gerbang kompilasi bagian 5 (bila `ya`). Galat baru → `BLOCKED` retroaktif menurut bagian 5.
 4. Unit `BLOCKED` → rantai berhenti; lompat ke Output `BLOCKED`. Phase 4 dilewati utuh.
 5. Unit `DONE` → jalankan ulang skrip prasyarat rantai; `fase=EKSEKUSI` → kembali ke Phase 1 dengan `unit_berikutnya` baru, `fase=PENUTUP` → Phase 4.
@@ -106,8 +106,8 @@ Rantai bersih — seluruh brief `DONE`, verifikasi hijau, review `PASS`/`WARNING
 ## Failure path
 
 1. **Tree kotor sebelum dispatch pertama**: hentikan di Precondition; kotoran yang bukan milik rantai adalah kerja user.
-2. **Laporan unit absen atau rusak, tree selain itu bersih**: kegagalan dispatch — hapus `report-<NN>.md` rusak (Check 12 menuntut ia absen), lalu ulangi sebanyak `max_dispatch_retry` dengan slot sama; brief tetap `READY`.
-3. **Laporan unit absen, tree kotor**: HENTIKAN, tampilkan berkas kotor, eskalasi ke user; dilarang retry, rollback otomatis, dan commit.
+2. **Balikan implementor absen, rusak, atau terpotong, tree bersih**: kegagalan dispatch — ulangi sebanyak `max_dispatch_retry` dengan slot sama; brief tetap `READY`.
+3. **Balikan absen, rusak, atau terpotong, tree kotor**: HENTIKAN, tampilkan berkas kotor, eskalasi ke user; dilarang retry, rollback otomatis, dan commit.
 4. **Commit unit gagal** (hook, lock): ulangi sekali sesudah memeriksa penyebabnya; tetap gagal → kembalikan status brief ke `READY` di disk (status `DONE` tanpa commit unit berkode menahan rantai sebagai fase `TERPUTUS` di Check 4), hentikan, dan serahkan riwayat git ke user. Dilarang `--no-verify`.
 5. **Perintah verifikasi melewati batas waktu**: `run_verification.py` membunuh pohon prosesnya pada `--timeout` (default 300 detik) dan mencatat `TIMEOUT`. Nilainya merah dan tidak pernah dianggap hijau, juga bila baseline ikut `TIMEOUT` (berkas hasil menandainya `TIMEOUT warisan`). Langkahnya:
    - ulangi Phase 4 butir 1 **sekali** dengan `--timeout` 3× lipat;

@@ -1,6 +1,6 @@
 # Execution Protocol — `architect`
 
-Rumah kanonik prosedur eksekusi rantai brief: ingest, dispatch implementor, matriks bukti disk, kontrak `report-<NN>.md`, gerbang kompilasi per-brief, verifikasi penutup, klasifikasi kegagalan, dan protokol rollback. `SKILL.md` merujuk bagian bernomor di sini dan dilarang menulis ulang isinya. Penulisan kode hidup di `agents/code-implementor.md`; penilaian penutup di `agents/code-reviewer.md`.
+Rumah kanonik prosedur eksekusi rantai brief: ingest, dispatch implementor, matriks bukti disk, penyimpanan laporan unit `report-<NN>.md`, gerbang kompilasi per-brief, verifikasi penutup, klasifikasi kegagalan, dan protokol rollback. `SKILL.md` merujuk bagian bernomor di sini dan dilarang menulis ulang isinya. Penulisan kode hidup di `agents/code-implementor.md`; penilaian penutup di `agents/code-reviewer.md`.
 
 **Satu aturan yang membingkai seluruh dokumen**: tidak ada verifikasi terminal **di dalam subagent**. Lint, test, dan build berjalan tepat sekali di Phase 4, sesudah seluruh brief tertutup. Satu pengecualian sempit hidup di main loop: typecheck per unit (bagian 5), dijalankan `architect` sesudah commit unit, dan hanya bila baris `typecheck-per-brief` adapter bernilai `ya`. Formatter profil atas berkas unit sebelum commit (bagian 3, **Format unit**) bukan verifikasi — ia mengubah format, tidak memvonis apa pun.
 
@@ -37,8 +37,8 @@ Keluaran yang sama mencetak `Berkas unit <NN>: CREATE: … · MODIFY: … · DEL
 Enam butir batas ditegakkan di tingkat prompt:
 
 1. Hanya berkas `files_touched`; pada berkas `MODIFY` hanya simbol kolom `Anchor` tabel seksi 3 brief; berkas `DELETE` tidak disunting implementor — `architect` menghapusnya saat commit unit.
-2. Satu-satunya berkas di luar `files_touched` yang boleh ditulis adalah `{taskdir}/report-<NN>.md`.
-3. Bug di berkas atau simbol lain dicatat di `## Out of Scope / Mismatch` `report-<NN>.md`, tidak diperbaiki.
+2. Tidak ada berkas lain yang boleh ditulis implementor, termasuk berkas laporan — laporan unit dikirim sebagai balikan dan disimpan `architect` menurut bagian 4 (37 U1).
+3. Bug di berkas atau simbol lain dicatat di `## Out of Scope / Mismatch` balikan, tidak diperbaiki.
 4. Nol `@ts-ignore`, `eslint-disable`, `svelte-ignore`, dan nol penambahan package tanpa instruksi brief.
 5. Komentar dan fungsi eksisting di luar unit dipertahankan.
 6. Nama fungsi dan ekspor persis brief.
@@ -47,18 +47,18 @@ Enam butir batas ditegakkan di tingkat prompt:
 
 ## 3. Matriks Bukti Disk & Triase
 
-`report-<NN>.md` adalah klaim subagent, bukan bukti. Jalankan `python3 «verify_scope.py» --brief <brief_path> --worktree` **sebelum** cabang mana pun dibuka — skrip menyandingkan `git status --porcelain -uall` (laci `.explore/` dibuang) dengan `files_touched` + brief + `report-<NN>.md`. `PASS` (exit 0) = baris "hanya `files_touched` berubah"; `FAIL` (exit 1) = baris "ada berkas berubah di luar `files_touched`", dengan daftar berkas liarnya; exit 2 = brief tak terbaca, perbaiki pemanggilannya. Vonis scope diambil dari exit skrip, bukan dari pembacaan manual:
+Balikan implementor (laporan unit) adalah klaim subagent, bukan bukti. Jalankan `python3 «verify_scope.py» --brief <brief_path> --worktree` **sebelum** cabang mana pun dibuka — skrip menyandingkan `git status --porcelain -uall` (laci `.explore/` dibuang) dengan `files_touched` + brief. `PASS` (exit 0) = baris "hanya `files_touched` berubah"; `FAIL` (exit 1) = baris "ada berkas berubah di luar `files_touched`", dengan daftar berkas liarnya; exit 2 = brief tak terbaca, perbaiki pemanggilannya. Vonis scope diambil dari exit skrip, bukan dari pembacaan manual:
 
-| `report-<NN>.md` | Disk vs `files_touched` | Tindakan |
+| Balikan (laporan unit) | Disk vs `files_touched` | Tindakan |
 |---|---|---|
-| `status: DONE` | hanya `files_touched` (+ `report-<NN>.md`) berubah | Pemeriksaan anchor (bawah), lalu **commit unit** |
-| `status: DONE` | ada berkas berubah di luar `files_touched` | Pelanggaran scope: pulihkan berkas liar dan `files_touched`, tulis `## Triase` ke `report-<NN>.md`, turunkan brief ke `BLOCKED` — **tandai BLOCKED** |
+| `status: DONE` | hanya `files_touched` berubah | Pemeriksaan anchor (bawah), lalu **commit unit** |
+| `status: DONE` | ada berkas berubah di luar `files_touched` | Pelanggaran scope: pulihkan berkas liar dan `files_touched`, simpan laporan beserta `## Triase` (bagian 4), turunkan brief ke `BLOCKED` — **tandai BLOCKED** |
 | `status: DONE` | `## Changes` menyebut berkas yang tidak berubah (kecuali baris `DELETE` — berkas itu memang baru dihapus saat commit unit) | Laporan tidak jujur: perlakukan sebagai baris "kosong/rusak" di bawah |
 | `status: DONE` | hunk `git diff -U0` berkas `MODIFY` menyebut simbol di luar `Anchor` | Pelanggaran scope tingkat simbol: perlakuan sama dengan berkas liar |
 | `status: FAILED` | bersih | **Tandai BLOCKED** |
 | `status: FAILED` | kotor di dalam `files_touched` | Rollback milik `architect` (implementor tidak punya terminal): `git restore -- <path>` berkas `MODIFY` (juga berkas `DELETE` yang tersunting) dan `rm -- <path>` berkas `CREATE` yang disebut `## Rollback` laporan atau terbaca kotor, catat di `## Triase`, lalu **tandai BLOCKED** |
-| absen / rusak | bersih | Kegagalan dispatch: hapus `report-<NN>.md` rusak itu bila ada (Check 12 menuntut ia absen), lalu ulangi maksimal sekali dengan slot yang sama; brief tetap `READY` |
-| absen / rusak | kotor | **HENTIKAN.** Tampilkan berkas kotor ke user dan eskalasi; dilarang retry, rollback otomatis, dan commit |
+| absen / rusak / terpotong | bersih | Kegagalan dispatch: ulangi maksimal sekali dengan slot yang sama; brief tetap `READY`, tanpa berkas laporan |
+| absen / rusak / terpotong | kotor | **HENTIKAN.** Tampilkan berkas kotor ke user dan eskalasi; dilarang retry, rollback otomatis, dan commit |
 
 Dokumen taskdir (brief, `report-<NN>.md`) diabaikan git, jadi tidak pernah tampak di `git status`; `verify_scope.py` tetap memvonis kontrak brief terhadap `sidik_kontrak`-nya. Brief `DONE` di disk tanpa commit unit (sesi terputus di antara penulisan status dan commit kode, `DONE` diketik tangan, atau commit unit di-reset user) divonis prasyarat sebagai fase `TERPUTUS` dengan `unit_berikutnya` = unit itu (25 R6) dan dijalankan lewat matriks yang sama **tanpa dispatch**: baris pertama berakhir di **commit unit** (statusnya sudah `DONE`); laporan absen/rusak dengan tree bersih → kembalikan status brief ke `READY` di disk lalu Phase 1 (dispatch ulang, laporan rusak dihapus dulu); baris lain → HENTIKAN dan eskalasi ke user. Asal kotoran pada fase ini tidak diketahui (Check 8 tidak menjaminnya bersih sebelum dispatch), jadi dilarang memulihkan berkas di luar `files_touched` — baris "berkas di luar `files_touched`" pada fase ini berarti HENTIKAN, bukan pemulihan. Kebalikannya — commit unit sudah mendarat tetapi `report-<NN>.md` hilang dari disk — bukan unit terputus: commit itu tetap bukti `DONE`, Check 4 hanya `WARN`, dan unit tidak didispatch ulang; laporan dipulihkan dari cermin nataflow bila dibutuhkan.
 
@@ -82,6 +82,7 @@ Formatter adalah transformasi mekanis, bukan verifikasi: ia tidak pernah memutus
 **Commit unit** — kenaikan status di disk lalu commit kode, satu langkah:
 
 ```bash
+# report-<NN>.md: simpan dulu bila unit tidak bersih (bagian 4) — disk, tidak di-stage
 # frontmatter brief: status: READY → DONE (disk; brief dan report-<NN>.md tidak di-stage)
 git rm -q -- <path DELETE baris `Berkas unit <NN>:`>      # hanya bila unit ber-DELETE (36 D1)
 git add <path CREATE dan MODIFY baris `Berkas unit <NN>:`>
@@ -93,7 +94,8 @@ Penghapusan `DELETE` adalah bagian commit unit, bukan suntingan bebas main loop:
 **Tandai BLOCKED** — suntingan disk, tanpa commit:
 
 ```bash
-# frontmatter brief: status: READY → BLOCKED; report-<NN>.md memuat ## Triase
+# report-<NN>.md: balikan disalin persis + ## Triase (bagian 4)
+# frontmatter brief: status: READY → BLOCKED
 ```
 
 Bukti `DONE` dibaca skrip dari dua hal: status `DONE` di disk dan commit `<type>(<slug>): implement unit <NN>` pembawa kode sejak `base_commit`. Brief `DONE` tanpa commit itu ditolak Check 4 dan membuat `depends_on` unit berikutnya tak pernah terpenuhi. Karena itu status `DONE` ditulis tepat sebelum commit kode, tidak pernah tanpa commit itu, dan subjek commit wajib persis bentuk di atas. `BLOCKED` cukup ditulis di disk: `taskdir_state.py` membaca titik berhentinya dari brief, dan Riwayat mencatatnya saat lead membuka ulang hop BRIEF.
@@ -102,7 +104,16 @@ Bukti `DONE` dibaca skrip dari dua hal: status `DONE` di disk dan commit `<type>
 
 ## 4. Kontrak `report-<NN>.md`
 
-Ditulis `code-implementor` sebagai **satu-satunya** balikan persisten unit — ringkasan di chat mati bersama sesi, berkas ini tidak. `architect` hanya menambahkan `## Triase`.
+Isi laporan dikirim `code-implementor` sebagai **balikan**; ia tidak menulis berkas — harness Claude Code menolak subagent menulis berkas laporan, dan hook menolak tulisan implementor di taskdir (37 U1, U5). `architect` menyimpannya ke `{taskdir}/report-<NN>.md` dengan **menyalin persis** balikan itu; satu-satunya tambahan miliknya `## Triase`. Berkasnya ditulis di disk sebelum commit unit atau sebelum status `BLOCKED`, dan tidak pernah di-stage.
+
+Laporan disimpan **hanya untuk unit tak bersih** — salah satu terpenuhi:
+
+1. balikan `status: FAILED`;
+2. unit turun ke `BLOCKED` — pelanggaran scope (bagian 3) atau galat kompilasi retroaktif (bagian 5);
+3. `architect` menulis `## Triase`, termasuk catatan **Format unit**;
+4. `## Out of Scope / Mismatch` balikan bukan `- Tidak ada` — termasuk baris `preseden menyesatkan`.
+
+Unit bersih tidak meninggalkan berkas laporan: buktinya commit unit, dan butir `DITUNDA`-nya ada di seksi 5 brief. Dilarang merapikan, meringkas, atau melengkapi balikan saat menyalinnya — laporan tetap klaim subagent. Bentuk balikan (= isi berkas):
 
 ```markdown
 ---
@@ -147,7 +158,7 @@ Pakai `typecheck_per_brief` dari baris `Terselesaikan:` prasyarat rantai (nilai 
 | `tidak` | Lewati; pembuktian menunggu Phase 4 |
 | `ya` | `python3 «run_verification.py» closing --taskdir <taskdir> --cmd typecheck='<typecheck commands.md>' --out {taskdir}/.explore/gate-<NN>.md` — dibandingkan dengan baseline Phase 0 (diukur sebelum unit pertama mendarat); exit 1 = galat baru atau `TIMEOUT` |
 
-Vonis **relatif baseline**: nol galat *baru*, bukan hijau absolut. Galat baru → unit `BLOCKED` retroaktif: tambahkan `## Triase` berisi galat mentahnya ke `report-<NN>.md`, dan turunkan brief `DONE` → `BLOCKED` di disk (tanpa commit). Kode unit **tetap** di tree — `git revert` hanya atas persetujuan eksplisit user, karena ia membalik kode yang dinilai `report-<NN>.md`. Brief remedi (`remedies: "<NN>"`) memperbaikinya dengan aksi `MODIFY`. Dilarang melanjutkan ke `NN+1` di atas galat yang unit ini terbitkan. Lint, test, dan build tidak pernah ikut gerbang ini.
+Vonis **relatif baseline**: nol galat *baru*, bukan hijau absolut. Galat baru → unit `BLOCKED` retroaktif: simpan `report-<NN>.md` dengan `## Triase` berisi galat mentahnya — salinan balikan unit itu bila masih ada di konteks; bila tidak (sesi terputus), frontmatter (`artifact`, `unit`, `brief`, `status: FAILED`) + `## Triase` saja — dan turunkan brief `DONE` → `BLOCKED` di disk (tanpa commit). Kode unit **tetap** di tree — `git revert` hanya atas persetujuan eksplisit user, karena ia membalik kode yang dinilai laporan unit. Brief remedi (`remedies: "<NN>"`) memperbaikinya dengan aksi `MODIFY`. Dilarang melanjutkan ke `NN+1` di atas galat yang unit ini terbitkan. Lint, test, dan build tidak pernah ikut gerbang ini.
 
 ---
 
@@ -156,8 +167,8 @@ Vonis **relatif baseline**: nol galat *baru*, bukan hijau absolut. Galat baru �
 | Dari | Pemicu | Ke | Penulis | Ikut di-commit (kode saja) |
 |---|---|---|---|---|
 | — | Batch brief ditulis `plan`, disetujui user lewat `chain.py approve --row BRIEF` | `READY` | `frontend:plan` | — (`chain.py approve` menulis `sidik_kontrak` dan kejadian `approve BRIEF`) |
-| `READY` | `report-<NN>.md` `DONE` + matriks bagian 3 bersih | `DONE` | `architect` | `files_touched` |
-| `READY` | `report-<NN>.md` `FAILED` atau pelanggaran scope | `BLOCKED` | `architect` | — (suntingan disk) |
+| `READY` | Balikan `DONE` + matriks bagian 3 bersih | `DONE` | `architect` | `files_touched` |
+| `READY` | Balikan `FAILED` atau pelanggaran scope | `BLOCKED` | `architect` | — (suntingan disk) |
 | `DONE` | Galat kompilasi baru di gerbang bagian 5 | `BLOCKED` | `architect` | — (suntingan disk; `report-<NN>.md` ber-`## Triase`) |
 | `DONE` tanpa commit unit (fase `TERPUTUS`) | Laporan absen/rusak + tree bersih (bagian 3) | `READY` | `architect` | — (suntingan disk; dispatch ulang) |
 
