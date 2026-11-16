@@ -53,6 +53,9 @@ Telusuri kode untuk elisitasi satu tiket analyst.
 - **Dispatch langsung tanpa skill pembungkus**, ke `analyst:code-explorer` dengan nama penuh. Doktrin penelusuran ada
   di `agents/code-explorer.md`. Dilarang menyalin isi tiket ke prompt. Butir `pertanyaan` cukup kata-kata peminta.
 - **Audit hidrasi**: batalkan dispatch bila prompt masih memuat slot `{...}` mentah atau `TBD`/`TODO`.
+- **Konsep yang sudah terjawab di sesi tidak didispatch** (38 K1, `KONTEKS`): temuan penelusuran yang sudah tertulis
+  di percakapan dipakai seperti balikan (`SKILL.md` Phase 1, Temuan sesi); `pertanyaan` hanya memuat konsep sisanya.
+  `BUKTI` tetap didispatch; letak yang sudah diketahui boleh menjadi petunjuk di butirnya.
 
 ### Penanganan Balikan
 
