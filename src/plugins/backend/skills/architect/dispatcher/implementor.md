@@ -9,9 +9,9 @@ Gunakan template ini saat mendispatch subagent eksekutor brief (`code-implemento
 **Dispatch setelah:** Brief `NN` terpilih sebagai titik mulai rantai di Fase 1 dan working tree bersih.
 
 ```markdown
-Eksekusi satu brief implementasi.
+Eksekusi satu brief implementasi: `{brief_path}` (unit `{unit_name}`).
 
-- Brief: `{brief_path}` (unit `{unit_name}`). Baca utuh sebelum menulis baris kode pertama.
+- Brief: baca utuh sebelum menulis baris kode pertama.
 - Taskdir: `{taskdir}`
 - Batas File: `## File scope` di brief adalah batas mutlak — jangan menyentuh file di luar daftar
   itu. Gunakan kolom `Anchor` sebagai acuan posisi sisip relatif.

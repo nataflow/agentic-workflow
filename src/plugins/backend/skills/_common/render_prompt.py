@@ -122,7 +122,9 @@ def ringkasan(body: str) -> str:
 def kalimat_dispatch(body: str, out_rel: str) -> str:
     rujukan = f"Baca dan jalankan instruksi di `{out_rel}`; jangan menyuntingnya."
     awal = ringkasan(body)
-    return f"{awal}. {rujukan}" if awal else rujukan
+    if not awal:
+        return rujukan
+    return f"{awal} {rujukan}" if awal.endswith("…") else f"{awal}. {rujukan}"
 
 
 def main() -> int:

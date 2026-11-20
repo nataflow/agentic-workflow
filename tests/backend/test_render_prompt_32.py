@@ -42,7 +42,8 @@ def test_tiap_dispatcher_dapat_dirender_tanpa_slot_tabel_mentah(tmp_path, templa
     assert not [s for s in slots if "{" + s + "}" in body]
     rujukan = f"Baca dan jalankan instruksi di `{out['out']}`; jangan menyuntingnya."
     awal = " ".join(body.strip().split("\n\n", 1)[0].split()).rstrip(" .,:;")
-    assert awal and out["prompt"] == f"{awal[:239]}{'…' if len(awal) > 240 else ''}. {rujukan}"
+    harap = f"{awal[:239].rstrip()}… {rujukan}" if len(awal) > 240 else f"{awal}. {rujukan}"
+    assert awal and out["prompt"] == harap
     assert "\n" not in out["prompt"]
     text = (BE_SKILLS / template).read_text(encoding="utf-8")
     para = text.split("**Cara dispatch (32 T1).**", 1)[1].split("\n\n", 1)[0]
@@ -144,6 +145,16 @@ def test_ringkasan_objective_panjang_dipangkas(tmp_path):
                         "konteks_diketahui=k", "batas_cakupan=b", "slug=s",
                         out="backenddev/docs/.explore/prompt/s.md")
     assert code == 0, out
-    awal, rujukan = out["prompt"].split(". Baca dan jalankan instruksi di ", 1)
-    assert len(awal) == 240 and awal.endswith("…") and awal.startswith("Objective: xxx")
+    awal, rujukan = out["prompt"].split(" Baca dan jalankan instruksi di ", 1)
+    assert len(awal) == 240 and awal.endswith("…") and not awal.endswith("….")
+    assert awal.startswith("Objective: xxx")
     assert rujukan == "`backenddev/docs/.explore/prompt/s.md`; jangan menyuntingnya."
+
+
+@pytest.mark.regression("32 T1")
+def test_ringkasan_implementor_menyebut_brief(tmp_path):
+    code, out = _render(tmp_path, "architect/dispatcher/implementor.md", f"taskdir={TD}",
+                        f"brief_path={TD}/brief-01-x.md", "unit_name=01", "adapter_path=a.md",
+                        out=f"{TD}/.explore/prompt/implementor-01.md")
+    assert code == 0, out
+    assert out["prompt"].startswith(f"Eksekusi satu brief implementasi: `{TD}/brief-01-x.md` (unit `01`). Baca ")
