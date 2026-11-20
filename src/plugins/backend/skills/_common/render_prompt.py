@@ -21,8 +21,11 @@ Main loop tidak lagi memuat badan template dispatcher ke konteksnya. Skrip ini:
 Slot `slug` menamai berkas laporan explorer di laci `.explore/`; nilai yang berawalan `report` ditolak (exit 1,
 37 E1) — harness Claude Code menolak subagent menulis berkas berawalan itu. Beri awalan `telusur-`.
 
-Prompt subagent lalu cukup satu kalimat, dicetak skrip ini apa adanya:
-"Baca dan jalankan instruksi di `<out>`; jangan menyuntingnya."
+Prompt subagent lalu cukup satu baris, dicetak skrip ini apa adanya:
+"<ringkasan>. Baca dan jalankan instruksi di `<out>`; jangan menyuntingnya."
+`<ringkasan>` adalah paragraf pertama prompt jadi (mis. `Objective: …`), diciutkan ke satu baris dan dipangkas
+ke RINGKASAN_MAKS karakter, supaya maksud dispatch terlihat di input tool `Agent` (classifier auto mode tidak
+membaca isi berkas rujukan).
 
 Exit: 0 = prompt ditulis; 1 = slot wajib kosong, slot tak dikenal, slot tabel
 tersisa mentah, atau `slug` berawalan `report` (prompt tidak ditulis); 2 = template tak terbaca, tanpa blok template,
@@ -40,6 +43,7 @@ from typing import Dict, List, Tuple
 
 OUT_RE = re.compile(r"^backenddev/docs/(?:[^/]+/)?\.explore/prompt/[A-Za-z0-9._-]+\.md$")
 SLOT_ROW = re.compile(r"^\|\s*`\{([a-z_]+)\}`\s*\|(.*)$")
+RINGKASAN_MAKS = 240
 
 
 class RenderError(Exception):
@@ -106,6 +110,21 @@ def render(template_text: str, values: Dict[str, str]) -> Tuple[str, List[str], 
     return body, filled, empty_optional
 
 
+def ringkasan(body: str) -> str:
+    """Paragraf pertama prompt jadi, diciutkan ke satu baris dan dipangkas ke RINGKASAN_MAKS karakter."""
+    paragraf = body.strip().split("\n\n", 1)[0]
+    teks = " ".join(paragraf.split()).rstrip(" .,:;")
+    if len(teks) > RINGKASAN_MAKS:
+        teks = teks[:RINGKASAN_MAKS - 1].rstrip() + "…"
+    return teks
+
+
+def kalimat_dispatch(body: str, out_rel: str) -> str:
+    rujukan = f"Baca dan jalankan instruksi di `{out_rel}`; jangan menyuntingnya."
+    awal = ringkasan(body)
+    return f"{awal}. {rujukan}" if awal else rujukan
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--template", required=True, help="Berkas dispatcher, mis. <plugin>/skills/plan/dispatcher/explorer.md")
@@ -121,7 +140,7 @@ def main() -> int:
             print(json.dumps({"status": status, **extra}, ensure_ascii=False))
         elif status == "PASS":
             print(f"PASS prompt {extra['out']} ({extra['karakter']} karakter) — prompt subagent: "
-                  f"\"Baca dan jalankan instruksi di `{extra['out']}`; jangan menyuntingnya.\"")
+                  f"\"{extra['prompt']}\"")
         else:
             print(f"{status}: {extra.get('reason', '')}", file=sys.stderr)
         return code
@@ -156,7 +175,7 @@ def main() -> int:
     except (OSError, ValueError) as e:   # UnicodeDecodeError dan JSON rusak termasuk ValueError
         return emit("ERROR", 2, reason=str(e))
     return emit("PASS", 0, out=out_rel, karakter=len(body), slot_terisi=filled, baris_opsional_dihapus=dropped,
-                prompt=f"Baca dan jalankan instruksi di `{out_rel}`; jangan menyuntingnya.")
+                prompt=kalimat_dispatch(body, out_rel))
 
 
 if __name__ == "__main__":

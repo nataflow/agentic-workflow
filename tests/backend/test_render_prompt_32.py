@@ -40,7 +40,10 @@ def test_tiap_dispatcher_dapat_dirender_tanpa_slot_tabel_mentah(tmp_path, templa
     assert code == 0, out
     body = (tmp_path / out["out"]).read_text(encoding="utf-8")
     assert not [s for s in slots if "{" + s + "}" in body]
-    assert out["prompt"] == f"Baca dan jalankan instruksi di `{out['out']}`; jangan menyuntingnya."
+    rujukan = f"Baca dan jalankan instruksi di `{out['out']}`; jangan menyuntingnya."
+    awal = " ".join(body.strip().split("\n\n", 1)[0].split()).rstrip(" .,:;")
+    assert awal and out["prompt"] == f"{awal[:239]}{'…' if len(awal) > 240 else ''}. {rujukan}"
+    assert "\n" not in out["prompt"]
     text = (BE_SKILLS / template).read_text(encoding="utf-8")
     para = text.split("**Cara dispatch (32 T1).**", 1)[1].split("\n\n", 1)[0]
     assert "render_prompt.py" in para and "${CLAUDE_PLUGIN_ROOT}" not in para
@@ -115,3 +118,32 @@ def test_agent_membaca_prompt_berkas_dan_skill_merender():
         text = (BE_SKILLS / skill / "SKILL.md").read_text(encoding="utf-8")
         assert "render_prompt.py" in text, skill
         assert not re.search(r"[Mm]uat (template|`dispatcher)", text), skill
+
+
+@pytest.mark.regression("32 T1")
+def test_prompt_dispatch_membawa_ringkasan_maksud_satu_baris(tmp_path):
+    """Classifier auto mode tidak membaca berkas rujukan: maksud dispatch harus terlihat di prompt `Agent`."""
+    obj = "telusuri alur pickup AWB manual\nrecall order di modul logistik"
+    code, out = _render(tmp_path, "tech-lead/dispatcher/explorer.md", f"objective={obj}",
+                        "konteks_diketahui=k", "batas_cakupan=b", "slug=pickup-awb",
+                        out="backenddev/docs/.explore/prompt/pickup-awb.md")
+    assert code == 0, out
+    assert out["prompt"] == ("Objective: telusuri alur pickup AWB manual recall order di modul logistik. "
+                             "Baca dan jalankan instruksi di `backenddev/docs/.explore/prompt/pickup-awb.md`; "
+                             "jangan menyuntingnya.")
+    teks = run_script(SCRIPT, "--template", str(BE_SKILLS / "tech-lead/dispatcher/explorer.md"),
+                      "--out", "backenddev/docs/.explore/prompt/pickup-awb.md", "--root", str(tmp_path),
+                      "--slot", f"objective={obj}", "--slot", "konteks_diketahui=k", "--slot", "batas_cakupan=b",
+                      "--slot", "slug=pickup-awb", cwd=tmp_path)
+    assert teks.returncode == 0 and f'prompt subagent: "{out["prompt"]}"' in teks.stdout
+
+
+@pytest.mark.regression("32 T1")
+def test_ringkasan_objective_panjang_dipangkas(tmp_path):
+    code, out = _render(tmp_path, "tech-lead/dispatcher/explorer.md", "objective=" + "x" * 500,
+                        "konteks_diketahui=k", "batas_cakupan=b", "slug=s",
+                        out="backenddev/docs/.explore/prompt/s.md")
+    assert code == 0, out
+    awal, rujukan = out["prompt"].split(". Baca dan jalankan instruksi di ", 1)
+    assert len(awal) == 240 and awal.endswith("…") and awal.startswith("Objective: xxx")
+    assert rujukan == "`backenddev/docs/.explore/prompt/s.md`; jangan menyuntingnya."

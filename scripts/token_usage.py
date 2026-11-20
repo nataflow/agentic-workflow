@@ -417,10 +417,10 @@ def prompt_efektif(block: Dict[str, Any], reads: Dict[str, List[Tuple[str, str]]
     """Prompt utuh sebuah dispatch: langsung dari `input.prompt`, atau — bila prompt itu rujukan berkas (32 T1) —
     gabungan isi `Read` berkas rujukan di transcript subagentnya. `None` = rujukan tak terpulihkan."""
     prompt = str((block.get("input") or {}).get("prompt") or "")
-    ref = PROMPT_REF_RE.search(prompt)
-    if not ref:
+    refs = PROMPT_REF_RE.findall(prompt)   # rujukan berkas ada di ujung, sesudah ringkasan maksud
+    if not refs:
         return prompt
-    rel = ref.group(1)
+    rel = refs[-1]
     text = "\n".join(t for p, t in reads.get(block.get("id", ""), []) if p.endswith(rel))
     return text or None
 

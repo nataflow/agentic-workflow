@@ -210,7 +210,8 @@ def _rel(nama):
 def _dispatch_ref(tid, nama):
     return {"type": "tool_use", "id": tid, "name": "Agent",
             "input": {"subagent_type": "backend:code-explorer",
-                      "prompt": f"Baca dan jalankan instruksi di `{_rel(nama)}`; jangan menyuntingnya."}}
+                      "prompt": f"Objective: telusuri `src/{nama}.rs`. "
+                                f"Baca dan jalankan instruksi di `{_rel(nama)}`; jangan menyuntingnya."}}
 
 
 def _agent_read(nama, isi, tur=True, baca=True):
