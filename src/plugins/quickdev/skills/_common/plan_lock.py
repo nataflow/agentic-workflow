@@ -18,8 +18,14 @@
 - `unlock`  APPROVED → DRAFT untuk revisi atas permintaan user; blok eksekusi dipertahankan.
 - `commit`  commit berkas rencana APPROVED saja (staging eksplisit, `--only`), sebelum eksekusi dimulai (39 C1);
             bukan repo git, diabaikan `.gitignore`, tanpa perubahan, atau blok eksekusi sudah ada → SKIP.
-- `sync-payload` sinkron nataflow untuk rencana yang pernah dikunci (`--plan`); tanpa menulis berkas. `--push` memanggil server langsung (MCP key `.claude/nataflow.local.json`) dan
-            mencetak satu baris segmen (29 S4). Config `.claude/nataflow.json` absen → SKIP sebelum rencana dibaca.
+- `summary` ringkasan naratif singkat hasil eksekusi ke blok (`Summary`), sesudah `close`; isi pembuka dokumen
+            report nataflow (41 D4). Di luar wilayah sidik dan `Tree-Hash`, jadi segel `close` tidak basi.
+- `task`    baca task nataflow acuan (`--ref <code|uuid>`) lewat `get_task`; `--plan` menautkannya ke rencana DRAFT
+            sebagai `Nataflow-Task: <uuid>` (41 D1). Task acuan tidak pernah dibuat atau diubah isinya oleh quickdev.
+- `sync-payload` sinkron nataflow rencana DRAFT maupun APPROVED (`--plan`; 41 D2) beserta dokumen report bila blok
+            eksekusi sudah tertutup (41 D4); tanpa menulis berkas. `--push` memanggil server langsung (MCP key
+            `.claude/nataflow.local.json`) dan mencetak satu baris segmen (29 S4). Config `.claude/nataflow.json`
+            absen → SKIP sebelum rencana dibaca.
 
 Metadata rencana adalah baris polos `Kunci: nilai` di antara H1 dan `## 1.`. Sidik mencakup
 `## 1.` sampai sebelum `## Execution Status`: CRLF → LF, spasi ujung baris dibuang, `- [x]` dihitung
@@ -56,13 +62,14 @@ META = re.compile(r"^([A-Z][A-Za-z-]+): ?(.*)$")
 ITEM = re.compile(r"^- ([A-Z][A-Za-z0-9-]+): ?(.*)$")
 FENCE = re.compile(r"^\s*(`{3,}|~{3,})(.*)$")
 META_KEYS = ("Status", "Author", "Date", "Profile", "Gates", "Approved-At", "Approval", "Plan-Hash",
-             "Hash-Scope", "Unlock-Reason")
+             "Hash-Scope", "Unlock-Reason", "Nataflow-Task")
 SCOPE_V2 = "profile+body"           # 0.5–0.11: rencana lama yang masih berjalan
 SCOPE_BODY = "body"                 # 0.12: Section 1–5 saja, sama dengan rumus 0.4.0 tanpa penanda (34 L1)
 SCOPES = (SCOPE_V2, SCOPE_BODY)
 TEXT_ARGS = ("answer", "reason", "verification", "findings_text", "summary")
 DONE_STATES = ("COMPLETED", "VERIFICATION_MANUAL_REQUIRED")      # close yang menyegel verifikasi
 MANUAL = "VERIFICATION_MANUAL_REQUIRED"
+SUMMARY_MAX = 600
 REMEDIATION_CAP = 2
 
 
@@ -470,6 +477,8 @@ def cmd_start(p: Plan, a) -> int:
                         f"minta user meng-commit atau men-stash dulu: {', '.join(dirty[:10])}{more}")
         mode = "awal"
         p.set_block(Status="IN_PROGRESS", Base_Commit=head_commit(top), Remediation_Round="0", Timestamp=now())
+    if mode in ("resume", "remediasi") and b.get("Summary", "-") != "-":
+        p.set_block(Summary="-")          # ringkasan putaran lalu tidak berlaku untuk putaran ini (41 D4)
     p.save()
     b = p.block()
     nxt = next((t for ok, t in steps if not ok), "-")
@@ -555,6 +564,24 @@ def cmd_confirm(p: Plan, a) -> int:
     p.set_block(Status="COMPLETED (manual)", Manual_Confirmation=quote(a.answer), Timestamp=now())
     p.save()
     print("CONFIRM PASS: COMPLETED (manual)")
+    return 0
+
+
+def cmd_summary(p: Plan, a) -> int:
+    """Ringkasan naratif hasil eksekusi (41 D4): sesudah `close`, sebelum sinkron. Hanya blok yang berubah, jadi
+    `Verified-Hash` (Section 1–5) dan `Tree-Hash` (tanpa direktori rencana) tetap cocok."""
+    st = p.block().get("Status", "")
+    if p.exec_start == len(p.lines) or not st or st == "IN_PROGRESS":
+        return fail(f"SUMMARY FAIL: blok `{EXEC_H2}` belum ditutup (`{st or '-'}`) — jalankan `close` dulu")
+    text = one_line(a.summary)
+    if not text:
+        return fail("SUMMARY FAIL: ringkasan kosong")
+    if len(text) > SUMMARY_MAX:
+        return fail(f"SUMMARY FAIL: ringkasan {len(text)} karakter, maksimal {SUMMARY_MAX} — persingkat jadi 1–3 "
+                    f"kalimat")
+    p.set_block(Summary=quote(text, SUMMARY_MAX))
+    p.save()
+    print(f"SUMMARY PASS: {st}")
     return 0
 
 
@@ -712,13 +739,99 @@ def _diff_source(docs: list, source: str):
     return (None, problems) if problems else _diff(docs, text)
 
 
+TERMINAL = ("COMPLETED", "VERIFICATION_MANUAL_REQUIRED", "BLOCKED")    # blok tertutup → dokumen report (41 D4)
+AC_LINE = re.compile(r"\bAC-\d+\b")
+
+
+def task_ref(m: dict):
+    """`Nataflow-Task` rencana → `(uuid, masalah)`; kosong/`-` = tanpa task acuan (task milik quickdev)."""
+    raw = (m.get("Nataflow-Task") or "").strip()
+    if raw in ("", "-"):
+        return "", ""
+    if not ns.UUID_RE.match(raw):
+        return "", (f"`Nataflow-Task: {raw}` bukan UUID — ditulis `plan_lock.py task --plan`; pulihkan dari "
+                    f"riwayat git, dilarang menebak")
+    return raw.lower(), ""
+
+
+def changed_files(p: Plan, top: Optional[Path], base: str) -> list:
+    """`[(status, path, tambah, hapus)]` sejak `Base-Commit` (termasuk untracked), tanpa artefak gate — rumus berkas
+    yang sama dengan `tree_hash`, supaya report menyebut berkas yang sama dengan yang disegel `close`."""
+    if top is None:
+        return []
+    if base in ("", "none"):
+        e = git(top, "hash-object", "-t", "tree", "--stdin")
+        base = e.stdout.strip() if e is not None and e.returncode == 0 else ""
+    if not base:
+        return []
+    spec = ["--", "."] + [f":(exclude){g}" for g in gate_paths(p, top)]
+    ns_out = git(top, "diff", "--name-status", "-z", "--no-renames", base, *spec)
+    num = git(top, "diff", "--numstat", "-z", "--no-renames", base, *spec)
+    un = git(top, "ls-files", "--others", "--exclude-standard", "-z", *spec)
+    if any(r is None or r.returncode for r in (ns_out, num, un)):
+        return []
+    counts = {}
+    for entry in num.stdout.split("\0"):
+        parts = entry.split("\t")
+        if len(parts) == 3:
+            counts[parts[2]] = (parts[0], parts[1])
+    items = [x for x in ns_out.stdout.split("\0") if x]
+    rows = []
+    for i in range(0, len(items) - 1, 2):
+        st, rel = items[i], items[i + 1]
+        add, rem = counts.get(rel, ("-", "-"))
+        rows.append((st, rel, add, rem))
+    rows += [("A?", rel, "-", "-") for rel in un.stdout.split("\0") if rel]
+    return sorted(rows, key=lambda r: r[1])
+
+
+def report_text(p: Plan, root: Path, rel: str) -> str:
+    """Isi dokumen `quickdev.report` dari disk saja (41 D4): ringkasan naratif `Summary`, status, AC, checklist,
+    berkas berubah, verifikasi, dan remediasi. Tanpa waktu sinkron, supaya sinkron ulang tanpa perubahan = `sama`."""
+    m, b = p.meta(), p.block()
+    summary = b.get("Summary", "-").strip('"') or "-"
+    out = [f"# Laporan Eksekusi — {p.path.stem}", "",
+           summary if summary != "-" else "_Tanpa ringkasan naratif (`plan_lock.py summary` belum dijalankan)._", "",
+           "| Kunci | Nilai |", "|---|---|", f"| Rencana | `{rel}` |", f"| Status eksekusi | {b.get('Status', '-')} |",
+           f"| Base-Commit | `{b.get('Base-Commit', '-')}` |", f"| Waktu tutup | {b.get('Timestamp', '-')} |",
+           f"| Plan-Hash | `{m.get('Plan-Hash', '-')[:19]}` |"]
+    if b.get("Blocked-Step", "-") != "-":
+        out.append(f"| Langkah terblokir | {b['Blocked-Step']} |")
+    rnd = remediation_round(b)
+    if rnd:
+        out.append(f"| Remediasi | putaran {rnd}/{REMEDIATION_CAP} ({b.get('Remediation-State', '-')}) |")
+    acs = [ln.strip().lstrip("-* ").strip() for ln in section_one(p).split("\n") if AC_LINE.search(ln)]
+    if acs:
+        out += ["", "## Acceptance Criteria", ""] + [f"- {x}" for x in acs]
+    steps = p.steps()
+    out += ["", f"## Langkah ({sum(ok for ok, _ in steps)}/{len(steps)})", ""]
+    out += [f"- [{'x' if ok else ' '}] {t}" for ok, t in steps]
+    files = changed_files(p, repo_top(p), b.get("Base-Commit", ""))
+    label = {"A": "baru", "A?": "baru (untracked)", "M": "diubah", "D": "dihapus", "T": "tipe berubah"}
+    out += ["", f"## Berkas Berubah ({len(files)})", ""]
+    if files:
+        out += ["| Berkas | Perubahan | +/− |", "|---|---|---|"]
+        out += [f"| `{f}` | {label.get(s, s)} | {a_}/{r_} |" for s, f, a_, r_ in files]
+    else:
+        out.append("Tidak ada berkas di luar direktori rencana yang berbeda dari `Base-Commit`.")
+    out += ["", "## Verifikasi", ""]
+    for key in ("Verification", "Baseline", "Manual-Confirmation"):
+        if b.get(key, "-") != "-":
+            out.append(f"- {key}: {b[key].strip(chr(34))}")
+    for n in range(1, rnd + 1):
+        if b.get(f"Findings-{n}"):
+            out += ([] if n > 1 else ["", "## Temuan Review", ""]) + [f"- Putaran {n}: {b[f'Findings-{n}'].strip(chr(34))}"]
+    return "\n".join(out) + "\n"
+
+
 def sync_context(a, root: Path, config: dict):
     """Rencana → `(konteks, masalah)`; konteks = `head` (argumen fase 1), `docs`, `line`.
 
-    Satu workdir `quickdev:<repo>:<path rencana>` bernama `<task_name>`, task baru ber-`workdir_key`
-    (quickdev tidak mengenal tiket analyst), dan satu dokumen `quickdev.plan` berisi berkas di disk (skill tidak
-    meng-commit). Rencana yang belum pernah `lock` (tanpa `Approved-At`) → FAIL: DRAFT tidak didorong (D2).
-    Sinkron profil (`--repo-profile`) dihapus bersama skill `profile` (34 L3).
+    Satu workdir `quickdev:<repo>:<path rencana>` bernama `<task_name>`. Task-nya task acuan `Nataflow-Task` (41
+    D1; dibaca `get_task`, tidak pernah dibuat atau diubah isinya), atau task milik quickdev ber-`workdir_key`. Dokumen:
+    `quickdev.plan` berisi berkas di disk (skill tidak meng-commit), ditambah `quickdev.report` bila blok eksekusi
+    sudah tertutup (41 D4). Rencana DRAFT ikut didorong supaya terbaca di nataflow sebelum approval (41 D2; D2 lama
+    dibalik) tanpa menggeser status task. Sinkron profil (`--repo-profile`) dihapus bersama skill `profile` (34 L3).
     """
     workspace_id, choices, problems = ns.choose_workspace(config, a.workspace)
     if problems:
@@ -738,11 +851,12 @@ def sync_context(a, root: Path, config: dict):
         m, b = p.meta(), p.block()
     except SystemExit as exc:           # kunci ganda: FAIL rapi dari pembaca
         return None, [str(exc.code)[len("FAIL: "):] if str(exc.code).startswith("FAIL: ") else str(exc.code)]
-    if (m.get("Approved-At") or "-") == "-":
-        return None, [f"{rel} belum pernah dikunci (`lock`) — rencana DRAFT tidak didorong"]
     body, title = section_one(p), plan_title(p) or path.stem
     if p.body_start == len(p.lines) or not body:
         return None, [f"{rel} tanpa `## 1.` — deskripsi task diambil dari Section 1"]
+    ref, problem = task_ref(m)
+    if problem:
+        return None, [problem]
     execution = b.get("Status", "")
     done = execution.startswith("COMPLETED")
     status = "done" if done else "blocked" if execution == "BLOCKED" else "active"
@@ -751,16 +865,25 @@ def sync_context(a, root: Path, config: dict):
     if problems:
         return None, problems
     task = ns.task_args(config, workspace_id, {"source": "quickdev", "workdir_key": key}, repo, title, body)
-    task["status"] = ns.task_status("done" if done else "in_progress")       # workdir terbit → in_progress (28 T1)
+    # DRAFT belum disetujui: task tidak digeser (task baru tetap `todo`, 41 D2); terkunci → in_progress (28 T1).
+    draft = m.get("Status") != "APPROVED"
+    task["status"] = None if draft else ns.task_status("done" if done else "in_progress")
+    # Task acuan bisa menaungi workdir lain (taskdir backend/frontend): `done` lewat aturan saudara (28 T2).
+    task["siblings"] = bool(ref) and done and not draft
     meta = {"source": "quickdev", "repo": repo, "path": rel, "plan_status": m.get("Status", ""),
             "plan_hash": m.get("Plan-Hash", ""), "base_commit": b.get("Base-Commit", ""), "execution": execution}
     workdir = ns.workdir_args(key, path.stem, status, {k: v for k, v in meta.items() if v})
-    doc = ns.document("workdir", path.name, "quickdev.plan", content,
-                      ns.doc_meta("quickdev", repo, rel, m.get("Status", ""), commit, execution=execution))
-    head = {"repo": repo, **ns.workspace_fields(workspace_id, choices), "task": task, "workdir": workdir,
-            "list_document": {"reference_table": "workdir", "include_content": False}}
-    return {"head": head, "docs": [doc],
-            "line": f"{rel} · workdir {path.stem} ({status}) · server {config['url']}"}, []
+    docs = [ns.document("workdir", path.name, "quickdev.plan", content,
+                        ns.doc_meta("quickdev", repo, rel, m.get("Status", ""), commit, execution=execution))]
+    if execution.startswith(TERMINAL):
+        docs.append(ns.document("workdir", f"{path.stem}.report.md", "quickdev.report", report_text(p, root, rel),
+                                ns.doc_meta("quickdev", repo, rel, execution, commit,
+                                            base_commit=b.get("Base-Commit", ""))))
+    head = {"repo": repo, **ns.workspace_fields(workspace_id, choices), "task": task, "task_ref": ref,
+            "workdir": workdir, "list_document": {"reference_table": "workdir", "include_content": False}}
+    return {"head": head, "docs": docs,
+            "line": f"{rel} · workdir {path.stem} ({status}) · task {('acuan ' + ref[:8]) if ref else 'quickdev'} "
+                    f"· server {config['url']}"}, []
 
 
 def cmd_sync_payload(a) -> int:
@@ -788,8 +911,101 @@ def cmd_sync_payload(a) -> int:
     return _sync_documents(a, config, ctx["docs"], ctx["head"], ctx["line"])
 
 
+def plan_task(session, head: dict):
+    """Task induk workdir → `(row, masalah | hasil push non-PASS)`.
+
+    Task acuan (41 D1): `get_task` saja, tanpa `create_task`/`update_task`; workdir yang sudah menempel di task lain
+    (rencana yang dulu tersinkron tanpa acuan) → FAIL sebelum tulisan apa pun. Tanpa acuan: task milik quickdev
+    ber-`workdir_key` (kembar → FAIL), dibuat bila belum ada; judul/deskripsinya mengikuti rencana terbaru karena task
+    itu kini lahir saat DRAFT (41 D2) — `update_task` hanya bila berbeda.
+    """
+    from nataflow_client import as_list
+    task, ref, key = head["task"], head.get("task_ref") or "", head["workdir"]["key"]
+    if ref:
+        placed = as_list(session.call_json("list_workdir", {"key": key}, read=True), "workdirs", "data")
+        other = [w for w in placed if str(w.get("task_id") or "") not in ("", ref)]
+        if other:
+            code = (other[0].get("task") or {}).get("code") or other[0].get("task_id")
+            return None, ns.push_fail([f"workdir `{key}` sudah menempel di task lain (#{code}) — `Nataflow-Task` "
+                                       f"tidak memindahkannya; pakai nama rencana baru"])
+        return session.call_json("get_task", {"task_id": ref}, read=True), None
+    found = as_list(session.call_json("list_task", task["lookup"], read=True), "tasks", "data")
+    if len(found) > 1:
+        return None, ns.push_fail([f"{len(found)} task ber-workdir_key sama ("
+                                   + ", ".join(f"#{t.get('code') or t.get('id')}" for t in found) + ")"])
+    if not found:
+        if head.get("workspace_choices"):
+            return None, ns.push_choose(head["workspace_choices"])
+        return session.call_json("create_task", task["create"]), None
+    row, want = found[0], {k: task["create"][k] for k in ("title", "description")}
+    detail = session.call_json("get_task", {"task_id": row.get("id")}, read=True)
+    if isinstance(detail, dict) and any(str(detail.get(k) or "") != v for k, v in want.items()):
+        session.call_json("update_task", dict(want, task_id=row.get("id")))
+    return row, None
+
+
+def push_plan(session, head: dict, docs: list) -> dict:
+    """Task → workdir → manifest → dokumen → status task. Dokumen report yang gagal (mis. tipe belum terdaftar di
+    server) tidak menggagalkan sinkron rencana: dicatat di `report_problem` (41 D4)."""
+    from nataflow_client import NataflowError
+    row, stop = plan_task(session, head)
+    if stop:
+        return stop
+    task_id = str(row.get("id") or "")
+    workspace_id = str((row.get("workspace") or {}).get("id") or row.get("workspace_id") or "")
+    if not task_id:
+        return ns.push_fail(["balikan task tanpa `id`"])
+    wd_args = dict(head["workdir"], task_id=task_id)
+    if workspace_id:
+        wd_args["workspace_id"] = workspace_id
+    workdir = session.call_json("upsert_workdir", wd_args)
+    workdir_id = str(workdir.get("id") or "") if isinstance(workdir, dict) else ""
+    if not workdir_id:
+        return ns.push_fail(["balikan upsert_workdir tanpa `id`"])
+    text = session.call("list_document", dict(head["list_document"], reference_id=workdir_id), read=True)
+    diff, problems = _diff(docs, text)
+    if problems:
+        return ns.push_fail(problems)
+    counts, report_problem = {"created": 0, "updated": 0, "unchanged": 0}, ""
+    for doc in diff["documents"]:
+        try:
+            got = ns.upsert_documents(session, [doc], workdir_id)
+        except NataflowError as exc:
+            if doc["type"] != "quickdev.report":
+                raise
+            report_problem = exc.message
+            continue
+        for k in counts:
+            counts[k] += got[k]
+    target = head["task"].get("status")
+    if head["task"].get("siblings"):
+        args = {"task_id": task_id, **({"workspace_id": workspace_id} if workspace_id else {})}
+        workdirs, problems = ns.parse_workdirs(session.call("list_workdir", args, read=True))
+        if not problems:
+            target, problems = ns.sibling_task_status(workdirs, head["workdir"]["key"], "done",
+                                                      ns.task_status("in_progress"))
+        if problems:
+            return ns.push_fail(problems)
+    status = str(row.get("status") or "")
+    if target and status in target["from"]:
+        session.call_json("update_task_status", {"task_id": task_id, "status": target["status"]})
+        status = target["status"]
+    return {"status": "PASS", "documents_total": diff["documents_total"], "created": counts["created"],
+            "updated": counts["updated"], "same": diff["same"] + counts["unchanged"], "workdir": head["workdir"]["name"],
+            "task_code": row.get("code") or task_id, "task_status": status, "task_ref": bool(head.get("task_ref")),
+            "report_problem": report_problem}
+
+
+def plan_segment(result: dict) -> str:
+    """`task #<kode> · workdir <nama> · n dokumen (…)` (+ `· report GAGAL: …`); jalur lain = segmen bersama."""
+    if result["status"] != "PASS":
+        return ns.push_segment(result, "")
+    seg = ns.push_segment(result, f"task #{result['task_code']} · workdir {result['workdir']}")
+    return seg + (f" · report GAGAL: {result['report_problem']}" if result.get("report_problem") else "")
+
+
 def sync_push(a, root: Path, config, problems) -> int:
-    """`--push`: task → workdir → dokumen rencana, lalu satu baris segmen."""
+    """`--push`: task → workdir → dokumen rencana (dan report), lalu satu baris segmen."""
     ctx = None
     if not problems and config is not None:
         ctx, problems = sync_context(a, root, config)
@@ -800,9 +1016,82 @@ def sync_push(a, root: Path, config, problems) -> int:
     elif config is None:
         result = {"status": "SKIP"}
     else:
-        diff = lambda text: _diff(ctx["docs"], text)  # noqa: E731
-        result = ns.run_push(root, config, lambda s: ns.push_workdir(s, ctx["head"], diff, dup_label="workdir_key"))
-    return ns.emit_push(result, a.json, ns.push_segment(result, f"workdir {result.get('workdir', '')}"))
+        result = ns.run_push(root, config, lambda s: push_plan(s, ctx["head"], ctx["docs"]))
+    return ns.emit_push(result, a.json, plan_segment(result))
+
+
+def task_lookup_args(raw: str):
+    """`--ref` → `(argumen get_task, masalah)`: UUID → `task_id`; `#12`/`12` → `code`."""
+    ref = raw.strip().lstrip("#")
+    if ns.UUID_RE.match(ref):
+        return {"task_id": ref.lower()}, ""
+    if ref.isdigit() and int(ref) >= 1:
+        return {"code": int(ref)}, ""
+    return None, f"`--ref {raw}` bukan kode task (`12`, `#12`) atau UUID"
+
+
+def cmd_task(a) -> int:
+    """Baca task acuan (41 D1) → judul, status, workspace, dan description apa adanya (spesifikasi rencana).
+    `--plan` menautkannya ke rencana DRAFT (`Nataflow-Task: <uuid>`); tautan yang sudah ada tidak bisa diganti."""
+    import nataflow_client as nc
+    root = sync_root()
+    config, problems = ns.load_config(root)
+    if not problems and config is None:
+        problems = [f"{ns.CONFIG_FILE} tidak ada — task acuan butuh sinkron nataflow aktif; rencanakan dari "
+                    f"permintaan user"]
+    args, problem = task_lookup_args(a.ref)
+    problems += [problem] if problem else []
+    plan = None
+    if not problems and a.plan:
+        path, rel = root_relative(root, a.plan)
+        if path is None or not path.is_file():
+            problems.append(rel if path is None else f"{rel} tidak ada")
+        else:
+            try:
+                plan = Plan(path)
+                if plan.meta().get("Status") != "DRAFT":
+                    problems.append(f"{rel} bukan DRAFT — task acuan ditautkan sebelum approval")
+            except UnicodeDecodeError:
+                problems.append(f"{rel} bukan UTF-8 — pulihkan dari git; jangan menebak isinya")
+            except SystemExit as exc:                     # kunci metadata ganda
+                problems.append(str(exc.code).removeprefix("FAIL: "))
+    key, kp = ns.load_key(root) if not problems else ("", [])
+    problems += kp
+    if problems:
+        return ns.emit_fail(a.json, "TASK", problems)
+    try:
+        with nc.Session(config["url"], key) as s:
+            row = s.call_json("get_task", args, read=True)
+    except nc.NataflowError as exc:
+        return ns.emit_fail(a.json, "TASK", [exc.message])
+    tid = str(row.get("id") or "").lower() if isinstance(row, dict) else ""
+    if not ns.UUID_RE.match(tid):
+        return ns.emit_fail(a.json, "TASK", ["balikan get_task tanpa `id` UUID"])
+    status, code = str(row.get("status") or ""), row.get("code") or tid
+    if status == "cancelled":
+        return ns.emit_fail(a.json, "TASK", [f"task #{code} berstatus cancelled — tidak dipakai sebagai acuan"])
+    if plan is not None:
+        cur, problem = task_ref(plan.meta())
+        if problem or (cur and cur != tid):
+            return ns.emit_fail(a.json, "TASK", [problem or f"rencana sudah menaut ke task {cur} — tautan tidak "
+                                                            f"diganti; pakai nama rencana baru"])
+        plan.set_meta(Nataflow_Task=tid)
+        plan.save()
+    out = {"status": "PASS", "id": tid, "code": row.get("code"), "title": row.get("title") or "",
+           "task_status": status, "workspace": (row.get("workspace") or {}).get("name") or "",
+           "source": (row.get("metadata") or {}).get("source") or "", "linked": plan is not None,
+           "description": row.get("description") or ""}
+    if a.json:
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        return 0
+    print(f"TASK PASS: #{code} · {status} · workspace {out['workspace'] or '-'} · sumber {out['source'] or '-'} · "
+          f"id {tid}" + (" · ditautkan ke rencana" if plan is not None else ""))
+    if status == "done":
+        print("PERINGATAN: task sudah done — tanyakan user sebelum merencanakan kerja baru di bawahnya")
+    print(f"JUDUL: {out['title']}")
+    print("DESKRIPSI:")
+    print(out["description"] or "(kosong)")
+    return 0
 
 
 def main_sync(a) -> None:
@@ -819,11 +1108,13 @@ def main_sync(a) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description="Kunci rencana quickdev")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in ("lock", "verify", "start", "baseline", "close", "confirm", "status", "unlock", "commit"):
+    for name in ("lock", "verify", "start", "baseline", "close", "summary", "confirm", "status", "unlock", "commit"):
         s = sub.add_parser(name)
         s.add_argument("--plan", required=True)
         if name == "baseline":
             s.add_argument("--summary", required=True, help="ringkasan baseline segar per perintah (`-` = stdin)")
+        if name == "summary":
+            s.add_argument("--summary", required=True, help="ringkasan naratif 1–3 kalimat hasil eksekusi (`-` = stdin)")
         if name in ("lock", "confirm"):
             s.add_argument("--answer", required=True)
         if name == "start":
@@ -846,9 +1137,15 @@ def main() -> None:
                                                            "satu baris segmen")
     phase.add_argument("--remote", default=None, help="balikan list_document include_content=false (`-` = stdin)")
     s.add_argument("--json", action="store_true")
+    s = sub.add_parser("task")
+    s.add_argument("--ref", required=True, help="kode task (`12`, `#12`) atau UUID task nataflow acuan")
+    s.add_argument("--plan", default="", help="rencana DRAFT yang ditautkan (`Nataflow-Task`)")
+    s.add_argument("--json", action="store_true")
     a = ap.parse_args()
     if a.cmd == "sync-payload":
         main_sync(a)
+    if a.cmd == "task":
+        sys.exit(cmd_task(a))
     path = Path(a.plan)
 
     def die(msg: str) -> None:

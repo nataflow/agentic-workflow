@@ -156,7 +156,7 @@ class Nataflow:
         self.tasks: List[Dict[str, Any]] = []
         self.workdirs: List[Dict[str, Any]] = []
         self.docs: List[Dict[str, Any]] = []
-        for name in ("list_task", "create_task", "update_task", "update_task_status", "upsert_workdir",
+        for name in ("list_task", "get_task", "create_task", "update_task", "update_task_status", "upsert_workdir",
                      "list_workdir", "list_document", "upsert_document", "create_document", "get_document",
                      "get_project_info", "list_workspace", "list_artifacts", "get_artifact", "upsert_artifact"):
             fake.tools[name] = getattr(self, name)
@@ -193,6 +193,17 @@ class Nataflow:
                 return t
         raise ToolError("task not found")
 
+    def get_task(self, args: Dict[str, Any]) -> Any:
+        """`taskDetailView`: lewat `task_id`, atau `code` bila `task_id` kosong (langkah 41)."""
+        if args.get("task_id"):
+            t = self._task(args["task_id"])
+        else:
+            hit = [t for t in self.tasks if t["code"] == args.get("code")]
+            if not hit:
+                raise ToolError("task not found")
+            t = hit[0]
+        return dict(self._task_view(t), description=t["description"], metadata=t["metadata"])
+
     def update_task(self, args: Dict[str, Any]) -> Any:
         t = self._task(args["task_id"])
         for k in ("title", "description"):
@@ -223,9 +234,12 @@ class Nataflow:
         return {"action": action, "id": w["id"], "name": w["name"], "key": w["key"], "slug": w["name"], "task": None}
 
     def list_workdir(self, args: Dict[str, Any]) -> Any:
+        codes = {t["id"]: t["code"] for t in self.tasks}
         return [{"id": w["id"], "workspace_id": w["workspace_id"], "key": w["key"], "name": w["name"],
-                 "status": w["status"], "task_id": w["task_id"]} for w in self.workdirs
+                 "status": w["status"], "task_id": w["task_id"],
+                 "task": {"code": codes[w["task_id"]]} if w["task_id"] in codes else None} for w in self.workdirs
                 if (not args.get("task_id") or w["task_id"] == args["task_id"])
+                and (not args.get("key") or w["key"] == args["key"])
                 and (not args.get("workspace_id") or w["workspace_id"] == args["workspace_id"])]
 
     # dokumen

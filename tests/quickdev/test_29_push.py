@@ -49,7 +49,7 @@ def push(repo, *args):
 def test_rencana_task_workdir_dokumen(repo, fake):
     f, nf = fake
     code, out = push(repo, "--plan", "plan/t.md")
-    assert code == 0 and out["segment"] == "workdir t · 1 dokumen (1 baru, 0 diperbarui, 0 sama)", out
+    assert code == 0 and out["segment"] == "task #1 · workdir t · 1 dokumen (1 baru, 0 diperbarui, 0 sama)", out
     assert nf.tasks[0]["status"] == "in_progress" and nf.tasks[0]["metadata"]["source"] == "quickdev"
     assert nf.docs[0]["key"] == "t.md" and nf.docs[0]["type"] == "quickdev.plan"
     assert "Tambah validasi kuota" not in json.dumps(out)
@@ -79,12 +79,15 @@ def test_tanpa_config_dilewati(make_repo):
     assert (code, out["segment"]) == (0, "dilewati")
 
 
-def test_rencana_draft_gagal_tanpa_panggilan(make_repo, fake):
-    f, _ = fake
+@pytest.mark.regression("41 D2")
+def test_rencana_draft_didorong_task_tetap_todo(make_repo, fake):
+    f, nf = fake
     root = make_repo({"plan/t.md": PLAN})
     enable_sync(root, f.url)
     code, out = push(root, "--plan", "plan/t.md")
-    assert code == 1 and "belum pernah dikunci" in out["segment"] and f.requests == []
+    assert code == 0 and out["segment"].startswith("task #1 · workdir t · 1 dokumen (1 baru"), out
+    assert nf.tasks[0]["status"] == "todo" and "update_task_status" not in f.tool_names()
+    assert nf.docs[0]["metadata"]["status"] == "DRAFT"
 
 
 def test_push_dan_remote_saling_eksklusif(repo):

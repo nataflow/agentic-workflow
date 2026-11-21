@@ -57,10 +57,12 @@ def test_config_rusak_fail(repo):
     assert code == 1 and out["status"] == "FAIL" and "bukan UUID" in out["problems"][0]
 
 
-@pytest.mark.regression("15 Q13")
-def test_rencana_draft_ditolak(repo):
+@pytest.mark.regression("41 D2")
+def test_rencana_draft_didorong_tanpa_menggeser_task(repo):
+    """D2 lama (15 Q13) dibalik: rencana DRAFT terbaca di nataflow sebelum approval, task baru tetap `todo`."""
     code, out = payload(repo, "--plan", "plan/t.md")
-    assert code == 1 and "belum pernah dikunci" in out["problems"][0]
+    assert code == 0 and out["status"] == "PASS" and out["task"]["status"] is None
+    assert json.loads(out["workdir"]["metadata"])["plan_status"] == "DRAFT" and out["documents_total"] == 1
 
 
 def test_rencana_tidak_ada_dan_bukan_utf8(repo):
