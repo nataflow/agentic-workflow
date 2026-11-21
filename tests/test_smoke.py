@@ -18,6 +18,7 @@ from conftest import GIT_ENV, PLUGINS, git
 BE_TD = "backenddev/docs/2609250000-smoke"
 FE_TD = "frontenddev/docs/2609250000-smoke"
 AN_TD = "analyst/tickets/2609250000-smoke"
+BE_TK = "backenddev/tickets/2609250000-smoke"
 AN_NT = "analyst/notulen/2609250000-smoke"
 PR_TD = "product/smoke"
 HOOK_STDIN = "SESSION"  # diganti payload SessionStart ber-cwd repo
@@ -103,6 +104,11 @@ CASES = [
     ("backend/skills/system-analysis/scripts/check_preconditions.py", ["--taskdir", BE_TD, "--json"], True, None),
     ("backend/skills/task/scripts/check_preconditions.py", ["--taskdir", BE_TD, "--json"], True, None),
     ("backend/skills/tech-lead/scripts/check_preconditions.py", ["--json"], True, None),
+    ("backend/skills/ticket/scripts/check_preconditions.py", ["--json"], True, None),
+    ("backend/skills/ticket/scripts/ticket.py", ["state", "--all", "--json"], True, None),
+    ("backend/skills/ticket/scripts/ticket.py", ["check", "--ticketdir", BE_TK, "--json"], True, None),
+    ("backend/skills/ticket/scripts/ticket.py", ["sync", "--ticketdir", BE_TK, "--json"], True, None),
+    ("backend/skills/ticket/scripts/ticket.py", ["sync", "--ticketdir", BE_TK, "--push", "--json"], True, None),
 
     ("frontend/hooks/detect.py", ["--plugin", "frontend"], "hook", HOOK_STDIN),
     ("frontend/hooks/guard_bash.py", ["hook"], "hook", BASH_STDIN),
@@ -152,7 +158,7 @@ NOT_UTF8 = b"\xff\xfe\x80 bukan utf-8 \xc3\x28\n"
 CORRUPT = [f"{td}/{doc}" for td in (BE_TD, FE_TD) for doc in
            ("TASK.md", "brief-01.md", "REVIEW.md", "REPORT.md")] + [
     f"{BE_TD}/BRD.md", f"{BE_TD}/PRD.md", f"{BE_TD}/HALT.md", f"{BE_TD}/RCA.md",
-    f"{FE_TD}/FLOW.md", f"{FE_TD}/UI.md", f"{FE_TD}/CONTRACT.md", f"{AN_TD}/TICKET.md", f"{AN_NT}/NOTULEN.md", "analyst/nataflow.json",
+    f"{FE_TD}/FLOW.md", f"{FE_TD}/UI.md", f"{FE_TD}/CONTRACT.md", f"{AN_TD}/TICKET.md", f"{BE_TK}/TICKET.md", f"{AN_NT}/NOTULEN.md", "analyst/nataflow.json",
     f"{PR_TD}/CHARTER.md",
     ".claude/nataflow.json",
     "frontenddev/reviews/2609250000-smoke.md", "plan/smoke.md",

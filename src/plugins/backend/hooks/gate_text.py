@@ -12,7 +12,9 @@ WAJIB lewat gerbang:
 - susulan di tengah sesi, sekecil apa pun — "sekalian ganti X", "oh iya Y juga"
 - menjalankan artefak backend yang sudah ada (brief, `TASK.md`, `RCA.md`) — apa pun statusnya
 
-LEWATI hanya empat:
+LEWATI hanya lima:
+- permintaan membuat tiket teknis untuk dikerjakan nanti — "buatkan tiket …", "tiketkan …", `/backend:ticket`, atau
+  susulan di tengah skill itu — langsung ke `backend:ticket`; mengerjakan tiketnya tetap lewat gerbang ini
 - jawaban user yang memasok informasi ke rute yang sudah diputuskan gerbang di giliran sebelumnya
 - pertanyaan pengetahuan umum yang tidak menyentuh repo
 - operasi VCS (commit, push, PR, rebase, diff) atas kerja yang sudah selesai

@@ -40,6 +40,15 @@ def test_lewati_mentions_other_plugins(plugin):
     assert "/nataflow:*" in text            # 25 R5: create-artifact mengklaim bebas gerbang engineer
 
 
+@pytest.mark.regression("40 T1")
+def test_lewati_tiket_cepat_hanya_backend():
+    """Permintaan tiket teknis langsung ke `backend:ticket`; frontend belum punya skill itu (keputusan 40)."""
+    be = _load("backenddev", "gate_text").render(_verdict("backenddev", "OK"))
+    fe = _load("frontenddev", "gate_text").render(_verdict("frontenddev", "OK"))
+    assert "`/backend:ticket`" in be and "LEWATI hanya lima" in be
+    assert "ticket" not in fe
+
+
 @pytest.mark.parametrize("plugin", list(GATES))
 @pytest.mark.parametrize("state", STATES)
 def test_render_all_states_valid(plugin, state):
