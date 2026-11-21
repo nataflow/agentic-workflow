@@ -27,7 +27,7 @@ Dokumen taskdir hanya ada di disk dan tidak pernah di-commit (Langkah 24); nataf
 
 Jalankan `<sync_payload.py> --taskdir <taskdir> --push`, atau `<sync_payload.py> --repo-docs <audit | api | profile> --push` untuk dokumen repo (target per titik panggil di tabel atas).
 
-Skrip membaca config dan MCP key, memilih dokumen yang stabil, lalu memanggil sendiri tool server nataflow: cari task lewat identitasnya (buat bila belum ada), `upsert_workdir` di workspace task induknya, manifest `list_document`, `upsert_document` hanya untuk dokumen yang berbeda, lalu status task. Task tiket analyst baru ditutup `done` bila seluruh workdir di bawahnya tuntas. Isi dokumen tidak pernah lewat konteks model.
+Skrip membaca config dan MCP key, memilih dokumen yang stabil, lalu memanggil sendiri tool server nataflow: cari task lewat identitasnya (buat bila belum ada), `upsert_workdir` di workspace task induknya, manifest `list_document`, `upsert_document` hanya untuk dokumen yang berbeda, lalu status task. Taskdir bertiket `backend:ticket` menempel ke task yang dicerminkan `ticket.py sync` (identitas `{"source":"backenddev","ticket_key":<ticketdir>}`, Langkah 40) dan diperlakukan sama dengan task tiket analyst. Task tiket analyst baru ditutup `done` bila seluruh workdir di bawahnya tuntas. Isi dokumen tidak pernah lewat konteks model.
 
 Keluarannya tepat satu baris, yang disalin apa adanya sebagai segmen:
 

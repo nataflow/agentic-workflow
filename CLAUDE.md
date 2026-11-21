@@ -94,6 +94,12 @@ skeletons), `dispatcher/` (prompts used to dispatch subagents), `scripts/`, and 
   `approved_seal` + ledger tick `@ APPROVED <sidik12>`), `lock-briefs` (`sidik_kontrak`), `tick --hop BRIEF`,
   `cabut-halt` (`HALT.md` `status: DICABUT`), `buka-done` (the only `DONE → READY`, when no unit commit proves it). Brief DONE is proven by a code commit with the brief's
   `commit_message` in `base_commit..HEAD`; `REVIEW.md` is stale once code lands after its `range:` head.
+  `backend:ticket` (step 40) is the one gate-free entry: a quick technical ticket for later, no subagent, 3 code reads,
+  `skills/ticket/scripts/ticket.py` (`new`/`check`/`approve`/`reopen`/`cancel`/`state`/`sync`) writes
+  `backenddev/tickets/<YYMMDDhhmm>-<slug>/TICKET.md` under a self-ignoring `*` marker (never committed), seals it with
+  the analyst `ticket_seal`, and mirrors READY tickets to nataflow as `{"source":"backenddev","ticket_key":…}`. It is
+  accepted as `ticket_source` (`be_ticket_verdict`: READY + seal, no `elicitation`), and `sync_payload.ticket_key`
+  derives the same identity so the taskdir workdir attaches to the ticket's task. No `frontend:ticket` yet.
 - **frontend** — same shape with entry `frontend:lead`: TASK → FLOW (ux-design) → UI (ui-design) →
   CONTRACT → briefs → architect → review → report, under `frontenddev/docs/<taskdir>/` (gitignored, never
   committed). Progress is an approval **ledger** managed by `_common/chain.py`, which also writes the

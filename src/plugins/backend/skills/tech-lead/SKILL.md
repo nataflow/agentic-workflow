@@ -23,7 +23,7 @@ description: Gunakan ketika ada permintaan kerja baru atau susulan di repo backe
 - `base_branch` — string — `[OPTIONAL]` — Acuan pencabangan; default dari profil; keduanya kosong → hentikan.
 - `strict_mode` — boolean — default `false` — `true` → naikkan risk level 1 tingkat (Keputusan 2).
 - `feature_slug` — string — `[OPTIONAL]` — Slug `<domain>-<jenis-kerja>`; default 2–4 kata dari `request`.
-- `ticket_source` — string — default `""` — Path `TICKET.md` `READY` analyst (`references/gate-scope.md` bagian 4 B-2); jangan ditebak dari `request`.
+- `ticket_source` — string — default `""` — Path `TICKET.md` `READY` analyst/`backend:ticket` (`references/gate-scope.md` B-2); jangan ditebak dari `request`.
 
 ## Workflow
 

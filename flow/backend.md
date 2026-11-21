@@ -1,6 +1,6 @@
 # Alur Plugin `backend`
 
-> Plugin `backend` (v0.18.0, `src/plugins/backend/.claude-plugin/plugin.json`) menyediakan 12 skill dan 6 subagent untuk kerja backend lintas-stack: Java Spring, Go, Node, Bun, Rust, PHP, dan CodeIgniter 4. Plugin ini dipakai untuk tiap permintaan kerja di repo backend, yaitu fitur, bugfix, audit, dokumentasi API, maupun pertanyaan tentang kode. Semua permintaan masuk lewat satu gerbang, `backend:tech-lead`. Gerbang itu memutuskan lane, risk level, dan taskdir dari kode aktual sebelum satu brief ditulis atau satu berkas `src/` disentuh. Plugin sengaja dibuat generic: pengetahuan spesifik-repo disimpan di `.claude/profile/backenddev/`, sedangkan pengetahuan spesifik-stack disimpan di adapter `skills/profile/stacks/<stack>.md`. Dokumen taskdir (`backenddev/docs/`) diabaikan git dan tidak pernah di-commit (Langkah 24): keutuhannya dijaga materai di disk yang ditulis `doc_seal.py`, dan cermin nataflow menjadi satu-satunya salinannya di luar mesin kerja. Yang masih di-commit hanya kode dan artefak tingkat repo (profil, laporan audit, indeks issues, `docs/api/`).
+> Plugin `backend` (v0.18.0, `src/plugins/backend/.claude-plugin/plugin.json`) menyediakan 13 skill dan 6 subagent untuk kerja backend lintas-stack: Java Spring, Go, Node, Bun, Rust, PHP, dan CodeIgniter 4. Plugin ini dipakai untuk tiap permintaan kerja di repo backend, yaitu fitur, bugfix, audit, dokumentasi API, maupun pertanyaan tentang kode. Semua permintaan kerja masuk lewat satu gerbang, `backend:tech-lead`; satu-satunya pengecualian adalah `backend:ticket` (Langkah 40), yang hanya mencatat tiket teknis kecil untuk dikerjakan nanti. Gerbang itu memutuskan lane, risk level, dan taskdir dari kode aktual sebelum satu brief ditulis atau satu berkas `src/` disentuh. Plugin sengaja dibuat generic: pengetahuan spesifik-repo disimpan di `.claude/profile/backenddev/`, sedangkan pengetahuan spesifik-stack disimpan di adapter `skills/profile/stacks/<stack>.md`. Dokumen taskdir (`backenddev/docs/`) diabaikan git dan tidak pernah di-commit (Langkah 24): keutuhannya dijaga materai di disk yang ditulis `doc_seal.py`, dan cermin nataflow menjadi satu-satunya salinannya di luar mesin kerja. Yang masih di-commit hanya kode dan artefak tingkat repo (profil, laporan audit, indeks issues, `docs/api/`).
 
 Semua path berkas di dokumen ini relatif terhadap `src/plugins/backend/`.
 
@@ -13,6 +13,7 @@ Semua path berkas di dokumen ini relatif terhadap `src/plugins/backend/`.
 | `backend:debug` | skill (titik masuk user) | Membuktikan rantai kausal `file:line` lalu menulis `RCA.md` | `skills/debug/SKILL.md` |
 | `backend:audit` | skill (titik masuk user) | Menyapu 6 dimensi konvensi arsitektur lalu menulis laporan ke `backenddev/issues/` | `skills/audit/SKILL.md` |
 | `backend:document-api` | skill (titik masuk user) | Memetakan endpoint nyata di kode ke `docs/api/<slug>.md` | `skills/document-api/SKILL.md` |
+| `backend:ticket` | skill (titik masuk user, bebas gerbang) | Tiket teknis cepat berbukti `path:baris` di `backenddev/tickets/`, lokal tanpa commit, dicerminkan ke nataflow (40) | `skills/ticket/SKILL.md` |
 | `backend:architect` | skill (titik masuk user) | Orkestrasi sekuensial brief READY, verifikasi penutup, dan review tunggal | `skills/architect/SKILL.md` |
 | `backend:analyst` | skill (`user-invocable: false`) | Orkestrasi rantai TASK/BRD/PRD/brief beserta gerbang approval dokumen | `skills/analyst/SKILL.md` |
 | `backend:task` | skill (`user-invocable: false`) | Menulis akar rantai `TASK.md` | `skills/task/SKILL.md` |
@@ -44,6 +45,7 @@ Semua path berkas di dokumen ini relatif terhadap `src/plugins/backend/`.
 | `scaffold_brief.py` | script | Mengunci matriks alokasi, lalu menulis kerangka brief | `skills/plan/scripts/scaffold_brief.py` |
 | `validate_briefs.py` | script | Validasi batch dan per-brief, serta state ronde review brief | `skills/plan/scripts/validate_briefs.py` |
 | `symbol_map.py` | script | Peta simbol yang disunting satu commit, dicocokkan dengan kolom `Anchor` dan deklarasi baru di `## Steps` (`--brief`) | `skills/architect/scripts/symbol_map.py` |
+| `ticket.py` | script | Siklus tiket cepat: `state`, `new` (penanda ignore `backenddev/tickets/.gitignore`), `check`, `approve` (segel `approved_seal`/`approved_seal_norm`), `reopen`, `cancel`, `sync` (`--push`); tidak pernah meng-commit | `skills/ticket/scripts/ticket.py` |
 | `close_brief.py` | script | Satu vonis penutup per brief: sisa berkas, scope, simbol, cabut lease (32 C1) | `skills/architect/scripts/close_brief.py` |
 | `render_prompt.py` | script | Render template dispatcher ke `.explore/prompt/`; prompt subagent = satu baris ringkasan maksud + kalimat rujukan berkas (32 T1) | `skills/_common/render_prompt.py` |
 | `migrate_profile.py` | script | Memindah profil lama `.claude/profile/` ke `.claude/profile/backenddev/` via `git mv` | `skills/profile/scripts/migrate_profile.py` |
@@ -461,6 +463,23 @@ flowchart TD
 - **Gerbang & commit**: skill ini tidak meng-commit. Keputusan commit milik user atau gerbang (Fase 5).
 - **Lanjut ke**: `backend:tech-lead` (commit, lalu rantai selesai).
 
+### `backend:ticket`
+
+- **Pemicu / kapan dipakai**: user meminta tiket teknis backend yang kecil dan sudah jelas untuk dikerjakan nanti ("buatkan tiket …", `/backend:ticket`). Gerbang SessionStart melewatkannya langsung ke skill ini; mengerjakan tiketnya tetap lewat `backend:tech-lead`.
+- **Prasyarat**: `scripts/check_preconditions.py`, 5 check: repo git, profil sah, templat ada, `backenddev/tickets/` dapat ditulis, dan tidak ada tiket ter-track. Tidak menuntut tree bersih, branch kerja, atau taskdir.
+- **Langkah**:
+  1. **Fase 1**: rumusan perubahan, slug, dan judul; `ticket.py state` untuk tiket kembar.
+  2. **Fase 2**: telusur ringan dipandu `surface-map.md`/`domain-map.md`, jatah 3 kali baca berkas kode.
+  3. **Fase 3**: penjaga ukuran — letak tidak terbukti → `tech-lead`; lebih dari satu perubahan → pecah; butuh keputusan bisnis → `analyst:intake`; bug tanpa penyebab → `debug`; lebih dari 5 AC.
+  4. **Fase 4**: paling banyak satu `AskUserQuestion`.
+  5. **Fase 5**: `ticket.py new`, isi lima seksi (`Permintaan`, `Kondisi Sekarang`, `Perubahan`, `Acceptance Criteria`, `Dampak Kontrak`), lalu `ticket.py check` sampai PASS.
+  6. **Fase 6 (blocking)**: kartu disajikan; Setujui → `ticket.py approve`, Revisi, atau Batal → `ticket.py cancel`.
+  7. **Fase 7**: `ticket.py sync --push`.
+- **Subagent yang didispatch**: tidak ada.
+- **Output / artefak**: `backenddev/tickets/<YYMMDDhhmm>-<slug>/TICKET.md` dan `### TICKET — READY · <ticketdir>/TICKET.md · segel <segel> · nataflow <segmen>`.
+- **Gerbang & commit**: tidak ada commit; tiket diabaikan git lewat penanda `*`. Tiket tidak menulis risk (Keputusan 2 `tech-lead`), hanya `## Dampak Kontrak` (`aditif` | `mengubah` | `menghapus` | `tidak ada`).
+- **Lanjut ke**: sesi lain, `/backend:tech-lead` dengan `ticket_source <ticketdir>/TICKET.md`.
+
 ## Subagent
 
 | Agent | Dipanggil oleh | Tools | Input | Output/vonis | Larangan |
@@ -514,6 +533,9 @@ backenddev/
       .explore/                    scratch skill hilir: gate-*.md, brief-spec.json, brief-matrix.md,
                                    verification-baseline.json, closing-verification.md, counters-log.json,
                                    review/<brd|prd|brief>.md (balikan reviewer ronde terakhir)
+  tickets/                         seluruhnya diabaikan git (Langkah 40)
+    .gitignore                     penanda berisi * tulisan ticket.py new
+    <YYMMDDhhmm>-<slug>/TICKET.md  tiket cepat backend:ticket: DRAFT → READY (bersegel) | CANCELLED
   issues/                          ter-commit
     README.md                      indeks temuan audit dan review
     <yyyy-mm-dd>-<NNN>-issues.md
@@ -535,6 +557,7 @@ docs/api/<slug>.md                 ter-commit
 | `REPORT.md` | `report` | Ringkasan, Perubahan, Catatan. Menandai taskdir tuntas bersama `REVIEW.md` |
 | `backenddev/issues/*.md` | `audit`. Baris `> Status: FIXED` ditulis `code-implementor` | Temuan tanpa penanda / `DEFERRED` / `FIXED` / `DROPPED` / `OBSOLETE` |
 | `docs/api/<slug>.md` | `document-api` | `DOCUMENTED` / `PARTIAL` (ada `UNVERIFIED`) |
+| `backenddev/tickets/<td>/TICKET.md` | `ticket` (`ticket.py`) | `kind: backend-ticket`, `DRAFT` → `READY` (`approved_seal`, `approved_seal_norm`, `approvals`) → `CANCELLED`; `reopen` READY/DRIFT → DRAFT. Isi berubah sesudah READY = `DRIFT` (dibaca dari segel, bukan status). Tidak pernah di-commit |
 
 **Siklus status brief** (`skills/architect/references/lifecycle-recovery.md` bagian 1, `skills/_common/brief_status.py`):
 
@@ -580,7 +603,7 @@ Ledger `## Chain` di `TASK.md` berjalan `- [ ]` → `- [x] … @ APPROVED <sidik
 | `report` | — | `REPORT.md` |
 | `debug` | — | `RCA.md` |
 
-`audit` dan `document-api` tidak meng-commit sendiri; gerbang yang meng-commit hasilnya. Staging selalu memakai path eksplisit. `git add .`/`-A` dan `git add -f` atas path di bawah `backenddev/docs/` dilarang.
+`ticket` tidak pernah meng-commit (tiketnya diabaikan git). `audit` dan `document-api` tidak meng-commit sendiri; gerbang yang meng-commit hasilnya. Staging selalu memakai path eksplisit. `git add .`/`-A` dan `git add -f` atas path di bawah `backenddev/docs/` dilarang.
 
 ## Handoff Lintas Plugin
 
@@ -591,7 +614,8 @@ Ledger `## Chain` di `TASK.md` berjalan `- [ ]` → `- [x] … @ APPROVED <sidik
   - Tiket `type: TECH` (kartu teknis lead engineer): `D-{n}`/`C-{n}` dirujuk `TD-{n}`/`TC-{n}` dan dihitung disepakati, BRD tidak dijadwalkan (`analyst/references/chain-rules.md` bagian 1.1), dan bukti `path:baris` kartu menjadi titik awal Fase 1, bukan kebenaran final (`tech-lead/references/gate-scope.md` B-2 butir 6).
   - Syarat tiket: frontmatter `status: READY` dan `elicitation: CLOSED`, dan isi berkas sama dengan `approved_seal`. Tiket lama tanpa segel dinilai dari commit terakhir berkas itu, yang harus bersubjek `docs(ticket): kunci TICKET <slug> READY` atau `docs(ticket): ref TICKET <slug>`, dengan berkas bersih. Syarat ini dinilai prasyarat `task` check 7. Bila gagal, tiket dikembalikan ke `analyst:spec`.
   - Skill `backend:analyst` berbeda dari plugin `analyst`.
-- **Cermin nataflow**: taskdir bertiket menempel ke task yang sama dengan tiket analyst (metadata `ticket_key` = direktori `ticket_source`), sehingga taskdir backend dan frontend dari satu tiket bernaung di satu task. Config `.claude/nataflow.json` dibaca bersama keempat plugin.
+- **Dari `backend:ticket`** (Langkah 40). Path `backenddev/tickets/<YYMMDDhhmm>-<slug>/TICKET.md` lewat `ticket_source` yang sama (B-2 butir 7): `request` = seluruh kartu, hanya `AC-{n}` (→ `TAC-{n}`), syarat `status: READY` dengan `approved_seal` cocok tanpa `elicitation` dan tanpa subjek commit. Gagal → kembali ke `backend:ticket` (`ticket.py reopen`). Frontend belum menerima tiket ini.
+- **Cermin nataflow**: taskdir bertiket menempel ke task yang sama dengan tiketnya (metadata `ticket_key` = direktori `ticket_source`; `source` `analyst` untuk tiket analyst, `backenddev` untuk tiket `backend:ticket` yang dicerminkan `ticket.py sync`), sehingga taskdir backend dan frontend dari satu tiket bernaung di satu task. Config `.claude/nataflow.json` dibaca bersama keempat plugin.
 - **`frontend`**: profil terpisah (`.claude/profile/frontenddev/` vs `.claude/profile/backenddev/`). Di repo fullstack, kedua hook menyala dengan deteksinya masing-masing. Deteksi backend hanya membaca `dependencies` server.
 - **`quickdev`**: permintaan `/quickdev:*` dilewati gerbang. Repo yang sepenuhnya memakai quickdev menulis `.claude/workflow`.
 - **`.claude/workflow`**: berkas teks berisi daftar plugin yang boleh menggerbangi repo (dipisah spasi, koma, atau baris). Bila berkas ada dan tidak memuat `backend`, hook SessionStart backend diam.

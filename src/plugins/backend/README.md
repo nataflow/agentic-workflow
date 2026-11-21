@@ -1,9 +1,10 @@
 # backend
 
 Plugin Claude Code untuk kerja backend lintas-stack: Java Spring, Go, Node, Bun, Rust, PHP, dan
-CodeIgniter 4. Dua belas skill dan enam subagent, dengan satu gerbang masuk, `backend:tech-lead`, yang
+CodeIgniter 4. Tiga belas skill dan enam subagent, dengan satu gerbang masuk, `backend:tech-lead`, yang
 memutuskan lane, risk level, dan taskdir dari kode sebelum satu brief ditulis atau satu berkas `src/`
-disentuh.
+disentuh. Satu pengecualian: `backend:ticket` mencatat tiket teknis kecil untuk dikerjakan nanti tanpa
+menyentuh kode.
 
 Plugin ini sengaja generic. Pengetahuan spesifik-repo hidup di `.claude/profile/backenddev/`, disiapkan
 sekali lewat skill `profile`. Pengetahuan spesifik-stack hidup di satu adapter
@@ -36,7 +37,7 @@ stack repo sendiri (build, test) dibutuhkan untuk baseline profil.
 Lalu di tiap repo backend, sekali: `/backend:profile`, atau cukup ajukan permintaan kerja pertama.
 `tech-lead` merutekan lane `PROFILE` lebih dulu bila profil belum ada.
 
-## Dua Belas Skill
+## Tiga Belas Skill
 
 | Skill | Titik masuk user | Peran |
 |---|---|---|
@@ -45,6 +46,7 @@ Lalu di tiap repo backend, sekali: `/backend:profile`, atau cukup ajukan permint
 | `backend:debug` | ya | pembuktian rantai kausal `file:line` ke `RCA.md` |
 | `backend:audit` | ya | sapuan 6 konvensi arsitektur ke `backenddev/issues/` |
 | `backend:document-api` | ya | endpoint nyata dipetakan ke `docs/api/` |
+| `backend:ticket` | ya | tiket teknis cepat berbukti `path:baris`, lokal tanpa commit, dicerminkan ke nataflow |
 | `backend:architect` | ya | orkestrasi sekuensial brief READY dan review penutup |
 | `backend:analyst` | — | orkestrasi rantai TASK/BRD/PRD/brief dan gerbang approval |
 | `backend:task` | — | akar rantai `TASK.md` |
@@ -154,6 +156,10 @@ backenddev/
       HALT.md  REVIEW.md  REPORT.md
       JOURNEY.md                     keputusan antar sesi (journey.py), bukan sumber status
       .explore/                      scratch skill hilir; laporan explorer utuh
+  tickets/                           diabaikan git, tidak pernah di-commit (Langkah 40)
+    .gitignore                       `*` — ditulis `ticket.py new`
+    2611211030-tambah-username/      <YYMMDDhhmm>-<slug>
+      TICKET.md                      DRAFT → READY (bersegel) | CANCELLED
   issues/
     README.md                        indeks temuan audit
     2026-09-23-001-issues.md
@@ -288,9 +294,12 @@ tidak menulis berkas dan tidak meng-commit, dan kegagalannya tidak menahan ranta
   kosong → workspace milik key, satu entri → otomatis, lebih dari satu → user memilih saat task baru atau
   dokumen repo disinkron), `pic_id`, dan `repo` (default: remote `origin` ternormalisasi). Berkas absen → dilewati, dan prasyarat `task` mencetak `[PERINGATAN]` karena dokumen taskdir lalu
   hanya ada di disk; ada tetapi rusak (termasuk `mcp_server` lama) → `GAGAL`. MCP key di `.claude/nataflow.local.json` (`{"mcp_key": "…"}`, tidak pernah di-commit; di repo git wajib diabaikan git, bila tidak sinkron menolak berjalan). Skrip memanggil server sendiri lewat `url`; server tidak perlu didaftarkan di Claude Code.
-- **Jangkar**: satu taskdir = satu workdir `backenddev:<repo>:<path taskdir>`, tertaut ke task tiket analyst
-  bila `TASK.md` membawa `ticket_source` (taskdir frontend dari tiket yang sama bernaung di task itu juga),
-  atau ke task baru dari `TASK.md`.
+- **Jangkar**: satu taskdir = satu workdir `backenddev:<repo>:<path taskdir>`, tertaut ke task tiket bila
+  `TASK.md` membawa `ticket_source` — tiket analyst (taskdir frontend dari tiket yang sama bernaung di task itu
+  juga) atau tiket `backend:ticket` — atau ke task baru dari `TASK.md`.
+- **Tiket cepat**: `ticket.py sync --push` sesudah `approve` membuat atau memperbarui task beridentitas
+  `{"source":"backenddev","ticket_key":<ticketdir>}` (judul H1, deskripsi kartu); tiket pernah-READY yang
+  dibatalkan menjadikan task-nya `cancelled`. Tiket DRAFT tidak disinkron.
 - **Yang didorong** (isi disk): `TASK.md` berakar terkunci (`base_commit`); `BRD.md`/`PRD.md` hanya `APPROVED`
   dengan materai utuh; brief yang sudah dikunci (`sidik_kontrak`), semua status; `RCA.md`, `report-NN.md`,
   `HALT.md` (termasuk yang dicabut), `REVIEW.md`, `REPORT.md`. Dokumen yang pernah tercermin tetap diperbarui
@@ -323,7 +332,8 @@ tidak menulis berkas dan tidak meng-commit, dan kegagalannya tidak menahan ranta
   tiap `TAC-{n}` dipikul `SC-{n}` atau tercatat di `## Out of Scope` (`validate_doc.py` T10), dan tiket yang
   disunting sesudah approve ditolak prasyarat `task` check 7. Kontrak lengkap:
   `skills/tech-lead/references/gate-scope.md` bagian 4 B-2. Skill `backend:analyst` berbeda dari plugin
-  `analyst`.
+  `analyst`. Permintaan teknis kecil yang sudah jelas tidak perlu lewat analyst: `/backend:ticket` menulis
+  kartu teknis di `backenddev/tickets/` yang diserahkan lewat `ticket_source` yang sama (B-2 butir 7).
 - **quickdev**: permintaan `/quickdev:*` dilewati gerbang. Untuk repo yang sepenuhnya memakai quickdev,
   tulis `.claude/workflow`.
 - **`.claude/workflow`**: berkas teks berisi nama plugin yang boleh menggerbangi repo, dipisah spasi, koma,
