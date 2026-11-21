@@ -6,8 +6,8 @@ Tidak menulis berkas dan tidak meng-commit (D5); skrip ini satu-satunya penyusun
 `nataflow_client` dengan MCP key `.claude/nataflow.local.json`, lalu mencetak satu baris segmen — isi dokumen tidak
 pernah lewat konteks model. Tanpa `--push` keluarannya argumen tool per fase (uji dan diagnosis).
 
-- `--taskdir <td>`: workdir `backenddev:<repo>:<td>` tertaut ke task tiket analyst (`ticket_source`) atau ke task
-  baru ber-`workdir_key`. Dokumen taskdir tidak di-commit (Langkah 24), jadi isinya diambil dari disk (24 K14),
+- `--taskdir <td>`: workdir `backenddev:<repo>:<td>` tertaut ke task tiket (`ticket_source`: tiket analyst, atau
+  tiket `backend:ticket` yang dicerminkan `ticket.py sync`, 40 T3) atau ke task baru ber-`workdir_key`. Dokumen taskdir tidak di-commit (Langkah 24), jadi isinya diambil dari disk (24 K14),
   hanya yang stabil: `TASK.md` berakar terkunci (`base_commit`); `BRD.md`/`PRD.md` hanya `APPROVED` dengan
   `approved_seal` utuh; brief yang sudah dikunci (`sidik_kontrak`), semua status; `RCA.md`, `report-NN.md`,
   `HALT.md`, `REVIEW.md`, `REPORT.md` apa adanya; `.explore/` tidak pernah. Metadata `commit` kosong, `head` = sha
@@ -51,6 +51,8 @@ from brief_status import HALT_REVOKED  # noqa: E402
 from docs_git import head_sha  # noqa: E402
 from verify_scope import SIDIK_FIELD  # noqa: E402
 from precondition_lib import (  # noqa: E402
+    BE_TICKET_PATH_RE,
+    BE_TICKETS_DIR,
     PROFILE_DIR_REL,
     TICKET_PATH_RE,
     check_taskdir,
@@ -243,15 +245,20 @@ def siblings_line(result: Dict[str, Any]) -> str:
             f"→ task {target['status'] if target else 'tidak diubah'} — argumen lewat `--json`")
 
 
-def ticket_key(task_text: str) -> Tuple[Optional[str], str]:
-    """`ticket_source` frontmatter → `ticket_key` analyst (dirname path `TICKET.md`), `None` tanpa tiket."""
+def ticket_key(task_text: str) -> Tuple[Optional[Dict[str, str]], str]:
+    """`ticket_source` frontmatter → identitas task tiket `{"source", "ticket_key"}` (dirname path `TICKET.md`),
+    `None` tanpa tiket. Tiket analyst bersumber `analyst`; tiket `backend:ticket` bersumber `backenddev` (40 T3),
+    identitas yang sama dengan tulisan `ticket.py sync`."""
     raw = ns.frontmatter_value(task_text, "ticket_source")
     if not raw:
         return None, ""
     path = normalize_ticket_path(raw)
+    if BE_TICKET_PATH_RE.fullmatch(path):
+        return {"source": SOURCE, "ticket_key": posixpath.dirname(path)}, ""
     if not TICKET_PATH_RE.fullmatch(path):
-        return None, f"`ticket_source: {raw}` bukan path `analyst/tickets/<YYMMDDhhmm>-<slug>/TICKET.md`"
-    return posixpath.dirname(path), ""
+        return None, (f"`ticket_source: {raw}` bukan path `analyst/tickets/<YYMMDDhhmm>-<slug>/TICKET.md` maupun "
+                      f"`{BE_TICKETS_DIR}/<YYMMDDhhmm>-<slug>/TICKET.md`")
+    return {"source": "analyst", "ticket_key": posixpath.dirname(path)}, ""
 
 
 def taskdir_plan(args, root: Path, config: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], List[str]]:
@@ -271,7 +278,8 @@ def taskdir_plan(args, root: Path, config: Dict[str, Any]) -> Tuple[Optional[Dic
         return diff_result(docs, lambda remote: disk_extras(root, remote, docs, td, repo, head), text)
 
     def phase1():
-        tkey, problem = ticket_key(task_text)
+        tident, problem = ticket_key(task_text)
+        tkey = tident["ticket_key"] if tident else ""
         if problem:
             return None, None, [problem]
         key, name = f"{SOURCE}:{repo}:{td}", posixpath.basename(td)
@@ -284,7 +292,7 @@ def taskdir_plan(args, root: Path, config: Dict[str, Any]) -> Tuple[Optional[Dic
         problems = ns.workdir_problems(key, name, status)
         if problems:
             return None, None, problems
-        ident = {"source": "analyst", "ticket_key": tkey} if tkey else {"source": SOURCE, "workdir_key": key}
+        ident = tident or {"source": SOURCE, "workdir_key": key}
         title = ns.h1_title(task_text) or name
         task = ns.task_args(config, args.workspace_id, ident, repo, title,
                             ns.pick_sections(task_text, TASK_SECTIONS) or title)

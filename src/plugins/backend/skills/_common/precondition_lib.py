@@ -575,6 +575,13 @@ TICKET_AC_RE = re.compile(r"^- \*\*AC-(\d+)\*\*:")
 TICKET_ELICIT_H2 = re.compile(r"^## +Catatan Elisitasi\s*$")
 TICKET_ACTION = "Kembalikan ke `analyst:spec` (reopen → approve ulang); rantai engineer dilarang menyunting tiket."
 
+# Tiket cepat `backend:ticket` (40 T4): kartu teknis di disk, tidak pernah di-commit, selalu bersegel. Ditulis
+# `skills/ticket/scripts/ticket.py`; segel dan baris `- **AC-{n}**:` sama dengan tiket analyst.
+BE_TICKETS_DIR = "backenddev/tickets"
+BE_TICKET_PATH_RE = re.compile(r"backenddev/tickets/\d{10}-([a-z0-9]+(?:-[a-z0-9]+)*)/TICKET\.md")
+BE_TICKET_ACTION = ("Buka ulang lewat `backend:ticket` (`ticket.py reopen` → approve ulang); rantai engineer dilarang "
+                    "menyunting tiket.")
+
 
 def normalize_ticket_path(value: Optional[str]) -> str:
     rel = (value or "").strip().replace("\\", "/")
@@ -662,7 +669,8 @@ def ticket_seal_norm(text: str) -> str:
     return hashlib.sha256(("\n".join(head) + "\n\x00\n" + norm).encode("utf-8")).hexdigest()[:16]
 
 
-def sealed_verdict(root: Path, rel: str, fm: Dict[str, Any]) -> Optional[Tuple[str, str, str]]:
+def sealed_verdict(root: Path, rel: str, fm: Dict[str, Any],
+                   action: str = TICKET_ACTION) -> Optional[Tuple[str, str, str]]:
     """Vonis dari `approved_seal` bila tiket bersegel; None = tiket lama (vonis dari subjek commit).
 
     Segel menilai isi, bukan riwayat: suntingan sesudah READY → DRIFT di dalam maupun di luar git,
@@ -675,14 +683,33 @@ def sealed_verdict(root: Path, rel: str, fm: Dict[str, Any]) -> Optional[Tuple[s
     try:
         text = (root / rel).read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as exc:
-        return "FAIL", f"`{rel}` tak terbaca ({exc})", TICKET_ACTION
+        return "FAIL", f"`{rel}` tak terbaca ({exc})", action
     now = ticket_seal(text)
     if now == seal:
         return "PASS", f"{rel} READY bersegel {seal}", ""
     if norm not in ("", "-") and ticket_seal_norm(text) == norm:   # hanya format yang berubah (38 N1)
         return "PASS", f"{rel} READY bersegel {norm} (tahan format)", ""
-    return ("FAIL", f"isi `{rel}` berubah sesudah disetujui (segel {seal}, sekarang {now}) — DRIFT",
-            TICKET_ACTION)
+    return ("FAIL", f"isi `{rel}` berubah sesudah disetujui (segel {seal}, sekarang {now}) — DRIFT", action)
+
+
+def be_ticket_verdict(root: Path, rel: str) -> Tuple[str, str, str]:
+    """Tiket `backend:ticket` (40 T4): `status: READY` dan segel cocok. Tanpa `elicitation` dan tanpa fallback
+    subjek commit — tiket ini tidak pernah di-commit, jadi tiket tanpa segel tidak pernah disetujui."""
+    path = root / rel
+    if not path.is_file():
+        return "FAIL", f"`{rel}` tidak ada di disk", "Minta path dari keluaran `backend:ticket` (`TICKET — READY · …`)."
+    try:
+        fm, _ = read_frontmatter(path)
+    except (OSError, UnicodeDecodeError, FrontmatterError) as exc:
+        return "FAIL", f"`{rel}`: frontmatter tak terbaca ({exc})", BE_TICKET_ACTION
+    status = fm.get("status") or "-"
+    if status != "READY":
+        return ("FAIL", f"tiket backend berstatus `{status}` — wajib `READY`",
+                "Selesaikan tiket di `backend:ticket` sampai READY.")
+    sealed = sealed_verdict(root, rel, fm, BE_TICKET_ACTION)
+    if sealed:
+        return sealed
+    return "FAIL", f"`{rel}` READY tanpa `approved_seal` — bukan tulisan `ticket.py approve`", BE_TICKET_ACTION
 
 
 def ticket_source_verdict(root: Path, value: Optional[str]) -> Tuple[str, str, str]:
@@ -690,10 +717,14 @@ def ticket_source_verdict(root: Path, value: Optional[str]) -> Tuple[str, str, s
     rel = normalize_ticket_path(value)
     if not rel:
         return "PASS", "bukan dari tiket analyst", ""
+    if BE_TICKET_PATH_RE.fullmatch(rel):
+        return be_ticket_verdict(root, rel)
     m = TICKET_PATH_RE.fullmatch(rel)
     if not m:
-        return ("FAIL", f"`{rel}` bukan path TICKET.md analyst (analyst/tickets/<YYMMDDhhmm>-<slug>/TICKET.md)",
-                "Minta path dari keluaran `analyst:spec` (`SPEC — READY · <ticketdir>/TICKET.md`).")
+        return ("FAIL", f"`{rel}` bukan path TICKET.md analyst (analyst/tickets/<YYMMDDhhmm>-<slug>/TICKET.md) "
+                        f"maupun tiket backend ({BE_TICKETS_DIR}/<YYMMDDhhmm>-<slug>/TICKET.md)",
+                "Minta path dari keluaran `analyst:spec` (`SPEC — READY · <ticketdir>/TICKET.md`) atau "
+                "`backend:ticket` (`TICKET — READY · <ticketdir>/TICKET.md`).")
     path = root / rel
     if not path.is_file():
         return "FAIL", f"`{rel}` tidak ada di disk", "Minta path dari keluaran `analyst:spec`."
