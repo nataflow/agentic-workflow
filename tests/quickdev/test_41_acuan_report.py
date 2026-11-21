@@ -250,3 +250,45 @@ def test_report_gagal_tidak_menggagalkan_rencana(repo, fake):
     code, out = push(repo)
     assert code == 0 and out["segment"].endswith("· report GAGAL: upsert_document: invalid input data"), out
     assert [d["type"] for d in nf.docs] == ["quickdev.plan"] and nf.tasks[0]["status"] == "done"
+
+
+# ── prosa selaras skrip ───────────────────────────────────────────────────────
+
+SK = PLUGINS / "quickdev" / "skills"
+
+
+def section(text, start, end):
+    return text.split(start, 1)[1].split(end, 1)[0]
+
+
+@pytest.mark.regression("41 D2")
+def test_plan_fase4_cermin_sebelum_ringkasan_gerbang():
+    fase4 = section((SK / "plan" / "SKILL.md").read_text(encoding="utf-8"), "### Fase 4", "### Fase 5")
+    assert fase4.index("references/nataflow-sync.md") < fase4.index("**ringkasan gerbang**")
+    assert "*Coba lagi*" in fase4 and "*Lanjut tanpa cermin nataflow*" in fase4
+    assert "cerminkan ulang (butir 0)" in fase4
+
+
+@pytest.mark.regression("41 D1")
+def test_plan_fase0_task_acuan_lewat_skrip():
+    plan = (SK / "plan" / "SKILL.md").read_text(encoding="utf-8")
+    fase0 = section(plan, "### Fase 0", "### Fase 1")
+    assert "plan_lock.py task --ref <task_ref>" in fase0 and "*Lanjut tanpa task acuan*" in fase0
+    assert "task --ref <id dari TASK PASS> --plan" in section(plan, "### Fase 3", "### Fase 4")
+    assert "`task_ref`" in section(plan, "## Parameter", "## Workflow")
+
+
+@pytest.mark.regression("41 D4")
+def test_execute_summary_sebelum_sinkron():
+    execute = (SK / "execute" / "SKILL.md").read_text(encoding="utf-8")
+    conv = section(execute, "### Konvensi `plan_lock.py`", "### Fase 0")
+    assert conv.index("plan_lock.py summary --plan <plan_path> --summary -") < conv.index("**Sinkron nataflow.**")
+    assert "`Summary`" in section(execute, "## Guardrails", "## Output")
+    sync = (SK / "plan" / "references" / "nataflow-sync.md").read_text(encoding="utf-8")
+    assert "quickdev.report" in sync and "report GAGAL" in sync and "Nataflow-Task" in sync
+
+
+def test_segmen_nataflow_seragam():
+    for name in ("plan", "execute"):
+        out = section((SK / name / "SKILL.md").read_text(encoding="utf-8"), "## Output", "## Failure path")
+        assert "NATAFLOW: task #<kode> · workdir <nama>" in out, name

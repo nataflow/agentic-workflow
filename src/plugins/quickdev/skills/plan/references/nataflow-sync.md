@@ -1,6 +1,6 @@
 # Prosedur Sinkron nataflow
 
-Dimuat `quickdev:plan` (Fase 5 sesudah `LOCK PASS`, sesudah `unlock`, dan rute sinkron ulang) dan `quickdev:execute` (sesudah tiap `close`/`confirm` PASS). Hasilnya tepat satu segmen untuk baris `NATAFLOW:` ringkasan skill pemanggil: `workdir <nama> · <n> dokumen (<c> baru, <u> diperbarui, <s> sama)`, `dilewati`, atau `GAGAL: <sebab>`.
+Dimuat `quickdev:plan` (Fase 4 sebelum draf diajukan dan di tiap putaran revisi, Fase 5 sesudah `LOCK PASS` dan commit, sesudah `unlock`, dan rute sinkron ulang) dan `quickdev:execute` (sesudah tiap `close`/`confirm` PASS beserta `summary`). Hasilnya tepat satu segmen untuk baris `NATAFLOW:` ringkasan skill pemanggil: `task #<kode> · workdir <nama> · <n> dokumen (<c> baru, <u> diperbarui, <s> sama)`, `dilewati`, atau `GAGAL: <sebab>`.
 
 Rencana di disk tetap satu-satunya sumber kebenaran; nataflow hanya cermin. Prosedur ini tidak menulis berkas apa pun, sehingga `Plan-Hash`, `Verified-Hash`, dan `Tree-Hash` tidak basi dan `quickdev:review` tidak menolak rencana yang sudah disinkronkan. Kegagalannya tidak mengubah status terminal skill pemanggil.
 
@@ -11,13 +11,17 @@ Rencana di disk tetap satu-satunya sumber kebenaran; nataflow hanya cermin. Pros
 
 Jalankan `<plan_lock.py> sync-payload --plan <plan_path> --push`.
 
-Skrip membaca config dan MCP key, lalu memanggil sendiri tool server nataflow. Rencana: cari task lewat `workdir_key` (buat bila belum ada), `upsert_workdir` di workspace task induknya, manifest, `upsert_document` hanya bila rencana berbeda, lalu status task (`in_progress` sejak workdir terbit, `done` saat eksekusi `COMPLETED`). Isi rencana tidak pernah lewat konteks model.
+Skrip membaca config dan MCP key, lalu memanggil sendiri tool server nataflow. Isi rencana dan report tidak pernah lewat konteks model.
+
+- **Task.** Rencana ber-`Nataflow-Task` (task acuan, ditautkan `plan_lock.py task --plan`) → task itu dibaca lewat `get_task`; quickdev tidak pernah membuat task baru maupun mengubah judul/deskripsinya. Tanpa acuan → task milik quickdev dicari lewat `workdir_key`, dibuat bila belum ada, dan judul/deskripsinya diselaraskan ke Section 1 rencana terbaru bila berbeda.
+- **Workdir dan dokumen.** `upsert_workdir` di workspace task induknya, manifest, lalu `upsert_document` hanya untuk dokumen yang berbeda: rencana (`quickdev.plan`, DRAFT maupun APPROVED) dan, sesudah blok eksekusi tertutup, report (`quickdev.report`, key `<task_name>.report.md`). Report disusun skrip dari disk: ringkasan naratif `summary`, status dan base, AC Section 1, checklist, berkas berubah sejak `Base-Commit`, verifikasi, dan temuan review.
+- **Status task.** DRAFT tidak menggeser status (task baru tetap `todo`); sejak `lock` → `in_progress`; eksekusi `COMPLETED` → `done`. Task acuan baru `done` bila seluruh workdir di bawahnya (mis. taskdir backend/frontend) sudah tuntas; status `done`/`cancelled` tidak pernah ditimpa.
 
 Keluarannya tepat satu baris, yang disalin apa adanya sebagai segmen:
 
-- `workdir <nama> · <n> dokumen (<c> baru, <u> diperbarui, <s> sama)` → selesai.
+- `task #<kode> · workdir <nama> · <n> dokumen (<c> baru, <u> diperbarui, <s> sama)` → selesai. Ekor `· report GAGAL: <sebab>` (mis. tipe `quickdev.report` belum terdaftar di server) → rencana tetap tercermin; sampaikan sebabnya ke user, sinkron ulang sesudah dibereskan.
 - `dilewati` (`.claude/nataflow.json` tidak ada) → selesai.
-- `GAGAL: <sebab>` → selesai. Sebab setup (`.claude/nataflow.local.json` tidak ada, tidak diabaikan git, `url` belum diisi, atau `mcp_server` lama) disampaikan ke user apa adanya bersama bagian Prasyarat di bawah. Task kembar (`<n> task ber-workdir_key sama`) dan rencana DRAFT berhenti sebelum tulisan apa pun.
+- `GAGAL: <sebab>` → selesai. Sebab setup (`.claude/nataflow.local.json` tidak ada, tidak diabaikan git, `url` belum diisi, atau `mcp_server` lama) disampaikan ke user apa adanya bersama bagian Prasyarat di bawah. Task kembar (`<n> task ber-workdir_key sama`) dan workdir yang sudah menempel di task lain (`Nataflow-Task` ditautkan sesudah rencana tersinkron tanpa acuan) berhenti sebelum tulisan apa pun.
 - `PILIH_WORKSPACE: <alias> (<uuid>), …` → muncul hanya saat `workspaces` berisi lebih dari satu entri dan task harus dibuat baru, sebelum tulisan apa pun. Tanyakan workspace tujuan lewat `AskUserQuestion` (satu opsi per alias: label alias, deskripsi UUID), lalu jalankan ulang perintah yang sama dengan `--workspace <alias terpilih>` dan pakai segmen keluarannya.
 
 ## Larangan
@@ -33,6 +37,7 @@ Keluarannya tepat satu baris, yang disalin apa adanya sebagai segmen:
 
 - `.claude/nataflow.json` di root repo (ter-commit, tanpa rahasia) mengaktifkan sinkron. Berkas absen → `dilewati`; ada tetapi rusak → `GAGAL`, bukan dilewati. Berkas yang sama dibaca plugin `analyst`, `backend`, `frontend`, dan `nataflow`.
 - `.claude/nataflow.local.json` di root repo menyimpan MCP key: `{"mcp_key": "<MCP key nataflow>"}`. Berkas ini tidak pernah di-commit: di repo git ia wajib tercantum di `.gitignore` (baris `.claude/nataflow.local.json`). Berkas absen, tidak diabaikan git, atau sudah ter-track → `GAGAL` sebelum satu panggilan server pun; root non-git tidak dicek ignore. Skill tidak pernah membaca, mencetak, atau menyalin isinya.
+- Tipe dokumen `quickdev.plan` dan `quickdev.report` terdaftar di server (document type); tipe yang belum terdaftar ditolak server.
 - Server nataflow di `url` terjangkau dari mesin ini (`python3` membuka koneksi HTTPS sendiri). Plugin tidak memakai server MCP yang terdaftar di Claude Code untuk sinkron ini.
 - Migrasi dari config lama ber-`mcp_server`: lihat `MIGRATION_v0.10.0_to_v0.11.0.md` di root plugin quickdev.
 

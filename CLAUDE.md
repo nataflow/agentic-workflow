@@ -122,6 +122,12 @@ skeletons), `dispatcher/` (prompts used to dispatch subagents), `scripts/`, and 
   `_common/plan_lock.py` (`Hash-Scope: body`; 0.11 plans with `profile+body` still verify). Step 34. Since step 39
   the chain runs on: approval *Setujui & eksekusi* → `plan_lock.py commit` (plan file only, `--only`, active branch)
   → `execute` invoked directly → `COMPLETED` invokes `review` directly; review remediation stays user-typed.
+  Step 41: a nataflow task the user names (`#12`/UUID) is the plan's reference — `plan_lock.py task --ref` reads it via
+  `get_task` (its description becomes the spec) and `--plan` writes `Nataflow-Task: <uuid>`; quickdev then never
+  creates or edits that task. `plan` Fase 4 mirrors the DRAFT before asking approval (task stays `todo`; sync `GAGAL`
+  holds the gate). After `close`, `plan_lock.py summary` writes a 1–3 sentence `Summary`, and sync adds a
+  script-built `quickdev.report` document (`<task>.report.md`). quickdev builds its own `push_plan` in
+  `plan_lock.py` instead of the shared `push_workdir`.
 - **nataflow** — direct work against the nataflow server over MCP, no repo artifacts. `create-artifact`
   writes a self-contained HTML page, gates it with `skills/create-artifact/scripts/artifact.py check`, and
   `artifact.py publish` upserts it under the MCP key's project via the `*_artifact` tools. Model-invocable.

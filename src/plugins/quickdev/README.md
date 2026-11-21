@@ -26,7 +26,8 @@ gerbang `backend:tech-lead` atau `frontend:lead`.
 
 Prasyarat: `git` (execute dan review menuntut repo git), `python3` (3.12+, hanya stdlib) untuk
 `plan_lock.py`, dan toolchain repo sendiri untuk baseline dan verifikasi. Pindah dari 0.11: lihat
-`MIGRATION_v0.11.x_to_v0.12.0.md`; dari 0.12: `MIGRATION_v0.12.x_to_v0.13.0.md`.
+`MIGRATION_v0.11.x_to_v0.12.0.md`; dari 0.12: `MIGRATION_v0.12.x_to_v0.13.0.md`; dari 0.13:
+`MIGRATION_v0.13.x_to_v0.14.0.md`.
 
 ## Tiga Skill
 
@@ -91,6 +92,7 @@ Approved-At: <ISO>                     ← ditulis lock
 Approval: "setuju, lanjut"              ← jawaban user apa adanya
 Hash-Scope: body                       ← ditulis lock
 Plan-Hash: sha256:<64 hex>             ← sidik Section 1–5
+Nataflow-Task: <uuid>                  ← task acuan; hanya ditulis plan_lock.py task --plan
 
 ## 1. Overview & Objectives            ← tujuan, keputusan klarifikasi, asumsi, out of scope
 ## 2. Architecture & Layer Impact      ← modul disentuh berbukti path:baris, berkas acuan konvensi
@@ -98,7 +100,7 @@ Plan-Hash: sha256:<64 hex>             ← sidik Section 1–5
 ## 4. Verification & Testing Strategy  ← tabel | Jenis | Perintah | Cwd | Risiko | + skenario test
 ## 5. Rollback & Contingency Strategy  ← bila include_rollback
 
-## Execution Status                    ← ditulis plan_lock.py start/baseline/close/confirm
+## Execution Status                    ← ditulis plan_lock.py start/baseline/close/summary/confirm
 - Status: COMPLETED
 - Base-Commit: <sha | none>            ← pembanding diff review, tidak pernah ditimpa
 - Remediation-Round: 1
@@ -107,6 +109,7 @@ Plan-Hash: sha256:<64 hex>             ← sidik Section 1–5
 - Baseline: "<ringkasan per perintah>" ← baseline segar, sah hanya di Base-Commit
 - Baseline-Commit: <sha>
 - Verification: "<ringkasan>"
+- Summary: "<1–3 kalimat hasil>"       ← ditulis summary sesudah close; pembuka report nataflow
 - Blocked-Step: -
 - Verified-Hash: sha256:<64 hex>       ← Plan-Hash saat close
 - Tree-Hash: sha256:<64 hex>           ← isi berkas yang berbeda dari Base-Commit saat close
@@ -217,17 +220,25 @@ berkas apa pun, sehingga `Plan-Hash`, `Verified-Hash`, dan `Tree-Hash` tidak bas
   kosong → workspace milik key, satu entri → otomatis, lebih dari satu → user memilih saat task baru dibuat),
   `pic_id` (UUID), dan `repo` (default: remote `origin` ternormalisasi). Berkas absen → dilewati; ada
   tetapi rusak (termasuk `mcp_server` lama) → `GAGAL`. MCP key di `.claude/nataflow.local.json` (`{"mcp_key": "…"}`, tidak pernah di-commit; di repo git wajib diabaikan git, bila tidak sinkron menolak berjalan). Skrip memanggil server sendiri lewat `url`; server tidak perlu didaftarkan di Claude Code.
-- **Jangkar**: satu rencana = satu workdir `quickdev:<repo>:<path rencana>` bernama `<task_name>`, tertaut ke task
-  yang dibuat dari H1 dan Section 1 rencana. Rencana didorong sebagai dokumen `quickdev.plan`.
-- **Kapan**: `plan` sesudah `LOCK PASS` dan sesudah `unlock` (cermin menjadi `DRAFT`); `execute` sesudah tiap
-  `close`/`confirm`. Rencana yang belum pernah dikunci tidak didorong.
-- **Status**: workdir `active`, `blocked` (`BLOCKED`), atau `done` (`COMPLETED`, `COMPLETED (manual)`); task naik
-  ke `in_progress` begitu rencana terkunci (workdir terbit) dan `done` saat selesai, tanpa pernah diturunkan.
+- **Jangkar**: satu rencana = satu workdir `quickdev:<repo>:<path rencana>` bernama `<task_name>`. Task induknya
+  task nataflow acuan bila user menyebutnya (`#12` atau UUID; dibaca `plan_lock.py task --ref`, ditautkan sebagai
+  `Nataflow-Task`, deskripsinya menjadi spesifikasi rencana, dan quickdev tidak membuat task baru maupun mengubah
+  isinya), atau task milik quickdev yang dibuat dari H1 dan Section 1 rencana dan diselaraskan bila draf direvisi.
+  Rencana didorong sebagai dokumen `quickdev.plan`; sesudah eksekusi ditutup, dokumen `quickdev.report`
+  (`<task_name>.report.md`) menyusul: ringkasan naratif (`plan_lock.py summary`), AC, checklist, berkas berubah sejak
+  `Base-Commit`, verifikasi, dan temuan review. Kedua tipe dokumen wajib terdaftar di server.
+- **Kapan**: `plan` Fase 4 sebelum draf diajukan untuk approval (dan di tiap revisi), sesudah `LOCK PASS` + commit,
+  dan sesudah `unlock` (cermin menjadi `DRAFT`); `execute` sesudah tiap `close`/`confirm`.
+- **Status**: workdir `active`, `blocked` (`BLOCKED`), atau `done` (`COMPLETED`, `COMPLETED (manual)`); task baru tetap
+  `todo` selama DRAFT, naik ke `in_progress` begitu rencana terkunci, dan `done` saat eksekusi `COMPLETED`, tanpa
+  pernah diturunkan. Task acuan baru `done` bila seluruh workdir di bawahnya (mis. taskdir backend/frontend) tuntas.
 - **Hemat token**: `plan_lock.py sync-payload --push` memanggil server sendiri; isi dokumen hanya didorong bila
   sha, tipe, atau metadatanya berbeda dari manifest remote, dan tidak pernah lewat konteks model.
-- **Gagal tidak memblokir**: ringkasan skill memuat baris `NATAFLOW: <… | dilewati | GAGAL: <sebab>>`, dan
-  status terminal tidak berubah. Ulangi lewat `/quickdev:plan` ("sinkron ulang `plan/<task>.md`").
-- **Tidak didorong**: laporan terminal `review`.
+- **Gagal**: ringkasan skill memuat baris `NATAFLOW: <task #<kode> · … | dilewati | GAGAL: <sebab>>`. Di Fase 4 `plan`,
+  `GAGAL` menahan approval sampai user memilih *Coba lagi* atau *Lanjut tanpa cermin nataflow*; di titik lain status
+  terminal tidak berubah. Report yang gagal didorong hanya menambah `· report GAGAL: <sebab>`. Ulangi lewat
+  `/quickdev:plan` ("sinkron ulang `plan/<task>.md`").
+- **Tidak didorong**: laporan terminal `review` (temuannya masuk report lewat `Findings-<n>` putaran remediasi).
 
 ## Keterbatasan yang Diketahui
 

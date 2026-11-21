@@ -46,7 +46,17 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py close --plan <plan_pat
 QD_EOF
 ```
 
-**Sinkron nataflow.** Sesudah tiap `close` atau `confirm` yang PASS (Fase 0 butir 3, Fase 1 butir 4, Fase 3 butir 3, Fase 4 butir 1, dan Failure path yang menutup `BLOCKED`), jalankan prosedur `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/nataflow-sync.md` (langkah rencana) atas `<plan_path>` apa adanya, lalu tulis hasilnya di baris `NATAFLOW:` ringkasan. Semua jalur tutup didorong, bukan hanya `COMPLETED`, supaya status `blocked` juga tercermin. Sinkron tidak menulis berkas maupun menyentuh kode, sehingga segel `close` tidak basi. `GAGAL` tidak mengubah status terminal; sinkron diulang lewat `/quickdev:plan` ("sinkron ulang `<plan_path>`").
+**Ringkasan naratif.** Sesudah tiap `close` yang PASS, sebelum sinkron, tulis ringkasan naratif singkat hasil putaran ini ke blok:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py summary --plan <plan_path> --summary - <<'QD_EOF'
+<1–3 kalimat: apa yang dikerjakan dan hasilnya; jalur BLOCKED: di mana berhenti dan mengapa>
+QD_EOF
+```
+
+Ringkasan menceritakan hasil, bukan menyalin langkah rencana atau log verifikasi, maksimal 600 karakter; ia menjadi paragraf pembuka dokumen report di nataflow. Skrip hanya menulis `Summary` di blok `## Execution Status`, sehingga segel `close` tidak basi; `start` putaran berikutnya mengosongkannya. `confirm` tidak butuh ringkasan baru (ringkasan `close` sebelumnya tetap berlaku). `SUMMARY FAIL` → perbaiki teksnya, jangan menulis `Summary` dengan tangan.
+
+**Sinkron nataflow.** Sesudah tiap `close` atau `confirm` yang PASS (Fase 0 butir 3, Fase 1 butir 4, Fase 3 butir 3, Fase 4 butir 1, dan Failure path yang menutup `BLOCKED`) beserta ringkasannya, jalankan prosedur `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/nataflow-sync.md` (langkah rencana) atas `<plan_path>` apa adanya, lalu tulis hasilnya di baris `NATAFLOW:` ringkasan. Semua jalur tutup didorong, bukan hanya `COMPLETED`, supaya status `blocked` juga tercermin; prosedur yang sama menerbitkan dokumen report (`<task_name>.report.md`) dan menggeser task ke `done` saat `COMPLETED`. Sinkron tidak menulis berkas maupun menyentuh kode, sehingga segel `close` tidak basi. `GAGAL` tidak mengubah status terminal; sinkron diulang lewat `/quickdev:plan` ("sinkron ulang `<plan_path>`").
 
 ### Fase 0 — Validasi Status Rencana & Persiapan Lingkungan
 
@@ -121,7 +131,7 @@ QD_EOF
 
 ### Fase 4 — Penyusunan Laporan Eksekusi & Penutupan Tugas
 
-1. Tutup lewat `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py close --plan <plan_path> --status <COMPLETED | VERIFICATION_MANUAL_REQUIRED> --verification -` dengan ringkasan lewat stdin. Skrip memanggil `verify`, menulis/menimpa blok `## Execution Status` (`Status`, `Verification`, `Blocked-Step`, `Timestamp`; `Remediation-Round` ditulis `start`), menolak `COMPLETED` bila masih ada `- [ ]`, menutup ronde remediasi yang `OPEN`, dan menyegel `Verified-Hash` (= `Plan-Hash`) serta `Tree-Hash` (isi berkas yang berbeda dari `Base-Commit`, tanpa direktori rencana). Suntingan kode atau rencana sesudah close membuat review menolak dan `start` berikutnya masuk `resume (verifikasi basi)`, jadi close adalah langkah terakhir yang menyentuh kode. Dilarang menulis blok itu dengan tangan.
+1. Tutup lewat `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py close --plan <plan_path> --status <COMPLETED | VERIFICATION_MANUAL_REQUIRED> --verification -` dengan ringkasan lewat stdin. Skrip memanggil `verify`, menulis/menimpa blok `## Execution Status` (`Status`, `Verification`, `Blocked-Step`, `Timestamp`; `Remediation-Round` ditulis `start`), menolak `COMPLETED` bila masih ada `- [ ]`, menutup ronde remediasi yang `OPEN`, dan menyegel `Verified-Hash` (= `Plan-Hash`) serta `Tree-Hash` (isi berkas yang berbeda dari `Base-Commit`, tanpa direktori rencana). Suntingan kode atau rencana sesudah close membuat review menolak dan `start` berikutnya masuk `resume (verifikasi basi)`, jadi close adalah langkah terakhir yang menyentuh kode. Dilarang menulis blok itu dengan tangan. Lanjutkan dengan `summary` dan sinkron (Konvensi `plan_lock.py`).
 2. Susun laporan ringkasan implementasi komprehensif yang mencakup:
    - Daftar seluruh file baru yang dibuat dan berkas eksisting yang dimodifikasi.
    - Ringkasan log eksekusi verifikasi baseline (Typecheck: PASS, Lint: PASS, Tests: PASS) beserta sumber pembandingnya.
@@ -139,7 +149,7 @@ QD_EOF
 - MUST NOT menghapus kode lama secara sembarangan tanpa instruksi eksplisit di dokumen rencana.
 - MUST NOT memasang framework/dependensi test yang tidak tercantum di Section 3 rencana.
 - MUST NOT menjalankan migrasi atau perintah pengubah skema/data, perintah verifikasi tanpa timeout, atau perintah bertanda `menyentuh DB/jaringan` tanpa izin user lewat `AskUserQuestion`.
-- MUST NOT menulis `Status`, `Base-Commit`, `Remediation-Round`, `Remediation-State`, `Findings-<n>`, `Baseline`, `Verified-Hash`, `Tree-Hash`, atau `Manual-Confirmation` blok `## Execution Status` dengan tangan; semuanya ditulis `plan_lock.py`.
+- MUST NOT menulis `Status`, `Base-Commit`, `Remediation-Round`, `Remediation-State`, `Findings-<n>`, `Baseline`, `Verified-Hash`, `Tree-Hash`, `Manual-Confirmation`, atau `Summary` blok `## Execution Status` dengan tangan; semuanya ditulis `plan_lock.py`.
 - MUST NOT mengirim teks bebas ke `plan_lock.py` dalam kutip ganda; pakai stdin dengan heredoc berkutip (Konvensi `plan_lock.py`).
 - MUST NOT memalsukan, memotong, atau mengabaikan log kegagalan verifikasi baseline runtime.
 - Seluruh hasil perubahan kode sumber wajib dapat dibuktikan melalui eksekusi perintah verifikasi nyata.
@@ -164,7 +174,7 @@ Skill ini menghasilkan perubahan kode sumber yang terverifikasi dan laporan term
    VERIFIKASI: typecheck=<status> lint=<status> test=<status> build=<status>  (status boleh bawaan(n), UNVERIFIED(n), atau TIDAK_ADA)
    REGRESI BARU: <n> | - — di luar rencana: <daftar berkas> | -
    ITERASI PERBAIKAN: <n>/<max_fix_iterations>
-   NATAFLOW: workdir <nama> · <n> dokumen (<c> baru, <u> diperbarui, <s> sama) | dilewati | GAGAL: <sebab>
+   NATAFLOW: task #<kode> · workdir <nama> · <n> dokumen (<c> baru, <u> diperbarui, <s> sama) | dilewati | GAGAL: <sebab>
    HANDOFF: review (plan_path) — dipanggil langsung | user (perintah manual atau blocker)
    ```
 
