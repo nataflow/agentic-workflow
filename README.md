@@ -55,6 +55,31 @@ npx skills add nataflow/agentic-workflow@ui-improvement -g
 Tanpa `@<skill>` CLI menawarkan daftar skill di repo untuk dipilih; tanpa `-g` skill dipasang ke proyek
 aktif, bukan global. Cara manual: salin folder `skills/<nama>/` ke `~/.claude/skills/<nama>/`.
 
+### Khusus Claude Code
+
+Tanpa `-a`, CLI menanyakan agent tujuan. Flag `-a claude-code` memasang skill hanya untuk Claude Code, dan
+`-y` melewati konfirmasi:
+
+```
+# global (~/.claude/skills/), tersedia di semua proyek
+npx skills add nataflow/agentic-workflow@planning -g -a claude-code -y
+npx skills add nataflow/agentic-workflow@ui-improvement -g -a claude-code -y
+
+# proyek aktif saja (.claude/skills/ di root proyek)
+npx skills add nataflow/agentic-workflow@planning -a claude-code -y
+npx skills add nataflow/agentic-workflow@ui-improvement -a claude-code -y
+```
+
+Tanpa Node.js, salin langsung dari clone repo:
+
+```sh
+git clone --depth 1 https://github.com/nataflow/agentic-workflow.git /tmp/agentic-workflow
+mkdir -p ~/.claude/skills
+cp -R /tmp/agentic-workflow/skills/planning /tmp/agentic-workflow/skills/ui-improvement ~/.claude/skills/
+```
+
+Skill terbaca di sesi Claude Code berikutnya; uji dengan `/planning <task>`.
+
 ## Prasyarat
 
 - `python3` ≥ 3.12 di `PATH` untuk hook dan skrip `analyst`, `backend`, `frontend`, `nataflow`, `product`, dan `fullstack`. Semua skrip
