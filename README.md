@@ -43,7 +43,7 @@ tanpa skrip, hook, subagent, maupun profil repo. Skill ini tidak ikut marketplac
 | Skill | Fungsi | Pemanggilan |
 |---|---|---|
 | [`planning`](skills/planning/SKILL.md) | Pre-execution review sebuah task: pahami kebutuhan, telusuri codebase, analisis dampak, rencana implementasi, dan strategi pengujian, lalu berhenti menunggu persetujuan tanpa mengubah berkas | hanya `/planning <task>` |
-| [`ui-improvement`](skills/ui-improvement/SKILL.md) | Review perbaikan UI yang sudah ada (hierarki visual, keterbacaan, kontras, spacing, konsistensi, responsif) berbasis bukti, lalu menunggu persetujuan sebelum menyentuh berkas | `/ui-improvement <target>` atau otomatis dari permintaan seperti "rapikan UI" |
+| [`ui-improvement`](skills/ui-improvement/SKILL.md) | Review perbaikan UI yang sudah ada (hierarki visual, keterbacaan, kontras, spacing, konsistensi, responsif) berbasis bukti, dengan 2–3 opsi layout bermockup ASCII untuk temuan Critical/High, lalu menunggu persetujuan sebelum menyentuh berkas | `/ui-improvement <target>` atau otomatis dari permintaan seperti "rapikan UI" |
 
 Pasang dari GitHub dengan CLI [`skills`](https://github.com/vercel-labs/skills):
 

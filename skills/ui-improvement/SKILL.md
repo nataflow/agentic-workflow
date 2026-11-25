@@ -217,6 +217,54 @@ Gunakan rekomendasi konkret seperti:
 
 Bila memungkinkan, sebutkan nilai konkretnya juga (mis. `text-xs` → `text-sm`, `gap-2` → `gap-4`, `text-muted-foreground` untuk metadata) supaya rencana bisa diverifikasi.
 
+### Opsi Layout untuk Temuan Critical/High
+
+Perubahan layout jarang punya satu jawaban benar dan mahal diubah sesudah dikerjakan. Karena itu, untuk temuan berprioritas **Critical** atau **High** yang perbaikannya **mengubah struktur layout**, tawarkan **2–3 opsi** beserta mockup ASCII alih-alih langsung satu rencana.
+
+Termasuk perubahan struktur layout:
+- Susunan atau urutan section.
+- Jumlah kolom atau grid.
+- Pola penyajian (mis. tabel ↔ card list, tab ↔ satu halaman panjang, modal ↔ halaman sendiri).
+- Posisi CTA atau aksi utama.
+- Pengelompokan informasi (memecah, menggabungkan, atau memindahkan grup).
+
+Bukan perubahan struktur layout — tetap satu rekomendasi seperti biasa:
+- Penyesuaian spacing, padding, atau gap.
+- Ukuran, weight, atau warna teks.
+- Kontras, semantic color, atau state komponen.
+- Temuan Medium dan Low, apa pun jenisnya.
+
+Aturan opsi:
+- Salah satu opsi wajib berupa **perubahan minimal** yang tetap menyelesaikan masalah.
+- Setiap opsi harus benar-benar layak dikerjakan; jangan mengarang opsi hanya untuk memenuhi jumlah. Jika memang hanya ada satu arah yang masuk akal, tulis satu opsi saja dan jelaskan mengapa tidak ada alternatif.
+- Sertakan mockup **"Sekarang"** sebagai pembanding, lalu satu mockup per opsi.
+- Gambar mockup pada viewport yang paling terdampak, lebar maksimal ±60 kolom, dan beri label dengan nama komponen nyata dari codebase.
+- Tutup dengan satu opsi rekomendasi beserta alasannya.
+
+Format per temuan:
+
+```text
+**Temuan #N — [ringkasan masalah] (High)**
+
+Sekarang:
+┌────────────────────────────────┐
+│ ...                            │
+└────────────────────────────────┘
+
+**Opsi A — [Nama]** (rekomendasi)
+┌────────────────────────────────┐
+│ ...                            │
+└────────────────────────────────┘
++ Pro: ...
+− Kontra: ...
+→ Dampak: berkas dan shared component yang tersentuh
+
+**Opsi B — [Nama]**
+...
+
+Rekomendasi: Opsi A, karena ...
+```
+
 ## 5. Validate — Strategi Validasi UI
 
 Tentukan bagaimana hasil perbaikan akan dievaluasi.
@@ -291,6 +339,8 @@ Kelompokkan berdasarkan:
 
 Tidak semua kategori harus memiliki perubahan.
 
+Temuan Critical/High yang mengubah struktur layout disajikan dengan format opsi dan mockup ASCII dari §4 (Opsi Layout untuk Temuan Critical/High).
+
 ### D. Impact Analysis
 
 Jelaskan:
@@ -308,6 +358,8 @@ Sebutkan file atau komponen yang akan diubah jika sudah diketahui.
 
 Jelaskan tujuan dan hasil yang diharapkan dari setiap tahapan.
 
+Untuk temuan yang memiliki opsi layout, susun rencana berdasarkan opsi rekomendasi. Tambahkan catatan singkat tentang tahapan atau berkas yang berbeda bila opsi lain dipilih — jangan menulis rencana penuh untuk setiap opsi.
+
 ### F. Validation Strategy
 
 Jelaskan bagaimana perubahan akan diuji dan dibandingkan.
@@ -317,6 +369,8 @@ Sertakan acceptance criteria yang objektif.
 ### G. Open Questions
 
 Informasi atau keputusan yang masih membutuhkan klarifikasi user.
+
+Cantumkan pilihan opsi untuk setiap temuan yang memiliki opsi layout (mis. "Temuan #2: Opsi A (rekomendasi) atau Opsi B?").
 
 Jika tidak ada, tuliskan "Tidak ada".
 
@@ -355,6 +409,11 @@ Jika user memberikan revisi terhadap pendekatan atau scope:
 - Minta persetujuan ulang.
 
 Setelah persetujuan diberikan, implementasikan hanya perubahan yang telah disepakati. Jika user hanya menyetujui sebagian (mis. "kerjakan yang Critical dan High saja"), batasi implementasi pada bagian itu.
+
+Untuk temuan yang memiliki opsi layout:
+- Persetujuan sebaiknya menyebut opsi per temuan (mis. "kerjakan, #2 pakai Opsi B").
+- Jika user menyetujui tanpa menyebut opsi, gunakan opsi rekomendasi dan nyatakan pilihan itu secara eksplisit sebelum mulai mengubah file.
+- Jika user memilih opsi selain rekomendasi, perbarui implementation plan dan analisis dampaknya sesuai opsi itu sebelum mengubah file. Jika dampaknya berbeda bermakna dari yang sudah dilaporkan, minta persetujuan ulang.
 
 Selama implementasi:
 - Pertahankan business logic dan perilaku existing.
