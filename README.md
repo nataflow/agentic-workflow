@@ -34,6 +34,27 @@ Untuk salinan lokal: `/plugin marketplace add ./path/ke/agentic-workflow`. Marke
 memuat plugin langsung dari tempatnya dan tidak dikunci versi, jadi perubahan berkas langsung terpakai.
 Marketplace git memakai `version` di `plugin.json`: pengguna hanya mendapat perubahan bila versinya naik.
 
+## Skill Mandiri
+
+Di luar plugin, folder [`skills/`](skills/) memuat skill berdiri sendiri: satu `SKILL.md` per skill,
+tanpa skrip, hook, subagent, maupun profil repo. Skill ini tidak ikut marketplace dan tidak memakai
+`version`.
+
+| Skill | Fungsi | Pemanggilan |
+|---|---|---|
+| [`planning`](skills/planning/SKILL.md) | Pre-execution review sebuah task: pahami kebutuhan, telusuri codebase, analisis dampak, rencana implementasi, dan strategi pengujian, lalu berhenti menunggu persetujuan tanpa mengubah berkas | hanya `/planning <task>` |
+| [`ui-improvement`](skills/ui-improvement/SKILL.md) | Review perbaikan UI yang sudah ada (hierarki visual, keterbacaan, kontras, spacing, konsistensi, responsif) berbasis bukti, lalu menunggu persetujuan sebelum menyentuh berkas | `/ui-improvement <target>` atau otomatis dari permintaan seperti "rapikan UI" |
+
+Pasang dari GitHub dengan CLI [`skills`](https://github.com/vercel-labs/skills):
+
+```
+npx skills add nataflow/agentic-workflow@planning -g
+npx skills add nataflow/agentic-workflow@ui-improvement -g
+```
+
+Tanpa `@<skill>` CLI menawarkan daftar skill di repo untuk dipilih; tanpa `-g` skill dipasang ke proyek
+aktif, bukan global. Cara manual: salin folder `skills/<nama>/` ke `~/.claude/skills/<nama>/`.
+
 ## Prasyarat
 
 - `python3` ≥ 3.12 di `PATH` untuk hook dan skrip `analyst`, `backend`, `frontend`, `nataflow`, `product`, dan `fullstack`. Semua skrip
