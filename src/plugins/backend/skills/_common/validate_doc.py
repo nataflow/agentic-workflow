@@ -30,9 +30,11 @@ from precondition_lib import (  # noqa: E402
     find_repo_root,
     iter_outside_fences,
     normalize_text,
+    resolve_evidence_path,
     resolve_taskdir,
     split_frontmatter,
     ticket_carry_problems,
+    tracked_files,
 )
 from precondition_lib import cli  # noqa: E402
 
@@ -273,17 +275,30 @@ class Validator:
         self.manual("T3b", "Alat ukur cocok kolom lane", "task/SKILL.md tabel Fase 3, task-template bagian 2 butir 3")
         self.manual("T4", "Ambang terukur", "task-template bagian 2 butir 4")
 
-        p = []
+        p, notes = [], []
         refs = FILE_LINE.findall(d.section_text("Description"))
-        if not refs:
-            p.append("`## Description` tanpa rujukan `file:baris`")
+        tracked = tracked_files(self.root) if refs else []
+        resolved = 0
         for path, line_no in refs:
-            f = self.root / path
-            if not f.is_file():
+            verdict, full = resolve_evidence_path(self.root, path, tracked)
+            if verdict == "bukan":          # host:port, tag image — bukan bukti (B11)
+                continue
+            resolved += 1
+            if verdict == "hilang":
                 p.append(f"`{path}:{line_no}` — berkas tidak ada")
-            elif int(line_no) > len(f.read_text(encoding="utf-8", errors="replace").splitlines()):
-                p.append(f"`{path}:{line_no}` — melewati jumlah baris berkas")
-        self.add("T5", "Bukti berpaut kode", p)
+                continue
+            if verdict == "ambigu":
+                p.append(f"`{path}:{line_no}` — nama berkas ambigu ({full}); tulis path penuh")
+                continue
+            if verdict == "suffix":
+                notes.append(f"`{path}` → `{full}`")
+            f = self.root / full
+            if int(line_no) > len(f.read_text(encoding="utf-8", errors="replace").splitlines()):
+                p.append(f"`{full}:{line_no}` — melewati jumlah baris berkas")
+        if not resolved:
+            p.insert(0, "`## Description` tanpa rujukan `file:baris`")
+        self.add("T5", "Bukti berpaut kode", p,
+                 note=f"path di-resolve dari nama berkas: {', '.join(notes)}" if notes else "")
 
         items = [l for _, l in d.section("Out of Scope") if re.match(r"^\s*- ", l)]
         p = [] if items else ["`## Out of Scope` tanpa butir"]
@@ -373,10 +388,15 @@ class Validator:
         p, warn = [], []
         for n, line in d.section("Current state"):
             for path, line_no in FILE_LINE.findall(line):
+                verdict, full = resolve_evidence_path(self.root, path)
+                if verdict == "bukan":      # host:port, tag image — bukan bukti (B11)
+                    continue
                 if "Observasi kode" not in line:
                     p.append(f"baris {n}: `{path}:{line_no}` tanpa label `Observasi kode:`")
-                elif not (self.root / path).is_file():
+                elif verdict == "hilang":
                     warn.append(f"baris {n}: `{path}` tidak ada di repo")
+                elif verdict == "ambigu":
+                    warn.append(f"baris {n}: `{path}` ambigu ({full}); tulis path penuh")
         self.add("B3", "Observasi vs aturan", p or warn, status="FAIL" if p else ("WARN" if warn else "PASS"))
 
         self.add("B4", "Nol placeholder", placeholder_hits(d, slots=False))

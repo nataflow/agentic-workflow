@@ -46,9 +46,11 @@ from precondition_lib import (  # noqa: E402
     normalize_text,
     normalize_ticket_path,
     plugin_file,
+    resolve_evidence_path,
     split_frontmatter,
     ticket_seal,
     ticket_seal_norm,
+    tracked_files,
 )
 import nataflow_sync as ns  # noqa: E402
 
@@ -340,12 +342,18 @@ def cmd_new(root: Path, args: argparse.Namespace) -> int:
 
 # ── check ─────────────────────────────────────────────────────────────────────
 
-def evidence_problems(root: Path, path: str, start: int, end: Optional[int]) -> str:
+def evidence_problems(root: Path, path: str, start: int, end: Optional[int],
+                      tracked: Optional[List[str]] = None) -> str:
+    """Masalah satu bukti `path:baris`; kosong = sah. Nama berkas lepas di-resolve ke satu-satunya
+    berkas terlacak berakhiran itu (B11); `amazoncorretto:21` dan sejenisnya disaring pemanggil (vonis `bukan`)."""
     if path.startswith("/") or ".." in path.split("/"):
         return f"bukti `{path}:{start}` wajib relatif root repo"
-    target = root / path
-    if not target.is_file():
+    verdict, full = resolve_evidence_path(root, path, tracked)
+    if verdict == "ambigu":
+        return f"bukti `{path}:{start}`: nama berkas ambigu ({full}) — tulis path penuh"
+    if verdict in ("hilang", "bukan"):
         return f"bukti `{path}:{start}`: berkas tidak ada di repo"
+    target = root / full
     try:
         total = len(target.read_bytes().decode("utf-8", "replace").splitlines())
     except OSError as exc:
@@ -414,11 +422,13 @@ def card_problems(root: Path, rel: str, text: str) -> List[str]:
                         + ", ".join(map(str, strays)) + ")")
     # Bukti `path:baris` di Kondisi Sekarang: berkas ada, baris dalam jangkauan.
     if "Kondisi Sekarang" in content:
+        tracked = tracked_files(root)
         found = [(p, int(a), int(b) if b else None) for _, l in content["Kondisi Sekarang"]
-                 for p, a, b in EVIDENCE_RE.findall(l)]
+                 for p, a, b in EVIDENCE_RE.findall(l)
+                 if resolve_evidence_path(root, p, tracked)[0] != "bukan"]   # tag image, host:port (B11)
         if not found:
             problems.append("`## Kondisi Sekarang` tanpa bukti `path:baris` berbacktick")
-        problems.extend(p for p in (evidence_problems(root, *f) for f in found) if p)
+        problems.extend(p for p in (evidence_problems(root, *f, tracked=tracked) for f in found) if p)
     if "Dampak Kontrak" in content and content["Dampak Kontrak"] and not impact_of(body):
         problems.append("baris pertama `## Dampak Kontrak` wajib diawali jenis: " + " | ".join(IMPACTS))
     return problems

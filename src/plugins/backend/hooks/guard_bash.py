@@ -20,8 +20,8 @@ Untuk implementor: fail-closed — galat internal pun menolak (exit 2), karena e
 memblokir (docs hooks: "Any other exit code doesn't block on its own").
 
 Allowlist Bash implementor: git read-only (`status`, `diff`, `log`, `show`, `rev-parse`,
-`ls-files`), `git add <path lease>…` tanpa flag, `git commit -m "<pesan>"`. Edit/Write hanya pada
-path lease. Lease = scope brief (parser `skills/_common/verify_scope.py`) + berkas brief +
+`ls-files`), `git add <path lease>…` tanpa flag, `git rm [-q] [--] <path delete>…` hanya atas baris
+beraksi `delete` `## File scope` (B6), `git commit -m "<pesan>"`. Edit/Write hanya pada path lease. Lease = scope brief (parser `skills/_common/verify_scope.py`) + berkas brief +
 `finding_source` — tanpa `report-NN.md`: badan laporan jalur gagal dibawa amplop dan disimpan `architect`
 (37 B2), karena harness Claude Code menolak subagent menulis berkas laporan; disimpan di `<git-dir>/nataflow/lease-backend.json`,
 di luar working tree sehingga tidak pernah muncul di `git status --porcelain`.
@@ -37,7 +37,7 @@ from typing import List, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "skills" / "_common"))
 try:
-    from verify_scope import rel, scope_of  # noqa: E402
+    from verify_scope import file_scope_table, rel, scope_of  # noqa: E402
     IMPORT_ERROR = None
 except Exception as e:  # berkas plugin rusak: implementor tetap ditolak di hook(), bukan diloloskan
     IMPORT_ERROR = e
@@ -141,11 +141,27 @@ def shell_tokens(cmd: str) -> Tuple[List[str], str]:
     return tok, ""
 
 
-def decide_bash(cmd: str, root: Path, allowed: set, cwd: Path) -> str:
+def decide_bash(cmd: str, root: Path, allowed: set, cwd: Path, deletes: frozenset = frozenset()) -> str:
     """'' bila boleh, selain itu alasan penolakan."""
     tok, why = shell_tokens(cmd)
     if why:
         return why
+    if tok[:2] == ["git", "rm"]:
+        rest = tok[2:]
+        head, ps = (rest[:rest.index("--")], rest[rest.index("--") + 1:]) if "--" in rest else (rest, [])
+        flags = [t for t in head if t.startswith("-")]
+        ps = [t for t in head if not t.startswith("-")] + ps
+        if any(f not in ("-q", "--quiet") for f in flags) or not ps or \
+                any(ch in p for p in ps for ch in "*?[]"):
+            return "`git rm` hanya `git rm [-q] [--] <path>` eksplisit tanpa glob (tanpa -r/-f/--cached)"
+        out = []
+        for p in ps:
+            try:
+                if rel(root, str(cwd / p)) not in deletes:
+                    out.append(p)
+            except ValueError:
+                out.append(p)
+        return f"`git rm` hanya atas baris beraksi `delete` `## File scope`: {out}" if out else ""
     if tok[0] == "git" and len(tok) > 1 and tok[1] in READ_ONLY_GIT:
         bad = READ_ONLY_BAD_FLAGS.intersection(t.split("=")[0] for t in tok)
         return f"flag {sorted(bad)} dilarang" if bad else ""
@@ -208,9 +224,11 @@ def hook() -> int:
         lp = lease_path(root)
         if not lp.exists():
             return deny(f"lease absen ({lp}); architect wajib menjalankan `guard_bash.py lease` sebelum dispatch")
-        allowed = set(json.loads(lp.read_text(encoding="utf-8"))["allowed"])
+        lease_data = json.loads(lp.read_text(encoding="utf-8"))
+        allowed = set(lease_data["allowed"])
+        deletes = frozenset(lease_data.get("delete", []))
         ti = data["tool_input"]
-        reason = decide_bash(ti["command"], root, allowed, cwd) if tool == "Bash" else \
+        reason = decide_bash(ti["command"], root, allowed, cwd, deletes) if tool == "Bash" else \
             decide_file(ti["file_path"], root, allowed)
         return deny(reason) if reason else 0
     except Exception as e:                         # fail-closed khusus implementor
@@ -305,19 +323,21 @@ def lease(brief: str, clear: bool) -> int:
             print(f"LEASE CLEARED {lp}")
             return 0
         b = Path(brief).resolve()
-        paths, fs = scope_of(b.read_text(encoding="utf-8"))
+        text = b.read_text(encoding="utf-8")
+        paths, fs = scope_of(text)
+        deletes = sorted({rel(root, p) for aksi, p in file_scope_table(text) if aksi == "delete"})
         if not paths:
             raise ValueError("`## File scope` kosong atau tak terbaca")
         allowed = [rel(root, p) for p in paths] + [rel(root, str(b))]
         if fs:                                     # penanda FIXED di-stage implementor (L2.6)
             allowed.append(rel(root, fs))
         lp.parent.mkdir(parents=True, exist_ok=True)
-        lp.write_text(json.dumps({"brief": allowed[len(paths)], "allowed": sorted(set(allowed))}, indent=1),
-                      encoding="utf-8")
+        lp.write_text(json.dumps({"brief": allowed[len(paths)], "allowed": sorted(set(allowed)),
+                                  "delete": deletes}, indent=1), encoding="utf-8")
     except (OSError, ValueError, RuntimeError) as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 2
-    print(f"LEASE {lp}: {len(paths)} path scope")
+    print(f"LEASE {lp}: {len(paths)} path scope" + (f", {len(deletes)} delete" if deletes else ""))
     return 0
 
 

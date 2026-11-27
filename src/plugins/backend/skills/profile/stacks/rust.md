@@ -83,6 +83,12 @@ Migrasi: `sqlx` di `migrations/{timestamp}_{nama}.sql`; `diesel` di
 Pilih sub-bagian sesuai `architecture:` profil. Lima jebakan di bawah tiap gaya berlaku hanya untuk
 gaya itu; jebakan yang tidak bergantung gaya ada di keduanya.
 
+Manifest dan lockfile berlaku untuk kedua gaya (B6). `Cargo.toml` — root maupun anggota workspace — sah
+disunting brief yang mendaftarkannya di `## File scope`: anggota `[workspace] members`, dependensi path antar
+crate, atau dependensi baru yang disebut `## Steps`. `Cargo.lock` tidak pernah didaftarkan maupun disunting
+tangan: gerbang kompilasi per-brief meregenerasinya, dan `close_brief.py` meng-commit-nya sebagai pendamping
+turunan bila commit unit menyentuh `Cargo.toml`.
+
 ### Gaya `layered`
 
 Urutan eksekusi kode dalam satu brief:
@@ -149,8 +155,6 @@ Lima jebakan yang wajib dijaga saat menulis kode di layer ini:
 
 Transaksi lintas port memakai port tersendiri (`UnitOfWork`), karena `&mut Transaction` beserta
 lifetime-nya tidak bisa melewati batas port tanpa membocorkan tipe `sqlx`.
-
-`Cargo.toml` dan `Cargo.lock` tidak boleh dimutasi oleh brief implementasi.
 
 ## Navigation recipes
 

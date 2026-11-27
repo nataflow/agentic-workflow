@@ -4,9 +4,10 @@
   verify_scope.py --brief <brief> --commit <sha>   # backend: sesudah implementor commit
   verify_scope.py --brief <brief> --worktree       # frontend: sebelum architect commit
 
-Scope sah = path `files_touched` frontmatter (frontend) atau baris `modify|create` tabel
+Scope sah = path `files_touched` frontmatter (frontend) atau baris `modify|create|delete` tabel
 **File** `## File scope` (backend), ditambah berkas brief itu sendiri dan `report-NN.md` di
-direktori yang sama. Berkas `finding_source` frontmatter sah hanya bila diff-nya semata menambah
+direktori yang sama. Lockfile turunan (`Cargo.lock`) sah sebagai pendamping bila manifestnya
+(`Cargo.toml` di direktori yang sama atau di bawahnya) ada di scope (B6). Berkas `finding_source` frontmatter sah hanya bila diff-nya semata menambah
 baris `> Status: FIXED`. Laci `.explore/` diabaikan, hanya di `<plugin>/docs/[<taskdir>/].explore/`.
 
 Pelaksana tidak dapat memperluas scope dengan menyunting brief-nya sendiri (11 H3). Brief yang dikunci
@@ -72,11 +73,16 @@ MIN_COLS_BACKEND = 4   # Aksi | Path | Anchor | Apa yang berubah
 MIN_COLS_FRONTEND = 3  # AKSI | path | Anchor — scope utamanya `files_touched`
 
 
-def file_scope_rows(text: str, min_cols: int = MIN_COLS_BACKEND) -> List[str]:
-    """Path baris `modify|create` di `## File scope` (tabel **Folder** tidak beraksi, jadi terlewati).
+ACTIONS = ("modify", "create", "delete")
+LOCK_COMPANIONS = {"Cargo.lock": "Cargo.toml"}   # lockfile turunan → manifest pemicunya (B6)
+
+
+def file_scope_table(text: str, min_cols: int = MIN_COLS_BACKEND) -> List[Tuple[str, str]]:
+    """(aksi, path) baris `modify|create|delete` di `## File scope` (tabel **Folder** tidak beraksi).
 
     Baris beraksi yang kolomnya kurang dari `min_cols` tidak pernah terbaca validator plan, jadi juga
-    tidak masuk scope di sini. Heading dicocokkan tak peka huruf, sama dengan validator.
+    tidak masuk scope di sini. Heading dicocokkan tak peka huruf, sama dengan validator. `delete`
+    sejak B6: berkas yang dihapus brief, dieksekusi implementor lewat `git rm`.
     """
     m = re.search(r"^## File scope[ \t]*$", text, re.M | re.I)
     if not m:
@@ -87,9 +93,24 @@ def file_scope_rows(text: str, min_cols: int = MIN_COLS_BACKEND) -> List[str]:
     out = []
     for line in sec.splitlines():
         cols = [c.strip() for c in line.strip().strip("|").split("|")] if line.strip().startswith("|") else []
-        if len(cols) >= min_cols and cols[0].strip("`").lower() in ("modify", "create"):
-            out.append(cols[1].strip("`").strip())
+        if len(cols) >= min_cols and cols[0].strip("`").lower() in ACTIONS:
+            out.append((cols[0].strip("`").lower(), cols[1].strip("`").strip()))
     return out
+
+
+def file_scope_rows(text: str, min_cols: int = MIN_COLS_BACKEND) -> List[str]:
+    """Path seluruh baris beraksi `## File scope` (`file_scope_table` tanpa kolom aksi)."""
+    return [path for _, path in file_scope_table(text, min_cols)]
+
+
+def lock_companion(path: str, allowed: set) -> bool:
+    """`path` lockfile turunan yang manifestnya — di direktorinya atau di bawahnya — ada di `allowed`."""
+    parts = path.rsplit("/", 1)
+    manifest = LOCK_COMPANIONS.get(parts[-1])
+    if not manifest:
+        return False
+    base = parts[0] + "/" if len(parts) == 2 else ""
+    return any(a.startswith(base) and a.rsplit("/", 1)[-1] == manifest for a in allowed)
 
 
 def scope_of(brief_text: str) -> Tuple[List[str], Optional[str]]:
@@ -230,7 +251,7 @@ def main() -> int:
                 tampered = None not in (before, after) and brief_contract(before) != brief_contract(after)
         stray = []
         for p in touched:
-            if p in allowed or is_scratch(p):
+            if p in allowed or is_scratch(p) or lock_companion(p, allowed):
                 continue
             if fs and p == fs and only_fixed_marker(root, p, a.commit):
                 continue

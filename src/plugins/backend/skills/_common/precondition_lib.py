@@ -211,6 +211,62 @@ def is_scratch(path: str) -> bool:
     return seg[:2] == ["backenddev", "docs"] and ".explore" in seg[2:4]
 
 
+# Ekstensi berkas wajib memuat huruf: `0.0.0.0:4729` (host:port) dan `amazoncorretto:21` (tag image)
+# bukan bukti `path:baris` (B11).
+FILE_EXT = re.compile(r"\.[A-Za-z][A-Za-z0-9]*$")
+
+
+def tracked_files(root: Path) -> List[str]:
+    """`git ls-files` relatif root; kosong bila bukan repo git atau git gagal."""
+    try:
+        proc = subprocess.run(["git", "-C", str(root), "ls-files", "-z"], capture_output=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return []
+    if proc.returncode != 0:
+        return []
+    return [p for p in proc.stdout.decode("utf-8", "surrogateescape").split("\0") if p]
+
+
+def resolve_evidence_path(root: Path, token: str, tracked: Optional[List[str]] = None) -> Tuple[str, str]:
+    """Resolusi path bukti `path:baris` (B11) → `(vonis, path)`.
+
+    `ok` — berkas ada di path itu. `suffix` — path tidak ada, tetapi tepat satu berkas terlacak
+    berakhiran `/<token>` (basename `RecallOrderService.java` atau path parsial `order/Svc.java`);
+    path kedua adalah path penuhnya. `ambigu` — lebih dari satu; path kedua daftar `, `-nya.
+    `bukan` — token bukan path berkas (tanpa `/` dan tanpa ekstensi berhuruf, serta bukan nama berkas
+    terlacak seperti `Dockerfile`), jadi bukan bukti. `hilang` — selain itu.
+    """
+    token = token.strip().removeprefix("./")
+    if (root / token).is_file():
+        return "ok", token
+    files = tracked_files(root) if tracked is None else tracked
+    hits = [p for p in files if p == token or p.endswith("/" + token)]
+    if "/" not in token and not FILE_EXT.search(token) and not hits:
+        return "bukan", ""
+    if len(hits) == 1:
+        return ("ok" if hits[0] == token else "suffix"), hits[0]
+    if len(hits) > 1:
+        return "ambigu", ", ".join(hits[:4]) + (f", +{len(hits) - 4} lainnya" if len(hits) > 4 else "")
+    return "hilang", ""
+
+
+LOCKFILES = ("Cargo.lock",)   # lockfile turunan; selaras `verify_scope.LOCK_COMPANIONS` (B6)
+
+
+def lockfile_remedy(dirty: Sequence[str]) -> str:
+    """Remediasi satu perintah bila seluruh berkas kotor lockfile turunan (B6); selain itu ''.
+
+    Lockfile diregenerasi alat build (`cargo check`) dari manifest yang sudah ter-commit, jadi
+    perubahannya turunan, bukan suntingan: commit apa adanya, atau buang bila regenerasinya tak diminta.
+    """
+    if not dirty or not all(p.rsplit("/", 1)[-1] in LOCKFILES for p in dirty):
+        return ""
+    paths = " ".join(dirty)
+    return (f"Hanya lockfile turunan yang kotor — satu perintah: "
+            f"`git commit -m \"chore: sinkron {dirty[0].rsplit('/', 1)[-1]}\" -- {paths}` bila manifestnya sudah "
+            f"ter-commit, atau `git checkout -- {paths}` untuk membuang regenerasinya.")
+
+
 def dirty_paths(root: Path, exclude_scratch: bool = True) -> List[str]:
     """Path kotor relatif root dari `git status --porcelain -z -uall`.
 

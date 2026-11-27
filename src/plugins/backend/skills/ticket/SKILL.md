@@ -106,6 +106,7 @@ Selain READY: `### TICKET — <DIBATALKAN | DIALIHKAN ke <skill>: <alasan satu k
 
 - `new` FAIL slug kembar → kembali ke Fase 1 butir 2.
 - `check` FAIL bukti `path:baris` tidak ada atau melewati panjang berkas → baca ulang berkasnya (masih dalam jatah
-  Fase 2) dan betulkan barisnya; jangan menebak nomor baris.
+  Fase 2) dan betulkan barisnya; jangan menebak nomor baris. Nama berkas lepas di-resolve ke satu-satunya berkas
+  terlacak bernama itu (B11); FAIL "ambigu" → tulis path penuhnya.
 - `sync` GAGAL → tiket tetap READY di disk; laporkan segmennya dan sarankan `sync --push` ulang sesudah config atau
   MCP key dibenahi.

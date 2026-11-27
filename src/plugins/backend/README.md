@@ -234,12 +234,13 @@ oleh skrip prasyarat, sehingga vonis hook sama dengan vonis skrip.
 **PreToolUse** (`python3 hooks/guard_bash.py hook`, matcher `Bash|Edit|Write`, timeout 10 detik) berlaku
 untuk subagent `backend:code-implementor`, `backend:code-explorer`, dan `backend:code-reviewer`, dan menolak bila ragu (fail-closed). Implementor hanya
 boleh menjalankan git read-only (`status`, `diff`, `log`, `show`, `rev-parse`, `ls-files`),
-`git add <path>` eksplisit di dalam lease, dan `git commit -m` satu baris. Rantai perintah, pipe, pengalihan,
+`git add <path>` eksplisit di dalam lease, `git rm [-q] [--] <path>` hanya atas baris beraksi `delete`
+`## File scope` (B6), dan `git commit -m` satu baris. Rantai perintah, pipe, pengalihan,
 substitusi, dan ekspansi shell (`$`, backtick, brace `{a,b}`) ditolak, begitu pula glob (`*`, `?`, `[`)
 sebelum `--`, karena nama berkas hasil ekspansinya dapat menjadi flag; operator dinilai sesudah tokenisasi,
 jadi `<T>` atau `->` di dalam kutip tetap satu argumen. Edit/Write hanya boleh ke path lease. Lease ditulis `architect` sebelum dispatch
 (`guard_bash.py lease --brief <path>`) ke `<git-dir>/nataflow/lease-backend.json`, di luar
-working tree. Isinya `## File scope` brief, berkas brief, dan `finding_source` — tanpa `report-NN.md`, yang
+working tree. Isinya `## File scope` brief (ditambah daftar `delete` terpisah), berkas brief, dan `finding_source` — tanpa `report-NN.md`, yang
 disimpan `architect` dari badan laporan amplop jalur gagal (37 B2). Tanpa lease,
 semua Bash/Edit/Write implementor ditolak. Untuk `backend:code-explorer`, hook yang sama hanya
 mengizinkan Edit/Write ke laporan `backenddev/docs/[<taskdir>/].explore/*.md`. `backend:code-reviewer` hanya

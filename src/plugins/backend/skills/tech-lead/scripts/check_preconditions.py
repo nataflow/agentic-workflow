@@ -45,6 +45,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_common"))
 from precondition_lib import (  # noqa: E402
     GitError,
     dirty_paths,
+    lockfile_remedy,
     find_repo_root,
     format_text,
     freshness_banner,
@@ -289,7 +290,8 @@ class PreconditionChecker:
                             "name": name,
                             "status": "FAIL",
                             "summary": f"Mode re-entry: {len(outside)} berkas kotor di luar zona artefak ({sample})",
-                            "action": "Minta user stash atau commit berkas di luar zona artefak sebelum melanjutkan re-entry."
+                            "action": lockfile_remedy(outside)
+                            or "Minta user stash atau commit berkas di luar zona artefak sebelum melanjutkan re-entry."
                         })
                         return
 
@@ -307,7 +309,8 @@ class PreconditionChecker:
                     "name": name,
                     "status": "FAIL",
                     "summary": f"Working tree kotor ({len(dirty)} berkas uncommitted)",
-                    "action": "Minta user stash atau commit perubahan sebelum membuat taskdir/branch."
+                    "action": lockfile_remedy(dirty)
+                    or "Minta user stash atau commit perubahan sebelum membuat taskdir/branch."
                 })
                 return
 

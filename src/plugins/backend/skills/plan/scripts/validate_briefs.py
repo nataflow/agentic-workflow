@@ -233,13 +233,29 @@ def _is_test_path(path: str, test_hint: Optional[str] = None) -> bool:
         if stem and stem in re.sub(r"[^a-z0-9]+", "", low):
             return True
     base = os.path.basename(low)
+    # `tests/` di awal path (crate root Rust, PHP, Node) sama sahnya dengan di tengah (B5).
+    slashed = "/" + low.lstrip("/")
     return (
         "test" in base
         or "spec" in base
-        or "/tests/" in low
-        or "/test/" in low
+        or "/tests/" in slashed
+        or "/test/" in slashed
         or "__tests__" in low
     )
+
+
+# Kembaran produksi berkas test se-direktori: `foo_test.rs` → `foo.rs`, `foo.test.ts` → `foo.ts`,
+# `FooTest.java` → `Foo.java` (B5).
+TEST_TWIN = re.compile(r"^(?P<stem>.+?)(?:_test|_spec|\.test|\.spec|Tests?|IT)\.(?P<ext>[A-Za-z0-9]+)$")
+
+# Pendamping turunan: lockfile yang diregenerasi alat build dari manifest dalam scope (B5, B6).
+LOCK_COMPANIONS = {"Cargo.lock": "Cargo.toml"}
+
+# Anchor berkas 0 byte: tidak ada simbol untuk ditunjuk, jadi titik sisipnya sentinel (B5).
+EMPTY_ANCHOR = re.compile(r"kosong|\bEOF\b|\bempty\b", re.IGNORECASE)
+
+# TOML: kunci `nama =` dan header `[section]` adalah deklarasinya; nama kunci boleh ber-`-` (B5).
+TOML_DECLARATION = re.compile(r"^\s*(?:\[\[?[^\]]+\]\]?\s*(?:#.*)?$|\"?[A-Za-z0-9_.-]+\"?\s*=)")
 
 
 def _is_migration_path(path: str) -> bool:
@@ -673,7 +689,7 @@ class BriefValidator:
             if set(cols[0]) <= set("-: "):
                 continue
             aksi = cols[0].strip("`").lower()
-            if aksi not in ("modify", "create"):
+            if aksi not in ("modify", "create", "delete"):
                 continue
             if len(cols) < 4:
                 # Baris beraksi berkolom kurang dilewati predikat rencana, dan `verify_scope.py`
@@ -1063,11 +1079,24 @@ class BriefValidator:
 
     # -- Resolusi anchor ---------------------------------------------------
 
-    def _anchor_tokens(self, anchor: str) -> List[str]:
+    def _anchor_tokens(self, anchor: str, path: str = "") -> List[str]:
         cleaned = re.sub(r"~?:\s*\d+", " ", anchor)
         cleaned = cleaned.replace("`", " ")
-        tokens = re.findall(r"[A-Za-z_][A-Za-z0-9_]{2,}", cleaned)
-        return [t for t in tokens if t.lower() not in ANCHOR_STOPWORDS]
+        # Kunci TOML (`delivery-order_domain`) memuat `-`; memecahnya menyisakan `delivery` (B5).
+        word = r"[A-Za-z_][A-Za-z0-9_-]*[A-Za-z0-9_]" if path.endswith(".toml") else r"[A-Za-z_][A-Za-z0-9_]{2,}"
+        tokens = re.findall(word, cleaned)
+        return [t for t in tokens if len(t) > 2 and t.lower() not in ANCHOR_STOPWORDS]
+
+    @staticmethod
+    def _is_declaration(path: str, line: str) -> bool:
+        if path.endswith(".toml"):
+            return bool(TOML_DECLARATION.match(line))
+        return bool(DECLARATION_RE.search(line))
+
+    def _empty_file(self, path: str) -> bool:
+        """Berkas ada di disk dan isinya kosong (0 byte atau hanya spasi)."""
+        candidate = self.root / path
+        return candidate.is_file() and not (self._read(candidate) or "").strip()
 
     def _resolve_anchor(self, path: str, anchor: str) -> Tuple[str, str]:
         """Resolve satu anchor ke laci `.explore` atau ke disk.
@@ -1079,7 +1108,12 @@ class BriefValidator:
         lintas-stack pasti meleset sesekali; tetapi ia wajib terbaca, karena
         anchor semacam itu mengirim eksekutor mencari titik sisip yang tidak ada.
         """
-        tokens = self._anchor_tokens(anchor)
+        if self._empty_file(path):
+            if EMPTY_ANCHOR.search(anchor):
+                return "ok", "berkas kosong (sentinel)"
+            return "fail", ("berkas kosong di disk — tidak ada simbol untuk ditunjuk; tulis Anchor "
+                            "`(berkas kosong)`")
+        tokens = self._anchor_tokens(anchor, path)
         if not tokens:
             return "fail", "anchor tidak memuat satu pun simbol"
 
@@ -1099,7 +1133,7 @@ class BriefValidator:
             if not hit:
                 return "fail", f"simbol {tokens[0]} tidak ditemukan di berkas"
             for line in text.splitlines():
-                if DECLARATION_RE.search(line) and any(
+                if self._is_declaration(path, line) and any(
                     re.search(rf"\b{re.escape(t)}\b", line) for t in hit
                 ):
                     return "ok", "disk (deklarasi)"
@@ -1132,12 +1166,20 @@ class BriefValidator:
                 maker = next((m for m in creators.get(row["path"], [])
                               if m["nn"] is not None and b["nn"] is not None and m["nn"] < b["nn"]), None)
                 if row["aksi"] == "modify" and maker and not (self.root / row["path"]).exists():
-                    tokens = self._anchor_tokens(row["anchor"])
+                    tokens = self._anchor_tokens(row["anchor"], row["path"])
                     made = self._section_text(maker, "Steps") + "\n" + self._section_text(maker, "Interfaces")
                     if not tokens or not any(re.search(rf"\b{re.escape(t)}\b", made) for t in tokens):
                         problems.append(
                             f"{b['name']}:{row['lineno']}: anchor `{row['anchor']}` pada `{row['path']}` "
                             f"tidak disebut `## Steps`/`## Interfaces` {maker['name']} yang membuat berkas itu"
+                        )
+                    continue
+                if row["aksi"] == "delete":
+                    # Berkas yang dihapus brief ini wajib ada; titik sisipnya tidak ada (B6).
+                    if not (self.root / row["path"]).is_file() and not creators.get(row["path"]):
+                        problems.append(
+                            f"{b['name']}:{row['lineno']}: aksi `delete` pada `{row['path']}` "
+                            f"yang tidak ada di disk maupun di-`create` brief lain"
                         )
                     continue
                 if row["aksi"] == "create":
@@ -1175,7 +1217,9 @@ class BriefValidator:
                 # langkah bertitik sisip konkret; ini separuh mekanis dari tuntutan
                 # itu — yang tidak dapat digerbangi di sini adalah apakah klaim
                 # isinya benar, dan itu milik `brief-reviewer`.
-                tokens = self._anchor_tokens(row["anchor"])
+                if verdict == "ok" and why.startswith("berkas kosong"):
+                    continue  # sentinel, bukan simbol yang disebut `## Steps`
+                tokens = self._anchor_tokens(row["anchor"], row["path"])
                 if tokens and not any(
                     re.search(rf"\b{re.escape(t)}\b", steps_text) for t in tokens
                 ):
@@ -1190,7 +1234,8 @@ class BriefValidator:
                       "`Simbol anchor` apa adanya; dilarang mengarang anchor. Berkas yang "
                       "memang belum ada berarti unit ini pekerjaan `create`. Anchor yang "
                       "resolve tetapi tak disebut `## Steps` menandakan langkahnya menyentuh "
-                      "simbol lain — samakan keduanya.",
+                      "simbol lain — samakan keduanya. Berkas 0 byte ber-Anchor `(berkas kosong)`; "
+                      "baris `delete` menunjuk berkas yang ada, Anchor `—`.",
                       warnings)
 
     # -- Check P -----------------------------------------------------------
@@ -1349,24 +1394,23 @@ class BriefValidator:
         problems: List[str] = []
         note = ""
 
-        allowed: List[str] = []
-        if self.file_scope_arg:
-            allowed = [p.strip().strip("`") for p in re.split(r"[,\s]+", self.file_scope_arg) if p.strip()]
+        allowed = self._scope_patterns(self.file_scope_arg or "")
 
         banned: List[str] = []
+        kosong = "file_scope tanpa satu pun pola path" if self.file_scope_arg else "file_scope kosong"
         if not allowed:
             body = self._doc_section(self.task_text, "Out of Scope")
             if body:
                 banned = [t for t in re.findall(r"`([^`]+)`", body) if "/" in t or "." in t]
-                note = "file_scope kosong — batas diturunkan dari `## Out of Scope` TASK.md"
+                note = f"{kosong} — batas diturunkan dari `## Out of Scope` TASK.md"
             else:
-                note = "file_scope kosong dan `## Out of Scope` TASK.md tidak terbaca"
+                note = f"{kosong} dan `## Out of Scope` TASK.md tidak terbaca"
 
         for b in self.plan_briefs:
             for row in b["file_rows"]:
                 path = row["path"]
                 if allowed:
-                    if not any(self._path_matches(path, pat) for pat in allowed):
+                    if not self._in_scope(path, allowed):
                         problems.append(
                             f"{b['name']}:{row['lineno']}: `{path}` di luar batas file_scope"
                         )
@@ -1411,6 +1455,75 @@ class BriefValidator:
         if "/" not in pattern:
             return pattern in path.strip("/").split("/")
         return is_under(path, pattern)
+
+    @classmethod
+    def _scope_patterns(cls, file_scope: str) -> List[str]:
+        """Pola path dari slot `File Scope` gerbang yang ditulis bebas (B5).
+
+        Pemisahnya koma, titik koma, `·`, spasi, dan kurung; brace `{a,b}` tetap utuh lalu
+        diperluas. Kata prosa (`root`, `modul baru`, `(baca)`) dibuang: yang dipakai hanya token
+        bermuatan `/`, `.`, atau glob.
+        """
+        out: List[str] = []
+        for raw in re.findall(r"[^\s,;·()]*\{[^{}]*\}[^\s,;·()]*|[^\s,;·()]+", file_scope):
+            tok = raw.strip("`'\"").lstrip("+").rstrip(".:")
+            if not tok or not re.search(r"[/.*?\[]", tok) or re.fullmatch(r"[\W_]+", tok):
+                continue
+            out += [t for t in cls._expand_braces(tok) if t]
+        return out
+
+    @classmethod
+    def _scope_match(cls, path: str, pattern: str) -> bool:
+        """`_path_matches`, ditambah pola ber-`/` yang relatif modul: cocok di batas segmen mana pun
+        (`modules/order/**` menaungi `src/main/java/x/modules/order/A.java`, B5)."""
+        if cls._path_matches(path, pattern):
+            return True
+        pat = pattern.strip().strip("`").strip("/")
+        if "/" not in pat:
+            return False
+        seg = path.strip("/").split("/")
+        return any(cls._path_matches("/".join(seg[i:]), pat) for i in range(1, len(seg)))
+
+    def _in_scope(self, path: str, allowed: List[str]) -> bool:
+        """Path di dalam batas, langsung atau sebagai pendamping yang sah (B5).
+
+        Pendamping: lockfile turunan (`Cargo.lock`) bila manifestnya ada di batas, dan berkas test
+        yang kembaran produksinya ada di batas — `<crate>/tests/**` terhadap isi crate itu, cermin
+        `src/test/` ↔ `src/main/`, serta `foo_test.rs`/`foo.test.ts`/`FooTest.java` di samping
+        berkas produksinya, atau se-direktori dengan berkas produksi yang ada di batas.
+        """
+        if any(self._scope_match(path, pat) for pat in allowed):
+            return True
+        base = os.path.basename(path)
+        manifest = LOCK_COMPANIONS.get(base)
+        if manifest:
+            return any(os.path.basename(p.rstrip("/")) == manifest for p in allowed)
+        if not _is_test_path(path, self.test_hint):
+            return False
+        candidates: List[str] = []
+        slashed = "/" + path.lstrip("/")
+        for marker in ("/tests/", "/test/"):
+            if marker in slashed and "/src/test/" not in slashed:
+                crate = slashed.split(marker, 1)[0].strip("/")
+                prefix = f"{crate}/" if crate else ""
+                if any(p.strip("`").startswith(prefix + "src/") or p.strip("`") == prefix + "Cargo.toml"
+                       or (crate and is_under(p.strip("`").rstrip("/"), crate))
+                       for p in allowed):
+                    return True
+        if "/src/test/" in slashed:
+            candidates.append(slashed.replace("/src/test/", "/src/main/", 1).lstrip("/"))
+        m = TEST_TWIN.match(base)
+        if m:
+            candidates.append(os.path.join(os.path.dirname(path), f"{m.group('stem')}.{m.group('ext')}"))
+        for cand in candidates:
+            folder = os.path.dirname(cand)
+            probe = (cand, os.path.join(folder, "_"))  # berkas itu, atau direktorinya
+            if any(self._scope_match(c, pat) for c in probe for pat in allowed):
+                return True
+            # Se-paket: berkas produksi mana pun di direktori kembarannya ada di batas.
+            if any(os.path.dirname(p.strip("`").rstrip("/")) == folder for p in allowed):
+                return True
+        return False
 
     # -- Check C -----------------------------------------------------------
 
@@ -1534,7 +1647,7 @@ class BriefValidator:
             if b["status"] != "READY":
                 continue
             for row in b["file_rows"]:
-                for tok in self._anchor_tokens(row["anchor"]) if row["aksi"] == "modify" else []:
+                for tok in self._anchor_tokens(row["anchor"], row["path"]) if row["aksi"] == "modify" else []:
                     other = seen_anchor.setdefault((row["path"], tok), b["name"])
                     if other != b["name"]:
                         overlap.append(f"`{row['path']}` anchor `{tok}` dipakai {other} dan {b['name']}")

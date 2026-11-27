@@ -24,6 +24,7 @@ from precondition_lib import (  # noqa: E402
     check_taskdir,
     check_base_branch,
     dirty_paths,
+    lockfile_remedy,
     git_operation_in_progress,
     find_agent,
     find_repo_root,
@@ -242,7 +243,8 @@ class PreconditionChecker:
                     "name": name,
                     "status": "FAIL",
                     "summary": f"Working tree git kotor sebelum rantai orkestrasi dimulai ({sample})",
-                    "action": "Bersihkan atau simpan perubahan uncommitted sebelum memulai orkestrasi architect.",
+                    "action": lockfile_remedy(dirty)
+                    or "Bersihkan atau simpan perubahan uncommitted sebelum memulai orkestrasi architect.",
                 })
                 return
 
