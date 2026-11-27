@@ -45,8 +45,28 @@ def test_lewati_tiket_cepat_hanya_backend():
     """Permintaan tiket teknis langsung ke `backend:ticket`; frontend belum punya skill itu (keputusan 40)."""
     be = _load("backenddev", "gate_text").render(_verdict("backenddev", "OK"))
     fe = _load("frontenddev", "gate_text").render(_verdict("frontenddev", "OK"))
-    assert "`/backend:ticket`" in be and "LEWATI hanya lima" in be
+    assert "`/backend:ticket`" in be and "LEWATI hanya enam" in be
     assert "ticket" not in fe
+
+
+@pytest.mark.regression("G1")
+@pytest.mark.parametrize("plugin", list(GATES))
+def test_lewati_skill_user_di_luar_plugin(plugin):
+    """Slash skill user tanpa prefiks plugin (`/planning`) milik skill itu, termasuk eksekusinya (review hkm G1)."""
+    text = " ".join(_load(plugin, "gate_text").render(_verdict(plugin, "OK")).split())
+    assert "`/planning`" in text and "`/discus-mode`" in text
+    assert "diketik user sendiri dan bukan milik plugin" in text
+    assert "eksekusi sesudah user menyetujui rencananya" in text
+    assert f"jangan memanggil skill `{GATES[plugin].split(':')[0]}:*` sebagai pengganti" in text
+
+
+@pytest.mark.regression("G1")
+@pytest.mark.parametrize("plugin", list(GATES))
+def test_lewati_opt_out_sesi(plugin):
+    """Frasa opt-out user berlaku untuk sisa sesi sampai user meminta kembali (review hkm G1, keputusan a)."""
+    text = " ".join(_load(plugin, "gate_text").render(_verdict(plugin, "OK")).split())
+    assert '"abaikan hook"' in text and '"jangan lewat plugin"' in text
+    assert "sisa sesi" in text
 
 
 @pytest.mark.parametrize("plugin", list(GATES))

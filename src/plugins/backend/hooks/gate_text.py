@@ -12,16 +12,21 @@ WAJIB lewat gerbang:
 - susulan di tengah sesi, sekecil apa pun — "sekalian ganti X", "oh iya Y juga"
 - menjalankan artefak backend yang sudah ada (brief, `TASK.md`, `RCA.md`) — apa pun statusnya
 
-LEWATI hanya lima:
+LEWATI hanya enam:
 - permintaan membuat tiket teknis untuk dikerjakan nanti — "buatkan tiket …", "tiketkan …", `/backend:ticket`, atau
   susulan di tengah skill itu — langsung ke `backend:ticket`; mengerjakan tiketnya tetap lewat gerbang ini
 - jawaban user yang memasok informasi ke rute yang sudah diputuskan gerbang di giliran sebelumnya
 - pertanyaan pengetahuan umum yang tidak menyentuh repo
 - operasi VCS (commit, push, PR, rebase, diff) atas kerja yang sudah selesai
-- permintaan yang memanggil atau melanjutkan alur plugin lain secara eksplisit — `/analyst:*`,
-  `/product:*`, `/quickdev:*`, `/nataflow:*`, atau susulan di tengah skill `analyst:*`/`product:*`/
-  `quickdev:*`/`nataflow:*` yang sedang berjalan (elisitasi tiket atau charter, `plan/<task>.md`,
-  halaman artifact). Kerja itu milik plugin tersebut sampai user sendiri meminta pindah ke gerbang ini.
+- slash command atau skill yang diketik user sendiri dan bukan milik plugin `backend` — alur plugin lain
+  (`/analyst:*`, `/product:*`, `/quickdev:*`, `/nataflow:*`) maupun skill user tanpa prefiks plugin
+  (`/planning`, `/discus-mode`, `/ui-improvement`, …) — beserta susulannya di tengah skill itu, termasuk
+  eksekusi sesudah user menyetujui rencananya (elisitasi tiket atau charter, `plan/<task>.md`, halaman
+  artifact, rencana `/planning`). Kerja itu milik skill tersebut sampai user sendiri meminta pindah ke
+  gerbang ini; jangan memanggil skill `backend:*` sebagai pengganti langkahnya.
+- opt-out eksplisit user di sesi ini — "abaikan hook", "abaikan hook dari plugin backend/frontend",
+  "jangan lewat plugin", atau yang semakna. Berlaku untuk sisa sesi sampai user sendiri meminta kembali
+  ke gerbang ini.
 
 Pengingat ini disuntik sekali per sesi, tidak diulang tiap giliran. Berlaku sama di permintaan ke-1
 dan ke-40; jaraknya dari prompt yang sedang kamu baca bukan tanda ia kedaluwarsa."""

@@ -59,7 +59,7 @@ Skill ber-`user-invocable: false` tidak muncul di menu `/`. Untuk memulai, melan
 flowchart TD
     U["Permintaan user"] --> HK["SessionStart: detect.py menyuntik blok backend-tech-lead-gate"]
     HK --> TL["backend:tech-lead — Gerbang Masuk"]
-    TL -->|"4 pengecualian: klarifikasi, konsep umum, VCS, /analyst:* /product:* /quickdev:* /nataflow:*"| DIRECT["Jawab langsung tanpa gerbang"]
+    TL -->|"6 pengecualian: tiket cepat, klarifikasi, konsep umum, VCS, skill di luar plugin yang diketik user, opt-out sesi"| DIRECT["Jawab langsung tanpa gerbang"]
     TL --> F0{"Fase 0: prasyarat --read-only, profil ada?"}
     F0 -->|"profil absen/rusak/lama & rute mengubah kode"| PROF["backend:profile GENERATE / REFRESH / MIGRATE"]
     F0 -->|"ya"| F1["Fase 1: eksplorasi kode — code-explorer atau fast-path ≤3 Glob+Grep"]
@@ -136,7 +136,7 @@ flowchart TD
 
 ### `backend:tech-lead`
 
-- **Pemicu / kapan dipakai**: tiap pesan user berupa permintaan perubahan perilaku, bugfix, audit, eksekusi artefak, susulan cakupan, koreksi arah, atau pertanyaan baca-kode. Pertanyaan baca-kode memakai jalur cepat `references/explore-fact.md`. Ada empat pengecualian yang dijawab tanpa gerbang (`references/gate-scope.md` bagian 1): jawaban klarifikasi, konsep umum non-repo, operasi VCS atas kerja tuntas, dan alur `/analyst:*`, `/product:*`, atau `/quickdev:*` yang dipanggil eksplisit. Persetujuan `BRD.md`/`PRD.md` bukan pemicu; ia diteruskan ke `backend:analyst`.
+- **Pemicu / kapan dipakai**: tiap pesan user berupa permintaan perubahan perilaku, bugfix, audit, eksekusi artefak, susulan cakupan, koreksi arah, atau pertanyaan baca-kode. Pertanyaan baca-kode memakai jalur cepat `references/explore-fact.md`. Ada enam pengecualian yang dijawab tanpa gerbang (`references/gate-scope.md` bagian 1): tiket teknis cepat (`backend:ticket`), jawaban klarifikasi, konsep umum non-repo, operasi VCS atas kerja tuntas, slash command atau skill yang diketik user dan bukan milik plugin `backend` beserta susulannya (`/analyst:*`, `/product:*`, `/quickdev:*`, `/nataflow:*`, skill user seperti `/planning` dan `/discus-mode`), dan opt-out sesi dari user ("abaikan hook", "jangan lewat plugin") yang berlaku sampai user meminta kembali ke gerbang. Persetujuan `BRD.md`/`PRD.md` bukan pemicu; ia diteruskan ke `backend:analyst`.
 - **Prasyarat**: `scripts/check_preconditions.py --read-only` di Fase 0. Prasyarat penuh 6 check dijalankan tanpa flag di Fase 3 butir 0, atau dengan `--re-entry` di Fase 5. Keenam check: Profile Index & Invariants, Git Worktree & HEAD State, Git Clean Working Tree, Workspace Write Access, Profile Commands, dan Base Branch & Branch Convention. Check 3 lebih dulu menulis penanda `backenddev/docs/.gitignore`, atau FAIL `MIGRASI` bila berkas `backenddev/docs/` masih ter-track (`references/gate-lifecycle.md` bagian 0). Mode `--read-only` tidak menulis apa pun.
 - **Langkah**:
   1. **Fase 0**: jalankan prasyarat read-only. Bila profil absen, pertanyaan baca-kode tetap dijawab dalam mode terdegradasi, sedangkan rute yang mengubah kode diarahkan ke `PROFILE` lebih dulu. Profil di lokasi lama memicu `PROFILE` mode MIGRATE. Bila `taskdir` diberikan, journey-nya dibaca (`journey.py show`); permintaan "lanjutkan <taskdir>" sesudah serah terima menempuh jalur lanjutan `gate-lifecycle.md` bagian 6a butir 4.
@@ -618,6 +618,7 @@ Ledger `## Chain` di `TASK.md` berjalan `- [ ]` → `- [x] … @ APPROVED <sidik
 - **Cermin nataflow**: taskdir bertiket menempel ke task yang sama dengan tiketnya (metadata `ticket_key` = direktori `ticket_source`; `source` `analyst` untuk tiket analyst, `backenddev` untuk tiket `backend:ticket` yang dicerminkan `ticket.py sync`), sehingga taskdir backend dan frontend dari satu tiket bernaung di satu task. Config `.claude/nataflow.json` dibaca bersama keempat plugin.
 - **`frontend`**: profil terpisah (`.claude/profile/frontenddev/` vs `.claude/profile/backenddev/`). Di repo fullstack, kedua hook menyala dengan deteksinya masing-masing. Deteksi backend hanya membaca `dependencies` server.
 - **`quickdev`**: permintaan `/quickdev:*` dilewati gerbang. Repo yang sepenuhnya memakai quickdev menulis `.claude/workflow`.
+- **Skill user di luar plugin** (`/planning`, `/discus-mode`, `/ui-improvement`, …): slash command yang diketik user beserta susulannya, termasuk eksekusi sesudah rencananya disetujui, dilewati gerbang sampai user sendiri meminta pindah ke `backend:tech-lead`. Opt-out sesi ("abaikan hook", "jangan lewat plugin") berlaku untuk sisa sesi.
 - **`.claude/workflow`**: berkas teks berisi daftar plugin yang boleh menggerbangi repo (dipisah spasi, koma, atau baris). Bila berkas ada dan tidak memuat `backend`, hook SessionStart backend diam.
 
 ## Titik Gagal & Pemulihan

@@ -7,13 +7,17 @@ sebelum menjalankan skill frontend lain, sebelum menelusuri repo, dan sebelum me
 juga untuk susulan di tengah sesi, sekecil apa pun ("sekalian ganti X"), dan untuk menjalankan artefak
 frontend yang sudah ada (brief, `TASK.md`, `CONTRACT.md`) apa pun statusnya.
 
-Lewati hanya untuk empat hal: jawaban user yang memasok informasi ke kerja yang rutenya sudah
+Lewati hanya untuk lima hal: jawaban user yang memasok informasi ke kerja yang rutenya sudah
 diputuskan gate di giliran sebelumnya; pertanyaan pengetahuan umum yang tidak menyentuh repo; operasi
-VCS (commit, push, PR, rebase, diff) atas kerja yang sudah selesai; dan permintaan yang memanggil atau
-melanjutkan alur plugin lain secara eksplisit — `/analyst:*`, `/product:*`, `/quickdev:*`, `/nataflow:*`,
-atau susulan di tengah skill `analyst:*`/`product:*`/`quickdev:*`/`nataflow:*` yang sedang berjalan
-(elisitasi tiket atau charter, `plan/<task>.md`, halaman artifact). Kerja itu milik plugin tersebut sampai
-user sendiri meminta pindah ke gate ini.
+VCS (commit, push, PR, rebase, diff) atas kerja yang sudah selesai; slash command atau skill yang
+diketik user sendiri dan bukan milik plugin `frontend` — alur plugin lain (`/analyst:*`, `/product:*`,
+`/quickdev:*`, `/nataflow:*`) maupun skill user tanpa prefiks plugin (`/planning`, `/discus-mode`,
+`/ui-improvement`, …) — beserta susulannya di tengah skill itu, termasuk eksekusi sesudah user menyetujui
+rencananya (elisitasi tiket atau charter, `plan/<task>.md`, halaman artifact, rencana `/planning`); dan opt-out
+eksplisit user di sesi ini — "abaikan hook", "abaikan hook dari plugin backend/frontend", "jangan lewat
+plugin", atau yang semakna — yang berlaku untuk sisa sesi. Kerja itu milik skill tersebut, dan opt-out
+tetap berlaku, sampai user sendiri meminta pindah ke gate ini; jangan memanggil skill `frontend:*`
+sebagai pengganti langkahnya.
 
 Pengingat ini disuntik sekali per sesi dan tidak diulang tiap giliran. Ia berlaku sama untuk
 permintaan pertama dan permintaan ke-40; jaraknya dari prompt yang sedang kamu baca bukan tanda
