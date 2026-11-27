@@ -65,7 +65,7 @@ Dokumen taskdir (`backenddev/docs/<taskdir>/`) diabaikan git dan tidak pernah di
 | `src/**` | Tiap brief selesai atau terblokir | **`code-implementor`** | commit `commit_message` frontmatter brief; status brief ditulis di disk, tidak di-stage |
 | `{taskdir}/HALT.md` | Gerbang kompilasi, scope, simbol, atau berkas liar menahan rantai | **`architect`** | ditulis di disk; menahan lewat check 7 architect |
 | `{taskdir}/brief-NN-<unit>.md` koreksi `READY → DONE` | Commit unit mendarat tetapi status tertinggal | **`architect`** | suntingan status di disk |
-| Pencabutan `{taskdir}/HALT.md` ber-`verdict: SCOPE`/`SYMBOL` | User menerima commit di luar scope | `tech-lead` | `doc_seal.py cabut-halt --alasan "scope diterima user"` — `status: DICABUT`, berkas tetap |
+| Pencabutan `{taskdir}/HALT.md` ber-`verdict: SCOPE` (atau `SYMBOL` sebelum 0.25.0) | User menerima commit di luar scope | `tech-lead` | `python3 «doc_seal.py» cabut-halt --taskdir <taskdir> --alasan "scope diterima user"` — `status: DICABUT`, berkas tetap |
 | `{taskdir}/REPORT.md` | Laporan rantai selesai ditulis | **`report`** | tanpa materai — final di disk |
 
 *Aturan kunci penulis artefak*: `business-analysis` dan `system-analysis` menyerahkan draft **hanya** setelah self-review subagent reviewer masing-masing (`brd-reviewer`, `prd-reviewer`) berstatus `Approved`; `plan` menjalankan `doc_seal.py lock-briefs` **hanya** setelah `brief-reviewer` `Approved`. Tak satu pun menulis `status: APPROVED`.

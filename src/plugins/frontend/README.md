@@ -268,7 +268,8 @@ atau `architect`). `/clear` paling hemat: gate berikutnya mulai dari konteks das
 
 Nuansa percakapan yang tidak tertulis di dokumen rantai dibawa `{taskdir}/JOURNEY.md`, ditulis
 `skills/_common/journey.py`: satu baris per titik (`LEAD`, `FLOW`/`UI`/`CONTRACT`/`BRIEF`, `ARCHITECT`,
-`REVIEW`), maksimal dua kalimat dan 280 karakter, maksimal 40 entri. Isinya keputusan user dan alasannya,
+`REVIEW`), maksimal dua kalimat dan target 280 karakter (281–360 diterima dengan `WARN`; titik di backtick,
+singkatan seperti `mis.`, dan `v1.` tidak memecah kalimat), maksimal 40 entri. Isinya keputusan user dan alasannya,
 bukan status — jawaban approve sudah tercatat di `## Riwayat Rantai`. Tidak ada skrip gerbang yang
 membacanya, ia tidak disinkron ke nataflow, dan bila bertentangan dengan disk, disk menang.
 

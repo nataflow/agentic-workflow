@@ -27,7 +27,11 @@ Prompt subagent lalu cukup satu baris, dicetak skrip ini apa adanya:
 ke RINGKASAN_MAKS karakter, supaya maksud dispatch terlihat di input tool `Agent` (classifier auto mode tidak
 membaca isi berkas rujukan).
 
-Exit: 0 = prompt ditulis; 1 = slot wajib kosong, slot tak dikenal, slot tabel
+`--list-slots` (B3) mencetak daftar slot tabel `### Slot Hidrasi` — nama, wajib/opsional, dan kolom
+sumber pengisiannya — tanpa `--out` dan tanpa menulis apa pun, supaya main loop tidak membaca dispatcher
+lewat `grep`/`sed` hanya untuk nama slot.
+
+Exit: 0 = prompt ditulis (atau daftar slot dicetak); 1 = slot wajib kosong, slot tak dikenal, slot tabel
 tersisa mentah, atau `slug` berawalan `report` (prompt tidak ditulis); 2 = template tak terbaca, tanpa blok template,
 atau `--out` di luar laci prompt.
 
@@ -85,6 +89,22 @@ def slot_table(text: str) -> Dict[str, bool]:
     return slots
 
 
+def slot_rows(text: str) -> List[Dict[str, object]]:
+    """Baris tabel `### Slot Hidrasi`: nama, wajib, dan kolom sumber pengisian (untuk `--list-slots`)."""
+    wajib = slot_table(text)
+    m = re.search(r"^### Slot Hidrasi[ \t]*$", text, re.M)
+    sec = text[m.end():]
+    nxt = re.search(r"^#{2,3} ", sec, re.M)
+    sec = sec[:nxt.start()] if nxt else sec
+    rows: List[Dict[str, object]] = []
+    for line in sec.splitlines():
+        row = SLOT_ROW.match(line.strip())
+        if row:
+            sumber = row.group(2).split("|")[0].strip()
+            rows.append({"nama": row.group(1), "wajib": wajib[row.group(1)], "sumber": sumber})
+    return rows
+
+
 def render(template_text: str, values: Dict[str, str]) -> Tuple[str, List[str], List[str]]:
     body = template_block(template_text)
     slots = slot_table(template_text)
@@ -132,7 +152,9 @@ def main() -> int:
     ap.add_argument("--template", required=True, help="Berkas dispatcher, mis. <plugin>/skills/plan/dispatcher/explorer.md")
     ap.add_argument("--slot", action="append", default=[], help="nama=nilai (berulang)")
     ap.add_argument("--slots-json", help="Berkas JSON {nama: nilai} untuk nilai multi-baris")
-    ap.add_argument("--out", required=True, help="Laci prompt: backenddev/docs/[<taskdir>/].explore/prompt/<nama>.md")
+    ap.add_argument("--out", help="Laci prompt: backenddev/docs/[<taskdir>/].explore/prompt/<nama>.md (wajib kecuali --list-slots)")
+    ap.add_argument("--list-slots", action="store_true",
+                    help="Cetak slot tabel `### Slot Hidrasi` template (nama, wajib/opsional, sumber), tanpa menulis")
     ap.add_argument("--root", default=".", help="Root repositori (path --out relatif terhadapnya)")
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
@@ -146,6 +168,21 @@ def main() -> int:
         else:
             print(f"{status}: {extra.get('reason', '')}", file=sys.stderr)
         return code
+
+    if a.list_slots:
+        try:
+            rows = slot_rows(Path(a.template).read_text(encoding="utf-8"))
+        except (RenderError, OSError, ValueError) as e:   # template tak terbaca atau tanpa `### Slot Hidrasi`
+            return emit("ERROR", 2, reason=str(e))
+        if a.json:
+            print(json.dumps({"status": "PASS", "template": a.template, "slot": rows}, ensure_ascii=False))
+        else:
+            print(f"SLOT {Path(a.template).name}: {len(rows)} slot ({sum(1 for r in rows if r['wajib'])} wajib)")
+            for r in rows:
+                print(f"- {{{r['nama']}}} {'WAJIB' if r['wajib'] else 'opsional'} — {r['sumber']}")
+        return 0
+    if not a.out:
+        return emit("ERROR", 2, reason="`--out` wajib kecuali `--list-slots`")
 
     try:
         out_rel = a.out.replace("\\", "/").lstrip("./") if not Path(a.out).is_absolute() else None

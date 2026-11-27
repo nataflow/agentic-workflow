@@ -124,16 +124,20 @@ bukan pula dipindahkan ke taskdir baru.
 
 ### 3a. Penanda Henti `{taskdir}/HALT.md`
 
-Vonis gerbang kompilasi per-brief (Fase 3 butir 3b), scope, dan simbol (butir 4) jatuh **sesudah**
+Vonis gerbang kompilasi per-brief (Fase 3 butir 3b), sisa berkas, dan scope (butir 4) jatuh **sesudah**
 implementor meng-commit kode unit dan menulis brief `DONE`. Vonis yang hanya hidup di laporan percakapan
 hilang saat sesi putus: sesi berikutnya melihat brief itu `DONE`, memilih `NN+1`, dan melanjutkan di atas
 kode yang diketahui rusak. `HALT.md` mencatat vonis itu di disk (tanpa commit); check 7 skrip prasyarat
 menolak setiap sesi selama berkas itu ada dan belum dicabut (`status: DICABUT`, 24 K11).
 
+Simbol di luar `Anchor` tidak lagi menulis `HALT.md` (B1): `close_brief.py` memvonisnya `WARN`, menulis
+`{taskdir}/.explore/simbol-NN.md`, dan rantai lanjut; `code-reviewer` menilainya di Fase 4. `verdict: SYMBOL`
+hanya ada pada `HALT.md` yang ditulis sebelum backend 0.25.0 dan diperlakukan seperti `SCOPE`.
+
 ```markdown
 ---
 brief: brief-02-endpoint.md
-verdict: COMPILE | SCOPE | SYMBOL | STRAY
+verdict: COMPILE | SCOPE | STRAY
 sha: <sha7 commit unit yang divonis>
 baseline: <sha7 merge-base> · <hijau | merah (n galat) | TERDEGRADASI (alasan)>
 ---
@@ -144,7 +148,7 @@ baseline: <sha7 merge-base> · <hijau | merah (n galat) | TERDEGRADASI (alasan)>
 
 ## Rute
 COMPILE/STRAY → tech-lead → PLANNING taskdir sama (reentry_reason = berkas ini) → plan: baris `repairs: "02"` + terbit ulang brief READY hilir.
-SCOPE/SYMBOL → tech-lead tanyakan ke user: terima (cabut HALT) atau reset.
+SCOPE (juga SYMBOL lama) → tech-lead tanyakan ke user: terima (cabut HALT) atau reset.
 ```
 
 Tulis di disk, tanpa commit. Pencabutan tidak menghapus berkasnya: ia menambah `status: DICABUT` dan `dicabut: <alasan>`, sehingga jejak penahanan tetap ada dan ikut tercermin ke nataflow.
@@ -152,7 +156,7 @@ Tulis di disk, tanpa commit. Pencabutan tidak menghapus berkasnya: ia menambah `
 | Pencabut | Kapan | Mekanisme |
 | --- | --- | --- |
 | `plan` | Brief perbaikan ber-`repairs: brief-NN` ditulis `scaffold_brief.py --all`/`--nn` | Skrip menulis `status: DICABUT` + `dicabut: brief-NN (repairs)` |
-| `tech-lead` | `SCOPE`/`SYMBOL` diterima user, atau commit unit di-reset user | `doc_seal.py cabut-halt --alasan "<scope diterima user \| commit di-reset user>"`; sesudah reset juga `doc_seal.py buka-done --brief <NN>` (brief `DONE` → `READY`) |
+| `tech-lead` | `SCOPE` (atau `SYMBOL` lama) diterima user, atau commit unit di-reset user | `python3 «doc_seal.py» cabut-halt --taskdir <taskdir> --alasan "<scope diterima user \| commit di-reset user>"`; sesudah reset juga `python3 «doc_seal.py» buka-done --taskdir <taskdir> --brief <NN> --alasan "commit di-reset user"` (brief `DONE` → `READY`). `«doc_seal.py»` = Peta skrip `SKILL.md` |
 | `architect` | tidak pernah | — |
 
 `HALT.md` bukan kode, sehingga tidak membuat `REVIEW.md` basi, dan seperti seluruh `backenddev/docs/`

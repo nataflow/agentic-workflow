@@ -7,16 +7,20 @@ supaya main loop membayar satu giliran per brief, bukan empat:
 1. `git status --porcelain` — sisa berkas di luar laci `.explore/` → `STRAY`.
 2. `skills/_common/verify_scope.py --brief <b> --commit <sha>` → `SCOPE` (exit 1).
 3. `symbol_map.py --sha <sha> --path <p> --brief <b>` atas tiap baris `modify`
-   `## File scope` → `SYMBOL` (exit 1); exit 2 dilaporkan `DEGRADED` per berkas dan
-   tidak menahan (pemanggil jatuh ke hunk header ber-driver).
+   `## File scope` → `WARN` (exit 0, B1): simbol eksisting di luar `Anchor` tidak menahan
+   rantai — scope sudah `PASS` dan gerbang kompilasi per-brief berjalan lebih dulu. Daftarnya
+   ditulis ke `{taskdir}/.explore/simbol-NN.md` untuk dinilai `code-reviewer`; tanpa simbol,
+   berkas itu dihapus. Exit 2 dilaporkan `DEGRADED` per berkas dan tidak menahan (pemanggil
+   jatuh ke hunk header ber-driver).
 4. `hooks/guard_bash.py lease --clear` — lease implementor selalu dicabut di akhir.
 5. Status brief dibaca dari frontmatter (`status:`), apa adanya.
 
 Vonis tetap exit skrip yang dipanggil; skrip ini hanya merangkumnya. `HALT.md` tidak
 ditulis di sini — itu tetap tugas `architect`.
 
-Exit: 0 = `PASS`; 1 = `STRAY` | `SCOPE` | `SYMBOL` (urutan presedensi itu); 2 = galat
-pemanggilan (brief tak terbaca, sha salah, bukan repo git).
+Exit: 0 = `PASS` | `WARN`; 1 = `STRAY` | `SCOPE` (urutan presedensi itu); 2 = galat
+pemanggilan (brief tak terbaca, sha salah, bukan repo git). Vonis `SYMBOL` (exit 1) berlaku
+sampai backend 0.24.x; `HALT.md` `verdict: SYMBOL` lama tetap dikenali dan dicabut seperti biasa.
 
 Zero external dependencies (Python Standard Library only).
 """
@@ -34,6 +38,7 @@ SYMBOL_MAP = HERE / "symbol_map.py"
 VERIFY_SCOPE = HERE.parents[1] / "_common" / "verify_scope.py"
 GUARD = HERE.parents[2] / "hooks" / "guard_bash.py"
 LACI = "/.explore/"
+_NN = re.compile(r"^brief-(\d{2})-")
 
 
 def _run(cmd: List[str], cwd: Path) -> subprocess.CompletedProcess:
@@ -67,7 +72,8 @@ def status_of(text: str) -> str:
 def close(root: Path, brief: Path, sha: str, py: str) -> Dict:
     text = brief.read_text(encoding="utf-8")
     result: Dict = {"brief": brief.name, "sha": sha[:7], "status_brief": status_of(text),
-                    "stray": [], "scope": "", "simbol": [], "new_declared": [], "degraded": [], "lease": ""}
+                    "stray": [], "scope": "", "simbol": [], "new_declared": [], "diabaikan": [], "degraded": [],
+                    "lease": "", "peringatan": ""}
 
     porcelain = _run(["git", "status", "--porcelain"], root)
     if porcelain.returncode != 0:
@@ -93,21 +99,57 @@ def close(root: Path, brief: Path, sha: str, py: str) -> Dict:
             result["degraded"].append({"path": path, "reason": out.get("reason", "")})
             continue
         result["new_declared"] += [f"{path}#{s}" for s in out.get("new_declared", [])]
+        result["diabaikan"] += [f"{path}#{s}" for s in out.get("diabaikan", [])]
         for o in out.get("outside_anchor", []):
             result["simbol"].append({"path": path, "symbol": o["symbol"], "lines": o["lines"]})
 
     lease = _run([py, str(GUARD), "lease", "--clear"], root)
     result["lease"] = "dicabut" if lease.returncode == 0 else f"GAGAL: {(lease.stderr or lease.stdout).strip()}"
+    result["peringatan"] = write_warning(root, brief, sha, result["simbol"])
 
     if result["stray"]:
         result["verdict"] = "STRAY"
     elif scope_fail:
         result["verdict"] = "SCOPE"
     elif result["simbol"]:
-        result["verdict"] = "SYMBOL"
+        result["verdict"] = "WARN"
     else:
         result["verdict"] = "PASS"
     return result
+
+
+def write_warning(root: Path, brief: Path, sha: str, simbol: List[Dict]) -> str:
+    """Tulis atau hapus `{taskdir}/.explore/simbol-NN.md`; kembalikan path relatif, `dihapus`, atau `GAGAL: …`.
+
+    Berkas ini membawa peringatan lintas sesi (`/clear` di tengah eksekusi) sampai `code-reviewer`
+    menilainya di Fase 4. Laci `.explore/` diabaikan git dan tidak dihitung `STRAY`.
+    """
+    m = _NN.match(brief.name)
+    if not m:
+        return ""
+    target = brief.parent / ".explore" / f"simbol-{m.group(1)}.md"
+    try:
+        rel = target.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        rel = str(target)
+    try:
+        if not simbol:
+            if target.exists():
+                target.unlink()
+                return "dihapus"
+            return ""
+        rows = "\n".join(f"| `{s['path']}` | `{s['symbol']}` | {', '.join(map(str, s['lines']))} |" for s in simbol)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            f"# Peringatan simbol — {brief.name} @ {sha[:7]}\n\n"
+            "Simbol eksisting yang disunting di luar kolom `Anchor` brief (B1). Bukan penahan rantai: scope brief\n"
+            "`PASS` dan gerbang kompilasi per-brief sudah berjalan. `code-reviewer` menilai tiap baris sebagai suntingan\n"
+            "pendukung yang sah atau `P1 — simbol di luar anchor`.\n\n"
+            "| Berkas | Simbol | Baris (sesudah commit) |\n| --- | --- | --- |\n"
+            f"{rows}\n", encoding="utf-8")
+        return rel
+    except OSError as e:
+        return f"GAGAL: {e}"
 
 
 def line_of(r: Dict) -> str:
@@ -118,8 +160,12 @@ def line_of(r: Dict) -> str:
     if r["simbol"]:
         parts.append("simbol di luar anchor: " + ", ".join(
             f"{s['path']}:{','.join(map(str, s['lines']))} {s['symbol']}" for s in r["simbol"]))
+    if r["peringatan"] and r["simbol"]:
+        parts.append(f"peringatan ditulis ke {r['peringatan']}")
     if r["new_declared"]:
         parts.append("deklarasi baru: " + ", ".join(r["new_declared"]))
+    if r["diabaikan"]:
+        parts.append("diabaikan (lifecycle test/main/default): " + ", ".join(r["diabaikan"]))
     if r["degraded"]:
         parts.append("cek simbol TERDEGRADASI: " + ", ".join(d["path"] for d in r["degraded"]))
     parts.append(f"lease {r['lease']}")
@@ -149,7 +195,7 @@ def main() -> int:
             print(f"ERROR: {e}", file=sys.stderr)
         return 2
     print(json.dumps(r, ensure_ascii=False) if a.json else line_of(r))
-    return 0 if r["verdict"] == "PASS" else 1
+    return 0 if r["verdict"] in ("PASS", "WARN") else 1
 
 
 if __name__ == "__main__":

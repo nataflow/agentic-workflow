@@ -2,7 +2,7 @@
 
 Gunakan template ini saat `architect` mendispatch subagent penilai diff (`code-reviewer`) secara langsung.
 
-**Cara dispatch (32 T1).** Blok template di bawah tidak dibaca main loop. Isi slot `### Slot Hidrasi` lewat `render_prompt.py --template <berkas ini> --slot nama=nilai … --out <laci>/prompt/<nama>.md` (skrip `_common/render_prompt.py` di bawah root plugin, diawali `python3` dan awalan path yang sama dengan skrip prasyarat SKILL.md pendispatch) (`<laci>` = `{taskdir}/.explore`, atau `backenddev/docs/.explore` untuk dispatch gerbang), lalu kirim kalimat rujukan berkas yang dicetak skrip sebagai prompt subagent — bukan isi blok. Slot wajib kosong → skrip menolak (`FAIL`) sebelum prompt ditulis; slot opsional kosong → barisnya dihapus skrip. Berkas ini dibaca per seksi: `### Slot Hidrasi` sebelum render, aturan pendispatch, dan `### Penanganan Balikan` saat balikan datang.
+**Cara dispatch (32 T1).** Blok template di bawah tidak dibaca main loop. Isi slot `### Slot Hidrasi` lewat `render_prompt.py --template <berkas ini> --slot nama=nilai … --out <laci>/prompt/<nama>.md` (perintah lengkap — `python3`, path absolut skrip dan template — tertulis di SKILL.md pendispatch; daftar slot cukup `render_prompt.py --template <berkas ini> --list-slots`, B10) (`<laci>` = `{taskdir}/.explore`, atau `backenddev/docs/.explore` untuk dispatch gerbang), lalu kirim kalimat rujukan berkas yang dicetak skrip sebagai prompt subagent — bukan isi blok. Slot wajib kosong → skrip menolak (`FAIL`) sebelum prompt ditulis; slot opsional kosong → barisnya dihapus skrip. Berkas ini dibaca per seksi: `### Slot Hidrasi` sebelum render, aturan pendispatch, dan `### Penanganan Balikan` saat balikan datang.
 
 **Tujuan:** Menilai seluruh diff branch satu taskdir terhadap kontrak gabungan briefnya, tepat satu kali di akhir tiap putaran rantai, dan menuliskan hasilnya sebagai `{taskdir}/REVIEW.md`.
 
@@ -15,6 +15,10 @@ Review seluruh branch pekerjaan untuk satu direktori tugas.
 - Rentang Git: `<sha merge-base>..HEAD` — SHA dari `git merge-base {base_branch} HEAD` yang dijalankan
   sendiri lebih dulu, bukan `{base_branch}..HEAD` polos dan bukan substitusi `$(…)` (ditolak hook).
 - Kontrak Penilai: Gabungan seluruh brief di `{taskdir}/`, bukan kualitas umum modul sekitarnya.
+- Peringatan Simbol: tiap `{taskdir}/.explore/simbol-NN.md` (bila ada; daftar dengan Glob, baca dengan
+  Read) memuat simbol eksisting yang disunting brief `NN` di luar kolom `Anchor`-nya. Nilai tiap baris:
+  suntingan pendukung yang sah untuk tujuan brief (catat di `REVIEW.md`, bukan temuan) atau
+  `P1 — simbol di luar anchor` bila mengubah perilaku yang tidak diminta brief mana pun.
 - Adapter: `{adapter_path}` — `## Audit checklist` stack repo ini.
 - Kontrak Temuan: `{findings_contract}` — severity (bagian 1), ID (bagian 2), dan skema index (bagian 4).
 - Acceptance: Tulis `{taskdir}/REVIEW.md` (selalu, termasuk bila diff bersih) sesuai `## Kontrak

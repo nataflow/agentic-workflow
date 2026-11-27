@@ -134,7 +134,8 @@ fase `plan` tidak membutuhkan prosa skill hulu dan proses penulisan PRD yang men
 
 Nuansa percakapan yang tidak tertulis di dokumen rantai dibawa `{taskdir}/JOURNEY.md`, ditulis
 `skills/_common/journey.py`: satu baris per titik (`TECH_LEAD`, `BRD`/`PRD`, `READY`, `REVIEW`,
-`ARCHITECT`), maksimal dua kalimat dan 280 karakter, maksimal 40 entri. Isinya keputusan user dan alasannya,
+`ARCHITECT`), maksimal dua kalimat dan target 280 karakter (281–360 diterima dengan `WARN`; titik di backtick,
+singkatan seperti `mis.`, dan `v1.` tidak memecah kalimat), maksimal 40 entri. Isinya keputusan user dan alasannya,
 bukan status. Tidak ada skrip gerbang yang membacanya, dan bila bertentangan dengan disk, disk menang.
 
 ## Artefak di Repo Pengguna

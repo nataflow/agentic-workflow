@@ -65,7 +65,9 @@ def test_detached_message_reachable(make_repo):
 
 
 def test_skill_size_budget():
-    assert len((BE_SKILLS / "tech-lead/SKILL.md").read_text(encoding="utf-8").encode()) <= 14000
+    # 14000 → 14400 (B3, B10): satu baris peta skrip `«nama.py»` + baca `.md` lewat Read, dan path template
+    # absolut di Protokol Dispatch — references tidak disubstitusi, jadi pemetaannya wajib tinggal di SKILL.md.
+    assert len((BE_SKILLS / "tech-lead/SKILL.md").read_text(encoding="utf-8").encode()) <= 14400
 
 
 def test_hook_mentions_read_only(make_repo):

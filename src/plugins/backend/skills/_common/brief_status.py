@@ -18,15 +18,30 @@ Status brief dan penulis tunggalnya:
 * `SUPERSEDED`  — hanya `scaffold_brief.py --nn <pengganti>`, atas brief `BLOCKED`
                   atau brief `READY` hilir yang diterbitkan ulang. Terminal.
 
+CLI (B3) — satu tabel status taskdir, pengganti `grep "^status:" brief-*.md` di Bash yang ditolak classifier
+auto mode:
+
+    brief_status.py --taskdir <taskdir> [--json]
+
+Mencetak per brief NN, berkas, status, risk, `sidik_kontrak` (12 hex), tautan `supersedes`/`superseded_by`/
+`repairs`, dan commit unit yang terbukti mendarat; lalu `HALT.md` dan kesegaran `REVIEW.md`. Hanya membaca.
+Exit 0 = tabel dicetak; 1 = taskdir tak sah atau tak terbaca; 2 = argumen.
+
 Zero external dependencies (Python Standard Library only).
 """
 
+import argparse
+import json
 import re
+import sys
 import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from precondition_lib import FrontmatterError, doc_status, split_frontmatter, task_base_commit
+from precondition_lib import (
+    TASKDIR_ACTION, FrontmatterError, check_taskdir, cli, doc_status, find_repo_root, split_frontmatter,
+    task_base_commit,
+)
 
 BRIEF_STATUSES = ("READY", "DONE", "BLOCKED", "SUPERSEDED")
 CLOSED = ("DONE", "SUPERSEDED")               # tidak dieksekusi lagi, tidak menahan rantai
@@ -259,3 +274,70 @@ def halted_nn(taskdir: Path) -> Optional[str]:
     fm = read_halt(taskdir)
     refs = brief_refs(fm.get("brief", "")) if fm else []
     return refs[0] if refs else None
+
+
+# -- CLI (B3) ----------------------------------------------------------------------------------
+
+
+def taskdir_table(root: Path, taskdir: Path, rel: str) -> Dict:
+    """Ringkasan baca-saja taskdir untuk `--taskdir`: satu baris per brief, penanda henti, kesegaran review."""
+    briefs = scan_briefs(taskdir)
+    rows = []
+    for b in briefs:
+        fm = read_frontmatter(b["path"])
+        links = [f"supersedes {', '.join('brief-' + n for n in b['supersedes'])}" if b["supersedes"] else "",
+                 f"superseded_by {', '.join('brief-' + n for n in b['superseded_by'])}" if b["superseded_by"] else "",
+                 f"repairs {', '.join('brief-' + n for n in b['repairs'])}" if b["repairs"] else ""]
+        rows.append({
+            "nn": b["nn"], "berkas": b["name"], "status": b["status"], "why": b["why"],
+            "risk": fm.get("risk", ""), "sidik": fm.get("sidik_kontrak", "")[:12],
+            "tautan": "; ".join(x for x in links if x),
+            "commit": done_sha(root, f"{rel}/{b['name']}", b["commit_message"]),
+        })
+    halt_path = taskdir / HALT_FILE
+    halt = read_halt(taskdir)
+    if halt is not None:
+        halt_info = f"AKTIF verdict {halt.get('verdict', '?')} {halt.get('brief', '?')}"
+    elif halt_path.exists():
+        halt_info = "dicabut"
+    else:
+        halt_info = "tidak ada"
+    fresh, review = review_freshness(root, rel)
+    return {"taskdir": rel, "brief": rows, "tautan_bermasalah": validate_links(briefs), "halt": halt_info,
+            "review": {"segar": fresh, "keterangan": review}}
+
+
+def _main() -> int:
+    ap = argparse.ArgumentParser(description="Tabel status brief taskdir backend (baca-saja)")
+    ap.add_argument("--taskdir", required=True)
+    ap.add_argument("--json", action="store_true")
+    a = ap.parse_args()
+    root = find_repo_root()
+    verdict = check_taskdir(root, a.taskdir)
+    if not verdict.ok:
+        msg = f"{verdict.summary} — {TASKDIR_ACTION}"
+        print(json.dumps({"status": "FAIL", "message": msg}, ensure_ascii=False) if a.json else f"FAIL: {msg}")
+        return 1
+    t = taskdir_table(root, verdict.path, verdict.rel)
+    if a.json:
+        print(json.dumps({"status": "PASS", **t}, ensure_ascii=False, indent=2))
+        return 0
+    counts: Dict[str, int] = {}
+    for r in t["brief"]:
+        counts[r["status"]] = counts.get(r["status"], 0) + 1
+    ringkas = ", ".join(f"{k} {v}" for k, v in sorted(counts.items())) or "belum ada brief"
+    print(f"BRIEF_STATUS {t['taskdir']}: {len(t['brief'])} brief ({ringkas}) · HALT {t['halt']} · {t['review']['keterangan']}")
+    if t["brief"]:
+        print("| NN | Berkas | Status | Risk | Sidik | Tautan | Commit |")
+        print("| --- | --- | --- | --- | --- | --- | --- |")
+        for r in t["brief"]:
+            status = r["status"] + (f" ({r['why']})" if r["status"] == "UNKNOWN" and r["why"] else "")
+            print(f"| {r['nn']} | {r['berkas']} | {status} | {r['risk'] or '—'} | {r['sidik'] or '—'} | "
+                  f"{r['tautan'] or '—'} | {r['commit'] or '—'} |")
+    for problem in t["tautan_bermasalah"]:
+        print(f"- tautan bermasalah: {problem}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(cli(_main))

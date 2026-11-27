@@ -13,8 +13,10 @@ ditulis model, dibatasi plafon di bawah supaya berkas tidak ikut menggemukkan ko
     add  --taskdir <t> --hop <HOP> --teks "<kalimat>"   tambah satu entri
     show --taskdir <t>                                   cetak isi (Fase 0 sesi baru)
 
-Plafon: teks 1–280 karakter, satu baris, tanpa blok kode, maksimal 2 kalimat; maksimal 40 entri
-per berkas. Exit 0 = PASS, 1 = FAIL (taskdir tak sah, teks/hop ditolak, plafon entri), 2 = argumen.
+Plafon: teks satu baris tanpa blok kode, maksimal 2 kalimat (titik di backtick, singkatan umum seperti `mis.`/`dll.`,
+dan nomor versi `v1.` tidak memecah kalimat); target 280 karakter, 281–360 diterima dengan `WARN`, di atas 360
+ditolak (B2); maksimal 40 entri per berkas. Exit 0 = PASS/WARN, 1 = FAIL (taskdir tak sah, teks/hop ditolak,
+plafon entri), 2 = argumen.
 
 Zero external dependencies (Python Standard Library only).
 """
@@ -25,19 +27,23 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from precondition_lib import TASKDIR_ACTION, check_taskdir, cli, find_repo_root
 
 NAME = "JOURNEY.md"
 HOPS = ("TECH_LEAD", "TASK", "BRD", "PRD", "BRIEF", "READY", "ARCHITECT", "REVIEW")
-MAX_TEKS = 280
+MAX_TEKS = 280          # target; 281–MAX_TEKS_KERAS diterima dengan WARN (B2)
+MAX_TEKS_KERAS = 360
 MAX_KALIMAT = 2
 MAX_ENTRI = 40
 NOTE = ("> Catatan keputusan antar sesi (Langkah 30). Bukan sumber status: bila bertentangan dengan ledger, "
         "materai, status brief, atau commit, disk yang menang.")
 ENTRY_RE = re.compile(r"^- (\d{6} \d{2}:\d{2}) · ([A-Z_]+) · (.+)$")
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
+# Titik yang bukan akhir kalimat (B2): isi backtick, singkatan umum, dan nomor versi (`v1.`).
+_BACKTICK = re.compile(r"`[^`]*`")
+_SINGKATAN = re.compile(r"(?i)(?<![\w.])(?:mis|dll|dsb|dst|tsb|dkk|yth|spt|hlm|no|vs|cf|etc|e\.g|i\.e)\.|\bv\d+(?:\.\d+)*\.")
 
 
 def entries(text: str) -> List[Dict[str, str]]:
@@ -53,12 +59,37 @@ def teks_problem(teks: str) -> str:
         return "teks wajib satu baris"
     if "```" in teks:
         return "blok kode dilarang — journey mencatat keputusan, bukan isi kode atau dokumen"
-    if len(teks) > MAX_TEKS:
-        return f"teks {len(teks)} karakter > {MAX_TEKS}"
-    kalimat = [s for s in _SENTENCE_END.split(teks) if s.strip()]
-    if len(kalimat) > MAX_KALIMAT:
-        return f"{len(kalimat)} kalimat > {MAX_KALIMAT} — sebut keputusan dan alasannya saja"
+    if len(teks) > MAX_TEKS_KERAS:
+        return f"teks {len(teks)} karakter > {MAX_TEKS_KERAS} (target {MAX_TEKS})"
+    jumlah = len(kalimat(teks))
+    if jumlah > MAX_KALIMAT:
+        return f"{jumlah} kalimat > {MAX_KALIMAT} — sebut keputusan dan alasannya saja"
     return ""
+
+
+def kalimat(teks: str) -> List[str]:
+    """Kalimat teks entri; titik di backtick, singkatan umum, dan nomor versi tidak memecah (B2)."""
+    bersih = _SINGKATAN.sub(lambda m: m.group(0).replace(".", ""), _BACKTICK.sub("`x`", teks))
+    return [s for s in _SENTENCE_END.split(bersih) if s.strip()]
+
+
+def teks_warning(teks: str) -> str:
+    """Peringatan untuk teks sah yang melewati target `MAX_TEKS` (B2), atau string kosong."""
+    if len(teks) > MAX_TEKS:
+        return (f"teks {len(teks)} karakter melewati target {MAX_TEKS} — diterima (batas keras {MAX_TEKS_KERAS}); "
+                "tulis entri berikutnya lebih ringkas")
+    return ""
+
+
+def hasil_add(teks: str, nomor: int, hop: str) -> Tuple[str, str, Dict[str, Any]]:
+    """(status, pesan, tambahan) keluaran `add` yang berhasil; `WARN` tetap exit 0 (B2)."""
+    pesan = f"entri {nomor}/{MAX_ENTRI} ditambahkan ({hop})"
+    peringatan = teks_warning(teks)
+    extra: Dict[str, Any] = {"entri": nomor, "maks": MAX_ENTRI, "karakter": len(teks),
+                             "sisa": max(0, MAX_TEKS - len(teks))}
+    if peringatan:
+        return "WARN", f"{pesan} — {peringatan}", extra
+    return "PASS", f"{pesan} · sisa {MAX_TEKS - len(teks)} karakter dari target {MAX_TEKS}", extra
 
 
 def emit(as_json: bool, status: str, message: str, **extra: Any) -> int:
@@ -66,7 +97,7 @@ def emit(as_json: bool, status: str, message: str, **extra: Any) -> int:
         print(json.dumps({"status": status, "message": message, **extra}, ensure_ascii=False, indent=2))
     else:
         print(f"JOURNEY: [{status}] {message}")
-    return 0 if status == "PASS" else 1
+    return 0 if status in ("PASS", "WARN") else 1
 
 
 def main() -> int:
@@ -114,8 +145,8 @@ def main() -> int:
     elif not text.endswith("\n"):
         text += "\n"
     path.write_text(text + line + "\n", encoding="utf-8")
-    return emit(args.json, "PASS", f"entri {len(current) + 1}/{MAX_ENTRI} ditambahkan ({hop})",
-                taskdir=verdict.rel, entri=len(current) + 1, maks=MAX_ENTRI)
+    status, pesan, extra = hasil_add(teks, len(current) + 1, hop)
+    return emit(args.json, status, pesan, taskdir=verdict.rel, **extra)
 
 
 if __name__ == "__main__":

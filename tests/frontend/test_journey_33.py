@@ -42,7 +42,7 @@ def test_j1_show_teks_mencetak_isi(fe_chain_repo):
 
 @pytest.mark.parametrize("teks,alasan", [
     ("", "kosong"),
-    ("a" * 281, "281 karakter"),
+    ("a" * 361, "361 karakter > 360"),
     ("baris satu\nbaris dua", "satu baris"),
     ("lihat ```tsx```", "blok kode"),
     ("Satu. Dua. Tiga.", "3 kalimat"),
@@ -123,6 +123,6 @@ def test_j1_aturan_teks_identik_dengan_backend():
         return out
 
     fe, be = nodes(JOURNEY), nodes(BE_SKILLS / "_common" / "journey.py")
-    for name in ("NAME", "MAX_TEKS", "MAX_KALIMAT", "MAX_ENTRI", "ENTRY_RE", "_SENTENCE_END",
-                 "entries", "teks_problem", "emit"):
+    for name in ("NAME", "MAX_TEKS", "MAX_TEKS_KERAS", "MAX_KALIMAT", "MAX_ENTRI", "ENTRY_RE", "_SENTENCE_END",
+                 "_BACKTICK", "_SINGKATAN", "entries", "teks_problem", "kalimat", "teks_warning", "hasil_add", "emit"):
         assert fe[name] == be[name], name

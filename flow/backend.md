@@ -31,7 +31,7 @@ Semua path berkas di dokumen ini relatif terhadap `src/plugins/backend/`.
 | `guard_bash.py` | hook PreToolUse | Pagar mekanis Bash/Edit/Write untuk explorer, implementor, dan reviewer (fail-closed) | `hooks/guard_bash.py` |
 | `check_preconditions.py` | script (per skill) | Prasyarat sebelum fase pertama (exit 0 = PASS, 1 = FAIL) | `skills/<skill>/scripts/check_preconditions.py` |
 | `precondition_lib.py` | script | Parser frontmatter, taskdir, chain, status git, dan profil; mengimpor `hooks/detect.py` | `skills/_common/precondition_lib.py` |
-| `brief_status.py` | script | Mesin status brief, bukti `DONE` dari commit unit sejak `base_commit`, tautan `supersedes`, kesegaran `REVIEW.md` dari ujung `range:`, dan `HALT.md` (`DICABUT` tidak menahan) | `skills/_common/brief_status.py` |
+| `brief_status.py` | script | Mesin status brief, bukti `DONE` dari commit unit sejak `base_commit`, tautan `supersedes`, kesegaran `REVIEW.md` dari ujung `range:`, dan `HALT.md` (`DICABUT` tidak menahan). CLI `--taskdir` mencetak tabel status/risk/sidik/tautan/commit tiap brief, pengganti `grep` `.md` di Bash (B3) | `skills/_common/brief_status.py` |
 | `doc_seal.py` | script | Materai dokumen taskdir di disk: `root` (`base_commit`), `approve` (`approved_seal` BRD/PRD + centang ledger), `lock-briefs` (`sidik_kontrak`), `tick --hop BRIEF`, `cabut-halt`, `buka-done` (brief `DONE` tanpa commit unit → `READY`), dan `status` | `skills/_common/doc_seal.py` |
 | `docs_git.py` | script | Penanda ignore `backenddev/docs/.gitignore`, status, dan migrasi sekali jalan dokumen taskdir yang masih ter-track. Salinan identik dengan `frontend` | `skills/_common/docs_git.py` |
 | `validate_doc.py` | script | Self-test mekanis `TASK.md`/`BRD.md`/`PRD.md` | `skills/_common/validate_doc.py` |
@@ -44,10 +44,10 @@ Semua path berkas di dokumen ini relatif terhadap `src/plugins/backend/`.
 | `chain_counters.py` | script | Plafon loop rantai di `## Counters` `TASK.md`, dengan log tulisan skrip `.explore/counters-log.json` | `skills/analyst/scripts/chain_counters.py` |
 | `scaffold_brief.py` | script | Mengunci matriks alokasi, lalu menulis kerangka brief | `skills/plan/scripts/scaffold_brief.py` |
 | `validate_briefs.py` | script | Validasi batch dan per-brief, serta state ronde review brief | `skills/plan/scripts/validate_briefs.py` |
-| `symbol_map.py` | script | Peta simbol yang disunting satu commit, dicocokkan dengan kolom `Anchor` dan deklarasi baru di `## Steps` (`--brief`) | `skills/architect/scripts/symbol_map.py` |
+| `symbol_map.py` | script | Peta simbol yang disunting satu commit, dicocokkan dengan kolom `Anchor` dan deklarasi baru (nama berkualifikasi tipe induk; disebut `## Steps` atau di blok tipe/`impl` yang lahir di commit itu); lifecycle test, `main`, `default` → `diabaikan` (B1) | `skills/architect/scripts/symbol_map.py` |
 | `ticket.py` | script | Siklus tiket cepat: `state`, `new` (penanda ignore `backenddev/tickets/.gitignore`), `check`, `approve` (segel `approved_seal`/`approved_seal_norm`), `reopen`, `cancel`, `sync` (`--push`); tidak pernah meng-commit | `skills/ticket/scripts/ticket.py` |
 | `close_brief.py` | script | Satu vonis penutup per brief: sisa berkas, scope, simbol, cabut lease (32 C1) | `skills/architect/scripts/close_brief.py` |
-| `render_prompt.py` | script | Render template dispatcher ke `.explore/prompt/`; prompt subagent = satu baris ringkasan maksud + kalimat rujukan berkas (32 T1) | `skills/_common/render_prompt.py` |
+| `render_prompt.py` | script | Render template dispatcher ke `.explore/prompt/`; prompt subagent = satu baris ringkasan maksud + kalimat rujukan berkas (32 T1). `--list-slots` mencetak slot tanpa menulis (B3) | `skills/_common/render_prompt.py` |
 | `migrate_profile.py` | script | Memindah profil lama `.claude/profile/` ke `.claude/profile/backenddev/` via `git mv` | `skills/profile/scripts/migrate_profile.py` |
 | Adapter stack | referensi | `java-spring`, `go`, `node`, `bun`, `rust`, `php`, `php-codeigniter`. Masing-masing memuat 7 seksi wajib: `## Detection`, `## Commands`, `## Layer taxonomy`, `## Navigation recipes`, `## Audit checklist`, `## API surface`, `## Failure signatures` | `skills/profile/stacks/*.md`, kontrak di `_CONTRACT.md` |
 
@@ -188,7 +188,7 @@ flowchart TD
 | `plan` jalur RCA, brief READY terkunci (`lock-briefs`) | `backend:architect` pada taskdir sama |
 | `plan` jalur RCA membawa pemicu eskalasi | Tanya user. Bila naik, amandemen ke `PRD_BRIEF` lalu `PLANNING` (analyst mulai dari hop PRD) |
 | `audit` | Ringkasan per severity, user memilih ≤7 temuan, taskdir baru, lalu `PLANNING` + `finding_source` |
-| `architect` `TERTAHAN (scope)` / `HALT.md` `SCOPE`/`SYMBOL` | Tanya user: bila diterima, `doc_seal.py cabut-halt` lalu architect lagi; bila di-reset, user sendiri yang me-reset, gerbang mencabut `HALT.md` dan menjalankan `doc_seal.py buka-done` (brief `DONE` → `READY`), lalu `PLANNING` |
+| `architect` `TERTAHAN (scope)` / `HALT.md` `SCOPE` (atau `SYMBOL` sebelum 0.25.0) | Tanya user: bila diterima, `doc_seal.py cabut-halt` lalu architect lagi; bila di-reset, user sendiri yang me-reset, gerbang mencabut `HALT.md` dan menjalankan `doc_seal.py buka-done` (brief `DONE` → `READY`), lalu `PLANNING` |
 | `architect` `HALT.md` `COMPILE`/`STRAY` | `PLANNING` pada taskdir sama. `plan` menambah baris `repairs` |
 | `architect` severity `P1` | `PLANNING` pada taskdir sama, `finding_source` = `REVIEW.md`, `reentry_reason` = `REVIEW P1: <ID>`; journey `REVIEW` |
 | `architect` `COMPLETED` / `COMPLETED (WARNING)` | Rantai selesai. Pada WARNING, tawarkan taskdir perbaikan P2 (tidak otomatis) |
@@ -361,7 +361,7 @@ flowchart TD
   4. **Fase 3 (per brief, sekuensial)**:
      1. Tulis lease dengan `guard_bash.py lease --brief`, dispatch `code-implementor` via `dispatcher/implementor.md` tepat sekali, lalu triase `DONE`/`BLOCKED` memakai matriks bukti disk.
      2. **Gerbang kompilasi**: `run_verification.py closing --cmd typecheck` (relatif baseline) bila `typecheck-per-brief: ya`. Galat baru ditulis ke `HALT.md` dengan `verdict: COMPILE`.
-     3. **Pemeriksaan diff**: `git status` bersih (berkas sisa → `HALT.md STRAY`), `verify_scope.py --commit` (berkas di luar scope → `HALT.md SCOPE`, P1), dan `symbol_map.py --brief` — ketiganya dijalankan satu perintah `close_brief.py --brief --sha` yang juga mencabut lease dan mencetak satu baris vonis `PASS`/`STRAY`/`SCOPE`/`SYMBOL` (32 C1) — (simbol eksisting di luar anchor → `HALT.md SYMBOL`, P1; deklarasi baru yang ditulis `## Steps` → `new_declared`, sah, 32 S1; keluaran ringkas tanpa daftar baris, 32 S2).
+     3. **Pemeriksaan diff**: `git status` bersih (berkas sisa → `HALT.md STRAY`), `verify_scope.py --commit` (berkas di luar scope → `HALT.md SCOPE`, P1), dan `symbol_map.py --brief` — ketiganya dijalankan satu perintah `close_brief.py --brief --sha` yang juga mencabut lease dan mencetak satu baris vonis `PASS`/`WARN`/`STRAY`/`SCOPE` (32 C1) — (simbol eksisting di luar anchor → `WARN`, rantai lanjut, daftarnya ditulis ke `.explore/simbol-NN.md` dan dinilai `code-reviewer` di Fase 4, B1; deklarasi baru → `new_declared`, sah, 32 S1; lifecycle test, `main`, `default` → `diabaikan`; keluaran ringkas tanpa daftar baris, 32 S2).
      4. Berkas yatim (di luar union File scope) dicatat sebagai P1 lalu dikembalikan ke gerbang.
      5. Cabut lease dengan `lease --clear`.
   5. **Fase 4**: sesudah brief NN tertinggi DONE, jalankan `run_verification.py closing --cmd build --cmd test` sekali. Exit 1 diklasifikasi sebagai 4a (cacat eksekusi) atau 4b (cacat perencanaan / berkas yatim). Bila hijau, dispatch `code-reviewer` via `dispatcher/reviewer.md` tepat sekali. `REVIEW.md` terbit → sinkron nataflow seketika, apa pun severity-nya.
@@ -386,8 +386,7 @@ flowchart TD
     CG -->|"lolos / SKIP"| VS{"close_brief: git status + verify_scope + symbol_map --brief"}
     VS -->|"sisa berkas"| HS["HALT.md STRAY"]
     VS -->|"luar scope"| HSC["HALT.md SCOPE (P1)"]
-    VS -->|"simbol luar anchor"| HSY["HALT.md SYMBOL (P1)"]
-    VS -->|"bersih"| NX{"Masih ada brief READY?"}
+    VS -->|"bersih / WARN simbol (.explore/simbol-NN.md)"| NX{"Masih ada brief READY?"}
     NX -->|ya| L0
     NX -->|tidak| V["Fase 4: run_verification closing build+test"]
     V -->|"exit 1"| F4["Klasifikasi 4a eksekusi / 4b perencanaan → tech-lead"]
@@ -527,7 +526,7 @@ backenddev/
       TASK.md  BRD.md  PRD.md  RCA.md
       brief-NN-<unit>.md           READY → DONE | BLOCKED | SUPERSEDED
       report-NN.md                 laporan brief yang gagal (BLOCKED), ditulis architect dari amplop
-      HALT.md                      verdict COMPILE | SCOPE | SYMBOL | STRAY; status DICABUT bila dicabut
+      HALT.md                      verdict COMPILE | SCOPE | STRAY (SYMBOL hanya sebelum 0.25.0); status DICABUT bila dicabut
       REVIEW.md  REPORT.md
       JOURNEY.md                   keputusan antar sesi, satu baris per titik (journey.py); bukan sumber status
       .explore/                    scratch skill hilir: gate-*.md, brief-spec.json, brief-matrix.md,
@@ -552,7 +551,7 @@ docs/api/<slug>.md                 ter-commit
 | `brief-NN-<unit>.md` | `plan` (`scaffold_brief.py`, `sidik_kontrak` oleh `doc_seal.py lock-briefs`). Status `DONE`/`BLOCKED` ditulis `code-implementor` di disk | `READY`/`DONE`/`BLOCKED`/`SUPERSEDED`. 10 seksi, `Covers:`/`Fulfills:`, `commit_message`, `sidik_kontrak` |
 | `report-NN.md` | `architect`, salinan persis badan laporan amplop `code-implementor` (jalur gagal) | Stop condition, bukti, dan akar masalah |
 | `RCA.md` | `debug` | `ROOT_CAUSE_CONFIRMED` / `INCONCLUSIVE` |
-| `HALT.md` | `architect`. Dicabut `plan` (baris `repairs`) atau `tech-lead` (scope diterima) lewat `doc_seal.py cabut-halt` | `verdict: COMPILE / SCOPE / SYMBOL / STRAY`. Menahan tiap sesi lewat check 7 architect sampai `status: DICABUT`; berkasnya tidak dihapus |
+| `HALT.md` | `architect`. Dicabut `plan` (baris `repairs`) atau `tech-lead` (scope diterima) lewat `doc_seal.py cabut-halt` | `verdict: COMPILE / SCOPE / STRAY` (`SYMBOL` hanya berkas lama, diperlakukan seperti `SCOPE`). Menahan tiap sesi lewat check 7 architect sampai `status: DICABUT`; berkasnya tidak dihapus |
 | `REVIEW.md` | `code-reviewer` | Severity tertinggi `CLEAN`/`P3`/`P2`/`P1`, `range: <merge-base>..<HEAD>`. Dianggap basi bila commit kode mendarat sesudah ujung `range:` |
 | `REPORT.md` | `report` | Ringkasan, Perubahan, Catatan. Menandai taskdir tuntas bersama `REVIEW.md` |
 | `backenddev/issues/*.md` | `audit`. Baris `> Status: FIXED` ditulis `code-implementor` | Temuan tanpa penanda / `DEFERRED` / `FIXED` / `DROPPED` / `OBSOLETE` |
@@ -638,7 +637,7 @@ Ledger `## Chain` di `TASK.md` berjalan `- [ ]` → `- [x] … @ APPROVED <sidik
 | Brief `DONE` tanpa commit unit pembawa kode (commit di-reset user, atau `DONE` tak pernah mendarat) | Check 3 architect, matriks bukti disk | Tree kotor: eskalasi ke user. Tree bersih: gerbang mengonfirmasi ke user lalu `doc_seal.py buka-done` (brief → `READY`), lalu architect men-dispatch ulang |
 | Brief `BLOCKED` | Amplop implementor (badan laporan → `report-NN.md` oleh architect), matriks bukti disk architect | Rantai berhenti tanpa review. `PLANNING` pada taskdir sama, lalu `plan` menulis pengganti ber-`supersedes` |
 | `HALT.md` COMPILE/STRAY | Gerbang kompilasi / `git status` architect | `PLANNING` pada taskdir sama, lalu `plan` menulis baris `repairs` dan mencabut `HALT.md` lewat `doc_seal.py cabut-halt` |
-| `HALT.md` SCOPE/SYMBOL (termasuk kontrak brief yang disunting sesudah `sidik_kontrak`) | `verify_scope.py`, `symbol_map.py` | Gerbang bertanya ke user: bila diterima, `doc_seal.py cabut-halt` lalu architect lagi. Bila tidak, user me-reset, lalu `cabut-halt` + `doc_seal.py buka-done` dan `PLANNING` |
+| `HALT.md` SCOPE, atau SYMBOL lama (termasuk kontrak brief yang disunting sesudah `sidik_kontrak`) | `verify_scope.py` | Gerbang bertanya ke user: bila diterima, `doc_seal.py cabut-halt` lalu architect lagi. Bila tidak, user me-reset, lalu `cabut-halt` + `doc_seal.py buka-done` dan `PLANNING` |
 | Isi `BRD.md`/`PRD.md` berubah sesudah approve (`approved_seal` tidak cocok) | Prasyarat `system-analysis`/`plan` | Re-entry membuka hop itu, lalu gerbang dokumen Fase 4 berjalan lagi. Materai tidak ditulis tangan |
 | Verifikasi penutup merah | `run_verification.py closing` exit 1 | 4a cacat eksekusi: `DEFECT_RCA` atau brief perbaikan. 4b cacat perencanaan / berkas yatim: `PLANNING` re-entry, lalu `scaffold_brief.py --append` |
 | `REVIEW.md` P1 | `code-reviewer` | Tidak diperbaiki di architect. `PLANNING` pada taskdir sama dengan `finding_source` = `REVIEW.md`. Dihitung ke plafon re-entry |

@@ -52,10 +52,11 @@ def test_pass_dengan_deklarasi_baru_dan_lease_dicabut(repo):
 
 
 @pytest.mark.regression("32 C1")
-def test_symbol_di_luar_anchor(repo):
+@pytest.mark.regression("B1")
+def test_symbol_di_luar_anchor_jadi_peringatan(repo):
     path, sha = _land(repo, {"src/order.go": GO.replace("y := 1", "y := 2")})
     code, out = _close(repo, path, sha)
-    assert code == 1 and out["verdict"] == "SYMBOL"
+    assert code == 0 and out["verdict"] == "WARN"
     assert [s["symbol"] for s in out["simbol"]] == ["Cancel"]
 
 

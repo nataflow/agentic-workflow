@@ -1,5 +1,6 @@
 """Langkah 30 J1: `_common/journey.py` — catatan keputusan antar sesi di `<taskdir>/JOURNEY.md`."""
 import json
+import re
 
 import pytest
 
@@ -42,7 +43,7 @@ def test_j1_show_teks_mencetak_isi(chain_repo):
 @pytest.mark.parametrize("teks,alasan", [
     ("", "kosong"),
     ("   ", "kosong"),
-    ("a" * 281, "281 karakter"),
+    ("a" * 361, "361 karakter > 360"),
     ("baris satu\nbaris dua", "satu baris"),
     ("lihat ```go\nx```", "satu baris"),
     ("lihat ```x```", "blok kode"),
@@ -153,3 +154,54 @@ def test_h2_lanjutan_melewati_eksplorasi_dan_baseline_gerbang():
     butir4 = _read("tech-lead/references/gate-lifecycle.md").split("## 6a.", 1)[1].split("\n4. ", 1)[1]
     assert "Fase 1–4 dilewati" in butir4 and "--re-entry" in butir4
     assert "tanpa baseline build gerbang" in butir4 and "permukaan baru" in butir4
+
+
+# ------------------------------------------------------------------ B2 — pita lunak dan hitung kalimat
+
+
+@pytest.mark.regression("B2")
+def test_b2_pita_lunak_diterima_dengan_warn(chain_repo):
+    teks = "Keputusan: " + "x" * 289
+    proc, out = _run(chain_repo, "add", "--taskdir", TD, "--hop", "READY", "--teks", teks)
+    assert proc.returncode == 0 and out["status"] == "WARN", out
+    assert "melewati target 280" in out["message"] and out["karakter"] == 300 and out["sisa"] == 0
+    assert teks in (chain_repo / TD / "JOURNEY.md").read_text(encoding="utf-8")
+
+
+@pytest.mark.regression("B2")
+def test_b2_pass_mencetak_sisa_karakter(chain_repo):
+    proc, out = _run(chain_repo, "add", "--taskdir", TD, "--hop", "READY", "--teks", "a" * 280)
+    assert proc.returncode == 0 and out["status"] == "PASS" and "sisa 0 karakter dari target 280" in out["message"]
+    proc, out = _run(chain_repo, "add", "--taskdir", TD, "--hop", "READY", "--teks", "Pakai kolom baru.")
+    assert out["sisa"] == 280 - len("Pakai kolom baru.")
+
+
+@pytest.mark.regression("B2")
+@pytest.mark.parametrize("teks", [
+    "Filter tanggal dipakai, mis. rentang harian dll. Opsi bulanan ditolak user.",
+    "Rilis v1. dipakai dan v0.24. ditunda. Alasan: kompatibel.",
+    "Pola `a. b. c.` dipertahankan. Tanpa migrasi.",
+    "Endpoint GET aditif, e.g. daftar order. Tanpa PRD.",
+])
+def test_b2_singkatan_versi_backtick_bukan_akhir_kalimat(chain_repo, teks):
+    proc, out = _run(chain_repo, "add", "--taskdir", TD, "--hop", "BRIEF", "--teks", teks)
+    assert proc.returncode == 0, out
+
+
+@pytest.mark.regression("B2")
+def test_b2_tiga_kalimat_nyata_tetap_ditolak(chain_repo):
+    proc, out = _run(chain_repo, "add", "--taskdir", TD, "--hop", "BRIEF",
+                     "--teks", "Pakai filter mis. tanggal. Opsi B ditolak. Alasan kinerja.")
+    assert proc.returncode == 1 and "3 kalimat" in out["message"]
+
+
+@pytest.mark.regression("B2")
+def test_b2_titik_panggil_backend_menyebut_plafon():
+    """Model menulis median 310 karakter karena titik panggil backend tidak menyebut plafon (FE sudah, 36 J1)."""
+    slot = "≤2 kalimat, ≤280 karakter"
+    for rel in ("analyst/SKILL.md", "architect/SKILL.md", "tech-lead/references/gate-lifecycle.md"):
+        text = (BE_SKILLS / rel).read_text(encoding="utf-8")
+        calls = re.findall(r"journey\.py[»`]? add [^\n]*", text)
+        assert calls, rel
+        for line in calls:
+            assert slot in line, (rel, line[:120])

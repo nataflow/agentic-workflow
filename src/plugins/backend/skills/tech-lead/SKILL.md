@@ -30,7 +30,7 @@ description: Gunakan ketika ada permintaan kerja baru atau susulan di repo backe
 ### Protokol Dispatch — Satu-satunya Jalur ke Subagent
 
 1. **Satu titik sah**: dispatch hanya `code-explorer` di Fase 1 butir 2.
-2. **Render, bukan salin**: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/render_prompt.py --template <dispatcher/explorer.md> --slot … --out backenddev/docs/.explore/prompt/<slug>.md`; prompt subagent = kalimat cetakannya. Dispatcher dibaca per seksi.
+2. **Render, bukan salin**: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/render_prompt.py --template ${CLAUDE_PLUGIN_ROOT}/skills/tech-lead/dispatcher/explorer.md --slot objective=… --slot slug=… --out backenddev/docs/.explore/prompt/<slug>.md`; prompt subagent = kalimat cetakannya. Slot: `--list-slots`.
 3. `FAIL` → lengkapi slot; `ERROR` → sapuan manual berkuota; jangan mengarang prompt.
 
 ### Gerbang Masuk — Evaluasi Pemicu & Pengecualian
@@ -99,6 +99,7 @@ Jalankan untuk rute yang menghasilkan artefak rancangan atau kode; lewati lane `
 - **PENCABANGAN HANYA DARI BASE BRANCH**: dilarang bercabang di atas branch kerja lain.
 - **COMMIT ARTEFAK MILIK PENULISNYA**: gerbang meng-commit hanya artefak `profile`, `audit`, `document-api` di Fase 5; dokumen taskdir tidak pernah di-commit. Dilarang staging wildcard.
 - **LARANGAN GIT DESTRUKTIF**: dilarang `git push`, `git merge`, `git rebase`, `gh pr create`, atau `git branch -D` tanpa otorisasi eksplisit user.
+- **PETA SKRIP & `.md` (B3, B10)**: `«nama.py»` di `references/` = `${CLAUDE_PLUGIN_ROOT}/skills/_common/<nama>.py`; jangan `find`/`--help`. `.md` dibaca lewat `Read`, bukan grep/sed/cat di Bash; status brief: `«brief_status.py» --taskdir <t>`.
 - **RATIONALIZATION PREVENTION**: dilarang menganggap perubahan field response MINOR; menutupi taskdir `BLOCKED` dengan direktori baru; mendispatch implementor tanpa `architect`; berasumsi user setuju breaking tanpa PRD; melanjutkan sapuan setelah kuota habis; atau meminta stash/commit untuk pertanyaan baca-kode.
 
 ## Output [REQUIRED]

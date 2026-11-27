@@ -22,6 +22,16 @@ dan namanya disebut `## Steps` dilaporkan di `new_declared`, bukan `outside_anch
 brief berisi kode lengkap, jadi nama barunya tertulis di sana. Suntingan atas simbol
 yang sudah ada tetap dinilai terhadap `Anchor`.
 
+Deklarasi lama dibandingkan dengan nama berkualifikasi tipe induknya (`Foo::default`, B1): `fn
+default` di `impl Default for Foo` yang baru tidak lagi dianggap lama hanya karena `impl Default for Bar`
+sudah punya `fn default`. Pada Rust, `impl Trait for Type` dinamai `Type`. Fn baru di dalam blok tipe atau
+`impl` yang baris deklarasinya ditambah commit yang sama juga masuk `new_declared` tanpa syarat `## Steps`:
+seluruh bloknya lahir di commit itu.
+
+Fn yang lazim tersentuh sebagai pendukung masuk `diabaikan`, bukan `outside_anchor` (B1): lifecycle test
+(annotation `@Before*`/`@After*`, atau nama `setUp`/`tearDown`/`beforeEach`/`TestMain`/… di berkas test),
+`main`, dan `default`.
+
 Mode anchor (`--anchor`/`--brief`) mencetak keluaran ringkas tanpa daftar `lines`
 (32 S2); `--verbose` mengembalikannya.
 
@@ -63,6 +73,20 @@ TYPE = re.compile(
 )
 CONTROL = {"if", "for", "while", "switch", "catch", "return", "new", "else", "synchronized", "try", "do",
            "foreach", "elseif", "match", "when", "loop", "function"}
+# Pola fn berkata kunci (`fn`/`func`/`fun`/`function`) tidak tertukar dengan pemanggilan, jadi `CONTROL` tidak
+# berlaku: `fn new` Rust dulu tidak pernah dikenali dan barisnya jatuh ke blok `impl` (B1).
+KEYWORD_FN = {".rs", ".go", ".kt", ".php"}
+# Fn pendukung yang tidak dinilai terhadap `Anchor` (B1): `diabaikan`, bukan `outside_anchor`.
+ALWAYS_IGNORED = {"main", "default"}
+TEST_LIFECYCLE = {"setUp", "tearDown", "setUpClass", "tearDownClass", "setup", "teardown", "setUpTest",
+                  "tearDownTest", "beforeEach", "afterEach", "beforeAll", "afterAll", "TestMain"}
+LIFECYCLE_ANN = {"Before", "After", "BeforeEach", "AfterEach", "BeforeAll", "AfterAll", "BeforeClass",
+                 "AfterClass", "BeforeMethod", "AfterMethod", "BeforeTest", "AfterTest", "BeforeSuite",
+                 "AfterSuite"}
+TEST_PATH = re.compile(r"(?:^|/)(?:tests?|__tests__|spec)/|_test\.\w+$|Tests?\.\w+$|\.(?:test|spec)\.\w+$"
+                       r"|(?:^|/)test_[^/]*$")
+_RUST_IMPL = re.compile(r"^\s*(?:unsafe\s+)?impl\b")
+_ANN = re.compile(r"@(\w+)")
 # Deklarasi yang kurawalnya tidak muncul dalam jarak ini dianggap tanpa badan
 # (method abstract, deklarasi interface, pemanggilan yang mirip deklarasi).
 MAX_SIGNATURE_LINES = 6
@@ -98,26 +122,57 @@ def _code_only(line: str, in_block: bool) -> Tuple[str, bool]:
         rest = rest[end + 2:]
 
 
+def rust_impl_target(code: str) -> Optional[str]:
+    """Nama tipe sasaran `impl`: `impl<T> fmt::Display for Foo<T>` -> `Foo`; `impl Foo` -> `Foo`."""
+    if not _RUST_IMPL.match(code):
+        return None
+    rest = re.sub(r"<[^<>]*>", "", _RUST_IMPL.sub("", code, count=1))
+    rest = re.sub(r"<[^<>]*>", "", rest)
+    m = re.search(r"\bfor\s+((?:\w+::)*\w+)", rest) or re.match(r"\s*((?:\w+::)*\w+)", rest)
+    return m.group(1).split("::")[-1] if m else None
+
+
 def blocks(text: str, ext: str) -> List[Dict]:
-    """Deklarasi beserta rentang [baris deklarasi, baris kurawal penutup]."""
+    """Deklarasi beserta rentang [baris deklarasi, baris kurawal penutup].
+
+    Fn membawa `parent` (nama tipe induk terdekat) dan `parent_line` (baris deklarasinya), serta
+    `lifecycle` bila diberi annotation lifecycle test (`@BeforeEach` dan sejenisnya).
+    """
     fn_re = re.compile(FN[ext])
     out: List[Dict] = []
     stack: List[Optional[Dict]] = []
     pending: Optional[Dict] = None
     in_block = False
+    ann: List[str] = []
     for lineno, raw in enumerate(text.splitlines(), start=1):
         code, in_block_next = _code_only(raw, in_block)
         if not in_block:
             m = fn_re.match(code)
             t = TYPE.match(code)
-            if m and m.group(1) not in CONTROL:
-                pending = {"symbol": m.group(1), "kind": "fn", "start": lineno}
-            elif t:
-                pending = {"symbol": t.group(1) or t.group(2), "kind": "type", "start": lineno}
+            # `impl<T> Trait for Foo<T>` tidak cocok `TYPE` (tanpa spasi sebelum `<`) dan `impl Trait for Foo`
+            # tertangkap sebagai `Trait`; sasaran impl Rust dibaca terpisah.
+            rt = rust_impl_target(code) if ext == ".rs" else None
+            if m and (ext in KEYWORD_FN or m.group(1) not in CONTROL):
+                anns = ann + _ANN.findall(code[:m.start(1)])
+                pending = {"symbol": m.group(1), "kind": "fn", "start": lineno,
+                           "lifecycle": any(a in LIFECYCLE_ANN for a in anns)}
+                ann = []
+            elif t or rt:
+                name = rt or t.group(1) or t.group(2)
+                pending = {"symbol": name, "kind": "type", "start": lineno}
+                ann = []
+            elif code.strip().startswith("@"):
+                ann += _ANN.findall(code)
+            elif code.strip():
+                ann = []
         in_block = in_block_next
         for ch in code:
             if ch == "{":
                 if pending and lineno - pending["start"] < MAX_SIGNATURE_LINES:
+                    if pending["kind"] == "fn":
+                        parent = next((b for b in reversed(stack) if b and b["kind"] == "type"), None)
+                        pending["parent"] = parent["symbol"] if parent else None
+                        pending["parent_line"] = parent["start"] if parent else None
                     stack.append(pending)
                 else:
                     stack.append(None)
@@ -139,6 +194,11 @@ def blocks(text: str, ext: str) -> List[Dict]:
 def stack_paren_open(code: str) -> bool:
     """`;` di dalam kurung (`for (a; b; c)`) tidak menutup deklarasi."""
     return code.count("(") > code.count(")")
+
+
+def key_of(blk: Dict) -> str:
+    """Nama berkualifikasi tipe induk: `Foo::default`; deklarasi tanpa induk memakai namanya sendiri."""
+    return f"{blk['parent']}::{blk['symbol']}" if blk.get("parent") else blk["symbol"]
 
 
 def enclosing(blks: List[Dict], line: int) -> Optional[Dict]:
@@ -185,8 +245,16 @@ def changed(root: Path, sha: str, path: str) -> List[Dict]:
                     continue
                 result.append({"side": side, "line": line, "symbol": symbol,
                                "kind": blk["kind"] if blk else "top",
-                               "decl_line": blk["start"] if blk else None})
+                               "decl_line": blk["start"] if blk else None,
+                               # Internal (B1); dibuang sebelum `lines` dicetak supaya bentuk keluaran tetap.
+                               "_key": key_of(blk) if blk else None,
+                               "_parent_line": blk.get("parent_line") if blk else None,
+                               "_lifecycle": bool(blk.get("lifecycle")) if blk else False})
     return result
+
+
+def public(line: Dict) -> Dict:
+    return {k: v for k, v in line.items() if not k.startswith("_")}
 
 
 def brief_row(text: str, path: str) -> Tuple[Optional[str], str]:
@@ -212,12 +280,19 @@ def brief_row(text: str, path: str) -> Tuple[Optional[str], str]:
 
 
 def old_declarations(root: Path, sha: str, path: str, ext: str) -> set:
-    """Nama deklarasi di `sha^:path`; berkas yang belum ada di induk tidak punya deklarasi lama."""
+    """Nama berkualifikasi deklarasi di `sha^:path`; berkas yang belum ada di induk tidak punya deklarasi lama."""
     try:
         text = _git(root, "show", f"{sha}^:{path}")
     except Degraded:
         return set()
-    return {b["symbol"] for b in blocks(text, ext)}
+    return {key_of(b) for b in blocks(text, ext)}
+
+
+def ignored(line: Dict, path: str) -> bool:
+    """Fn pendukung yang tidak dinilai terhadap `Anchor` (B1)."""
+    name = line["symbol"]
+    return (name in ALWAYS_IGNORED or line["_lifecycle"]
+            or (name in TEST_LIFECYCLE and TEST_PATH.search(path) is not None))
 
 
 def main():
@@ -251,7 +326,7 @@ def main():
 
     try:
         lines = changed(root, args.sha, args.path)
-        old_decl = old_declarations(root, args.sha, args.path, Path(args.path).suffix) if steps is not None else set()
+        old_decl = old_declarations(root, args.sha, args.path, Path(args.path).suffix) if anchor is not None else set()
     except Exception as exc:   # noqa: BLE001 — exit 1 berarti `outside_anchor`; galat apa pun wajib exit 2
         degraded(str(exc))
 
@@ -260,23 +335,37 @@ def main():
                "symbols": [{"symbol": s, "kind": k} for s, k in symbols]}
     exit_code = 0
     if anchor is None:
-        payload["lines"] = lines
+        payload["lines"] = [public(l) for l in lines]
     else:
         named = set(re.findall(r"[A-Za-z_]\w*", anchor))
+        added_new = {l["line"] for l in lines if l["side"] == "new"}
 
-        def declared_new(symbol: str) -> bool:
-            return (steps is not None and symbol not in old_decl
-                    and re.search(rf"\b{re.escape(symbol)}\b", steps) is not None)
+        def declared_new(l: Dict) -> bool:
+            if l["_key"] in old_decl:
+                return False
+            if steps is not None and re.search(rf"\b{re.escape(l['symbol'])}\b", steps):
+                return True
+            # Blok induk lahir di commit ini: seluruh isinya baru (B1).
+            born_line = l["_parent_line"] if l["kind"] == "fn" else l["decl_line"]
+            return l["side"] == "new" and born_line is not None and born_line in added_new
 
-        unanchored_fn = sorted({l["symbol"] for l in lines if l["kind"] == "fn" and l["symbol"] not in named})
-        unanchored_type = sorted({l["symbol"] for l in lines if l["kind"] == "type" and l["symbol"] not in named})
-        payload["new_declared"] = sorted({s for s in unanchored_fn + unanchored_type if declared_new(s)})
-        payload["outside_anchor"] = [
-            {"symbol": s, "lines": [l["line"] for l in lines if l["symbol"] == s]}
-            for s in unanchored_fn if not declared_new(s)]
-        payload["type_level_unanchored"] = [s for s in unanchored_type if not declared_new(s)]
+        unanchored = [l for l in lines if l["symbol"] and l["kind"] in ("fn", "type") and l["symbol"] not in named]
+        new_decl, outside, type_level, skipped = set(), {}, set(), set()
+        for l in unanchored:
+            if declared_new(l):
+                new_decl.add(l["symbol"])
+            elif l["kind"] == "fn" and ignored(l, args.path):
+                skipped.add(l["symbol"])
+            elif l["kind"] == "fn":
+                outside.setdefault(l["symbol"], []).append(l["line"])
+            else:
+                type_level.add(l["symbol"])
+        payload["new_declared"] = sorted(new_decl)
+        payload["outside_anchor"] = [{"symbol": s, "lines": outside[s]} for s in sorted(outside)]
+        payload["type_level_unanchored"] = sorted(type_level - new_decl)
+        payload["diabaikan"] = sorted(skipped - set(outside))
         if args.verbose:
-            payload["lines"] = lines
+            payload["lines"] = [public(l) for l in lines]
         if payload["outside_anchor"]:
             payload["status"] = "FAIL"
             exit_code = 1
