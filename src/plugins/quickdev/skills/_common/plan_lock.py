@@ -1273,7 +1273,7 @@ def main() -> None:
         if name in ("lock", "confirm"):
             s.add_argument("--answer", required=True)
         if name == "start":
-            s.add_argument("--findings", action="store_true", help="putaran remediasi dari review CHANGES_REQUIRED")
+            s.add_argument("--findings", action="store_true", help="putaran remediasi dari temuan review (CHANGES_REQUIRED, atau REVIEWED bertemuan MINOR)")
             s.add_argument("--findings-text", default="", help="temuan ringkas yang dicatat ke blok (Findings-<n>)")
         if name == "close":
             s.add_argument("--status", required=True, choices=("COMPLETED", "BLOCKED", "VERIFICATION_MANUAL_REQUIRED"))

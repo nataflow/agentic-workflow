@@ -17,7 +17,7 @@ Path relatif terhadap `src/plugins/quickdev/`.
 | Panduan migrasi | dokumen | Pindah dari 0.11 (enam skill, profil) ke 0.12, dari 0.12 ke 0.13 (alur berantai), dari 0.13 ke 0.14 (task acuan, report), dan dari 0.14 ke 0.15 (rencana di luar git, commit hasil di akhir review) | `MIGRATION_v0.11.x_to_v0.12.0.md`, `MIGRATION_v0.12.x_to_v0.13.0.md`, `MIGRATION_v0.13.x_to_v0.14.0.md`, `MIGRATION_v0.14.x_to_v0.15.0.md` |
 | Manifest plugin | konfigurasi | Nama, versi, deskripsi | `.claude-plugin/plugin.json` |
 
-Hanya `plan` yang memakai `disable-model-invocation: true`, jadi alur selalu dimulai user dengan `/quickdev:plan`. `execute` dan `review` boleh dipanggil model supaya rantai berjalan tanpa jeda (39): approval *Setujui & eksekusi* memanggil `execute` langsung, dan `execute` yang `COMPLETED` memanggil `review` langsung. Gerbang keduanya ada di `plan_lock.py` (`verify`/`start`/`status`), bukan di frontmatter. Remediasi dari review dan status selain `COMPLETED` tetap berhenti dan menunggu user.
+Hanya `plan` yang memakai `disable-model-invocation: true`, jadi alur selalu dimulai user dengan `/quickdev:plan`. `execute` dan `review` boleh dipanggil model supaya rantai berjalan tanpa jeda (39): approval *Setujui & eksekusi* memanggil `execute` langsung, `execute` yang `COMPLETED` memanggil `review` langsung, dan pilihan *Perbaiki semua temuan* di review memanggil `execute` (remediasi) langsung (Q5). Gerbang keduanya ada di `plan_lock.py` (`verify`/`start`/`status`), bukan di frontmatter. Status selain `COMPLETED` tetap berhenti dan menunggu user.
 
 ## Alur Utama
 
@@ -46,16 +46,19 @@ flowchart TD
     ES -->|"COMPLETED: dipanggil langsung"| RV["quickdev:review: diff sejak Base-Commit"]
     RV --> RS{"Status review"}
     RS -->|NO_CHANGES| NC["Berhenti tanpa temuan"]
-    RS -->|REVIEWED| DONE{"Tawaran commit"}
+    RS -->|"REVIEWED tanpa MINOR"| DONE{"Tawaran commit"}
+    RS -->|"REVIEWED dengan MINOR"| MQ{"Perbaiki minor atau commit"}
+    MQ -->|"perbaiki semua temuan minor: dipanggil langsung (maks 2 putaran)"| EXE
+    MQ -->|"opsi commit"| DONE
     RS -->|CHANGES_REQUIRED| RQ{"AskUserQuestion"}
-    RQ -->|"remediasi otomatis: user ketik /quickdev:execute (maks 2 putaran)"| EXE
+    RQ -->|"perbaiki semua temuan: dipanggil langsung (maks 2 putaran)"| EXE
     RQ -->|"revisi rencana"| UL
     RQ -->|"terima apa adanya"| DONE
     DONE -->|"branch aktif / branch baru"| CMT["plan_lock.py commit: berkas tersegel close saja"]
     DONE -->|"jangan dulu"| LATER["Hasil uncommitted; execute berikutnya menawarkannya lewat MILIK:"]
 ```
 
-Panah plan → execute (*Setujui & eksekusi*) dan execute `COMPLETED` → review berjalan langsung; panah lain adalah **tawaran** yang menunggu user mengetik perintahnya. Tidak ada langkah persiapan tingkat repo: `plan` membaca manifest dan menelusuri kode untuk setiap tugas. Titik tengah alur ini adalah `plan/<task>.md`. Isinya, termasuk tabel perintah verifikasi Section 4, dikunci oleh sidik `Plan-Hash` saat user menyetujuinya. Setelah itu `execute` hanya boleh mengubah checkbox Section 3 dan blok `## Execution Status`. `review` menilai hasilnya terhadap rencana itu dan membuka tiga jalan: remediasi (maksimal 2 putaran), revisi rencana, atau terima apa adanya. Rencana tidak pernah di-commit (penanda `plan/.gitignore`, Q1); satu-satunya commit quickdev adalah hasil eksekusi yang tersegel, atas pilihan user di akhir review (Q2).
+Panah plan → execute (*Setujui & eksekusi*), execute `COMPLETED` → review, dan review → execute (*Perbaiki semua temuan*) berjalan langsung; panah lain adalah **tawaran** yang menunggu user mengetik perintahnya. Tidak ada langkah persiapan tingkat repo: `plan` membaca manifest dan menelusuri kode untuk setiap tugas. Titik tengah alur ini adalah `plan/<task>.md`. Isinya, termasuk tabel perintah verifikasi Section 4, dikunci oleh sidik `Plan-Hash` saat user menyetujuinya. Setelah itu `execute` hanya boleh mengubah checkbox Section 3 dan blok `## Execution Status`. `review` menilai hasilnya terhadap rencana itu dan membuka tiga jalan: perbaiki temuan, termasuk MINOR (remediasi, maksimal 2 putaran), revisi rencana, atau terima apa adanya. Rencana tidak pernah di-commit (penanda `plan/.gitignore`, Q1); satu-satunya commit quickdev adalah hasil eksekusi yang tersegel, atas pilihan user di akhir review (Q2).
 
 ## Alur per Skill
 
@@ -225,8 +228,10 @@ flowchart TD
      7. Regresi Cakupan (wajib mencari pemanggil secara nyata)
   4. **Fase 4: verifikasi bukti.** Buka ulang tiap baris kandidat temuan dan buang yang tidak terbukti. Beri severity `BLOCKER`/`MAJOR`/`MINOR`, deduplikasi, dan tulis rekomendasi imperatif (tanpa patch).
   5. **Fase 5: status.** Hasilnya `CHANGES_REQUIRED` bila ada minimal satu BLOCKER/MAJOR, atau MINOR dengan `strict=true`. Selain itu `REVIEWED`.
-     - `CHANGES_REQUIRED` → `AskUserQuestion`: *Remediasi otomatis (putaran n+1/2)*, *Revisi rencana*, atau *Terima apa adanya*. Opsi pertama tidak ditawarkan bila `remediation_round` sudah 2. Review tidak meneruskan ke `execute` sendiri karena remediasi adalah keputusan user (39 A3): opsi pertama ditutup dengan perintah `/quickdev:execute <plan_path>` untuk diketik user di sesi yang sama, dan `execute` mengambil temuan dari laporan ini.
-     - `REVIEWED`, atau *Terima apa adanya* → **tawaran commit** (Q2): subjek usulan `<feat|fix>: <tujuan Section 1> (#<kode task>)` (atau konvensi `git log` repo), lalu `AskUserQuestion`: *Commit di branch aktif (Recommended)* · *Commit di branch baru* · *Jangan dulu*. Dua opsi pertama menjalankan `plan_lock.py commit --plan <plan_path> --message - [--branch <nama>]`; hasilnya di baris `COMMIT:` ringkasan. Merge dan push tetap milik user.
+     - `CHANGES_REQUIRED` → `AskUserQuestion`: *Perbaiki semua temuan — remediasi putaran n+1/2 (Recommended)*, *Revisi rencana*, atau *Terima apa adanya*. Opsi pertama tidak ditawarkan bila `remediation_round` sudah 2.
+     - `REVIEWED` dengan minimal satu temuan MINOR dan putaran < 2 → satu `AskUserQuestion` gabungan: *Perbaiki semua temuan minor (Recommended)* · *Commit di branch aktif* · *Commit di branch baru* · *Jangan dulu*.
+     - **Remediasi berantai (Q5, membalik 39 A3)**: opsi perbaiki langsung memanggil `quickdev:execute <plan_path>` lewat tool `Skill`; `execute` mengambil temuan dari laporan ini sebagai `review_findings`, lalu memanggil review ulang sesudah `COMPLETED`. Review sendiri tetap tidak menyunting kode.
+     - `REVIEWED` tanpa MINOR (atau plafon habis), atau *Terima apa adanya* → **tawaran commit** (Q2): subjek usulan `<feat|fix>: <tujuan Section 1> (#<kode task>)` (atau konvensi `git log` repo), lalu `AskUserQuestion`: *Commit di branch aktif (Recommended)* · *Commit di branch baru* · *Jangan dulu*. Dua opsi pertama menjalankan `plan_lock.py commit --plan <plan_path> --message - [--branch <nama>]`; hasilnya di baris `COMMIT:` ringkasan. Merge dan push tetap milik user.
      - Ringkasan memuat `NATAFLOW:`: segmen `execute` terakhir di percakapan apa adanya, atau `tidak diketahui (sesi baru)` beserta perintah sinkron ulang (Q4).
 - **Subagent yang didispatch**: Tidak ada. Konsekuensinya, independensi review bergantung pada sesi. README menyarankan menjalankan ulang `/quickdev:review` di sesi baru untuk putaran terakhir.
 
@@ -241,11 +246,14 @@ flowchart TD
     R3 --> R4["Fase 4: verifikasi bukti + severity"]
     R4 --> R5{"Ada BLOCKER/MAJOR,<br/>atau MINOR dengan strict?"}
     R5 -->|tidak| RV["REVIEWED"]
-    RV --> OF{"Tawaran commit"}
+    RV -->|"ada MINOR, putaran < 2"| MN{"Perbaiki minor atau commit"}
+    MN -->|"perbaiki semua temuan minor"| EXE
+    MN -->|"opsi commit"| OF
+    RV -->|"tanpa MINOR"| OF{"Tawaran commit"}
     OF -->|"branch aktif / branch baru"| CM["plan_lock.py commit --message - [--branch]"]
     OF -->|"jangan dulu"| UC["Hasil tetap uncommitted"]
     R5 -->|ya| CR{"CHANGES_REQUIRED: pilihan user"}
-    CR -->|"remediasi (bila belum 2 putaran)"| EXE["User ketik /quickdev:execute<br/>temuan dari laporan ini"]
+    CR -->|"perbaiki semua temuan (bila belum 2 putaran)"| EXE["Skill quickdev:execute (remediasi)<br/>temuan dari laporan ini, lalu review ulang"]
     CR -->|"revisi rencana"| PL["quickdev:plan (unlock, revisi, lock)"]
     CR -->|"terima apa adanya"| OF
 ```
@@ -272,7 +280,7 @@ Tidak ada. README menyebutkan "semua kerja berlangsung di percakapan utama", dan
 
 | Guard | Mekanisme |
 |---|---|
-| Titik masuk oleh user | `disable-model-invocation: true` hanya di `plan`. `execute` dipanggil `plan` hanya atas jawaban *Setujui & eksekusi*; `review` dipanggil `execute` hanya sesudah `COMPLETED`. Remediasi tetap diketik user |
+| Titik masuk oleh user | `disable-model-invocation: true` hanya di `plan`. `execute` dipanggil `plan` hanya atas jawaban *Setujui & eksekusi*; `review` dipanggil `execute` hanya sesudah `COMPLETED`; `execute` (remediasi) dipanggil `review` hanya atas pilihan *Perbaiki semua temuan* / *Perbaiki semua temuan minor* (Q5), berplafon 2 putaran |
 | Koeksistensi | Blok gerbang engineer + `/quickdev:*` eksplisit → lanjut. Permintaan baru tanpa pilihan alur → tanya sekali (quickdev atau gerbang engineer). Dilarang memakai `backend:*`/`frontend:*` sebagai pengganti langkah |
 | Penanda `.claude/workflow` | Berkas ini ada tetapi tidak memuat `quickdev` → skill melapor dan bertanya dulu sebelum lanjut |
 | Kunci rencana (`plan_lock.py`) | Sidik sha256 atas `## 1.` sampai sebelum `## Execution Status` (CRLF → LF, spasi ujung dibuang, `[x]` dihitung sebagai `[ ]`), ditandai `Hash-Scope: body`. Heading dan checklist di dalam code fence diabaikan; fence tak tertutup → FAIL. Rencana 0.4.0 tanpa `Hash-Scope` dan rencana 0.5–0.11 ber-`Hash-Scope: profile+body` (sidik ditambah baris `Profile:`) diverifikasi dengan rumusnya masing-masing. `execute`/`review` menolak rencana yang sidiknya berbeda |
@@ -309,7 +317,7 @@ Tidak ada. README menyebutkan "semua kerja berlangsung di percakapan utama", dan
 
 - Kunci rencana adalah bukti audit, bukan pencegahan mutlak: model tetap bisa memanggil `unlock` lalu `lock` sendiri. Keduanya tercatat di `Approval:`/`Unlock-Reason:`.
 - Konteks repo dideteksi ulang di setiap rencana; murah di repo kecil, berulang di repo besar.
-- `Findings-<n>` dipotong 300 karakter dan `Baseline` 600 karakter. Remediasi otomatis paling andal bila `/quickdev:execute` diketik di sesi yang sama dengan review.
+- `Findings-<n>` dipotong 300 karakter dan `Baseline` 600 karakter. Remediasi berantai langsung di sesi review; remediasi yang diketik user (`/quickdev:execute`) paling andal di sesi yang sama.
 - `Tree-Hash` tidak menyegel isi submodule dan berkas ter-ignore.
 - Independensi review bergantung pada sesi.
 

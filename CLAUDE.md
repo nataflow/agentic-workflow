@@ -120,8 +120,10 @@ skeletons), `dispatcher/` (prompts used to dispatch subagents), `scripts/`, and 
   fast-path skip) and writes verification commands from the manifest into the plan's Section 4 table, which the seal
   covers; `execute` always measures a fresh baseline at `Base-Commit`. One `plan/<task>.md` guarded by
   `_common/plan_lock.py` (`Hash-Scope: body`; 0.11 plans with `profile+body` still verify). Step 34. Since step 39
-  the chain runs on: approval *Setujui & eksekusi* → `plan_lock.py commit` (plan file only, `--only`, active branch)
-  → `execute` invoked directly → `COMPLETED` invokes `review` directly; review remediation stays user-typed.
+  the chain runs on: approval *Setujui & eksekusi* → `plan_lock.py lock` (plans are never committed: self-ignoring
+  `plan/.gitignore`, Q1) → `execute` invoked directly → `COMPLETED` invokes `review` directly → review offers to
+  commit the sealed result (`plan_lock.py commit`, Q2). Since Q5 (0.16) review findings — `CHANGES_REQUIRED`, or
+  `REVIEWED` with MINOR — offer *Perbaiki semua temuan* first, which invokes `execute` (remediasi, cap 2 rounds) directly.
   Step 41: a nataflow task the user names (`#12`/UUID) is the plan's reference — `plan_lock.py task --ref` reads it via
   `get_task` (its description becomes the spec) and `--plan` writes `Nataflow-Task: <uuid>`; quickdev then never
   creates or edits that task. `plan` Fase 4 mirrors the DRAFT before asking approval (task stays `todo`; sync `GAGAL`

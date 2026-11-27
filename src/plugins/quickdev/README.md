@@ -27,7 +27,8 @@ gerbang `backend:tech-lead` atau `frontend:lead`.
 Prasyarat: `git` (execute dan review menuntut repo git), `python3` (3.12+, hanya stdlib) untuk
 `plan_lock.py`, dan toolchain repo sendiri untuk baseline dan verifikasi. Pindah dari 0.11: lihat
 `MIGRATION_v0.11.x_to_v0.12.0.md`; dari 0.12: `MIGRATION_v0.12.x_to_v0.13.0.md`; dari 0.13:
-`MIGRATION_v0.13.x_to_v0.14.0.md`; dari 0.14: `MIGRATION_v0.14.x_to_v0.15.0.md`.
+`MIGRATION_v0.13.x_to_v0.14.0.md`; dari 0.14: `MIGRATION_v0.14.x_to_v0.15.0.md`; dari 0.15:
+`MIGRATION_v0.15.x_to_v0.16.0.md`.
 
 ## Tiga Skill
 
@@ -39,8 +40,9 @@ berantai tanpa jeda konfirmasi tambahan:
 - `execute` yang ditutup `COMPLETED` langsung memanggil `quickdev:review` dan melaporkan temuannya.
 - `review` yang `REVIEWED` (atau `CHANGES_REQUIRED` yang diterima apa adanya) menawarkan commit hasilnya: branch
   aktif · branch baru · jangan dulu.
-- Status lain (`VERIFICATION_MANUAL_REQUIRED`, `BLOCKED`) dan remediasi dari review tetap berhenti dan menunggu
-  user. `execute` dan `review` juga tetap bisa diketik langsung (`/quickdev:execute`, `/quickdev:review`).
+- `review` yang punya temuan (`CHANGES_REQUIRED`, atau `REVIEWED` dengan temuan MINOR) menawarkan *Perbaiki semua
+  temuan* sebagai opsi utama; memilihnya langsung memanggil `quickdev:execute` (remediasi), lalu review ulang (sejak 0.16, Q5).
+- Status lain (`VERIFICATION_MANUAL_REQUIRED`, `BLOCKED`) tetap berhenti dan menunggu user. `execute` dan `review` juga tetap bisa diketik langsung (`/quickdev:execute`, `/quickdev:review`).
 
 Rantai ini aman karena gerbangnya ada di skrip, bukan di frontmatter: `execute` ditolak `plan_lock.py
 verify`/`start` tanpa rencana `APPROVED` bersidik cocok, dan `review` ditolak tanpa status `COMPLETED` yang konsisten.
@@ -62,10 +64,11 @@ verify`/`start` tanpa rencana `APPROVED` bersidik cocok, dan `review` ditolak ta
   membuka `review`; user memilih melanjutkan (`/quickdev:execute` lagi → mode `resume`), merevisi lewat
   `/quickdev:plan`, atau rollback.
 - **`review`**: `CHANGES_REQUIRED` bila ada minimal satu temuan BLOCKER/MAJOR, atau MINOR dengan
-  `strict=true`. Review lalu bertanya: remediasi otomatis (maksimal 2 putaran), revisi rencana, atau terima
-  apa adanya (lanjut ke tawaran commit). Review tidak meneruskan ke `execute` sendiri karena remediasi adalah keputusan user: opsi
-  pertama menutup review dengan perintah `/quickdev:execute <plan_path>` untuk diketik user di sesi yang sama, dan `execute` mengambil temuan dari
-  laporan itu sebagai `review_findings`.
+  `strict=true`. Review lalu bertanya: perbaiki semua temuan (maksimal 2 putaran remediasi), revisi rencana, atau
+  terima apa adanya (lanjut ke tawaran commit). `REVIEWED` dengan temuan MINOR mengajukan satu pertanyaan gabungan:
+  perbaiki semua temuan minor · commit di branch aktif · commit di branch baru · jangan dulu. Pilihan perbaiki
+  langsung memanggil `quickdev:execute`, yang mengambil temuan dari laporan itu sebagai `review_findings` lalu
+  memanggil review ulang sesudah `COMPLETED`.
 
 `execute` menurunkan mode dari berkas rencana (`plan_lock.py start`), tanpa parameter tambahan:
 
@@ -262,8 +265,8 @@ berkas apa pun, sehingga `Plan-Hash`, `Verified-Hash`, dan `Tree-Hash` tidak bas
 - **Konteks repo dideteksi ulang di setiap rencana.** Tanpa profil, `plan` membaca manifest dan menelusuri kode
   untuk tiap tugas; murah di repo kecil, berulang di repo besar (untuk repo besar, pertimbangkan `backend`/`frontend`).
 - **Temuan review lintas sesi hanya ringkasan.** `Findings-<n>` dipotong 300 karakter dan `Baseline` 600
-  karakter; rincian temuan ada di laporan terminal `review`, yang tidak menulis berkas. Remediasi otomatis
-  paling andal bila `/quickdev:execute` diketik di sesi yang sama dengan review.
+  karakter; rincian temuan ada di laporan terminal `review`, yang tidak menulis berkas. Remediasi
+  berantai langsung di sesi review; remediasi yang diketik user (`/quickdev:execute`) paling andal di sesi yang sama.
 - **`Tree-Hash` hanya menilai berkas ter-track yang berbeda dari `Base-Commit` dan berkas untracked yang
   tidak di-ignore.** Isi submodule dan berkas ter-ignore (mis. `dist/`) tidak ikut disegel.
 - **Independensi review bergantung sesi.** Review di sesi yang sama dengan `execute` ditandai

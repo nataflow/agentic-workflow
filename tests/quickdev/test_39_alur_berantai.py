@@ -10,6 +10,7 @@ from conftest import PLUGINS, commit, run_script
 
 PL = PLUGINS / "quickdev" / "skills" / "_common" / "plan_lock.py"
 SK = PLUGINS / "quickdev" / "skills"
+PLUGINS_QD = PLUGINS / "quickdev"
 PLAN = """# Implementation Plan — t
 Status: DRAFT
 Author: quickdev:plan
@@ -61,8 +62,38 @@ def test_execute_completed_berantai_ke_review():
     assert "`COMPLETED`" in fase4 and "`quickdev:review`" in fase4 and "tanpa bertanya" in fase4
 
 
-@pytest.mark.regression("39 A3")
-def test_remediasi_tetap_diketik_user():
+@pytest.mark.regression("Q5")
+def test_remediasi_berantai_dari_pilihan_user():
+    """39 A3 (remediasi diketik user) dibalik Q5: pilihan perbaiki di review memanggil execute langsung."""
     fase5 = section(skill("review"), "### Fase 5", "## Guardrails")
-    assert "/quickdev:execute <plan_path>" in fase5
-    assert not re.search(r"memanggil `quickdev:execute`(?! sendiri)", fase5)
+    assert "*Perbaiki semua temuan — remediasi putaran <n+1>/2 (Recommended)*" in fase5
+    assert "*Perbaiki semua temuan minor (Recommended)*" in fase5
+    assert re.search(r"langsung panggil tool `Skill` dengan `quickdev:execute`", fase5)
+    assert "remediasi adalah keputusan user" not in fase5 and "untuk diketik user" not in fase5
+    assert "Dilarang memperbaiki sendiri di sesi review" in fase5
+
+
+@pytest.mark.regression("Q5")
+def test_reviewed_minor_pertanyaan_gabungan_dan_plafon():
+    fase5 = section(skill("review"), "### Fase 5", "## Guardrails")
+    butir4 = section(fase5, "4. Bila status `REVIEWED`", "5. **Tawaran commit**")
+    for opt in ("*Perbaiki semua temuan minor (Recommended)*", "*Commit di branch aktif*", "*Commit di branch baru*",
+                "*Jangan dulu*"):
+        assert opt in butir4, opt
+    assert "`MINOR`" in butir4 and "belum 2" in butir4 and "sudah 2" in fase5
+    assert "HANDOFF: execute (remediasi, dipanggil langsung)" in section(skill("review"), "## Output", "## Failure")
+    assert (PLUGINS_QD / "MIGRATION_v0.15.x_to_v0.16.0.md").is_file()
+
+
+@pytest.mark.regression("Q5")
+def test_remediasi_temuan_minor_dari_reviewed_diterima_start(repo, pl):
+    """Remediasi MINOR dari REVIEWED memakai jalur skrip yang sama dengan CHANGES_REQUIRED: cukup blok COMPLETED."""
+    assert pl("lock", "--answer", "setuju").returncode == 0
+    assert pl("start").returncode == 0
+    plan = repo / "plan" / "t.md"
+    plan.write_text(plan.read_text(encoding="utf-8").replace("- [ ] 1.", "- [x] 1."), encoding="utf-8")
+    (repo / "app.js").write_text("a\nb\n", encoding="utf-8")
+    assert pl("close", "--status", "COMPLETED", "--verification", "npm test PASS").returncode == 0
+    r = pl("start", "--findings", "--findings-text", "[MINOR] app.js:2 nama helper tidak konsisten")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "remediasi" in r.stdout and "1/2" in r.stdout

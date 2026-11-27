@@ -19,12 +19,13 @@ def section(text, start, end):
     return text.split(start, 1)[1].split(end, 1)[0]
 
 
-def test_q2_review_tidak_memanggil_execute():
+def test_q2_review_meneruskan_temuan_ke_execute():
+    """13 Q2: execute mengambil temuan dari laporan review di percakapan; sejak Q5 review memanggilnya langsung."""
     fase5 = section(skill("review"), "### Fase 5", "## Guardrails")
-    assert "memanggil `quickdev:execute`" not in fase5
-    assert "/quickdev:execute" in fase5 and "remediasi adalah keputusan user" in fase5   # 39 A3
+    assert "`review_findings`" in fase5 and "`HANDOFF: execute (remediasi)`" in fase5
     param = section(skill("execute"), "- `review_findings`", "\n## ")
-    assert "laporan `quickdev:review` `CHANGES_REQUIRED` terakhir di percakapan" in param
+    assert "laporan `quickdev:review` terakhir di percakapan (`CHANGES_REQUIRED` atau `REVIEWED` bertemuan `MINOR`)" in param
+    assert "*Perbaiki semua temuan minor*" in param
 
 
 @pytest.mark.parametrize("name", ["plan", "execute", "review"])
