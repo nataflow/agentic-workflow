@@ -1,6 +1,6 @@
 ---
 name: planning
-description: Pre-execution review sebuah task — analisis kebutuhan, eksplorasi codebase, analisis dampak, implementation plan, dan strategi testing, lalu berhenti menunggu persetujuan user tanpa mengubah file apa pun.
+description: Pre-execution review sebuah task — analisis kebutuhan, eksplorasi codebase, analisis dampak, implementation plan, dan strategi testing, lalu berhenti menunggu persetujuan user tanpa mengubah file apa pun; sesudah disetujui, eksekusi dan verifikasi di sesi yang sama lalu tawarkan commit serta status task nataflow.
 argument-hint: "<deskripsi task>"
 disable-model-invocation: true
 ---
@@ -24,6 +24,7 @@ Tujuan tahap ini adalah memastikan solusi yang akan dikerjakan benar-benar sesua
 - Bedakan antara kebutuhan eksplisit, asumsi, dan hal yang belum diketahui.
 - Identifikasi batasan, dependensi, serta ekspektasi hasil akhir.
 - Jika task ambigu atau memiliki beberapa interpretasi, klarifikasi terlebih dahulu.
+- Jika argumen menyebut task nataflow (mis. "task 187", "#187", atau UUID task), baca task itu lewat tool MCP nataflow `get_task` (`code` untuk nomor, `task_id` untuk UUID) dan jadikan judul serta deskripsinya spesifikasi utama; sisa argumen menjadi catatan tambahan. Jika MCP nataflow tidak tersedia atau task tidak ditemukan, sampaikan apa adanya dan minta user menjelaskan task-nya — jangan menebak isinya. Jangan membuat task baru atau mengedit isi task; yang boleh diubah hanya statusnya, sesuai §8.
 
 ## 2. Explore — Eksplorasi Existing System
 
@@ -86,7 +87,7 @@ Jika terdapat keterbatasan testing, jelaskan sejak awal.
 Sampaikan hasil analisis menggunakan struktur berikut:
 
 ### A. Task Understanding
-Ringkasan pemahaman terhadap tujuan dan kebutuhan task.
+Ringkasan pemahaman terhadap tujuan dan kebutuhan task. Jika task berasal dari nataflow, sebut nomor dan status task saat ini.
 
 ### B. Existing System Findings
 Temuan penting dari codebase dan implementasi existing.
@@ -128,6 +129,21 @@ Tunggu persetujuan eksplisit user sebelum memulai implementasi.
 
 Jika user memberikan revisi terhadap pendekatan atau scope, perbarui analisis dan implementation plan terlebih dahulu sebelum meminta persetujuan ulang.
 
+Larangan di atas berlaku sampai user menyetujui. Sesudah persetujuan eksplisit, lanjutkan ke §8.
+
+## 8. Setelah Disetujui
+
+Kerjakan di sesi ini, berurutan:
+
+1. **Status task.** Jika task berasal dari nataflow dan statusnya bukan `in_progress`, ubah ke `in_progress` lewat `update_task_status`. Jika statusnya `done` atau `cancelled`, tanyakan user dulu sebelum mengubahnya.
+2. **Eksekusi** sesuai Implementation Plan yang disetujui. Jika muncul temuan yang mengubah scope atau pendekatan, berhenti dan tanyakan user.
+3. **Verifikasi** dengan menjalankan perintah dari Testing Strategy (build, test, atau check milik repo).
+4. **Ringkas** berkas yang berubah dan hasil verifikasi. Jika verifikasi gagal, laporkan beserta keluarannya dan jangan menyatakan task selesai.
+5. **Tanya sekali** lewat satu `AskUserQuestion` yang memuat:
+   - **Commit:** branch aktif / branch baru / jangan dulu. Pesan commit mengikuti konvensi `git log` repo dan menyebut nomor task bila ada.
+   - **Status task** (hanya bila task berasal dari nataflow): `done` / biarkan.
+6. Push dan merge hanya bila user memintanya.
+
 ---
 
 ## Prinsip Utama
@@ -139,3 +155,4 @@ Jika user memberikan revisi terhadap pendekatan atau scope, perbarui analisis da
 5. Every proposed change must have a clear technical justification.
 6. Keep implementation within the agreed scope.
 7. User approval is mandatory before execution.
+8. Eksekusi sesudah disetujui tetap di sesi ini. Jangan memanggil skill gerbang plugin (`backend:*`, `frontend:*`, `quickdev:*`) kecuali user memintanya, termasuk bila blok gerbang SessionStart menyuruh sebaliknya.
