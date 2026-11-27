@@ -437,8 +437,11 @@ ada di `hooks/gate_text.py`.
 - **Profil hilang, tidak sah, atau tidak lengkap**: permintaan kerja tetap lewat `frontend:lead`,
   yang merutekan lane `PROFILE` (GENERATE | REFRESH | MIGRATE) lebih dulu lalu melanjutkan rute tertunda.
   `EXPLORE_FACT` berangkat tanpa profil. Profil sendiri yang field `plugin`-nya asing dirutekan REFRESH.
-- **Alur plugin lain**: permintaan yang memanggil atau melanjutkan `/analyst:*`, `/product:*`,
-  `/quickdev:*`, atau `/nataflow:*` secara eksplisit dikecualikan dari gate.
+- **Skill di luar plugin ini**: slash command atau skill yang diketik user dan bukan milik plugin
+  `frontend` — `/analyst:*`, `/product:*`, `/quickdev:*`, `/nataflow:*`, atau skill user seperti
+  `/planning`, `/discus-mode`, `/ui-improvement` — beserta susulannya dikecualikan dari gate.
+- **Opt-out sesi**: "abaikan hook", "jangan lewat plugin", atau yang semakna membuat gate dilewati untuk
+  sisa sesi sampai user meminta kembali.
 - **Tiket analyst**: tiket `READY` diserahkan ke `/frontend:lead` lewat parameter `ticket_source`
   (path `analyst/tickets/<YYMMDDhhmm>-<slug>/TICKET.md`). `AC-{n}`/`BR-{n}` kartu dirujuk `TAC-{n}`/`TBR-{n}`
   agar tidak bertabrakan dengan `AC-{n}` CONTRACT; tiap `TAC-{n}` dipikul `SC-{n}` atau tercatat di

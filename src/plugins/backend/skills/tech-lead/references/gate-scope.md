@@ -19,12 +19,14 @@ Setiap pesan user yang meminta pemahaman kode, perubahan perilaku, perbaikan bug
 
 Ukuran perubahan kecil bukan alasan melewati gerbang. Subagent yang sedang berjalan dilarang memproses permintaan baru di luar briefnya.
 
-### Empat Pengecualian, dan Hanya Empat:
+### Enam Pengecualian, dan Hanya Enam:
 
-1. **Jawaban User Memasok Informasi**: Jawaban langsung atas pertanyaan klarifikasi Fase 2 atau entri `## Open questions` pada alur yang rutenya sudah diputuskan.
-2. **Pertanyaan Pengetahuan Umum Non-Repo**: Penjelasan konsep umum bahasa atau framework tanpa menyentuh file repo.
-3. **Operasi VCS atas Kerja Selesai**: Permintaan murni VCS yang tidak menambah kode baru ("commit perubahan dengan pesan X").
-4. **Alur Plugin Lain yang Dipanggil Eksplisit**: Permintaan yang memanggil atau melanjutkan `/analyst:*`, `/product:*`, `/quickdev:*`, atau `/nataflow:*`, termasuk susulan di tengah skill `analyst:*`/`product:*`/`quickdev:*`/`nataflow:*` yang sedang berjalan (elisitasi tiket atau charter, `plan/<task>.md`, halaman artifact). Kerja itu milik plugin tersebut sampai user sendiri meminta pindah ke gerbang ini. Penanda `.claude/workflow` tanpa kata `backend` membuat hook gerbang ini diam di repo itu.
+1. **Tiket Teknis Cepat**: "buatkan tiket …", "tiketkan …", `/backend:ticket`, atau susulan di tengah skill itu langsung ke `backend:ticket`. Mengerjakan tiketnya tetap lewat gerbang ini.
+2. **Jawaban User Memasok Informasi**: Jawaban langsung atas pertanyaan klarifikasi Fase 2 atau entri `## Open questions` pada alur yang rutenya sudah diputuskan.
+3. **Pertanyaan Pengetahuan Umum Non-Repo**: Penjelasan konsep umum bahasa atau framework tanpa menyentuh file repo.
+4. **Operasi VCS atas Kerja Selesai**: Permintaan murni VCS yang tidak menambah kode baru ("commit perubahan dengan pesan X").
+5. **Slash Command atau Skill di Luar Plugin Ini yang Diketik User**: Alur plugin lain (`/analyst:*`, `/product:*`, `/quickdev:*`, `/nataflow:*`) maupun skill user tanpa prefiks plugin (`/planning`, `/discus-mode`, `/ui-improvement`, …), beserta susulannya di tengah skill itu, termasuk eksekusi sesudah user menyetujui rencananya (elisitasi tiket atau charter, `plan/<task>.md`, halaman artifact, rencana `/planning`). Kerja itu milik skill tersebut sampai user sendiri meminta pindah ke gerbang ini; skill `backend:*` tidak dipanggil sebagai pengganti langkahnya. Skill yang dipanggil model sendiri tanpa diketik user tidak termasuk pengecualian ini. Penanda `.claude/workflow` tanpa kata `backend` membuat hook gerbang ini diam di repo itu.
+6. **Opt-out Sesi dari User**: "abaikan hook", "abaikan hook dari plugin backend/frontend", "jangan lewat plugin", atau yang semakna. Berlaku untuk sisa sesi sampai user sendiri meminta kembali ke gerbang ini.
 
 ### Approval Bukan Pengecualian:
 

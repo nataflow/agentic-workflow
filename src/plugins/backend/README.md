@@ -223,9 +223,11 @@ oleh skrip prasyarat, sehingga vonis hook sama dengan vonis skrip.
 - **Status profil**: ADA; di lokasi lama → MIGRATE; belum ada atau milik plugin lain → tetap lewat
   `tech-lead`, yang menawarkan GENERATE; JSON rusak, tanpa stack, stack tidak dikenal, field `plugin` asing
   pada profil sendiri, atau tidak lengkap → REFRESH.
-- **Pengecualian**: jawaban atas klarifikasi rute yang sudah diputuskan, pengetahuan umum, operasi VCS atas
-  kerja selesai, dan alur `/analyst:*`, `/product:*`, `/quickdev:*`, atau `/nataflow:*` yang dipanggil atau dilanjutkan
-  secara eksplisit.
+- **Pengecualian**: tiket teknis cepat (`backend:ticket`), jawaban atas klarifikasi rute yang sudah diputuskan,
+  pengetahuan umum, operasi VCS atas kerja selesai, slash command atau skill yang diketik user dan bukan milik
+  plugin ini beserta susulannya (`/analyst:*`, `/product:*`, `/quickdev:*`, `/nataflow:*`, atau skill user seperti
+  `/planning` dan `/discus-mode`), dan opt-out sesi dari user ("abaikan hook", "jangan lewat plugin") yang
+  berlaku sampai user meminta kembali ke gerbang.
 - **Opt-out `.claude/workflow`**: lihat Hidup Berdampingan.
 
 **PreToolUse** (`python3 hooks/guard_bash.py hook`, matcher `Bash|Edit|Write`, timeout 10 detik) berlaku
