@@ -1,9 +1,12 @@
-"""Langkah 39 — alur quickdev berantai: commit rencana sesudah approve, plan → execute → review tanpa jeda."""
+"""Langkah 39 — alur quickdev berantai: plan → execute → review tanpa jeda.
+
+Commit rencana sesudah approve (39 C1) diganti rencana di luar git dan commit hasil di akhir review (Q1, Q2):
+`test_lapangan_q1_q2_q4.py`."""
 import re
 
 import pytest
 
-from conftest import PLUGINS, commit, git, run_script
+from conftest import PLUGINS, commit, run_script
 
 PL = PLUGINS / "quickdev" / "skills" / "_common" / "plan_lock.py"
 SK = PLUGINS / "quickdev" / "skills"
@@ -42,74 +45,6 @@ def skill(name):
 
 def section(text, start, end):
     return text.split(start, 1)[1].split(end, 1)[0]
-
-
-@pytest.mark.regression("39 C1")
-def test_commit_hanya_berkas_rencana(repo, pl):
-    (repo / "app.js").write_text("ubah user\n", encoding="utf-8")
-    (repo / "lain.txt").write_text("staged user\n", encoding="utf-8")
-    git(repo, "add", "lain.txt")
-    assert pl("lock", "--answer", "Setujui & eksekusi").returncode == 0
-    r = pl("commit")
-    assert r.returncode == 0 and r.stdout.startswith("COMMIT PASS: plan/t.md @"), r.stdout
-    assert git(repo, "show", "--name-only", "--format=%s", "HEAD").split() == \
-        ["docs(plan):", "setujui", "rencana", "t", "plan/t.md"]
-    status = git(repo, "status", "--porcelain")
-    assert "A  lain.txt" in status and " M app.js" in status   # index dan working tree user utuh
-    assert pl("commit").stdout.startswith("COMMIT SKIP: plan/t.md sudah sama dengan HEAD")
-    r = pl("start")                                           # tree kotor milik user tetap dinilai start
-    assert r.returncode == 1 and r.stdout.rstrip().endswith("dulu: app.js, lain.txt")
-
-
-@pytest.mark.regression("39 C1")
-def test_commit_tolak_draft_dan_sidik_basi(repo, pl):
-    assert pl("commit").stdout.startswith("COMMIT FAIL")
-    pl("lock", "--answer", "ok")
-    p = repo / "plan" / "t.md"
-    p.write_text(p.read_text(encoding="utf-8").replace("kuota", "kuota harian"), encoding="utf-8")
-    r = pl("commit")
-    assert r.returncode == 1 and r.stdout.startswith("COMMIT FAIL")
-
-
-@pytest.mark.regression("39 C1")
-def test_commit_skip_gitignore_dan_blok_eksekusi(repo, pl):
-    (repo / ".gitignore").write_text("plan/\n", encoding="utf-8")
-    commit(repo, "abaikan plan", ".gitignore")
-    pl("lock", "--answer", "ok")
-    r = pl("commit")
-    assert r.returncode == 0 and "diabaikan .gitignore" in r.stdout
-    (repo / ".gitignore").unlink()
-    commit(repo, "lepas", ".gitignore")
-    assert pl("start").returncode == 0
-    r = pl("commit")
-    assert r.returncode == 0 and "Execution Status" in r.stdout and r.stdout.startswith("COMMIT SKIP")
-
-
-@pytest.mark.regression("39 C1")
-def test_commit_skip_bukan_git(make_repo):
-    root = make_repo(git_init=False)
-    (root / "plan").mkdir()
-    (root / "plan" / "t.md").write_text(PLAN, encoding="utf-8")
-    run_script(PL, "lock", "--answer", "ok", "--plan", "plan/t.md", cwd=root)
-    r = run_script(PL, "commit", "--plan", "plan/t.md", cwd=root)
-    assert r.returncode == 0 and r.stdout.startswith("COMMIT SKIP: bukan repo git")
-
-
-@pytest.mark.regression("39 C1")
-def test_commit_gagal_hook_exit_3(repo, pl):
-    hook = repo / ".git" / "hooks" / "pre-commit"
-    hook.write_text("#!/bin/sh\necho 'error: ditolak hook' >&2\nexit 1\n", encoding="utf-8")
-    hook.chmod(0o755)
-    pl("lock", "--answer", "ok")
-    r = pl("commit")
-    assert r.returncode == 3 and r.stdout.startswith("COMMIT GAGAL: error: ditolak hook")
-    assert pl("verify").returncode == 0
-
-
-@pytest.mark.regression("39 C1")
-def test_plan_fase5_commit_sebelum_sinkron():
-    fase5 = section(skill("plan"), "### Fase 5", "## Guardrails")
-    assert fase5.index("plan_lock.py commit") < fase5.index("references/nataflow-sync.md")
 
 
 @pytest.mark.regression("39 A1")

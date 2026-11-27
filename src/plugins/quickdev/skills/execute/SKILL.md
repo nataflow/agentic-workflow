@@ -10,7 +10,7 @@ DILARANG MEMULAI EKSEKUSI JIKA DOKUMEN RENCANA IMPLEMENTASI BELUM BERSTATUS APPR
 ## Precondition [REQUIRED]
 
 1. `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py verify --plan <plan_path>` → `VERIFY PASS`. `FAIL` (bukan APPROVED, tanpa `Plan-Hash`, atau Section 1–5 berubah sesudah disetujui) → hentikan, arahkan ke `quickdev:plan`.
-2. Mode dari `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py start` (Fase 0 butir 1). `awal`: skrip sendiri menilai `git status --porcelain -uall` dan menolak dengan `START FAIL` **tanpa menulis blok** bila ada berkas di luar direktori `plan_path` (dan `Profile:` rencana 0.11 bila tercatat); sajikan daftarnya, user meng-commit atau men-stash, lalu memanggil `/quickdev:execute` lagi, agar diff `quickdev:review` hanya berisi hasil eksekusi. `resume`/`remediasi`: perubahan uncommitted diizinkan hanya pada berkas target Section 3 dan `<plan_dir>/`; berkas lain → hentikan dan tanyakan user. Dilarang meminta user meng-commit atau men-stash kerja parsial: `quickdev:review` membandingkan terhadap `Base-Commit`, bukan `HEAD`.
+2. Mode dari `python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py start` (Fase 0 butir 1). `awal`: skrip sendiri menilai `git status --porcelain -uall` dan menolak dengan `START FAIL` **tanpa menulis blok** bila ada berkas di luar direktori `plan_path` (dan `Profile:` rencana 0.11 bila tercatat); sajikan daftarnya, user meng-commit atau men-stash (atau menerima tawaran commit hasil rencana lain bila ada baris `MILIK:`, Failure path 7), lalu memanggil `/quickdev:execute` lagi, agar diff `quickdev:review` hanya berisi hasil eksekusi. `resume`/`remediasi`: perubahan uncommitted diizinkan hanya pada berkas target Section 3 dan `<plan_dir>/`; berkas lain → hentikan dan tanyakan user. Dilarang meminta user meng-commit atau men-stash kerja parsial: `quickdev:review` membandingkan terhadap `Base-Commit`, bukan `HEAD`.
 3. Runtime, compiler, dan package manager yang dibutuhkan (seperti Node/TypeScript, Python, Go, dll.) aktif dan dapat menjalankan perintah verifikasi Section 4 rencana.
 4. Tool `Edit`, `Write`, dan `Bash` tersedia untuk mutasi berkas dan eksekusi perintah verifikasi.
 5. `python3` (3.12+) tersedia untuk `plan_lock.py`, dan direktori kerja adalah repo git.
@@ -66,7 +66,7 @@ Ringkasan menceritakan hasil, bukan menyalin langkah rencana atau log verifikasi
    |---|---|---|
    | `verify` FAIL | — | hentikan, ke `quickdev:plan` (Failure path 1) |
    | tanpa blok, nol `[x]`, tree bersih di luar direktori rencana | `awal` | `Base-Commit` = HEAD atau `none` (repo tanpa commit); lanjut butir 6 |
-   | tanpa blok, nol `[x]`, tree kotor, atau bukan repo git | — (`START FAIL`, blok tidak ditulis) | sajikan daftar berkas dari pesan skrip; user commit/stash lalu memanggil `/quickdev:execute` lagi. Bukan repo git → laporkan blocker environment |
+   | tanpa blok, nol `[x]`, tree kotor, atau bukan repo git | — (`START FAIL`, blok tidak ditulis) | sajikan daftar berkas dari pesan skrip; ada baris `MILIK:` (seluruh kotoran adalah hasil rencana lain yang sudah `COMPLETED`) → tawarkan commit hasil itu (Failure path 7); selain itu user commit/stash lalu memanggil `/quickdev:execute` lagi. Bukan repo git → laporkan blocker environment |
    | blok `IN_PROGRESS`/`BLOCKED`, tanpa blok tetapi ada `[x]`, blok `COMPLETED`/`VERIFICATION_MANUAL_REQUIRED` dengan langkah `[ ]` baru (`resume (rencana direvisi sesudah selesai)`), atau segel penutup basi (`resume (verifikasi basi: …)` — kode atau rencana berubah sesudah `close`) | `resume` | butir 2 di bawah; semua langkah `[x]` → langsung Fase 3. `Base-Note` menandai base yang diisi sesudah sesi putus; `Base-Commit` tetap, sehingga review berikutnya menilai seluruh hasil sejak base itu |
    | blok `IN_PROGRESS`/`BLOCKED` dengan `Remediation-State: OPEN` (ronde terputus: sesi putus atau `BLOCKED` Failure path 5) | `remediasi` lanjutan | butir 5 dengan temuan dari baris `TEMUAN:`; ronde tidak bertambah. Langkah `[ ]` baru (rencana direvisi) dikerjakan lebih dulu |
    | blok `COMPLETED` + `--findings` | `remediasi` | butir 5 di bawah; plafon 2 putaran |
@@ -145,7 +145,7 @@ Ringkasan menceritakan hasil, bukan menyalin langkah rencana atau log verifikasi
 - MUST NOT mengeksekusi perubahan kode jika berkas rencana implementasi belum berstatus `Status: APPROVED`.
 - MUST NOT menyimpang dari langkah-langkah yang telah disepakati di dalam dokumen rencana implementasi, termasuk mengubah teks langkah agar cocok dengan hasil kerja.
 - MUST NOT membiarkan ada error typecheck, lint, atau failing test yang belum terselesaikan sebelum menyatakan tugas selesai.
-- MUST NOT melakukan commit atau merge atas perubahan hasil eksekusi; status `COMPLETED` hanya membuka `quickdev:review`, bukan izin merilis.
+- MUST NOT melakukan commit atau merge atas perubahan hasil eksekusi rencana ini; status `COMPLETED` hanya membuka `quickdev:review`, bukan izin merilis. Satu-satunya commit di skill ini adalah hasil rencana lain yang sudah `COMPLETED`, lewat `plan_lock.py commit` atas pilihan eksplisit user (Failure path 7).
 - MUST NOT menghapus kode lama secara sembarangan tanpa instruksi eksplisit di dokumen rencana.
 - MUST NOT memasang framework/dependensi test yang tidak tercantum di Section 3 rencana.
 - MUST NOT menjalankan migrasi atau perintah pengubah skema/data, perintah verifikasi tanpa timeout, atau perintah bertanda `menyentuh DB/jaringan` tanpa izin user lewat `AskUserQuestion`.
@@ -177,6 +177,7 @@ Skill ini menghasilkan perubahan kode sumber yang terverifikasi dan laporan term
    NATAFLOW: task #<kode> · workdir <nama> · <n> dokumen (<c> baru, <u> diperbarui, <s> sama) | dilewati | GAGAL: <sebab>
    HANDOFF: review (plan_path) — dipanggil langsung | user (perintah manual atau blocker)
    ```
+   Baris `NATAFLOW:` menyalin segmen keluaran prosedur sinkron putaran ini apa adanya (termasuk ekor `· report GAGAL: …`); dilarang meringkas, menerjemahkan, atau menghilangkannya, karena baris itu satu-satunya bukti sinkron yang dilihat user.
 
 ## Failure path
 
@@ -189,7 +190,16 @@ Skill ini menghasilkan perubahan kode sumber yang terverifikasi dan laporan term
 4. **Restriksi Eksekusi Perintah Terminal**: Jika environment tidak mengizinkan eksekusi perintah baseline otomatis, catat status `VERIFICATION_MANUAL_REQUIRED` dan berikan daftar perintah manual yang harus dijalankan user secara mandiri.
 5. **Temuan Review di Luar Cakupan Rencana**: Jika temuan pada `review_findings` menuntut perubahan berkas atau perilaku yang tidak ada di rencana, jangan kerjakan temuan itu; selesaikan temuan yang berada di dalam rencana, set status `BLOCKED` dengan daftar temuan di luar rencana, dan arahkan pemanggil merevisi rencana lewat `quickdev:plan`. Ronde tetap `OPEN`: sesudah revisi, `/quickdev:execute` melanjutkannya (mode `remediasi` lanjutan) tanpa memakan jatah ronde baru.
 6. **Plafon Remediasi Habis**: `start --findings` menolak putaran ke-3. Jangan mengubah kode; sajikan temuan tersisa ke user untuk diputuskan (terima apa adanya, revisi rencana, atau perbaikan manual).
-7. **`START FAIL` tree kotor atau bukan repo git**: jangan mengubah kode dan jangan menulis blok dengan tangan; sajikan daftar berkas dari pesan skrip dan tunggu user meng-commit atau men-stash (atau memindahkan kerja ke repo git), lalu `/quickdev:execute` lagi.
+7. **`START FAIL` tree kotor atau bukan repo git**: jangan mengubah kode dan jangan menulis blok dengan tangan; sajikan daftar berkas dari pesan skrip.
+   - Keluaran memuat baris `MILIK: <rencana lain> (COMPLETED)` (seluruh berkas kotor adalah hasil rencana itu, segelnya cocok; biasanya task sebelumnya belum di-commit) → `AskUserQuestion`: *Commit hasil `<rencana lain>` dulu (Recommended)* (deskripsi opsi memuat subjek commit usulan) · *Commit/stash sendiri* · *Batal*. Opsi pertama → jalankan perintah di bawah di branch aktif, lalu ulangi Fase 0 butir 1. Subjek: `<feat|fix>: <tujuan Section 1 rencana itu, ≤72 karakter>` ditambah ` (#<kode>)` bila kode task nataflow-nya diketahui dari percakapan; repo dengan konvensi lain di `git log -5 --format=%s` → ikuti konvensi itu. `COMMIT GAGAL` (exit 3: hook, gpg, identitas) → sajikan sebab dan perintah manual dari skrip; dilarang mengulang dengan `--no-verify`.
+
+     ```
+     python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py commit --plan <rencana lain> --message - <<'QD_EOF'
+     <subjek commit>
+     QD_EOF
+     ```
+
+   - Tanpa baris `MILIK:` → tunggu user meng-commit atau men-stash (atau memindahkan kerja ke repo git), lalu `/quickdev:execute` lagi.
 
 ## STYLE
 

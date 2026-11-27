@@ -220,7 +220,7 @@ def test_report_terbit_sesudah_eksekusi(repo, fake):
     assert "| `app.js` | diubah | 1/0 |" in body and "| `quota.test.js` | baru (untracked) | -/- |" in body
     assert "plan/t.md` |" not in body.split("## Berkas Berubah")[1], "direktori rencana tidak dihitung"
     assert "- Verification: test=PASSED" in body
-    assert git(repo, "status", "--porcelain", "--", "plan") == "?? plan/\n", "report tidak menulis berkas"
+    assert sorted(x.name for x in (repo / "plan").iterdir()) == [".gitignore", "t.md"], "report tidak menulis berkas"
     code, out = push(repo)
     assert out["segment"].endswith("(0 baru, 0 diperbarui, 2 sama)")
 

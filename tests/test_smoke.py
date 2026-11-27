@@ -144,7 +144,7 @@ CASES = [
     ("frontend/skills/ux-design/scripts/check_preconditions.py", ["--taskdir", FE_TD, "--json"], True, None),
 
     ("quickdev/skills/_common/plan_lock.py", ["status", "--plan", "plan/smoke.md", "--json"], True, None),
-    ("quickdev/skills/_common/plan_lock.py", ["commit", "--plan", "plan/smoke.md"], False, None),
+    ("quickdev/skills/_common/plan_lock.py", ["commit", "--plan", "plan/smoke.md", "--message", "x"], False, None),
     ("quickdev/skills/_common/plan_lock.py", ["summary", "--plan", "plan/smoke.md", "--summary", "x"], False, None),
     ("quickdev/skills/_common/plan_lock.py", ["task", "--ref", "1", "--plan", "plan/smoke.md", "--json"], True, None),
     ("quickdev/skills/_common/plan_lock.py", ["sync-payload", "--plan", "plan/smoke.md", "--json"], True, None),

@@ -118,7 +118,7 @@ def test_e4_remediation_round_rusak_fail_rapi(repo, pl):
 
 def test_e4_save_atomik_tanpa_sisa_berkas_sementara(repo, pl):
     pl("lock", "--answer", "ok"), pl("start")
-    assert [p.name for p in (repo / "plan").iterdir()] == ["t.md"]
+    assert sorted(p.name for p in (repo / "plan").iterdir()) == [".gitignore", "t.md"]   # penanda Q1, tanpa .tmp
 
 
 def test_e5_blok_completed_tulisan_tangan_tidak_konsisten(repo, pl):

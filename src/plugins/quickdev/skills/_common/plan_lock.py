@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """Kunci rencana quickdev: sidik Section 1–5, blok `## Execution Status`, dan commit dasar.
 
-- `lock`    DRAFT → APPROVED: tulis `Approved-At`, `Approval`, `Plan-Hash`, `Hash-Scope: body`.
+- `lock`    DRAFT → APPROVED: tulis `Approved-At`, `Approval`, `Plan-Hash`, `Hash-Scope: body`, lalu pastikan direktori
+            rencana diabaikan git (penanda `<plan_dir>/.gitignore` berisi `*`; Q1). `start` memastikan hal yang sama untuk
+            rencana yang dikunci versi lama.
 - `verify`  APPROVED dan sidik Section 1–5 sekarang = `Plan-Hash` (checkbox dinormalkan).
 - `start`   vonis mode eksekusi (awal | resume | remediasi | manual | selesai); tulis blok
             `## Execution Status` (IN_PROGRESS + Base-Commit) bila belum ada. Mode `awal` menolak tree
             kotor di luar direktori rencana **sebelum** menulis (13 Q1). Blok terminal dengan
             langkah `[ ]` tersisa (rencana direvisi) atau segel basi (13 Q9/Q14) → `resume`; ronde
-            remediasi yang masih `OPEN` → `remediasi` lanjutan (13 Q3).
+            remediasi yang masih `OPEN` → `remediasi` lanjutan (13 Q3). Tree kotor yang seluruhnya hasil rencana lain
+            berstatus COMPLETED di direktori yang sama → baris `MILIK:` per rencana itu (tawaran commit; Q2).
 - `baseline` kunci ringkasan baseline segar (`Baseline`, `Baseline-Commit`); sah hanya di HEAD = Base-Commit
             dengan tree bersih, yaitu sebelum mutasi pertama (13 Q6). Satu-satunya pembanding regresi (34 L2).
 - `close`   tulis status terminal execute ke blok (COMPLETED | BLOCKED | VERIFICATION_MANUAL_REQUIRED);
@@ -16,16 +19,19 @@
 - `confirm` VERIFICATION_MANUAL_REQUIRED → COMPLETED (manual) dengan jawaban user apa adanya; segel basi → FAIL.
 - `status`  ringkasan untuk execute/review (`--json`); `consistent` menilai blok terhadap checklist dan segel.
 - `unlock`  APPROVED → DRAFT untuk revisi atas permintaan user; blok eksekusi dipertahankan.
-- `commit`  commit berkas rencana APPROVED saja (staging eksplisit, `--only`), sebelum eksekusi dimulai (39 C1);
-            bukan repo git, diabaikan `.gitignore`, tanpa perubahan, atau blok eksekusi sudah ada → SKIP.
+- `commit`  commit hasil eksekusi COMPLETED yang segelnya cocok, atas pilihan user di akhir review (Q2): hanya berkas
+            yang disegel `close` (berbeda dari `Base-Commit`, tanpa direktori rencana) dan masih uncommitted, ditambah
+            berkas rencana bila tidak diabaikan git (repo lama). Staging eksplisit + `--only`; `--branch` membuat branch
+            baru dari HEAD lebih dulu. Semua sudah ter-commit → SKIP; commit gagal (hook, gpg, identitas) → exit 3.
 - `summary` ringkasan naratif singkat hasil eksekusi ke blok (`Summary`), sesudah `close`; isi pembuka dokumen
             report nataflow (41 D4). Di luar wilayah sidik dan `Tree-Hash`, jadi segel `close` tidak basi.
 - `task`    baca task nataflow acuan (`--ref <code|uuid>`) lewat `get_task`; `--plan` menautkannya ke rencana DRAFT
             sebagai `Nataflow-Task: <uuid>` (41 D1). Task acuan tidak pernah dibuat atau diubah isinya oleh quickdev.
 - `sync-payload` sinkron nataflow rencana DRAFT maupun APPROVED (`--plan`; 41 D2) beserta dokumen report bila blok
             eksekusi sudah tertutup (41 D4); tanpa menulis berkas. `--push` memanggil server langsung (MCP key
-            `.claude/nataflow.local.json`) dan mencetak satu baris segmen (29 S4). Config `.claude/nataflow.json`
-            absen → SKIP sebelum rencana dibaca.
+            `.claude/nataflow.local.json`) dan mencetak satu baris segmen (29 S4); tipe dokumen yang belum terdaftar
+            (`list_document_types`) dilaporkan beserta instruksi pendaftarannya sebelum tulisan apa pun (Q4). Config
+            `.claude/nataflow.json` absen → SKIP sebelum rencana dibaca.
 
 Metadata rencana adalah baris polos `Kunci: nilai` di antara H1 dan `## 1.`. Sidik mencakup
 `## 1.` sampai sebelum `## Execution Status`: CRLF → LF, spasi ujung baris dibuang, `- [x]` dihitung
@@ -34,7 +40,7 @@ sebagai `- [ ]`. Checkbox dan blok penutup boleh berubah; teks Section 1–5 tid
 profile+body` juga menyidik baris `Profile:` (13 Q11) dan tetap diverifikasi dengan rumus itu.
 Heading, langkah, dan blok di dalam code fence diabaikan (13 Q7).
 
-Teks bebas (`--answer`, `--reason`, `--verification`, `--findings-text`, `--summary`) bernilai `-` dibaca dari stdin,
+Teks bebas (`--answer`, `--reason`, `--verification`, `--findings-text`, `--summary`, `--message`) bernilai `-` dibaca dari stdin,
 satu per panggilan (13 Q4): SKILL mengirimnya lewat heredoc berkutip supaya shell tidak mengekspansi apa pun.
 
 Zero external dependencies (Python Standard Library only).
@@ -66,7 +72,7 @@ META_KEYS = ("Status", "Author", "Date", "Profile", "Gates", "Approved-At", "App
 SCOPE_V2 = "profile+body"           # 0.5–0.11: rencana lama yang masih berjalan
 SCOPE_BODY = "body"                 # 0.12: Section 1–5 saja, sama dengan rumus 0.4.0 tanpa penanda (34 L1)
 SCOPES = (SCOPE_V2, SCOPE_BODY)
-TEXT_ARGS = ("answer", "reason", "verification", "findings_text", "summary")
+TEXT_ARGS = ("answer", "reason", "verification", "findings_text", "summary", "message")
 DONE_STATES = ("COMPLETED", "VERIFICATION_MANUAL_REQUIRED")      # close yang menyegel verifikasi
 MANUAL = "VERIFICATION_MANUAL_REQUIRED"
 SUMMARY_MAX = 600
@@ -270,23 +276,94 @@ def gate_paths(p: "Plan", top: Path) -> list:
     return out
 
 
-def dirty_outside(p: "Plan", top: Path) -> tuple:
-    """(berkas berubah atau untracked di luar artefak gate, galat git). Tree tak terbaca ≠ bersih."""
+def uncommitted(top: Path) -> tuple:
+    """(set path berubah, ter-stage, atau untracked terhadap HEAD, galat git). Tree tak terbaca ≠ bersih."""
     r = git(top, "status", "--porcelain", "-z", "-uall")
     if r is None or r.returncode != 0:
-        return [], "`git status` gagal: " + one_line(r.stderr if r is not None else "git tidak ada")[:160]
-    gates = gate_paths(p, top)
+        return set(), "`git status` gagal: " + one_line(r.stderr if r is not None else "git tidak ada")[:160]
     items, out, i = r.stdout.split("\0"), set(), 0
     while i < len(items):
         entry, i = items[i], i + 1
         if len(entry) < 4:
             continue
-        paths = [entry[3:]]
+        out.add(entry[3:])
         if "R" in entry[:2] or "C" in entry[:2]:        # `XY baru\0lama\0`
-            paths.append(items[i] if i < len(items) else "")
+            out.add(items[i] if i < len(items) else "")
             i += 1
-        out.update(x for x in paths if x and not any(x == g or x.startswith(g + "/") for g in gates))
-    return sorted(out), ""
+    out.discard("")
+    return out, ""
+
+
+def dirty_outside(p: "Plan", top: Path) -> tuple:
+    """(berkas berubah atau untracked di luar artefak gate, galat git). Tree tak terbaca ≠ bersih."""
+    paths, err = uncommitted(top)
+    if err:
+        return [], err
+    gates = gate_paths(p, top)
+    return sorted(x for x in paths if not any(x == g or x.startswith(g + "/") for g in gates)), ""
+
+
+# ------------------------------------------------------------------ rencana di luar git (Q1)
+
+IGNORE_TEXT = (
+    "# Ditulis `plan_lock.py` (quickdev, Q1): rencana hidup di disk dan dicerminkan ke nataflow, tidak pernah\n"
+    "# di-commit. Pola `*` ikut mengabaikan berkas ini sendiri; jangan di-commit.\n"
+    "*\n"
+)
+
+
+def is_plan_file(top: Path, rel: str) -> bool:
+    """Berkas rencana quickdev: `.md` ber-H1 `# Implementation Plan` (ditulis quickdev:plan)."""
+    f = top / rel
+    if not rel.endswith(".md") or not f.is_file():
+        return False
+    try:
+        head = f.read_text(encoding="utf-8", errors="replace").lstrip("﻿").split("\n", 1)[0]
+    except OSError:
+        return False
+    return head.startswith("# Implementation Plan")
+
+
+def ignored(top: Path, rel: str) -> bool:
+    """Path (boleh belum ada) diabaikan git; berkas ter-track tidak pernah dianggap diabaikan."""
+    r = git(top, "check-ignore", "-q", "--", rel)
+    return r is not None and r.returncode == 0
+
+
+def ensure_plan_ignored(p: "Plan") -> list:
+    """Tulis `<plan_dir>/.gitignore` (`*`) bila direktori rencana belum diabaikan git → baris `INFO:`/`PERINGATAN:`.
+
+    Idempoten, meniru penanda taskdir backend (`docs_git.py`, Langkah 24): `.gitignore` akar repo tidak disentuh, dan
+    rencana yang sudah ter-track tetap ter-track (lepas manual, lihat panduan migrasi 0.15). Tidak ditulis bila rencana
+    di root repo (`*` akan mengabaikan seluruh repo) atau direktorinya memuat berkas ter-track selain rencana quickdev."""
+    top = repo_top(p)
+    if top is None:
+        return []
+    try:
+        rel = p.path.resolve().parent.relative_to(top.resolve()).as_posix()
+    except ValueError:
+        return []
+    if rel in ("", "."):
+        return ["PERINGATAN: rencana di root repo — direktori rencana tidak diabaikan otomatis; pakai `plan_dir` "
+                "tersendiri (default `plan`)"]
+    if ignored(top, f"{rel}/0000-probe.md"):
+        return []
+    r = git(top, "ls-files", "-z", "--", rel)
+    others = [x for x in (r.stdout.split("\0") if r is not None and r.returncode == 0 else []) if x
+              and not is_plan_file(top, x)]
+    if others:
+        return [f"PERINGATAN: `{rel}/` memuat berkas ter-track selain rencana quickdev ({others[0]}"
+                f"{' …' if len(others) > 1 else ''}) — penanda ignore tidak ditulis; abaikan rencana lewat "
+                f"`.gitignore` sendiri bila perlu"]
+    marker = top / rel / ".gitignore"
+    if not marker.is_file() or marker.read_text(encoding="utf-8", errors="replace") != IGNORE_TEXT:
+        marker.write_text(IGNORE_TEXT, encoding="utf-8")
+    if not ignored(top, f"{rel}/0000-probe.md"):
+        return [f"PERINGATAN: `{rel}/` tetap tidak diabaikan sesudah `{rel}/.gitignore` ditulis — periksa berkas itu"]
+    out = [f"INFO: `{rel}/.gitignore` ditulis — rencana quickdev tidak di-commit; cerminnya di nataflow"]
+    if not (top / ns.CONFIG_FILE).is_file():
+        out.append(f"PERINGATAN: `{ns.CONFIG_FILE}` tidak ada — rencana hanya tersimpan di disk ini")
+    return out
 
 
 def base_state(top: Optional[Path], base: str) -> tuple:
@@ -396,6 +473,8 @@ def cmd_lock(p: Plan, a) -> int:
                Plan_Hash=digest)
     p.save()
     print(f"LOCK PASS: {p.path} APPROVED @{digest[7:19]}")
+    for line in ensure_plan_ignored(p):
+        print(line)
     return 0
 
 
@@ -473,8 +552,11 @@ def cmd_start(p: Plan, a) -> int:
             return fail(f"START FAIL: {err} — tree yang tak terbaca tidak pernah bersih")
         if dirty:
             more = f" … (+{len(dirty) - 10})" if len(dirty) > 10 else ""
-            return fail(f"START FAIL: mode awal menuntut tree bersih di luar direktori rencana — "
-                        f"minta user meng-commit atau men-stash dulu: {', '.join(dirty[:10])}{more}")
+            owners = sibling_owners(p, top, dirty)
+            return fail("\n".join([f"START FAIL: mode awal menuntut tree bersih di luar direktori rencana — "
+                                   f"minta user meng-commit atau men-stash dulu: {', '.join(dirty[:10])}{more}"]
+                                  + [f"MILIK: {o} (COMPLETED) — tawarkan `plan_lock.py commit --plan {o}` lebih "
+                                     f"dulu, lalu `start` ulang" for o in owners]))
         mode = "awal"
         p.set_block(Status="IN_PROGRESS", Base_Commit=head_commit(top), Remediation_Round="0", Timestamp=now())
     if mode in ("resume", "remediasi") and b.get("Summary", "-") != "-":
@@ -493,7 +575,31 @@ def cmd_start(p: Plan, a) -> int:
         print(f"INFO: HEAD maju {ahead} commit sejak Base-Commit — review menilainya sebagai bagian tugas")
     if b.get("Baseline"):
         print(f"BASELINE: {b['Baseline']} @{b.get('Baseline-Commit', '-')[:12]}")
+    for line in ensure_plan_ignored(p):      # rencana yang dikunci versi ≤ 0.14 (Q1)
+        print(line)
     return 0
+
+
+def sibling_owners(p: "Plan", top: Path, dirty: list) -> list:
+    """Rencana lain di direktori yang sama — APPROVED, eksekusi COMPLETED*, segel cocok — yang berkas hasilnya
+    mencakup **seluruh** `dirty` (Q2) → path relatif root repo; kosong bila ada berkas kotor yang bukan milik mereka."""
+    want, covered, owners = set(dirty), set(), []
+    for f in sorted(p.path.parent.glob("*.md")):
+        if f.resolve() == p.path.resolve():
+            continue
+        try:
+            q = Plan(f)
+            m, st = q.meta(), q.block().get("Status", "")
+            if m.get("Status") != "APPROVED" or m.get("Plan-Hash") != plan_digest(q) or not st.startswith(
+                    "COMPLETED") or inconsistency(q):
+                continue
+            mine = {rel for _, rel, _, _ in changed_files(q, top, q.block().get("Base-Commit", ""))} & want
+        except (SystemExit, UnicodeDecodeError, OSError):
+            continue
+        if mine:
+            covered |= mine
+            owners.append(f.resolve().relative_to(top.resolve()).as_posix())
+    return owners if covered >= want else []
 
 
 def cmd_baseline(p: Plan, a) -> int:
@@ -607,48 +713,72 @@ def git_error_line(out: str) -> str:
     return " ".join(plain[:2]) if plain else (lines[0] if lines else "-")
 
 
-def cmd_commit(p: Plan, a) -> int:
-    """Commit berkas rencana yang baru dikunci, dan hanya berkas itu (39 C1).
+def commit_paths(p: Plan, top: Path) -> tuple:
+    """(berkas hasil eksekusi yang masih uncommitted, galat git): rumus berkas `tree_hash`/`changed_files` sejak
+    `Base-Commit`, ditambah berkas rencana bila tidak diabaikan git (rencana ter-track di repo lama ikut commit kode)."""
+    paths = {rel for _, rel, _, _ in changed_files(p, top, p.block().get("Base-Commit", ""))}
+    plan_rel = p.path.resolve().relative_to(top.resolve()).as_posix()
+    if not ignored(top, plan_rel):
+        paths.add(plan_rel)
+    dirty, err = uncommitted(top)
+    return sorted(paths & dirty), err
 
-    Staging eksplisit + `--only`: index lain milik user tidak ikut. Bukan kegagalan (`COMMIT SKIP`, exit 0):
-    bukan repo git, rencana diabaikan `.gitignore`, isi sudah sama dengan HEAD, atau rencana sudah punya blok
-    `## Execution Status` (revisi sesudah eksekusi dimulai; rencana ikut commit kode milik user supaya `Base-Commit`
-    tidak tertinggal commit yang hanya berisi rencana). Commit gagal (hook, gpg, identitas) → exit 3.
+
+def cmd_commit(p: Plan, a) -> int:
+    """Commit hasil eksekusi atas pilihan eksplisit user di akhir quickdev:review (Q2), dan hanya hasil itu.
+
+    Sah hanya untuk blok `COMPLETED`/`COMPLETED (manual)` yang konsisten: segel `close` menjamin berkas yang di-stage
+    adalah isi yang diverifikasi. Staging eksplisit + `--only`: index lain milik user tidak ikut. `--branch` membuat
+    branch baru dari HEAD sebelum commit. Semua sudah ter-commit → `COMMIT SKIP` (exit 0). Commit gagal (hook, gpg,
+    identitas) → exit 3 beserta perintah manual; dilarang diulang dengan `--no-verify`.
     """
-    if p.meta().get("Status") != "APPROVED" or p.meta().get("Plan-Hash") != plan_digest(p):
-        return fail("COMMIT FAIL: rencana bukan APPROVED atau sidiknya tidak cocok — `verify` dulu")
-    if p.exec_start < len(p.lines):
-        print(f"COMMIT SKIP: rencana sudah punya blok `{EXEC_H2}` — ikut commit kode, keputusan user")
-        return 0
+    if cmd_verify(p, a):
+        return 1
+    st = p.block().get("Status", "")
+    if not st.startswith("COMPLETED"):
+        return fail(f"COMMIT FAIL: eksekusi `{st or '-'}` bukan COMPLETED — commit hasil hanya sesudah "
+                    f"quickdev:execute COMPLETED dan review")
+    why = inconsistency(p)
+    if why:
+        return fail(f"COMMIT FAIL: {why}")
     top = repo_top(p)
     if top is None:
-        print("COMMIT SKIP: bukan repo git")
+        return fail("COMMIT FAIL: bukan repo git")
+    message = a.message.strip()
+    if not message:
+        return fail("COMMIT FAIL: pesan commit kosong")
+    paths, err = commit_paths(p, top)
+    if err:
+        return fail(f"COMMIT FAIL: {err}")
+    if not paths:
+        print("COMMIT SKIP: hasil eksekusi sudah ter-commit")
         return 0
-    rel = p.path.resolve().relative_to(top.resolve()).as_posix()
-    tracked = git(top, "ls-files", "--error-unmatch", "--", rel)
-    tracked = tracked is not None and tracked.returncode == 0
-    if not tracked:
-        ign = git(top, "check-ignore", "-q", "--", rel)
-        if ign is not None and ign.returncode == 0:
-            print(f"COMMIT SKIP: {rel} diabaikan .gitignore")
-            return 0
-    subject = f"docs(plan): setujui rencana {p.path.stem}"
-    for args in (["add", *(["-u"] if tracked else []), "--", rel],
-                 ["diff", "--cached", "--quiet", "--", rel],
-                 ["commit", "-q", "-m", subject, "--only", "--", rel]):
+    branch = a.branch.strip()
+    if branch:
+        r = git(top, "check-ref-format", "--branch", branch)
+        if r is None or r.returncode != 0:
+            return fail(f"COMMIT FAIL: `{branch}` bukan nama branch sah")
+        r = git(top, "rev-parse", "--verify", "-q", f"refs/heads/{branch}")
+        if r is not None and r.returncode == 0:
+            return fail(f"COMMIT FAIL: branch `{branch}` sudah ada — pilih nama lain, atau commit di branch aktif")
+        r = git(top, "checkout", "-q", "-b", branch)
+        if r is None or r.returncode != 0:
+            return fail(f"COMMIT FAIL: branch `{branch}` tidak dapat dibuat: "
+                        f"{git_error_line((r.stdout + r.stderr) if r else 'git tidak ada')}")
+    subject = message.split("\n", 1)[0]
+    for args in (["add", "-A", "--", *paths], ["commit", "-q", "-m", message, "--only", "--", *paths]):
         r = git(top, *args)
         if r is None:
             return fail("COMMIT FAIL: git tidak ada")
-        if args[0] == "diff":
-            if r.returncode == 0:
-                print(f"COMMIT SKIP: {rel} sudah sama dengan HEAD")
-                return 0
-            continue
         if r.returncode != 0:
-            print(f"COMMIT GAGAL: {git_error_line(r.stdout + r.stderr)} — rencana tetap APPROVED; commit manual "
-                  f"`git add -- {rel} && git commit -m \"{subject}\" -- {rel}` sesudah sebabnya dibereskan")
+            shown = " ".join(paths[:10]) + (f" … (+{len(paths) - 10})" if len(paths) > 10 else "")
+            print(f"COMMIT GAGAL: {git_error_line(r.stdout + r.stderr)} — hasil tetap di working tree"
+                  f"{f' (branch {branch} sudah dibuat)' if branch else ''}; commit manual "
+                  f"`git add -A -- {shown} && git commit -m \"{subject}\" -- {shown}` sesudah sebabnya dibereskan")
             return 3
-    print(f"COMMIT PASS: {rel} @{head_commit(top)[:12]}")
+    cur = git(top, "rev-parse", "--abbrev-ref", "HEAD")
+    print(f"COMMIT PASS: {len(paths)} berkas @{head_commit(top)[:12]} · branch "
+          f"{cur.stdout.strip() if cur is not None and cur.returncode == 0 else '-'} · {quote(subject, 120)}")
     return 0
 
 
@@ -944,10 +1074,35 @@ def plan_task(session, head: dict):
     return row, None
 
 
+def type_problem(code: str) -> str:
+    return (f"tipe dokumen `{code}` belum terdaftar di server nataflow — admin mendaftarkannya di halaman Document "
+            f"Types (kode `{code}`), lalu sinkron ulang")
+
+
+def missing_types(session, docs: list) -> set:
+    """Tipe dokumen `docs` yang tidak ada di `list_document_types` (Q4). Server lama tanpa tool itu → kosong (cek
+    dilewati; server tetap menolak tipe yang tak dikenal saat `upsert_document`)."""
+    from nataflow_client import NataflowError, as_list
+    try:
+        rows = as_list(session.call_json("list_document_types", {}, read=True), "document_types", "data")
+    except NataflowError as exc:
+        if exc.kind == "tool":
+            return set()
+        raise
+    codes = {str(r.get("code") or "") for r in rows if isinstance(r, dict)}
+    return {d["type"] for d in docs} - codes
+
+
 def push_plan(session, head: dict, docs: list) -> dict:
-    """Task → workdir → manifest → dokumen → status task. Dokumen report yang gagal (mis. tipe belum terdaftar di
-    server) tidak menggagalkan sinkron rencana: dicatat di `report_problem` (41 D4)."""
+    """Tipe dokumen → task → workdir → manifest → dokumen → status task. Tipe `quickdev.plan` belum terdaftar → FAIL
+    sebelum tulisan apa pun; `quickdev.report` belum terdaftar → report tidak didorong (Q4). Dokumen report yang gagal
+    tidak menggagalkan sinkron rencana: dicatat di `report_problem` (41 D4)."""
     from nataflow_client import NataflowError
+    missing, report_problem = missing_types(session, docs), ""
+    if "quickdev.plan" in missing:
+        return ns.push_fail([type_problem("quickdev.plan")])
+    if "quickdev.report" in missing:
+        docs, report_problem = [d for d in docs if d["type"] != "quickdev.report"], type_problem("quickdev.report")
     row, stop = plan_task(session, head)
     if stop:
         return stop
@@ -966,7 +1121,7 @@ def push_plan(session, head: dict, docs: list) -> dict:
     diff, problems = _diff(docs, text)
     if problems:
         return ns.push_fail(problems)
-    counts, report_problem = {"created": 0, "updated": 0, "unchanged": 0}, ""
+    counts = {"created": 0, "updated": 0, "unchanged": 0}
     for doc in diff["documents"]:
         try:
             got = ns.upsert_documents(session, [doc], workdir_id)
@@ -1126,6 +1281,9 @@ def main() -> None:
             s.add_argument("--blocked-step", default="")
         if name == "unlock":
             s.add_argument("--reason", required=True)
+        if name == "commit":
+            s.add_argument("--message", required=True, help="pesan commit hasil eksekusi (`-` = stdin)")
+            s.add_argument("--branch", default="", help="buat branch baru dari HEAD lebih dulu")
         if name == "status":
             s.add_argument("--json", action="store_true")
     s = sub.add_parser("sync-payload")

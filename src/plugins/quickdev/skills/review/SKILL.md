@@ -1,11 +1,11 @@
 ---
 name: review
-description: Alur ringan quickdev (plan/<task>.md, tanpa taskdir dan tanpa profil repo) — menilai diff uncommitted hasil quickdev:execute terhadap plan/<task>.md dan konvensi kode di sekitarnya sebelum commit; dipanggil quickdev:execute sesudah COMPLETED, atau eksplisit lewat /quickdev:review. Bukan untuk review kode umum tanpa rencana quickdev.
+description: Alur ringan quickdev (plan/<task>.md, tanpa taskdir dan tanpa profil repo) — menilai diff uncommitted hasil quickdev:execute terhadap plan/<task>.md dan konvensi kode di sekitarnya sebelum commit, lalu menawarkan commit hasil itu atas pilihan user; dipanggil quickdev:execute sesudah COMPLETED, atau eksplisit lewat /quickdev:review. Bukan untuk review kode umum tanpa rencana quickdev.
 ---
 
 ## THE IRON LAW
 
-DILARANG MELAPORKAN SATU TEMUAN PUN TANPA BUKTI PATH BERKAS DAN NOMOR BARIS NYATA YANG DIAMBIL DARI ISI DIFF ATAU BERKAS SUMBER. DILARANG MENGUBAH, MENULIS, ATAU MEMPERBAIKI BERKAS KODE SUMBER SELAMA REVIEW BERLANGSUNG — SKILL INI MURNI READ-ONLY. SELURUH PERUBAHAN DALAM CAKUPAN DIFF WAJIB DINILAI TERHADAP TUJUH DIMENSI REVIEW SECARA LENGKAP TANPA MELEWATI DIMENSI MANA PUN. STATUS TERMINAL WAJIB `CHANGES_REQUIRED` BILA TERDAPAT MINIMAL SATU TEMUAN BERSEVERITAS `BLOCKER` ATAU `MAJOR`. KEPUTUSAN COMMIT, MERGE, ATAU RILIS TETAP MILIK MUTLAK USER DAN DILARANG DIAMBIL OLEH SKILL INI.
+DILARANG MELAPORKAN SATU TEMUAN PUN TANPA BUKTI PATH BERKAS DAN NOMOR BARIS NYATA YANG DIAMBIL DARI ISI DIFF ATAU BERKAS SUMBER. DILARANG MENGUBAH, MENULIS, ATAU MEMPERBAIKI BERKAS KODE SUMBER SELAMA REVIEW BERLANGSUNG — SKILL INI MURNI READ-ONLY TERHADAP ISI BERKAS. SELURUH PERUBAHAN DALAM CAKUPAN DIFF WAJIB DINILAI TERHADAP TUJUH DIMENSI REVIEW SECARA LENGKAP TANPA MELEWATI DIMENSI MANA PUN. STATUS TERMINAL WAJIB `CHANGES_REQUIRED` BILA TERDAPAT MINIMAL SATU TEMUAN BERSEVERITAS `BLOCKER` ATAU `MAJOR`. KEPUTUSAN COMMIT, MERGE, ATAU RILIS TETAP MILIK MUTLAK USER DAN DILARANG DIAMBIL OLEH SKILL INI; SKILL INI HANYA MENJALANKAN `plan_lock.py commit` SESUDAH USER MEMILIH OPSI COMMIT SECARA EKSPLISIT.
 
 ## Precondition [REQUIRED]
 
@@ -13,7 +13,7 @@ DILARANG MELAPORKAN SATU TEMUAN PUN TANPA BUKTI PATH BERKAS DAN NOMOR BARIS NYAT
 2. Direktori kerja adalah git repository valid (`git rev-parse --is-inside-work-tree` bernilai `true`); bila gagal, hentikan dan laporkan blocker environment.
 3. Terdapat minimal satu berkas berubah di luar `<plan_dir>/` (direktori `plan_path`) dan `Profile:` rencana 0.11 bila tercatat, dihitung dari gabungan `git diff <BASE> --name-only` dan `git ls-files --others --exclude-standard` (berkas untracked); `<BASE>` ditetapkan di Fase 1 butir 2. Bila nol, hentikan review dan laporkan status `NO_CHANGES` (Failure path 2) tanpa menulis temuan rekaan.
 4. Dokumen rencana pada `plan_path` (misal `plan/<task-name>.md`) tersedia di filesystem sebagai kontrak pembanding; bila hilang, hentikan dan minta path yang benar kepada user.
-5. `python3` (3.12+) tersedia untuk `plan_lock.py` (hanya subperintah baca `verify` dan `status`).
+5. `python3` (3.12+) tersedia untuk `plan_lock.py` (subperintah baca `verify` dan `status`, ditambah `commit` hanya atas pilihan user di Fase 5).
 
 ## Koeksistensi [REQUIRED]
 
@@ -80,13 +80,22 @@ Untuk dimensi 7, telusuri pemanggil setiap simbol yang diubah menggunakan pencar
 
 1. Tentukan status terminal: `CHANGES_REQUIRED` bila terdapat minimal satu temuan `BLOCKER` atau `MAJOR`, atau bila `strict` bernilai `true` dan terdapat temuan `MINOR`. Selain itu `REVIEWED`.
 2. Sajikan daftar temuan terurut menurun berdasarkan severity, lalu tabel cakupan tujuh dimensi, lalu ringkasan akhir maksimal 17 baris.
-3. Bila status `CHANGES_REQUIRED`: sajikan temuan, lalu `AskUserQuestion`: *Remediasi otomatis (putaran <n+1>/2)* · *Revisi rencana (`quickdev:plan`)* · *Terima apa adanya — keputusan commit di tangan user*. Opsi pertama tidak ditawarkan bila `remediation_round` (dari `plan_lock.py status --json`) sudah 2. Review tidak meneruskan ke skill lain sendiri: remediasi adalah keputusan user, sehingga opsi pertama ditutup dengan `HANDOFF: execute (remediasi)` dan perintah `/quickdev:execute <plan_path>` untuk diketik user di sesi yang sama — `quickdev:execute` mengambil temuan dari laporan ini sebagai `review_findings`. Sesi berganti sebelum itu → user menjalankan `/quickdev:review` ulang dulu. Jawaban user dikutip apa adanya di laporan. Dilarang memperbaiki sendiri di sesi review.
-4. Bila status `REVIEWED`, nyatakan bahwa keputusan commit atau merge menunggu tindakan user.
+3. Bila status `CHANGES_REQUIRED`: sajikan temuan, lalu `AskUserQuestion`: *Remediasi otomatis (putaran <n+1>/2)* · *Revisi rencana (`quickdev:plan`)* · *Terima apa adanya* (lanjut ke tawaran commit butir 5). Opsi pertama tidak ditawarkan bila `remediation_round` (dari `plan_lock.py status --json`) sudah 2. Review tidak meneruskan ke skill lain sendiri: remediasi adalah keputusan user, sehingga opsi pertama ditutup dengan `HANDOFF: execute (remediasi)` dan perintah `/quickdev:execute <plan_path>` untuk diketik user di sesi yang sama — `quickdev:execute` mengambil temuan dari laporan ini sebagai `review_findings`. Sesi berganti sebelum itu → user menjalankan `/quickdev:review` ulang dulu. Jawaban user dikutip apa adanya di laporan. Dilarang memperbaiki sendiri di sesi review.
+4. Bila status `REVIEWED`, lanjut ke tawaran commit butir 5. `NO_CHANGES` tidak menawarkan commit.
+5. **Tawaran commit** (`REVIEWED`, atau `CHANGES_REQUIRED` yang dijawab *Terima apa adanya*): susun subjek commit `<feat|fix>: <tujuan Section 1, ≤72 karakter>` (`fix` untuk bugfix), ditambah ` (#<kode>)` bila kode task nataflow diketahui dari percakapan (`ACUAN:` atau segmen `NATAFLOW: task #<kode>`); repo dengan konvensi lain di `git log -5 --format=%s` → ikuti konvensi itu. Lalu `AskUserQuestion`: *Commit di branch aktif (Recommended)* (deskripsi: subjek dan nama branch aktif) · *Commit di branch baru* (deskripsi: nama usulan `<feat|fix>/<task_name>`; user boleh menyebut nama lain) · *Jangan dulu*. Dua opsi pertama → jalankan perintah di bawah dengan subjek lewat stdin, ditambah `--branch <nama>` untuk opsi kedua:
+
+   ```
+   python3 ${CLAUDE_PLUGIN_ROOT}/skills/_common/plan_lock.py commit --plan <plan_path> --message - <<'QD_EOF'
+   <subjek commit>
+   QD_EOF
+   ```
+
+   Skrip hanya meng-commit berkas yang disegel `close` (berbeda dari `Base-Commit`, tanpa direktori rencana) yang masih uncommitted, ditambah berkas rencana bila masih ter-track git (repo lama); index user lainnya tidak ikut. `COMMIT PASS`/`COMMIT SKIP` → kutip barisnya di baris `COMMIT:` ringkasan. `COMMIT FAIL` (segel basi, branch sudah ada, nama branch tidak sah) → sajikan sebabnya; branch sudah ada → tanyakan nama lain. `COMMIT GAGAL` (exit 3: hook, gpg, identitas) → sajikan sebab dan perintah manual dari skrip; dilarang mengulang dengan `--no-verify`. *Jangan dulu* → hasil tetap uncommitted; `quickdev:execute` rencana berikutnya akan menawarkan commit ini lagi lewat baris `MILIK:`. Merge dan push tetap milik user.
 
 ## Guardrails
 
 - MUST NOT mengedit, menulis, memformat, atau menghapus berkas kode sumber, test, maupun konfigurasi apa pun.
-- MUST NOT menjalankan `git commit`, `git stash`, `git checkout`, `git reset`, `git clean`, `git push`, atau perintah git lain yang memutasi state repositori; hanya perintah baca (`git diff`, `git status`, `git log`, `git ls-files`, `git rev-parse`, `git hash-object -t tree /dev/null`) yang diizinkan. Dari `plan_lock.py` hanya `verify` dan `status`.
+- MUST NOT menjalankan `git commit`, `git add`, `git stash`, `git checkout`, `git reset`, `git clean`, `git push`, atau perintah git lain yang memutasi state repositori; hanya perintah baca (`git diff`, `git status`, `git log`, `git ls-files`, `git rev-parse`, `git hash-object -t tree /dev/null`) yang diizinkan. Dari `plan_lock.py` hanya `verify` dan `status`, ditambah `commit` sesudah jawaban eksplisit user atas tawaran commit Fase 5 butir 5; tanpa jawaban itu tidak ada commit.
 - MUST NOT mengubah `plan_path` atau berkas artefak gate hulu mana pun, termasuk mencentang checklist rencana.
 - MUST NOT menyetujui, melakukan merge, atau menyatakan perubahan siap rilis — keputusan itu milik mutlak user.
 - MUST NOT melaporkan temuan berbasis dugaan, praktik umum, atau ingatan tanpa bukti baris nyata pada berkas dalam cakupan diff.
@@ -95,7 +104,7 @@ Untuk dimensi 7, telusuri pemanggil setiap simbol yang diubah menggunakan pencar
 
 ## Output [REQUIRED]
 
-Skill ini menghasilkan laporan terminal saja tanpa artefak berkas.
+Skill ini menghasilkan laporan terminal tanpa artefak berkas, ditambah satu commit hasil eksekusi bila user memilihnya di Fase 5 butir 5.
 
 1. **Daftar Temuan** — satu blok per temuan dengan struktur pasti:
    ```
@@ -120,8 +129,11 @@ Skill ini menghasilkan laporan terminal saja tanpa artefak berkas.
    LANGKAH TERLEWAT: <daftar langkah rencana tanpa perubahan kode | ->
    MODE: strict=<true|false>, include_staged=<true|false>, sesi-sama=<ya|tidak>, base=<Base-Commit | base_ref | HEAD>
    REMEDIASI: putaran <n>/2 — pilihan user "<jawaban apa adanya>" | -
-   HANDOFF: execute (remediasi) | plan (revisi) | user (keputusan commit/merge) | tidak ada (NO_CHANGES)
+   COMMIT: <baris COMMIT PASS/SKIP/GAGAL apa adanya> | jangan dulu (pilihan user) | - (tidak ditawarkan)
+   NATAFLOW: <segmen baris NATAFLOW: ringkasan EXECUTE: terakhir di percakapan, apa adanya> | tidak diketahui (sesi baru) — /quickdev:plan "sinkron ulang <plan_path>"
+   HANDOFF: execute (remediasi) | plan (revisi) | user (merge/push) | tidak ada (NO_CHANGES)
    ```
+   Review tidak menjalankan sinkron sendiri; baris `NATAFLOW:` menjawab apakah rencana dan report sudah tercermin, sehingga dilarang diringkas atau dihilangkan.
 
 ## Failure path
 

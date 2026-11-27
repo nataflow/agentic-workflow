@@ -141,12 +141,14 @@ def test_byte_stabil_dan_tidak_menulis(repo):
     runs = {pl(repo, "sync-payload", "--plan", "plan/t.md", "--json").stdout for _ in range(2)}
     assert len(runs) == 1
     assert (repo / "plan" / "t.md").read_bytes() == before
-    assert git(repo, "status", "--porcelain") == "?? plan/\n"
+    assert git(repo, "status", "--porcelain") == "", "plan/ diabaikan penanda Q1; sinkron tidak menulis berkas"
 
 
 def test_commit_terisi_bila_rencana_ter_commit(repo):
-    locked(repo)
+    git(repo, "add", "plan/t.md")                  # repo lama yang sudah meng-commit rencana (Q1: tetap ter-track)
     sha = commit(repo, "docs: rencana", "plan/t.md")
+    locked(repo)
+    sha = commit(repo, "docs: rencana dikunci", "plan/t.md")
     doc = payload(repo, "--plan", "plan/t.md", "--remote", "-", stdin="[]")[1]["documents"][0]
     assert json.loads(doc["metadata"])["commit"].startswith(sha)
 
