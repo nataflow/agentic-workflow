@@ -40,7 +40,8 @@ def test_tiap_dispatcher_dapat_dirender_tanpa_slot_tabel_mentah(tmp_path, templa
     assert code == 0, out
     body = (tmp_path / out["out"]).read_text(encoding="utf-8")
     assert not [s for s in slots if "{" + s + "}" in body]
-    rujukan = f"Baca dan jalankan instruksi di `{out['out']}`; jangan menyuntingnya."
+    rujukan = (f"Rincian tugas Anda ada di `{out['out']}`; baca dengan Read dan ikuti format laporannya; "
+               "jangan menyuntingnya.")
     awal = " ".join(body.strip().split("\n\n", 1)[0].split()).rstrip(" .,:;")
     harap = f"{awal[:239].rstrip()}… {rujukan}" if len(awal) > 240 else f"{awal}. {rujukan}"
     assert awal and out["prompt"] == harap
@@ -130,8 +131,8 @@ def test_prompt_dispatch_membawa_ringkasan_maksud_satu_baris(tmp_path):
                         out="backenddev/docs/.explore/prompt/pickup-awb.md")
     assert code == 0, out
     assert out["prompt"] == ("Objective: telusuri alur pickup AWB manual recall order di modul logistik. "
-                             "Baca dan jalankan instruksi di `backenddev/docs/.explore/prompt/pickup-awb.md`; "
-                             "jangan menyuntingnya.")
+                             "Rincian tugas Anda ada di `backenddev/docs/.explore/prompt/pickup-awb.md`; "
+                             "baca dengan Read dan ikuti format laporannya; jangan menyuntingnya.")
     teks = run_script(SCRIPT, "--template", str(BE_SKILLS / "tech-lead/dispatcher/explorer.md"),
                       "--out", "backenddev/docs/.explore/prompt/pickup-awb.md", "--root", str(tmp_path),
                       "--slot", f"objective={obj}", "--slot", "konteks_diketahui=k", "--slot", "batas_cakupan=b",
@@ -145,10 +146,11 @@ def test_ringkasan_objective_panjang_dipangkas(tmp_path):
                         "konteks_diketahui=k", "batas_cakupan=b", "slug=s",
                         out="backenddev/docs/.explore/prompt/s.md")
     assert code == 0, out
-    awal, rujukan = out["prompt"].split(" Baca dan jalankan instruksi di ", 1)
+    awal, rujukan = out["prompt"].split(" Rincian tugas Anda ada di ", 1)
     assert len(awal) == 240 and awal.endswith("…") and not awal.endswith("….")
     assert awal.startswith("Objective: xxx")
-    assert rujukan == "`backenddev/docs/.explore/prompt/s.md`; jangan menyuntingnya."
+    assert rujukan == ("`backenddev/docs/.explore/prompt/s.md`; baca dengan Read dan ikuti format laporannya; "
+                       "jangan menyuntingnya.")
 
 
 @pytest.mark.regression("32 T1")
@@ -157,4 +159,18 @@ def test_ringkasan_implementor_menyebut_brief(tmp_path):
                         f"brief_path={TD}/brief-01-x.md", "unit_name=01", "adapter_path=a.md",
                         out=f"{TD}/.explore/prompt/implementor-01.md")
     assert code == 0, out
-    assert out["prompt"].startswith(f"Eksekusi satu brief implementasi: `{TD}/brief-01-x.md` (unit `01`). Baca ")
+    assert out["prompt"].startswith(f"Eksekusi satu brief implementasi: `{TD}/brief-01-x.md` (unit `01`). Rincian tugas ")
+
+
+@pytest.mark.regression("B12")
+def test_kalimat_dispatch_bukan_perintah_jalankan_instruksi(tmp_path):
+    """Frasa lama "Baca dan jalankan instruksi di …" ditolak classifier server (review hkm 968fb958, f65b2ab5)."""
+    code, out = _render(tmp_path, "tech-lead/dispatcher/explorer.md", "objective=o", "konteks_diketahui=k",
+                        "batas_cakupan=b", "slug=s", out="backenddev/docs/.explore/prompt/s.md")
+    assert code == 0, out
+    assert "jalankan instruksi" not in out["prompt"]
+    assert "Rincian tugas Anda ada di `backenddev/docs/.explore/prompt/s.md`" in out["prompt"]
+    for agent in sorted((PLUGINS / "backend" / "agents").glob("*.md")):
+        teks = agent.read_text(encoding="utf-8")
+        if "**Prompt berupa rujukan berkas (32 T1).**" in teks:
+            assert '"Rincian tugas Anda ada di `<path>`"' in teks and "jalankan instruksi" not in teks, agent.name

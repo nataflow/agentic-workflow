@@ -93,6 +93,8 @@ CASES = [
     ("backend/skills/architect/scripts/symbol_map.py", ["--sha", "HEAD", "--path", "README.txt"], False, None),
     ("backend/skills/architect/scripts/symbol_map.py",
      ["--sha", "HEAD", "--path", "README.txt", "--brief", f"{BE_TD}/brief-01.md"], False, None),
+    ("backend/skills/architect/scripts/review_diff.py", ["--taskdir", BE_TD, "--base-branch", "main", "--json"],
+     True, None),
     ("backend/skills/architect/scripts/close_brief.py",
      ["--brief", f"{BE_TD}/brief-01.md", "--sha", "HEAD", "--json"], True, None),
     ("backend/skills/audit/scripts/check_preconditions.py", ["--json"], True, None),

@@ -15,6 +15,7 @@ Review seluruh branch pekerjaan untuk satu direktori tugas.
 - Rentang Git: `<sha merge-base>..HEAD` — SHA dari `git merge-base {base_branch} HEAD` yang dijalankan
   sendiri lebih dulu, bukan `{base_branch}..HEAD` polos dan bukan substitusi `$(…)` (ditolak hook).
 - Kontrak Penilai: Gabungan seluruh brief di `{taskdir}/`, bukan kualitas umum modul sekitarnya.
+- Diff Utuh: `{diff_file}` — diff rentang di atas tanpa `backenddev/`/`.claude/`; baca dengan Read per potongan sesudah baris `head:`-nya cocok dengan `git rev-parse HEAD`.
 - Peringatan Simbol: tiap `{taskdir}/.explore/simbol-NN.md` (bila ada; daftar dengan Glob, baca dengan
   Read) memuat simbol eksisting yang disunting brief `NN` di luar kolom `Anchor`-nya. Nilai tiap baris:
   suntingan pendukung yang sah untuk tujuan brief (catat di `REVIEW.md`, bukan temuan) atau
@@ -45,6 +46,7 @@ Review seluruh branch pekerjaan untuk satu direktori tugas.
 | `{base_branch}` | Field `base_branch` di `.claude/profile/backenddev/index.json` | **[REQUIRED]** Titik cabang dasar — misal `main` atau `dev`. Batalkan dispatch bila profil tidak terbaca; menebak `main` pada repo ber-`base_branch` lain menghasilkan rentang diff yang salah dan review yang menilai pekerjaan orang lain |
 | `{findings_contract}` | `${CLAUDE_PLUGIN_ROOT}/skills/audit/references/findings-contract.md`, dihidrasi architect di badan SKILL.md | **[REQUIRED]** Path absolut hasil substitusi, bukan literal. Batalkan dispatch bila berkasnya tidak ada |
 | `{adapter_path}` | Path adapter yang sama dengan slot `adapter_path` implementor (`architect/SKILL.md` Fase 3 butir 1) | **[REQUIRED]** Path absolut hasil substitusi `${CLAUDE_PLUGIN_ROOT}` di badan SKILL.md, bukan literal. Batalkan dispatch bila berkasnya tidak ada |
+| `{diff_file}` | Keluaran `review_diff.py` (`architect/SKILL.md` Fase 4 butir 2) | **[OPTIONAL]** Path relatif repo `{taskdir}/.explore/review/diff.patch`. Diisi hanya bila skrip `PASS`; `FAIL` → slot dikosongkan dan barisnya dihapus skrip, reviewer menelusuri diff lewat git seperti sebelumnya (B13) |
 
 ### Aturan untuk Pendispatch
 

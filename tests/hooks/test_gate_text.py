@@ -69,6 +69,16 @@ def test_lewati_opt_out_sesi(plugin):
     assert "sisa sesi" in text
 
 
+@pytest.mark.regression("B8")
+def test_wajib_berkas_infra_backend():
+    """Berkas infra/CI/SQL juga kerja yang digerbangi; model tidak langsung menulisnya (review hkm 663aa146)."""
+    text = " ".join(_load("backenddev", "gate_text").render(_verdict("backenddev", "OK")).split())
+    wajib = text.split("WAJIB lewat gerbang:", 1)[1].split("LEWATI hanya enam", 1)[0]
+    for tok in ("`Dockerfile*`", "`docker-compose*`", "`.github/workflows/`", "SQL/migrasi", "`backend:ticket`"):
+        assert tok in wajib, tok
+    assert "jangan langsung menulisnya" in wajib and "teks mode diskusi yang ditempel" in wajib
+
+
 @pytest.mark.parametrize("plugin", list(GATES))
 @pytest.mark.parametrize("state", STATES)
 def test_render_all_states_valid(plugin, state):

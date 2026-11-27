@@ -11,6 +11,9 @@ WAJIB lewat gerbang:
 - pertanyaan memahami kode — lewat jalur cepat read-only; tidak menuntut tree bersih atau branch
 - susulan di tengah sesi, sekecil apa pun — "sekalian ganti X", "oh iya Y juga"
 - menjalankan artefak backend yang sudah ada (brief, `TASK.md`, `RCA.md`) — apa pun statusnya
+- berkas infra dan operasional — `Dockerfile*`, `docker-compose*`, workflow CI (`.github/workflows/`,
+  `.gitlab-ci.yml`), skrip deploy, SQL/migrasi — juga kerja, termasuk sesudah diskusi atau teks mode diskusi
+  yang ditempel; jangan langsung menulisnya: lewat gerbang ini, tawarkan `backend:ticket`, atau tanya dulu
 
 LEWATI hanya enam:
 - permintaan membuat tiket teknis untuk dikerjakan nanti — "buatkan tiket …", "tiketkan …", `/backend:ticket`, atau

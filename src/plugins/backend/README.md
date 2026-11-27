@@ -271,6 +271,7 @@ Tiap skill punya `skills/<skill>/scripts/check_preconditions.py` yang dijalankan
 | `analyst/scripts/chain_counters.py` | plafon eskalasi, re-entry, amandemen akar, dan ronde reviewer; menolak tabel yang diturunkan tangan (log `.explore/counters-log.json`) |
 | `architect/scripts/symbol_map.py` | peta simbol pada sha tertentu, dicocokkan dengan `Anchor` dan deklarasi baru di `## Steps` brief (`--brief`); mode anchor ringkas tanpa `lines` |
 | `architect/scripts/close_brief.py` | satu vonis penutup per brief: sisa berkas, scope, simbol, cabut lease |
+| `architect/scripts/review_diff.py` | diff utuh `<merge-base>..HEAD` (tanpa `backenddev/`, `.claude/`) ke `.explore/review/diff.patch` untuk `code-reviewer`, supaya ia tidak membaca diff per berkas lewat `git show` (B13) |
 | `_common/render_prompt.py` | render template dispatcher ke `.explore/prompt/`; prompt subagent satu baris: ringkasan maksud (paragraf pertama prompt jadi) + kalimat rujukan berkas |
 
 ## Pemulihan
