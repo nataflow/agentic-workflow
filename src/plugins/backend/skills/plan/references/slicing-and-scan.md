@@ -58,7 +58,7 @@ Dijalankan **sekali per batch** — bukan per unit kerja — sesudah daftar unit
 
 Penyaluran vonis: dimensi `terdampak` yang menuntut perubahan berkas masuk `## File scope` brief penampungnya; yang hanya perlu diawasi masuk `## Risk & rollback`. Seluruh vonis `tidak relevan` beserta simbol sapuannya dicatat satu baris per dimensi di `## Analysis trace` brief pertama batch.
 
-**Pintu eskalasi**: dimensi 3 atau 4 bervonis `terdampak` berarti kontrak keluar berubah — berhenti dan terapkan 5 pemicu eskalasi `entry-rules.md` bagian 1A, jangan diselesaikan di brief MINOR.
+**Pintu eskalasi**: dimensi 3 atau 4 bervonis `terdampak` berarti kontrak keluar berubah — berhenti dan terapkan 5 pemicu eskalasi `entry-rules.md` bagian 1A, jangan diselesaikan di brief MINOR. Payload aditif yang tertulis di kartu tiket cepat `ticket_source` berdampak `aditif` dikecualikan (bagian 1A, "Kontrak dari tiket cepat").
 
 ## 3. Strategi Pemecahan Unit (Slicing) & Linear DAG (Fase 3)
 

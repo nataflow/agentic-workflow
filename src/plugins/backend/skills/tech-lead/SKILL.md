@@ -125,7 +125,7 @@ Re-entry Fase 5 memakai `### TECH-LEAD RE-ENTRY DECISION` berslot **Pengirim Bal
 4. **Balikan explorer gagal** (`confidence: low`, payload rusak): pertajam `{objective}`, ulangi sekali, lalu sapuan manual dicatat di slot `Bukti`. Dilarang mengarang temuan.
 5. **Commit hulu gagal**: commit berkasnya di gerbang dengan format pesan penulisnya, catat penyimpangan di laporan re-entry.
 6. **Ambiguitas ekstrem** (3 pertanyaan tak dijawab): blast radius terkecil, naikkan `risk` satu tingkat, serahkan ke lane `PLANNING`.
-7. **Rantai planning tertahan** (`analyst` bervonis `NOT_READY_FOR_IMPLEMENTATION`): selesaikan akar yang dilaporkan, lalu berangkatkan ulang lane `PLANNING` pada taskdir yang sama dengan `reentry_reason` terisi. Dilarang membuat taskdir baru atau menambal artefak rancangan sendiri. **Plafon tertembus** (`analyst` Failure path 4, 5, 7–9) → `AskUserQuestion`: **rumuskan ulang di taskdir baru** atau **hentikan** (`gate-lifecycle.md` bagian 1).
+7. **Rantai planning tertahan** (`analyst` bervonis `NOT_READY_FOR_IMPLEMENTATION`): selesaikan akar yang dilaporkan, lalu berangkatkan ulang lane `PLANNING` pada taskdir yang sama dengan `reentry_reason` terisi. Dilarang membuat taskdir baru atau menambal artefak rancangan sendiri. **Plafon tertembus** (`analyst` Failure path 4, 5, 7–9) → `AskUserQuestion`: **rumuskan ulang di taskdir baru** atau **hentikan** (`gate-lifecycle.md` bagian 1). Butir 10 (batch dipecah) → tawarkan `backend:ticket` per pecahan.
 
 ## STYLE
 

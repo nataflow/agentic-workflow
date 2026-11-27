@@ -34,6 +34,8 @@ Kena salah satu → BERHENTI SEGERA, batalkan rute MINOR beserta penulisan brief
 4. **Permission atau boundary scope berubah**: role baru, perubahan hak akses method/endpoint, atau perubahan aturan scoping (`store_id`/`tenant_id`) di `## Invariants`.
 5. **Side-effect lintas modul belum dipetakan**: perubahan memicu event queue, scheduled job, atau consumer di modul lain tanpa bukti `file:line` konsumen terdampak.
 
+**Kontrak dari tiket cepat (B4).** `ticket_source` berupa tiket `backend:ticket` (`backenddev/tickets/…/TICKET.md`) yang baris pertama `## Dampak Kontrak`-nya `aditif` → pemicu 1 **tidak aktif** untuk endpoint, DTO, dan field yang tertulis konkret di `## Perubahan` kartu: bentuknya sudah disepakati user, dan `backend:analyst` menahan PRD karenanya (`../../analyst/references/chain-rules.md` bagian 1.2). Brief menulis delta itu persis kartu — method, path, nama field, tipe, sifat wajib/opsional — dan mengutip baris `## Perubahan` pemikulnya di `## Analysis trace`. Delta yang tidak tertulis di kartu, field yang ternyata wajib atau berubah tipe, serta pemicu 2–5 tetap berlaku biasa. Dimensi 4 bagian 2B (`slicing-and-scan.md`) untuk payload aditif yang tertulis di kartu divonis `terdampak` tanpa membuka pintu eskalasi; nilai enum baru tetap membukanya.
+
 Kelimanya **tidak berlaku** di jalur `PRD` — PRD `APPROVED` sudah menguncinya. Investigasi akar masalah yang belum menemukan `file:line` konkret di jalur mana pun → BERHENTI, dispatch `code-explorer` via template `../dispatcher/explorer.md`.
 
 **Jalan keluar eskalasi**: kembalikan pemicunya ke `backend:analyst` sebagai pemicu eskalasi chain nomor 1 — `analyst` menaikkan `chain` ke `PRD_BRIEF` beserta `risk` ke `MAJOR`, memverifikasi pasangan `(risk, chain)` hasilnya terhadap `analyst/references/chain-rules.md` bagian 1.4, lalu memberangkatkan hop PRD. Rutenya sama persis untuk batch ber-`finding_source`: temuan yang ternyata menuntut kontrak baru naik lewat kanal itu, bukan dikembalikan ke gerbang untuk diklasifikasi ulang dari nol. Dilarang memanggil `system-analysis` sendiri: skill itu menolak `risk_level` bernilai `MINOR` di Fase 0-nya, sehingga eskalasi tanpa reklasifikasi berhenti buntu.
@@ -80,3 +82,24 @@ Temuan yang gugur di salah satu dari keduanya melepaskan `SC-{n}` pemikulnya, da
 | `## Open questions` | `## Objective` atau `## Risk & rollback` brief pengklaim | Pertanyaannya tidak dipanen, tetapi **asumsi aktifnya dipanen**. Entri yang menyentuh `## Task breakdown` atau `## Business rules` BRD adalah kondisi berhenti jalur ini. Tiap `sementara dipakai:` yang membentuk langkah brief turun jadi kalimat di `## Objective` brief itu — atau `## Risk & rollback` bila ia hanya perlu diawasi — bukan ke `## Analysis trace`: seksi itu dinyatakan "BUKAN pekerjaan eksekutor" oleh `../templates/brief-template.md`, sehingga asumsi yang mendarat di sana tak terlihat di titik eksekusi. Entri `BR-DISANGGAH:` tidak dipanen sama sekali; ia sudah diputuskan user di gerbang dokumen |
 
 **Batas kewenangan**: dilarang menambah endpoint, field, transisi status, atau aturan validasi yang tidak ada di PRD. Kebutuhan yang muncul saat Fase 2 tetapi tidak tertutup PRD dikembalikan ke **pemanggilnya** — `backend:analyst` pada lane planning, `backend:tech-lead` pada jalur `RCA` — bukan diputuskan sendiri di brief dan bukan pula dikirim langsung ke `system-analysis`. Langkah brief yang menyentuh `## Out of Scope` `TASK.md` mengikuti rute yang sama: ia permintaan amandemen akar (`../../analyst/references/chain-rules.md` bagian 5), bukan keputusan `plan`.
+
+### 1E. Plafon Batch — 8 brief (B9)
+
+Batch besar adalah ongkos termahal `plan`: sapuan per unit, brief yang panjang, dan ronde `brief-reviewer` yang bertambah semuanya tumbuh bersama jumlah brief. Batasnya **8 brief baru per batch** pada lane planning (`entry_mode` `PRD` atau `LANGSUNG`); jalur `RCA` tidak dikenai plafon ini.
+
+**Perkiraan di Fase 1, sebelum satu sapuan pun.** Hitung dari masukan yang sudah ada, tanpa membaca kode:
+
+| `entry_mode` | Dasar perkiraan |
+|---|---|
+| `PRD` | jumlah baris `## Task breakdown` PRD — tiap baris minimal satu brief |
+| `LANGSUNG` | nilai terbesar antara jumlah `SC-{n}` yang menuntut perubahan kode dan jumlah berkas kode di `evidence`/`file_scope` dibagi 4 (langit-langit `slicing-and-scan.md` bagian 3A), dibulatkan ke atas |
+
+Akar ber-`finding_source` dihitung satu brief per temuan bila itu lebih besar. Perkiraan di atas 8 dan `batch_besar` bukan `diterima` → berhenti dengan vonis `BATCH_BESAR` (`../SKILL.md` `## Failure path` butir 10) beserta **usulan pecahan**, satu baris per pecahan:
+
+```markdown
+- Pecahan <k>: <judul> — <SC-{n}/AC-{n} yang dipikul> — ±<n> brief — dampak kontrak <aditif | mengubah | menghapus | tidak ada> — bergantung pada <pecahan j | —>
+```
+
+Tiap pecahan memikul paling banyak 8 brief, berdiri di titik hijau mandiri, dan cukup kecil untuk dicatat sebagai satu tiket `backend:ticket`. `backend:analyst` yang menanyakannya ke user (`analyst/SKILL.md` Fase 3 butir 1a); `plan` tidak bertanya sendiri.
+
+**Penahan mekanis.** `scaffold_brief.py --write-matrix` menolak matriks berisi lebih dari 8 baris baru di taskdir yang `TASK.md`-nya memuat `chain:` (lane planning), kecuali diberi `--batch-besar`. Baris brief `DONE`/`BLOCKED`/`SUPERSEDED` yang dipertahankan `--append` tidak dihitung. Penolakan itu berarti perkiraan Fase 1 meleset: berhenti dengan vonis yang sama, jumlahnya dari matriks — dilarang menggabung atau memangkas unit demi muat di bawah plafon.

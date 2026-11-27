@@ -64,6 +64,10 @@ from commit_lib import COMMIT_TYPES, commit_template, default_commit_type, rende
 
 RISK_ORDER = {"MINOR": 1, "MAJOR": 2, "BREAKING": 3}
 
+# Plafon brief baru per batch pada lane planning (B9, `entry-rules.md` bagian 1E). Batch di atasnya
+# hanya sah sesudah user menerimanya lewat `backend:analyst` (`batch_besar: diterima` → `--batch-besar`).
+BATCH_MAX = 8
+
 # Laci kerja taskdir. Direktori ini sudah dikecualikan tiap gerbang git di
 # rantai — tidak di-stage, tidak di-commit, tidak dihitung working tree kotor —
 # sehingga matriks yang mendarat di sini tidak pernah menghentikan `architect`
@@ -146,6 +150,10 @@ class MatrixTool:
         self.task_text = _read(self.taskdir / "TASK.md")
         self.prd_text = _read(self.taskdir / "PRD.md")
         self.commit_template = commit_template(load_profile_index(self.root, required=()).data)
+
+    def planning_lane(self) -> bool:
+        """Taskdir lane planning: `TASK.md` memateraikan `chain:` (jalur `RCA` tidak memikulnya)."""
+        return bool(self.task_text) and bool(frontmatter_field(self.taskdir / "TASK.md", "chain"))
 
     def default_commit_type(self, finding_source: Optional[str]) -> str:
         lane = frontmatter_field(self.taskdir / "TASK.md", "lane") if self.task_text else None
@@ -739,6 +747,9 @@ def main():
                         help="Tambahkan baris ke matriks eksisting; alokasi brief yang sudah "
                              "dieksekusi dipertahankan apa adanya")
     parser.add_argument("--force", action="store_true", help="Timpa kerangka yang sudah ada")
+    parser.add_argument("--batch-besar", action="store_true",
+                        help=f"Terima lebih dari {BATCH_MAX} brief baru pada lane planning; hanya sesudah "
+                             "user menerimanya (`batch_besar: diterima`)")
     parser.add_argument("--root", help="Root repositori target")
     args = parser.parse_args()
 
@@ -778,6 +789,15 @@ def main():
         kept_nn: List[str] = []
         merge_problems: List[str] = []
         n_new = len(spec.get("briefs") or [])
+
+        if n_new > BATCH_MAX and not args.batch_besar and tool.planning_lane():
+            # B9: batch besar memakan sapuan, brief, dan ronde reviewer sebanding jumlahnya. Perkiraan
+            # Fase 1 yang meleset berhenti di sini, sebelum satu kerangka pun ditulis.
+            print(f"BRIEF MATRIX: [FAIL] BATCH_BESAR: {n_new} brief baru melampaui plafon {BATCH_MAX} per batch")
+            print("\nBerhenti dengan vonis `BATCH_BESAR` beserta usulan pecahan (entry-rules.md bagian 1E) "
+                  "dan kembali ke `backend:analyst`; jangan menggabung atau memangkas unit demi muat. "
+                  "`--batch-besar` hanya sah sesudah user menerima batch ini (`batch_besar: diterima`).")
+            sys.exit(1)
 
         if args.append:
             spec, kept_nn, merge_problems = tool.merge_spec(spec)
